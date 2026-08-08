@@ -1,0 +1,17 @@
+name: ShadowHunterRolesPlugin
+version: '${version}'
+
+main: com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin
+paper-plugin-loader: com.shadowHunterRolesPlugin.ShadowHunterRolesPluginLoader
+api-version: '1.21.11'
+load: POSTWORLD
+
+commands:
+  role:
+    description: "The command of ShadowHunter role system."
+    usage: "/role <list|choose|info>"
+    aliases: [r]
+  skill:
+    description: "Test skill casting."
+    usage: "/skill <skillId>"
+    aliases: [s]

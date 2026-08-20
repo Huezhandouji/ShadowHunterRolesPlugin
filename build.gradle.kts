@@ -1,6 +1,8 @@
 plugins {
     id("java-library")
     id("xyz.jpenilla.run-paper") version "3.0.2"
+    id("maven-publish")
+    kotlin("jvm")
 }
 
 
@@ -8,12 +10,25 @@ group = "com.shadowHunterRolesPlugin"
 version = "1.0.0"
 
 repositories {
+    mavenLocal()
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
 }
 
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
+    repositories {
+        mavenLocal()
+    }
+}
+
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    testImplementation(kotlin("test"))
 }
 
 java {
@@ -35,4 +50,7 @@ tasks {
             expand(props)
         }
     }
+}
+kotlin {
+    jvmToolchain(21)
 }

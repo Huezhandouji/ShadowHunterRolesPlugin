@@ -11,7 +11,3 @@ commands:
     description: "The command of ShadowHunter role system."
     usage: "/role <list|choose|info>"
     aliases: [r]
-  skill:
-    description: "Test skill casting."
-    usage: "/skill <skillId>"
-    aliases: [s]

@@ -40,20 +40,48 @@ public class RoleManager {
 
         return true;
     }
+    public boolean selectRole(UUID uuid, String roleId){
+        if(!RoleRegistry.hasRole(roleId)) return false;
+
+        Player player = Bukkit.getPlayer(uuid);
+        if(player == null) return false;
+
+        Role role = RoleRegistry.getRole(roleId);
+        if(role == null) return false;
+
+        if(hasRole(uuid)) clearRole(uuid);
+
+
+        RoleInstance instance = role.createInstance(player);
+
+        playerRoleMap.put(player.getUniqueId(), instance);
+
+        return true;
+    }
 
     //获取玩家的角色实例
     public RoleInstance getRoleInstance(Player player){
         return playerRoleMap.getOrDefault(player.getUniqueId(), null);
+    }
+    public RoleInstance getRoleInstance(UUID uuid){
+        return playerRoleMap.getOrDefault(uuid, null);
     }
 
     public Role getCurrentRole(Player player){
         RoleInstance instance = getRoleInstance(player);
         return instance != null ? instance.getRole() : null;
     }
+    public Role getCurrentRole(UUID uuid){
+        RoleInstance instance = getRoleInstance(uuid);
+        return instance != null ? instance.getRole() : null;
+    }
 
     //检查玩家是否已经选择了角色
     public boolean hasRole(Player player){
         return playerRoleMap.containsKey(player.getUniqueId());
+    }
+    public boolean hasRole(UUID uuid){
+        return playerRoleMap.containsKey(uuid);
     }
 
 
@@ -80,6 +108,14 @@ public class RoleManager {
     //清除玩家的角色
     public boolean clearRole(Player player){
         RoleInstance removed = playerRoleMap.remove(player.getUniqueId());
+        if(removed != null){
+            removed.clear();
+            return true;
+        }
+        return false;
+    }
+    public boolean clearRole(UUID uuid){
+        RoleInstance removed = playerRoleMap.remove(uuid);
         if(removed != null){
             removed.clear();
             return true;

@@ -568,6 +568,14 @@ public class RoleInstance {
         return ins1.isHostileTo(ins2);
 
     }
+    public static boolean areHostile(UUID p1, UUID p2){
+        if(p1 == null || p2 == null) return false;
+        RoleInstance ins1 = RoleManager.getInstance().getRoleInstance(p1);
+        RoleInstance ins2 = RoleManager.getInstance().getRoleInstance(p2);
+
+        if(ins1 == null || ins2 == null) return true;
+        return ins1.isHostileTo(ins2);
+    }
 
     //生命周期触发
     public void triggerLifecycleOnSet(){

@@ -6,7 +6,10 @@ import com.shadowHunterRolesPlugin.command.RoleCommand;
 import com.shadowHunterRolesPlugin.listener.*;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import javax.inject.Inject;
 
 public final class ShadowHunterRolesPlugin extends JavaPlugin {
 
@@ -14,6 +17,7 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
     private RoleManager roleManager;
 
     private RoleAPI roleAPI;
+
 
     @Override
     public void onEnable() {
@@ -30,6 +34,8 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new RoleEventListener(), this);
 
         roleAPI = new RoleAPIImpl(roleManager);
+
+        Bukkit.getServicesManager().register(RoleAPI.class, roleAPI, this, ServicePriority.Normal);
 
         getLogger().info("ShadowHunter Character System enabled.");
 

@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.attribute.Attribute;
@@ -17,6 +18,12 @@ public class RoleAPIImpl implements RoleAPI {
 
     public RoleAPIImpl(RoleManager roleManager){
         this.roleManager = roleManager;
+    }
+
+
+    @Override
+    public boolean isValidRoleId(String id) {
+        return RoleRegistry.isValidRoleId(id);
     }
 
     //设置和取消角色

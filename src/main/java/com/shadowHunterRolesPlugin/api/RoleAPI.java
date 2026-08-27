@@ -10,6 +10,9 @@ import java.util.UUID;
 
 public interface RoleAPI {
 
+    //查询id是否合法
+    boolean isValidRoleId(String id);
+
     //设置角色
     boolean setPlayerRole(Player player, String roleId);
     boolean setPlayerRole(UUID uuid, String roleId);

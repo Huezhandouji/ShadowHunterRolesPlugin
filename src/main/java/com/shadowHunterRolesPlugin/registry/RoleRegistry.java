@@ -39,6 +39,11 @@ public class RoleRegistry {
         registerMeiqihezi();
     }
 
+    //检查一个id是否存在
+    public static boolean isValidRoleId(String id) {
+        return ROLES.containsKey(id);
+    }
+
     private static void registerMeiqihezi(){
 
         Role.Builder builder = new Role.Builder("meiqihezi")

@@ -36,7 +36,7 @@ public class RoleRegistry {
 
     //静态初始化块,注册所有角色
     static {
-        registerMeiqihezi();
+        registerHunterMeiqihezi();
     }
 
     //检查一个id是否存在
@@ -44,11 +44,11 @@ public class RoleRegistry {
         return ROLES.containsKey(id);
     }
 
-    private static void registerMeiqihezi(){
+    private static void registerHunterMeiqihezi(){
 
         Role.Builder builder = new Role.Builder("meiqihezi")
                 .displayName(Component.text("MeiqiHezi"))
-                .description(Component.text("A ShadowHunter Role."))
+                .description(Component.text("A hunter role."))
                 .maxHP(40)
                 .baseATK(10)
                 .maxEnergy(100)
@@ -65,6 +65,22 @@ public class RoleRegistry {
 
         BUILDERS.put("meiqihezi", builder);
         ROLES.put("meiqihezi", builder.build());
+    }
+
+    private static void registerShadowRed(){
+
+        Role.Builder builder = new Role.Builder("red")
+                .displayName(Component.text("Red"))
+                .description(Component.text("A shadow role."))
+                .maxHP(40)
+                .baseATK(10)
+                .maxEnergy(0)
+                .maxSanTE(100)
+                .faction(Faction.SHADOW);
+
+        BUILDERS.put("red", builder);
+        ROLES.put("red", builder.build());
+
     }
 
 }

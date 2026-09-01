@@ -7,6 +7,7 @@ import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 
@@ -83,6 +84,40 @@ public class RoleAPIImpl implements RoleAPI {
     @Override
     public boolean hasRole(UUID uuid) {
         return roleManager.hasRole(uuid);
+    }
+
+    //角色描述查询
+    @Override
+    public Component getRoleDisplayName(String roleID){
+        Role role = RoleRegistry.getRole(roleID);
+        if(role == null){
+            return Component.text("");
+        }
+        else{
+            return role.getDisplayName();
+        }
+    }
+
+    @Override
+    public Component getRoleDescription(String roleID){
+        Role role = RoleRegistry.getRole(roleID);
+        if(role == null){
+            return Component.text("");
+        }
+        else{
+            return role.getDescription();
+        }
+    }
+
+    @Override
+    public Material getRoleIcon(String roleID){
+        Role role = RoleRegistry.getRole(roleID);
+        if(role == null){
+            return Material.AIR;
+        }
+        else {
+            return role.getIcon();
+        }
     }
 
     //能量系统

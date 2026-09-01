@@ -9,6 +9,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
 import org.apache.maven.model.Build;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
@@ -42,6 +43,8 @@ public class Role {
 
     private final Faction faction;
 
+    private final Material icon;
+
     //私有构造方法，需要通过内部构建器创建实例
     private Role(Builder builder){
 
@@ -58,6 +61,8 @@ public class Role {
         this.passiveSuppliers = Collections.unmodifiableMap(builder.passiveSuppliers);
         this.mainWeaponSuppliers = Collections.unmodifiableMap(builder.mainWeaponSuppliers);
         this.slotMap = Collections.unmodifiableMap(builder.slotMap);
+
+        this.icon = builder.icon;
 
     }
 
@@ -80,6 +85,10 @@ public class Role {
         return supplier != null ? supplier.get() : null;
     }
 
+    public Material getIcon(){
+        return icon;
+    }
+
     public static class Builder{
 
         private final String id;
@@ -95,6 +104,8 @@ public class Role {
         private final Map<String, Supplier<PassiveSkill>> passiveSuppliers = new LinkedHashMap<>();
         private final Map<String, Supplier<MainWeapon>> mainWeaponSuppliers = new LinkedHashMap<>();
         private final Map<Integer, String> slotMap = new HashMap<>();
+
+        private Material icon;
 
         public Builder(String id){
             if(id == null || id.trim().isEmpty()){
@@ -201,6 +212,12 @@ public class Role {
             mainWeaponSuppliers.put(mainWeaponId, supplier);
             slotMap.put(slot, mainWeaponId);
 
+            return this;
+        }
+
+        //设置这个角色的图标, 便于游戏逻辑插件自动化读取
+        public Builder icon(Material icon){
+            this.icon = icon;
             return this;
         }
 

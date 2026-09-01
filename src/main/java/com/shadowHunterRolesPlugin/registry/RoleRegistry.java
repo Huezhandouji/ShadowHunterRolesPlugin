@@ -37,6 +37,7 @@ public class RoleRegistry {
     //静态初始化块,注册所有角色
     static {
         registerHunterMeiqihezi();
+        registerShadowRed();
     }
 
     //检查一个id是否存在

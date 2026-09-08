@@ -1,12 +1,15 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Vector;
+
+import java.util.UUID;
 
 
 public class DamageUtil {
@@ -16,10 +19,19 @@ public class DamageUtil {
             "last_damager"
     );
 
+    public static UUID getLastDamagerUUID(LivingEntity player) {
+        String uuidString = player.getPersistentDataContainer().get(LAST_DAMAGER_KEY, PersistentDataType.STRING);
+        if (uuidString == null) return null;
+        return UUID.fromString(uuidString);
+    }
+
     //真伤
     public static void dealtTrueDamage(LivingEntity victim, LivingEntity damager, double amount){
         if(victim == null || victim.isDead()) return;
-        if(damager != null && victim instanceof Player){
+        if(damager != null && victim instanceof Player player){
+            GameMode gm = player.getGameMode();
+            if(gm == GameMode.CREATIVE || gm == GameMode.SPECTATOR) return;
+
             DamageUtil.dealtPhysicalDamage(victim, damager, 0);
         }
         victim.setHealth(Math.max(0, victim.getHealth() - amount));

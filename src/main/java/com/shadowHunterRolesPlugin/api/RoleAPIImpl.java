@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.api;
 
+import com.shadowHunterRolesPlugin.core.DamageUtil;
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
@@ -9,6 +10,7 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 import java.util.UUID;
@@ -19,6 +21,11 @@ public class RoleAPIImpl implements RoleAPI {
 
     public RoleAPIImpl(RoleManager roleManager){
         this.roleManager = roleManager;
+    }
+
+    @Override
+    public UUID getLastDamagerUuid(LivingEntity player) {
+        return DamageUtil.getLastDamagerUUID(player);
     }
 
 

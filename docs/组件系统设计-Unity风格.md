@@ -52,6 +52,13 @@ public abstract class RoleComponent {
 
     /** 构造期注入；组件与它一对一，随组件存活。 */
     protected final ComponentServices svc;
+> **过渡期注入方式（2026-09-16 队长裁定，阶段 4）**：本节规定的「**构造期注入**」是**终态形态**。**过渡期**（组件仍由无参 `Supplier` 创建、`ComponentFactory` 尚未落地）允许以 **`bind(ComponentServices)` 等价实现**，但**必须同时满足五条**：
+> ① `bind` 由**容器**在 `supplier.get()` 之后**立刻**调用，且**在任何注册/钩子（含 `awake`）之前**；
+> ② `bind` **只允许调用一次**：重复调用或 `awake` 之后调用 = **抛异常**；
+> ③ 对外只暴露受保护访问器（如 `protected ComponentServices svc()`），**未绑定时抛 `IllegalStateException`**（**不允许静默 null**）；
+> ④ **组件构造点唯一**（容器内单一创建路径），使 `bind` 不可能被遗漏；
+> ⑤ **终态收尾**必须切回构造期注入（`ComponentFactory`），**删除 `bind`** —— 那一步本来就要动这 10 个组件的构造行。
+> 过渡期偏差须在小结里申报，并由 t16 按「可观察行为等价」复核。
 
     protected RoleComponent(ComponentServices svc) {
         this.svc = Objects.requireNonNull(svc, "ComponentServices");

@@ -69,17 +69,24 @@ public class Role {
     }
 
     public Skill createSkill(String skillId){
-        Supplier<Skill> supplier = skillSuppliers.get(skillId);
-        return supplier != null ? supplier.get() : null;
+        return createComponent(skillSuppliers.get(skillId));
     }
 
     public PassiveSkill createPassive(String passiveId){
-        Supplier<PassiveSkill> supplier = passiveSuppliers.get(passiveId);
-        return supplier != null ? supplier.get() : null;
+        return createComponent(passiveSuppliers.get(passiveId));
     }
 
     public MainWeapon createMainWeapon(String weaponId){
-        Supplier<MainWeapon> supplier = mainWeaponSuppliers.get(weaponId);
+        return createComponent(mainWeaponSuppliers.get(weaponId));
+    }
+
+    /**
+     * **唯一组件创建点**（阶段 4 的 4.1）：全仓只有这里调用 {@code supplier.get()}，
+     * 回归检查 {@code grep -c "supplier.get()" = 1}。
+     * 迁移后的组件将在此处**紧邻** {@code bind(ComponentServices)}（五条件①④，见
+     * {@code docs/阶段4-交付小结.md} §5.7），使 bind 不可能被遗漏。
+     */
+    private <T> T createComponent(Supplier<T> supplier){
         return supplier != null ? supplier.get() : null;
     }
 

@@ -299,6 +299,7 @@ public class RoleInstance {
 
     //技能释放
     public boolean castSkillLeftClick(String skillId, Player caster){
+        if(runComponentPipeline(CastTrigger.LEFT_CLICK, skillId, caster)) return true;
         Skill skill = skillMap.get(skillId);
         if(skill == null){
             caster.sendMessage(Component.text("unknown skill!"));
@@ -313,6 +314,7 @@ public class RoleInstance {
     }
 
     public boolean castSkillRightClick(String skillId, Player caster){
+        if(runComponentPipeline(CastTrigger.RIGHT_CLICK, skillId, caster)) return true;
         Skill skill = skillMap.get(skillId);
         if(skill == null){
             caster.sendMessage(Component.text("unknown skill!"));
@@ -327,6 +329,7 @@ public class RoleInstance {
     }
 
     public boolean castSkillQDrop(String skillId, Player caster){
+        if(runComponentPipeline(CastTrigger.DROP, skillId, caster)) return true;
         Skill skill = skillMap.get(skillId);
         if(skill == null){
             caster.sendMessage(Component.text("unknown skill!"));
@@ -337,6 +340,27 @@ public class RoleInstance {
         //在1t后更新技能物品
         platform.scheduler().runLater(this::updateHotbar, 1L);
 
+        return true;
+    }
+
+    /**
+     * 混合派发短路（B0a：硬约束第 12/13 条）：只有"该 id 的组件是**已迁移的** {@link ActiveComponent}"
+     * **且**收尾开关 `USE_COMPONENT_PIPELINE` 为真时，才走新管道并返回 true；否则返回 false，调用方继续旧路径。
+     * <p>
+     * <b>不可达性（B0a 必证）</b>：① 开关恒为 false；② 此刻**不存在任何 {@link ActiveComponent} 实例**
+     * （`Skill`/`MainWeapon`/`PassiveSkill` 尚未改基）⇒ 本方法在任何输入下都在第一行或第三行返回 false。
+     */
+    private boolean runComponentPipeline(CastTrigger trigger, String componentId, Player caster){
+        if(!USE_COMPONENT_PIPELINE) return false;
+        RoleComponent component = componentRegistry.getById(componentId);
+        if(!(component instanceof ActiveComponent active) || !active.isMigrated()) return false;
+
+        CastResult result = active.onCast(new CastSignal(trigger));
+        if(result == CastResult.CAST){
+            //声明值是唯一真值来源：框架按 getCooldownTicks() 启动冷却
+            componentServices.get(component).cooldowns().start(active.getCooldownTicks());
+        }
+        hotbarRenderer.markDirty();
         return true;
     }
 
@@ -370,6 +394,7 @@ public class RoleInstance {
 
     //释放主武器技能
     public boolean castMainWeaponLeftClick(String weaponId, Player caster){
+        if(runComponentPipeline(CastTrigger.LEFT_CLICK, weaponId, caster)) return true;
         MainWeapon mainWeapon = mainWeaponMap.get(weaponId);
         if(mainWeapon == null){
             caster.sendMessage(Component.text("unknown mainWeapon!"));
@@ -381,6 +406,7 @@ public class RoleInstance {
     }
 
     public boolean castMainWeaponRightClick(String weaponId, Player caster){
+        if(runComponentPipeline(CastTrigger.RIGHT_CLICK, weaponId, caster)) return true;
         MainWeapon mainWeapon = mainWeaponMap.get(weaponId);
         if(mainWeapon == null){
             caster.sendMessage(Component.text("unknown mainWeapon!"));
@@ -392,6 +418,7 @@ public class RoleInstance {
     }
 
     public boolean castMainWeaponQDrop(String weaponId, Player caster){
+        if(runComponentPipeline(CastTrigger.DROP, weaponId, caster)) return true;
         MainWeapon mainWeapon = mainWeaponMap.get(weaponId);
         if(mainWeapon == null){
             caster.sendMessage(Component.text("unknown mainWeapon!"));

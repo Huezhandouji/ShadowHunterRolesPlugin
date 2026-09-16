@@ -1,16 +1,18 @@
 package com.shadowHunterRolesPlugin;
 
 import com.shadowHunterRolesPlugin.api.RoleAPI;
-import com.shadowHunterRolesPlugin.api.RoleAPIImpl;
 import com.shadowHunterRolesPlugin.command.RoleCommand;
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
+import com.shadowHunterRolesPlugin.internal.api.RoleAPIImpl;
 import com.shadowHunterRolesPlugin.listener.*;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
 import com.shadowHunterRolesPlugin.platform.FactionLookup;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
+import com.shadowHunterRolesPlugin.registry.RoleLoader;
+import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.PluginCommand;
@@ -53,6 +55,15 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
 
         rolesContext = new RolesContext(this, getLogger(), new BukkitSchedulerAdapter(this), keys, factions);
 
+        //阶段 3.1/3.2：注册表降级为纯容器，角色装配由 RoleLoader 在 onEnable 显式执行（fail-fast、按角色隔离）
+        RoleRegistry roleRegistry = new RoleRegistry();
+        RoleLoader roleLoader = new RoleLoader(getLogger());
+        int loadedRoles = roleLoader.loadInto(roleRegistry);
+        RoleRegistry.install(roleRegistry);
+        if (loadedRoles == 0) {
+            getLogger().severe("No role templates were registered; /role and SHDF role selection will be unavailable.");
+        }
+
         roleManager = new RoleManager(rolesContext);
 
         PluginCommand roleCommand = getCommand("role");
@@ -69,7 +80,7 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new DamageTrackerListener(), this);
         Bukkit.getPluginManager().registerEvents(new RoleEventListener(), this);
 
-        roleAPI = new RoleAPIImpl(roleManager);
+        roleAPI = new RoleAPIImpl(roleManager, roleRegistry);
 
         Bukkit.getServicesManager().register(RoleAPI.class, roleAPI, this, ServicePriority.Normal);
 

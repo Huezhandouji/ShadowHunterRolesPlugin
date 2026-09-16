@@ -1,103 +1,105 @@
 package com.shadowHunterRolesPlugin.registry;
 
-import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
-import com.shadowHunterRolesPlugin.roleComponent.*;
-import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
-import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
-import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
-import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
-import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziUnconcernSkill;
-import com.shadowHunterRolesPlugin.roleComponent.red.*;
-import net.kyori.adventure.text.Component;
-import org.bukkit.Material;
 
-import java.util.HashMap;
-import java.util.List;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
+/**
+ * 角色模板的**纯容器**（阶段 3.1）：只负责保存与查询，不再自己做注册。
+ *
+ * <p>与阶段 2 之前的关键差别：
+ * <ul>
+ *   <li>**没有 static{} 初始化块** —— 注册改由 {@link RoleLoader} 在 {@code onEnable} 显式执行，
+ *       装配失败不再可能变成 {@code ExceptionInInitializerError}（那会把整个类初始化拖垮）。</li>
+ *   <li>**没有静态 Map** —— 容器状态是实例字段，由主类持有并注入。</li>
+ * </ul>
+ */
 public class RoleRegistry {
 
-    //角色模板缓存
-    private static final Map<String, Role> ROLES = new HashMap<>();
+    private final Map<String, Role> roles = new LinkedHashMap<>();
 
-    public static boolean hasRole(String roleId){
-        return ROLES.containsKey(roleId);
+    /** 注册一个角色模板；同一 id 重复注册会覆盖（去重发生在 Role.Builder 层，见 §10 裁决 1）。 */
+    public void register(Role role) {
+        if (role == null) {
+            throw new IllegalArgumentException("role cannot be null");
+        }
+        roles.put(role.getId(), role);
     }
 
-    public static Role getRole(String roleId){
-        return ROLES.getOrDefault(roleId, null);
+    public Role get(String roleId) {
+        return roleId == null ? null : roles.get(roleId);
     }
 
-    //静态初始化块,注册所有角色
-    static {
-        registerHunterMeiqihezi();
-        registerShadowRed();
+    public boolean contains(String roleId) {
+        return roleId != null && roles.containsKey(roleId);
     }
 
-    //检查一个id是否存在
+    public Set<String> ids() {
+        return Collections.unmodifiableSet(roles.keySet());
+    }
+
+    public Collection<Role> all() {
+        return Collections.unmodifiableCollection(roles.values());
+    }
+
+    public int size() {
+        return roles.size();
+    }
+
+    public boolean isEmpty() {
+        return roles.isEmpty();
+    }
+
+    // ==========================================================================================
+    // 临时兼容桥（**阶段 3 偏差，已申报**）
+    //
+    // 为什么还需要它：`command/RoleCommand.java` 与 `manager/RoleManager.java` 仍以
+    // `RoleRegistry.hasRole(...) / getRole(...) / isValidRoleId(...)` 的静态形式调用，而这两个文件
+    // **不在 t13 的 inScope 内**（本卡 inScope = registry/ + api/ + internal/api/ + 主类 + 小结），
+    // 因此本卡无法把它们改成注入式。
+    //
+    // 与旧实现的区别（也是本卡要满足的部分）：这里**没有静态 Map、没有 static{}**，桥只持有
+    // **一个实例引用**；未安装时立刻抛 IllegalStateException（fail-fast，而不是 NPE 或初始化崩溃）。
+    // **移除点**：阶段 4 把这些调用点迁到 ComponentServices/上下文注入之后，本桥必须删除。
+    // ==========================================================================================
+
+    private static RoleRegistry active;
+
+    public static void install(RoleRegistry registry) {
+        if (registry == null) {
+            throw new IllegalArgumentException("registry cannot be null");
+        }
+        active = registry;
+    }
+
+    public static RoleRegistry active() {
+        RoleRegistry current = active;
+        if (current == null) {
+            throw new IllegalStateException("RoleRegistry has not been installed yet (expected in onEnable, before any role query).");
+        }
+        return current;
+    }
+
+    /** @deprecated 兼容桥，改用 {@link #active()}.{@link #contains(String)}；阶段 4 删除。 */
+    @Deprecated
+    public static boolean hasRole(String roleId) {
+        return active().contains(roleId);
+    }
+
+    /** @deprecated 兼容桥，改用 {@link #active()}.{@link #get(String)}；阶段 4 删除。 */
+    @Deprecated
+    public static Role getRole(String roleId) {
+        return active().get(roleId);
+    }
+
+    /** @deprecated 兼容桥，改用 {@link #active()}.{@link #contains(String)}；阶段 4 删除。 */
+    @Deprecated
     public static boolean isValidRoleId(String id) {
-        return ROLES.containsKey(id);
-    }
-
-    private static void registerHunterMeiqihezi(){
-
-        Role.Builder builder = new Role.Builder("meiqihezi")
-                .displayName(Component.text("MeiqiHezi"))
-                //Component.text("战斗疯子\n普攻20能量以上左键造成范围伤害并消耗能量，20以下只能打一个人\n一技能加速\n二技能三段突进并造成伤害\n三技能圆弧斩，范围真伤")
-                .description(List.of(
-                        Component.text("战斗疯子"),
-                        Component.text("普攻20能量以上左键造成范围伤害并消耗能量，20以下只能打一个人"),
-                        Component.text("一技能加速"),
-                        Component.text("二技能三段突进并造成伤害"),
-                        Component.text("三技能圆弧斩，范围真伤")
-                ))
-                .maxHP(40)
-                .baseATK(10)
-                .maxEnergy(100)
-                .maxSanTE(100)
-                .addSkill(MeiqiheziUnconcernSkill::new, 1)
-                .addSkill(MeiqiheziBloodySlashSkill::new, 2)
-                .addSkill(MeiqiheziCircleSlashSkill::new, 3)
-                .addMainWeapon(MeiqiheziJuejueMainWeapon::new, 0)
-                .faction(Faction.HUNTER)
-                .addPassive(DefaultSanTEZeroPunishment::new)
-                .addPassive(AutoRecoverSanTEHealthPassive::new)
-                .addPassive(AutoRecoverEnergyPassive::new)
-                .addPassive(MeiqiheziEquipmentsPassive::new)
-                .icon(Material.DIAMOND_HOE);
-
-
-        ROLES.put("meiqihezi", builder.build());
-    }
-
-    private static void registerShadowRed(){
-
-        Role.Builder builder = new Role.Builder("red")
-                .displayName(Component.text("Red"))
-                //Component.text("待到血腥降临，一切化为土尘\n普攻造成15流血\n一技能捅人恢复生命\n二技能致盲敌人并结算5层流血恢复te\n三技能烧自己te开启狂暴")
-                .description(List.of(
-                        Component.text("待到血腥降临，一切化为土尘"),
-                        Component.text("普攻造成15流血"),
-                        Component.text("一技能捅人恢复生命")
-                ))
-                .maxHP(40)
-                .baseATK(10)
-                .maxEnergy(0)
-                .maxSanTE(100)
-                .faction(Faction.SHADOW)
-                .addPassive(RedBleedPassive::new)
-                .addMainWeapon(RedSanctifiedBladeMainWeapon::new, 0)
-                .addSkill(RedSolitaryArroganceSkill::new, 1)
-                .addSkill(RedEvilShockSkill::new, 2)
-                .addSkill(RedDeeplySorrowSkill::new, 3)
-                .addPassive(AutoRecoverSanTEHealthPassive::new)
-                .addPassive(RedEquipmentsPassive::new)
-                .addPassive(DefaultSanTEZeroPunishment::new)
-                .icon(Material.POPPY);
-
-        ROLES.put("red", builder.build());
-
+        return active().contains(id);
     }
 
 }

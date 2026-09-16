@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 
@@ -47,6 +48,11 @@ public interface RoleAPI {
     Component getRoleDisplayName(String roleId);
     List<Component> getRoleDescription(String roleId);
     Material getRoleIcon(String roleId);
+
+    //角色清单（阶段 3.3：**只增**，既有方法签名一律未动）
+    //下游用这两个方法自行发现"有哪些角色"，而不是 import 内部类去读注册表
+    Set<String> getAllRoleIds();
+    List<RoleInfo> getRoles();
 
     //能量系统
     @Deprecated

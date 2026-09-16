@@ -1,5 +1,7 @@
-package com.shadowHunterRolesPlugin.api;
+package com.shadowHunterRolesPlugin.internal.api;
 
+import com.shadowHunterRolesPlugin.api.RoleAPI;
+import com.shadowHunterRolesPlugin.api.RoleInfo;
 import com.shadowHunterRolesPlugin.core.DamageUtil;
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
@@ -13,15 +15,19 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class RoleAPIImpl implements RoleAPI {
 
     private final RoleManager roleManager;
+    private final RoleRegistry registry;
 
-    public RoleAPIImpl(RoleManager roleManager){
+    public RoleAPIImpl(RoleManager roleManager, RoleRegistry registry){
         this.roleManager = roleManager;
+        this.registry = registry;
     }
 
     @Override
@@ -32,7 +38,7 @@ public class RoleAPIImpl implements RoleAPI {
 
     @Override
     public boolean isValidRoleId(String id) {
-        return RoleRegistry.isValidRoleId(id);
+        return registry.contains(id);
     }
 
     //设置和取消角色
@@ -97,7 +103,7 @@ public class RoleAPIImpl implements RoleAPI {
     //角色描述查询
     @Override
     public Component getRoleDisplayName(String roleID){
-        Role role = RoleRegistry.getRole(roleID);
+        Role role = registry.get(roleID);
         if(role == null){
             return Component.text("");
         }
@@ -108,7 +114,7 @@ public class RoleAPIImpl implements RoleAPI {
 
     @Override
     public List<Component> getRoleDescription(String roleID){
-        Role role = RoleRegistry.getRole(roleID);
+        Role role = registry.get(roleID);
         if(role == null){
             return List.of(Component.text(""));
         }
@@ -119,7 +125,7 @@ public class RoleAPIImpl implements RoleAPI {
 
     @Override
     public Material getRoleIcon(String roleID){
-        Role role = RoleRegistry.getRole(roleID);
+        Role role = registry.get(roleID);
         if(role == null){
             return Material.AIR;
         }
@@ -361,7 +367,19 @@ public class RoleAPIImpl implements RoleAPI {
     public boolean areHostile(UUID uuid1, UUID uuid2) {
         return roleManager.areHostile(uuid1, uuid2);
     }
+    //阶段 3.3（RoleAPI 只增）：枚举已装配的角色 id 与只读快照
+    @Override
+    public Set<String> getAllRoleIds() {
+        return registry.ids();
+    }
+
+    @Override
+    public List<RoleInfo> getRoles() {
+        List<RoleInfo> result = new ArrayList<>();
+        for (Role role : registry.all()) {
+            result.add(new RoleInfo(role.getId(), role.getDisplayName(), role.getDescription(), role.getIcon(), role.getFaction()));
+        }
+        return result;
+    }
+
 }
-
-
-

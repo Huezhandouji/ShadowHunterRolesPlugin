@@ -4,11 +4,22 @@ import com.shadowHunterRolesPlugin.core.RoleComponentAware.EnergyChangeAware;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.SanTEChangeAware;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.UpdateAware;
+import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
+import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
+import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
+import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
+import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
+import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
+import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
+import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -73,6 +84,17 @@ public class RoleInstance {
 
     private final NamespacedKey roleHealthModifierKey;
 
+    //阶段 4：组件注册表（组件集合 + 每组件资源表 + getComponent 查找）与统一渲染器（骨架）
+    private final ComponentRegistry componentRegistry = new ComponentRegistry();
+    private final HotbarRenderer hotbarRenderer = new HotbarRenderer();
+    private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
+
+    /**
+     * 新旧路径开关（阶段 4 的 4.2）：批次迁移期默认走**旧路径**（listener + 组件自己启冷却），
+     * 行为逐字不变；批次 ①–⑨ 全部迁完后翻成 {@code true} 并删除旧路径。
+     */
+    private static final boolean USE_COMPONENT_PIPELINE = false;
+
     public RoleInstance(Player player, Role role, RolesContext platform){
         this.player = player;
         this.role = role;
@@ -84,6 +106,9 @@ public class RoleInstance {
         this.roleHealthModifierKey = platform.keys().of("role_health_modifier");
 
         initComponents();
+
+        //装配完成 → 冻结注册表（此后 getComponent 才合法）
+        componentRegistry.freeze();
 
         this.buffManager = new BuffManager(player, this);
 
@@ -111,14 +136,94 @@ public class RoleInstance {
         updateHotbar();
     }
 
-    //平台上下文：阶段 2 的组件取用入口（阶段 4 会收窄为 ComponentServices 端口白名单）
+    //平台上下文：阶段 2 的组件取用入口（阶段 4 起逐批收窄为 ComponentServices 端口白名单）
     public RolesContext rolesContext() { return platform; }
+
+    //统一渲染器（阶段 4.1 骨架；接管渲染属 4.4）
+    public HotbarRenderer hotbarRenderer() { return hotbarRenderer; }
+
+    //组件注册表（框架内部：装配、资源兜底、getComponent 查找）
+    public ComponentRegistry componentRegistry() { return componentRegistry; }
+
+    /**
+     * 唯一创建点之后的**紧邻两步**（五条件①④）：{@code new → bind → register}。
+     * 只对已迁移到 {@link RoleComponent} 的组件生效；未迁移组件继续走旧路径（本轮为零迁移 ⇒ 不触发）。
+     */
+    private void bindAndRegister(Object component, ItemKind kind){
+        if(!(component instanceof RoleComponent roleComponent)) return;
+        ComponentServices services = createServices(roleComponent, kind);
+        roleComponent.bind(services);          // ① 注册/钩子之前；② bind 只允许一次
+        componentServices.put(roleComponent, services);
+        componentRegistry.register(roleComponent);
+    }
+
+    /** 组件与它**一对一**的服务集（含构造期绑定本组件 id/kind 的冷却端口、指向本组件资源表的定时器端口）。 */
+    private ComponentServices createServices(RoleComponent component, ItemKind kind){
+        return new ComponentServices(
+                new SelfImpl(this),
+                new EnergyPortImpl(this),
+                new SanTEPortImpl(this),
+                new VitalsPortImpl(this),
+                new CooldownPortImpl(this, component.getId(), kind),
+                new BuffPortImpl(this),
+                new FactionPortImpl(this),
+                new DamagePortImpl(),
+                new TimerPortImpl(this, componentRegistry, component),
+                new ComponentLookupImpl(componentRegistry)
+        );
+    }
+
+    // ───────── 阶段 4：施放 / 攻击管道（新旧路径并存；开关默认旧路径 ⇒ 行为不变） ─────────
+
+    /**
+     * 新路径施放入口。返回 {@code true} = 本次已由管道处理（旧路径不再插手）；
+     * 开关关闭、或该 id 尚未迁移到 {@link RoleComponent} 时返回 {@code false}，交回旧路径。
+     */
+    public boolean handleCast(CastTrigger trigger, Player caster){
+        if(!USE_COMPONENT_PIPELINE || caster == null) return false;
+
+        ItemStack item = caster.getInventory().getItemInMainHand();
+        String id = Skill.Utils.getSkillId(item);
+        if(id == null) id = MainWeapon.Utils.getWeaponId(item);
+        if(id == null) return false;
+
+        RoleComponent component = componentRegistry.getById(id);
+        if(!(component instanceof ActiveComponent active)) return false;
+
+        CastResult result = active.onCast(new CastSignal(trigger));
+        if(result == CastResult.CAST){
+            //声明值是唯一真值来源（4.7/O-13）：框架按 getCooldownTicks() 启动冷却
+            componentServices.get(component).cooldowns().start(active.getCooldownTicks());
+        }
+        hotbarRenderer.markDirty();
+        return true;
+    }
+
+    /** 新路径攻击入口（主武器）。语义同 {@link #handleCast}。 */
+    public boolean handleAttack(Player victim, Player attacker){
+        if(!USE_COMPONENT_PIPELINE || victim == null || attacker == null) return false;
+
+        ItemStack item = attacker.getInventory().getItemInMainHand();
+        String id = MainWeapon.Utils.getWeaponId(item);
+        if(id == null) return false;
+
+        RoleComponent component = componentRegistry.getById(id);
+        if(!(component instanceof CombatHook hook)) return false;
+
+        CastResult result = hook.onAttack(new AttackSignal(victim));
+        if(result == CastResult.CAST){
+            componentServices.get(component).cooldowns().start(((ActiveComponent) component).getCooldownTicks());
+        }
+        hotbarRenderer.markDirty();
+        return true;
+    }
 
     private void initComponents(){
         for(String skillId : role.getSkillIds()){
             Skill skill = role.createSkill(skillId);
             if(skill != null){
                 skillMap.put(skillId, skill);
+                bindAndRegister(skill, ItemKind.SKILL);
             }
         }
 
@@ -126,6 +231,7 @@ public class RoleInstance {
             PassiveSkill passive = role.createPassive(passiveId);
             if(passive != null){
                 passiveMap.put(passiveId, passive);
+                bindAndRegister(passive, ItemKind.SKILL);
             }
         }
 
@@ -133,6 +239,7 @@ public class RoleInstance {
             MainWeapon mainWeapon = role.createMainWeapon(weaponId);
             if(mainWeapon != null){
                  mainWeaponMap.put(weaponId, mainWeapon);
+                 bindAndRegister(mainWeapon, ItemKind.MAIN_WEAPON);
             }
         }
     }
@@ -707,6 +814,9 @@ public class RoleInstance {
         valid = false;
 
         triggerLifecycleStop();
+
+        //阶段 4：框架兜底回收组件登记的全部资源（定时器等）——组件忘了取消也不会泄漏
+        componentRegistry.cancelAllAndClear();
 
         if(updateTask != null){
             updateTask.cancel();

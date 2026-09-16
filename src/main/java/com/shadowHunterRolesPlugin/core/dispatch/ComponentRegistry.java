@@ -62,6 +62,22 @@ public final class ComponentRegistry {
         return null;
     }
 
+    /** 按组件 id 查找（施放管道用）；未注册 → null；冻结前调用 → 抛异常。 */
+    public RoleComponent getById(String id) {
+        if (id == null) {
+            return null;
+        }
+        if (!frozen) {
+            throw new IllegalStateException("ComponentRegistry is not frozen yet; getById() is only allowed after assembly.");
+        }
+        for (RoleComponent component : components) {
+            if (id.equals(component.getId())) {
+                return component;
+            }
+        }
+        return null;
+    }
+
     /** 登记本组件的资源（定时器等）；{@code stop()} 返回后由 {@link #cancelAll} 兜底回收。 */
     public void track(RoleComponent component, Task task) {
         if (component == null || task == null) {

@@ -1,10 +1,10 @@
 package com.shadowHunterRolesPlugin.manager;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.Buff;
 import com.shadowHunterRolesPlugin.core.BuffType;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
-import org.bukkit.Bukkit;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
+import com.shadowHunterRolesPlugin.platform.Task;
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
@@ -16,14 +16,13 @@ import java.util.*;
 
 public class BuffManager {
 
-    public static final NamespacedKey BUFF_MOVEMENT_SPEED_MODIFIER_KEY = new NamespacedKey(
-            ShadowHunterRolesPlugin.getInstance(),
+    public static final NamespacedKey BUFF_MOVEMENT_SPEED_MODIFIER_KEY = KeyFactory.Registry.of(
             "buff_movement_speed_modifier"
     );
 
     private final Player player;
     private final Map<BuffType, Buff> activeBuffs = new HashMap<>();
-    private int updaterTaskId = -1;
+    private Task updaterTask;
 
     private final RoleInstance instance;
 
@@ -134,12 +133,11 @@ public class BuffManager {
     }
 
     private void startUpdater(){
-        updaterTaskId = Bukkit.getScheduler().runTaskTimer(
-                ShadowHunterRolesPlugin.getInstance(),
+        updaterTask = instance.rolesContext().scheduler().runRepeating(
                 this::tickAllBuffs,
                 0L,
                 1L
-        ).getTaskId();
+        );
     }
 
     private void tickAllBuffs(){
@@ -165,9 +163,9 @@ public class BuffManager {
         }
         activeBuffs.clear();
 
-        if(updaterTaskId != -1){
-            Bukkit.getScheduler().cancelTask(updaterTaskId);
-            updaterTaskId = -1;
+        if(updaterTask != null){
+            updaterTask.cancel();
+            updaterTask = null;
         }
     }
 

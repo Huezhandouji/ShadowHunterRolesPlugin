@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.core;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -17,8 +17,7 @@ public class DamageUtil {
     //小于这个水平距离平方时不计算击退，避免向量归一化得到NaN
     private static final double MIN_KNOCKBACK_LENGTH_SQUARED = 1.0E-6;
 
-    public static final NamespacedKey LAST_DAMAGER_KEY = new NamespacedKey(
-            ShadowHunterRolesPlugin.getInstance(),
+    public static final NamespacedKey LAST_DAMAGER_KEY = KeyFactory.Registry.of(
             "last_damager"
     );
 

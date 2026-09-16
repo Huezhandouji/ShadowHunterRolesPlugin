@@ -1,10 +1,9 @@
 package com.shadowHunterRolesPlugin.listener;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.platform.RolesContext;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -17,9 +16,11 @@ import org.bukkit.inventory.ItemStack;
 public class SkillListener implements Listener {
 
     private final RoleManager roleManager;
+    private final RolesContext context;
 
-    public SkillListener(RoleManager roleManager){
+    public SkillListener(RoleManager roleManager, RolesContext context){
         this.roleManager = roleManager;
+        this.context = context;
     }
 
     //右键释放技能
@@ -129,7 +130,7 @@ public class SkillListener implements Listener {
         //设置标记
         instance.setDroppingState(true);
         //1tick后清除标记
-        Bukkit.getScheduler().runTaskLater(ShadowHunterRolesPlugin.getInstance(), () -> {
+        context.scheduler().runLater(() -> {
             instance.setDroppingState(false);
         }, 1L);
 

@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.core;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -114,8 +114,7 @@ public abstract class MainWeapon {
 
     public static class Utils{
 
-        private static final NamespacedKey MAIN_WEAPON_KEY = new NamespacedKey(
-                ShadowHunterRolesPlugin.getInstance(),
+        private static final NamespacedKey MAIN_WEAPON_KEY = KeyFactory.Registry.of(
                 "main_weapon_id"
         );
 

@@ -2,7 +2,6 @@ package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
-import com.shadowHunterRolesPlugin.manager.RoleManager;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -14,14 +13,16 @@ import java.util.*;
 
 public class SkillUtil {
 
-    public static boolean hasEnemyInRange(Faction selfFaction, Location loc, double radius){
+    //阶段 2：不再查 RoleManager 单例，改走 RoleInstance 注入的 FactionLookup（未选角色 → 敌对）
+    public static boolean hasEnemyInRange(RoleInstance self, Location loc, double radius){
         if(loc == null || loc.getWorld() == null) return false;
+
+        Faction selfFaction = self.getFaction();
 
         for(Player p : loc.getNearbyPlayers(radius)){
             if(p == null) continue;
-            RoleInstance other = RoleManager.getInstance().getRoleInstance(p);
-            //没有选角色的玩家也要算进来，否则 getRoleInstance() 返回 null 会抛 NPE
-            if(other == null || other.isHostileTo(selfFaction)){
+            //没有选角色的玩家也要算进来（FactionLookup 对未选角色返回敌对）
+            if(self.rolesContext().factions().isHostile(selfFaction, p)){
                 return true;
             }
         }

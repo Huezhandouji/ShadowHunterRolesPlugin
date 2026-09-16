@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.core;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -123,8 +123,7 @@ public abstract class Skill {
 
     public static class Utils{
 
-        public static final NamespacedKey SKILL_KEY = new NamespacedKey(
-                ShadowHunterRolesPlugin.getInstance(),
+        public static final NamespacedKey SKILL_KEY = KeyFactory.Registry.of(
                 "skill_id"
         );
 

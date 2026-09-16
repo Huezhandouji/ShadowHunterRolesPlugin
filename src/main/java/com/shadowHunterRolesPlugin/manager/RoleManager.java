@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.manager;
 
 import com.shadowHunterRolesPlugin.core.*;
+import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -11,17 +12,11 @@ public class RoleManager {
 
     private final Map<UUID, RoleInstance> playerRoleMap = new HashMap<>();
 
-    private static RoleManager instance;
+    //阶段 2：去掉静态单例，改由主类在 onEnable 构造并注入平台上下文
+    private final RolesContext context;
 
-    public static RoleManager getInstance(){
-        if(instance == null){
-            instance = new RoleManager();
-        }
-        return instance;
-    }
-
-    private RoleManager(){
-
+    public RoleManager(RolesContext context){
+        this.context = context;
     }
 
     //选择角色
@@ -34,7 +29,7 @@ public class RoleManager {
 
         if(hasRole(player)) clearRole(player);
 
-        RoleInstance instance = role.createInstance(player);
+        RoleInstance instance = role.createInstance(player, context);
 
         playerRoleMap.put(player.getUniqueId(), instance);
 
@@ -52,7 +47,7 @@ public class RoleManager {
         if(hasRole(uuid)) clearRole(uuid);
 
 
-        RoleInstance instance = role.createInstance(player);
+        RoleInstance instance = role.createInstance(player, context);
 
         playerRoleMap.put(player.getUniqueId(), instance);
 
@@ -73,6 +68,26 @@ public class RoleManager {
     }
     public boolean hasRole(UUID uuid){
         return playerRoleMap.containsKey(uuid);
+    }
+
+    //这两个查询原本是 core/RoleInstance 的静态方法（内部走 RoleManager.getInstance()）。
+    //阶段 2 移到数据所有者这里：语义逐字保留（任一方没有角色 → true），且 core 不再依赖单例。
+    public boolean areHostile(Player p1, Player p2){
+        if(p1 == null || p2 == null) return false;
+        RoleInstance ins1 = getRoleInstance(p1);
+        RoleInstance ins2 = getRoleInstance(p2);
+
+        if(ins1 == null || ins2 == null) return true;
+        return ins1.isHostileTo(ins2);
+
+    }
+    public boolean areHostile(UUID p1, UUID p2){
+        if(p1 == null || p2 == null) return false;
+        RoleInstance ins1 = getRoleInstance(p1);
+        RoleInstance ins2 = getRoleInstance(p2);
+
+        if(ins1 == null || ins2 == null) return true;
+        return ins1.isHostileTo(ins2);
     }
 
 

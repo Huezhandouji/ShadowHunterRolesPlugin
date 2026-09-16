@@ -1,10 +1,9 @@
 package com.shadowHunterRolesPlugin.listener;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.MainWeapon;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
-import org.bukkit.Bukkit;
+import com.shadowHunterRolesPlugin.platform.RolesContext;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -18,9 +17,11 @@ import org.bukkit.inventory.ItemStack;
 public class MainWeaponListener implements Listener {
 
     protected final RoleManager roleManager;
+    private final RolesContext context;
 
-    public MainWeaponListener(RoleManager roleManager){
+    public MainWeaponListener(RoleManager roleManager, RolesContext context){
         this.roleManager = roleManager;
+        this.context = context;
     }
 
     //攻击玩家时
@@ -131,7 +132,7 @@ public class MainWeaponListener implements Listener {
         //设置标记
         instance.setDroppingState(true);
         //1tick后清除标记
-        Bukkit.getScheduler().runTaskLater(ShadowHunterRolesPlugin.getInstance(), () -> {
+        context.scheduler().runLater(() -> {
             instance.setDroppingState(false);
         }, 1L);
 

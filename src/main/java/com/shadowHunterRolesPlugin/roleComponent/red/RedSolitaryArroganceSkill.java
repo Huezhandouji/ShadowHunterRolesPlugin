@@ -1,12 +1,11 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.DamageUtil;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.Skill;
+import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -17,12 +16,11 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.List;
-import java.util.function.Consumer;
 
 public class RedSolitaryArroganceSkill extends Skill implements LifecycleAware {
 
-    //O-5：任务句柄化（Folia 语义的 ScheduledTask），stop 时取消
-    private ScheduledTask attackTask;
+    //O-5：任务句柄化，stop 时取消（阶段 2 由平台 Scheduler 提供，同时去掉 Folia 全局调度器误用）
+    private Task attackTask;
 
 
     public RedSolitaryArroganceSkill() {
@@ -34,25 +32,24 @@ public class RedSolitaryArroganceSkill extends Skill implements LifecycleAware {
     @Override
     public void onRightClick(Player caster, RoleInstance instance){
         if(!instance.getBuffManager().canCastSkill()) return;
-        attackTask = ShadowHunterRolesPlugin.getInstance().getServer().getGlobalRegionScheduler().runAtFixedRate(
-                ShadowHunterRolesPlugin.getInstance(),
-                new Consumer<ScheduledTask>() {
+        attackTask = instance.rolesContext().scheduler().runRepeating(
+                new Runnable() {
                     private Player cas = caster;
                     private RoleInstance casterIns = instance;
                     private int cnt = 0;
 
                     @Override
-                    public void accept(ScheduledTask scheduledTask) {
+                    public void run() {
                         //实例已失效（角色被清除）时立即停止，不再以旧实例结算伤害
                         if(cas == null || !cas.isOnline() || cas.isDead() || casterIns == null || !casterIns.isValid()) {
-                            scheduledTask.cancel();
+                            attackTask.cancel();
                             return;
                         }
 
                         //执行4次
                         cnt++;
                         if(cnt > 4){
-                            scheduledTask.cancel();
+                            attackTask.cancel();
                             return;
                         }
 

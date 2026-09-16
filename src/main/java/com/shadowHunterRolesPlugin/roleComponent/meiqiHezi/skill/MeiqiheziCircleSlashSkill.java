@@ -1,9 +1,9 @@
 package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 
 import com.destroystokyo.paper.ParticleBuilder;
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
+import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -15,7 +15,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,8 +22,8 @@ import java.util.List;
 
 public class MeiqiheziCircleSlashSkill extends Skill implements LifecycleAware {
 
-    //O-4：前摇任务句柄化，stop 时取消
-    private BukkitTask castTask;
+    //O-4：前摇任务句柄化，stop 时取消（阶段 2 换成平台 Task）
+    private Task castTask;
 
 
     public MeiqiheziCircleSlashSkill(){
@@ -55,17 +54,17 @@ public class MeiqiheziCircleSlashSkill extends Skill implements LifecycleAware {
 
 
 
-        castTask = new BukkitRunnable(){
+        castTask = instance.rolesContext().scheduler().runLater(new BukkitRunnable(){
 
             @Override
             public void run() {
                 //实例已失效（角色被清除）时立即停止，不再以旧实例结算真伤
                 if(!instance.isValid()){
-                    this.cancel();
+                    castTask.cancel();
                     return;
                 }
                 if(caster.isDead() || !caster.isOnline()){
-                    this.cancel();
+                    castTask.cancel();
                     return;
                 }
 
@@ -87,7 +86,7 @@ public class MeiqiheziCircleSlashSkill extends Skill implements LifecycleAware {
 
                 loc.getWorld().playSound(loc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1f, 1f);
             }
-        }.runTaskLater(ShadowHunterRolesPlugin.getInstance(), 20L);
+        }, 20L);
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
+import com.shadowHunterRolesPlugin.platform.RolesContext;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -63,8 +64,8 @@ public class Role {
 
     }
 
-    public RoleInstance createInstance(Player player){
-        return new RoleInstance(player, this);
+    public RoleInstance createInstance(Player player, RolesContext context){
+        return new RoleInstance(player, this, context);
     }
 
     public Skill createSkill(String skillId){

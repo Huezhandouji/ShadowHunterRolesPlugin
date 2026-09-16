@@ -17,7 +17,7 @@ public class AutoRecoverEnergyPassive extends PassiveSkill implements UpdateAwar
 
     @Override
     public void update(Player player, RoleInstance instance) {
-        if(SkillUtil.hasEnemyInRange(instance.getFaction(), player.getLocation(), 10)){
+        if(SkillUtil.hasEnemyInRange(instance, player.getLocation(), 10)){
             if(noEnemySurroundTime != 0) noEnemySurroundTime = 0;
         }
         else{

@@ -1,19 +1,17 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.SanTEChangeAware;
+import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.time.Duration;
 
@@ -26,10 +24,8 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
         );
     }
 
-    //O-6：没有在跑任务时的哨兵值（抽成常量，守卫里不再重复写字面量）
-    private static final int NO_TASK_ID = -1;
-
-    int taskId = NO_TASK_ID;
+    //O-6：任务句柄（阶段 2 换成平台 Task，null = 没有任务在跑）
+    private Task punishmentTask;
 
     @Override
     public void onSanTEChange(Player player, RoleInstance instance, int preSanTE, int newSanTE) {
@@ -40,7 +36,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
         //（原实现直接覆盖 taskId，旧任务永远无法取消，泄漏且会在结束后改写 SanTE）
         cancelPunishmentTask();
 
-        taskId = new BukkitRunnable() {
+        punishmentTask = instance.rolesContext().scheduler().runRepeating(new Runnable() {
 
                     int count = 0;
                     Player player = instance.getPlayer();
@@ -50,15 +46,15 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
 
                     @Override
                     public void run() {
-                        if (this.isCancelled()) return;
+                        if (punishmentTask == null || punishmentTask.isCancelled()) return;
                         if (!player.isOnline() || player.isDead()) {
-                            this.cancel();
+                            punishmentTask.cancel();
                             return;
                         }
 
 
                         if (count >= 3) {
-                            this.cancel();
+                            punishmentTask.cancel();
                             return;
                         }
                         count += 1;
@@ -118,7 +114,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
                             instance.setIsInSanTEPunishmentState(false);
                         }
                     }
-                }.runTaskTimer(ShadowHunterRolesPlugin.getInstance(), 0L, 40L).getTaskId();
+                }, 0L, 40L);
     }
 
     @Override
@@ -128,9 +124,9 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
 
     //取消仍在运行的惩罚任务并复位句柄（O-6）
     private void cancelPunishmentTask(){
-        if(taskId != NO_TASK_ID){
-            Bukkit.getScheduler().cancelTask(taskId);
-            taskId = NO_TASK_ID;
+        if(punishmentTask != null){
+            punishmentTask.cancel();
+            punishmentTask = null;
         }
     }
 

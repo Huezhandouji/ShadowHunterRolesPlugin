@@ -1,6 +1,5 @@
 package com.shadowHunterRolesPlugin.core;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.EnergyChangeAware;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.SanTEChangeAware;
@@ -8,7 +7,8 @@ import com.shadowHunterRolesPlugin.core.RoleComponentAware.UpdateAware;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
-import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.platform.RolesContext;
+import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -57,8 +57,11 @@ public class RoleInstance {
     //阵营信息，构造时将从Role里面复制，方便以后插件可以通过设置这个信息来实现无差别pvp
     private Faction faction;
 
-    //上下文
+    //上下文（阶段 2：平台层剥离后，领域层唯一的平台入口）
     private final Map<String, Object> context = new HashMap<>();
+
+    //平台上下文（调度/日志/键/阵营查询）
+    private final RolesContext platform;
 
     //buff管理器
     private final BuffManager buffManager;
@@ -66,19 +69,19 @@ public class RoleInstance {
     //已经上报过update异常的组件，避免每tick刷屏
     private final Set<String> reportedUpdateErrors = new HashSet<>();
 
-    private int updateTaskId = -1;
+    private Task updateTask;
 
-    private final NamespacedKey roleHealthModifierKey = new NamespacedKey(
-            ShadowHunterRolesPlugin.getInstance(),
-            "role_health_modifier"
-    );
+    private final NamespacedKey roleHealthModifierKey;
 
-    public RoleInstance(Player player, Role role){
+    public RoleInstance(Player player, Role role, RolesContext platform){
         this.player = player;
         this.role = role;
+        this.platform = platform;
         this.faction = role.getFaction();
         this.currentEnergy = role.getMaxEnergy();
         this.currentSanTE = role.getMaxSanTE();
+
+        this.roleHealthModifierKey = platform.keys().of("role_health_modifier");
 
         initComponents();
 
@@ -99,15 +102,17 @@ public class RoleInstance {
         triggerLifecycleAwake();
         triggerLifecycleStart();
 
-        updateTaskId = Bukkit.getScheduler().runTaskTimer(
-                ShadowHunterRolesPlugin.getInstance(),
+        updateTask = platform.scheduler().runRepeating(
                 this::triggerUpdate,
                 1L,
                 1L
-        ).getTaskId();
+        );
 
         updateHotbar();
     }
+
+    //平台上下文：阶段 2 的组件取用入口（阶段 4 会收窄为 ComponentServices 端口白名单）
+    public RolesContext rolesContext() { return platform; }
 
     private void initComponents(){
         for(String skillId : role.getSkillIds()){
@@ -170,11 +175,7 @@ public class RoleInstance {
 
         updateHotbar();
         //冷却结束后刷新物品
-        Bukkit.getScheduler().runTaskLater(
-                ShadowHunterRolesPlugin.getInstance(),
-                this::updateHotbar,
-                getRemainingSkillCooldownTicks(skillId)
-        );
+        platform.scheduler().runLater(this::updateHotbar, getRemainingSkillCooldownTicks(skillId));
 
     }
 
@@ -199,11 +200,7 @@ public class RoleInstance {
         skill.onLeftClick(caster, this);
 
         //在1t后更新技能物品
-        Bukkit.getScheduler().runTaskLater(
-                ShadowHunterRolesPlugin.getInstance(),
-                this::updateHotbar,
-                1L
-        );
+        platform.scheduler().runLater(this::updateHotbar, 1L);
 
         return true;
     }
@@ -217,11 +214,7 @@ public class RoleInstance {
         skill.onRightClick(caster, this);
 
         //在1t后更新技能物品
-        Bukkit.getScheduler().runTaskLater(
-                ShadowHunterRolesPlugin.getInstance(),
-                this::updateHotbar,
-                1L
-        );
+        platform.scheduler().runLater(this::updateHotbar, 1L);
 
         return true;
     }
@@ -235,11 +228,7 @@ public class RoleInstance {
         skill.onDrop(caster, this);
 
         //在1t后更新技能物品
-        Bukkit.getScheduler().runTaskLater(
-                ShadowHunterRolesPlugin.getInstance(),
-                this::updateHotbar,
-                1L
-        );
+        platform.scheduler().runLater(this::updateHotbar, 1L);
 
         return true;
     }
@@ -260,11 +249,7 @@ public class RoleInstance {
         mainWeaponCooldowns.put(weaponId, endTick);
         updateHotbar();
 
-        Bukkit.getScheduler().runTaskLater(
-                ShadowHunterRolesPlugin.getInstance(),
-                this::updateHotbar,
-                getRemainingMainWeaponCooldownTicks(weaponId)
-        );
+        platform.scheduler().runLater(this::updateHotbar, getRemainingMainWeaponCooldownTicks(weaponId));
     }
 
     public int getRemainingMainWeaponCooldownTicks(String weaponId){
@@ -284,11 +269,7 @@ public class RoleInstance {
             return false;
         }
         mainWeapon.onLeftClick(caster, this);
-        Bukkit.getScheduler().runTaskLater(
-                ShadowHunterRolesPlugin.getInstance(),
-                this::updateHotbar,
-                1L
-        );
+        platform.scheduler().runLater(this::updateHotbar, 1L);
         return true;
     }
 
@@ -299,11 +280,7 @@ public class RoleInstance {
             return false;
         }
         mainWeapon.onRightClick(caster, this);
-        Bukkit.getScheduler().runTaskLater(
-                ShadowHunterRolesPlugin.getInstance(),
-                this::updateHotbar,
-                1L
-        );
+        platform.scheduler().runLater(this::updateHotbar, 1L);
         return true;
     }
 
@@ -314,11 +291,7 @@ public class RoleInstance {
             return false;
         }
         mainWeapon.onDrop(caster, this);
-        Bukkit.getScheduler().runTaskLater(
-                ShadowHunterRolesPlugin.getInstance(),
-                this::updateHotbar,
-                1L
-        );
+        platform.scheduler().runLater(this::updateHotbar, 1L);
         return true;
     }
 
@@ -529,32 +502,14 @@ public class RoleInstance {
         return isHostileTo(otherFaction);
     }
 
+    //阶段 2：不再查 RoleManager 单例，改走注入进来的 FactionLookup（未选角色 → UNKNOWN → 敌对）
     public boolean isHostileTo(Player other){
-        RoleInstance otherInstance =  RoleManager.getInstance().getRoleInstance(other);
-        return isHostileTo(otherInstance);
+        return platform.factions().isHostile(getFaction(), other);
     }
 
     public boolean isHostileTo(Faction otherFaction){
         Faction thisFaction = getFaction();
         return thisFaction != otherFaction || thisFaction == Faction.UNKNOWN;
-    }
-
-    public static boolean areHostile(Player p1, Player p2){
-        if(p1 == null || p2 == null) return false;
-        RoleInstance ins1 = RoleManager.getInstance().getRoleInstance(p1);
-        RoleInstance ins2 = RoleManager.getInstance().getRoleInstance(p2);
-
-        if(ins1 == null || ins2 == null) return true;
-        return ins1.isHostileTo(ins2);
-
-    }
-    public static boolean areHostile(UUID p1, UUID p2){
-        if(p1 == null || p2 == null) return false;
-        RoleInstance ins1 = RoleManager.getInstance().getRoleInstance(p1);
-        RoleInstance ins2 = RoleManager.getInstance().getRoleInstance(p2);
-
-        if(ins1 == null || ins2 == null) return true;
-        return ins1.isHostileTo(ins2);
     }
 
     //生命周期触发
@@ -714,13 +669,13 @@ public class RoleInstance {
         try{
             action.run();
             if(reportedUpdateErrors.remove(key)){
-                ShadowHunterRolesPlugin.getInstance().getLogger().info(
+                platform.logger().info(
                         "Role '" + role.getId() + "' component [" + key + "] recovered from a previous update error.");
             }
         }
         catch(Throwable throwable){
             if(reportedUpdateErrors.add(key)){
-                ShadowHunterRolesPlugin.getInstance().getLogger().log(Level.SEVERE,
+                platform.logger().log(Level.SEVERE,
                         "Role '" + role.getId() + "' component [" + key + "] threw an exception in update(), only this component is skipped. "
                                 + "Repeated errors of this component are suppressed until it recovers.", throwable);
             }
@@ -753,7 +708,10 @@ public class RoleInstance {
 
         triggerLifecycleStop();
 
-        Bukkit.getScheduler().cancelTask(updateTaskId);
+        if(updateTask != null){
+            updateTask.cancel();
+            updateTask = null;
+        }
 
         clearHotbar();
 

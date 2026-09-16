@@ -355,11 +355,11 @@ public class RoleAPIImpl implements RoleAPI {
 
     @Override
     public boolean areHostile(Player p1, Player p2) {
-        return RoleInstance.areHostile(p1, p2);
+        return roleManager.areHostile(p1, p2);
     }
     @Override
     public boolean areHostile(UUID uuid1, UUID uuid2) {
-        return RoleInstance.areHostile(uuid1, uuid2);
+        return roleManager.areHostile(uuid1, uuid2);
     }
 }
 

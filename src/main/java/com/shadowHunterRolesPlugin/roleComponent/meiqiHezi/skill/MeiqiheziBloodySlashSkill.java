@@ -1,8 +1,8 @@
 package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
+import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -12,7 +12,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
 import java.util.*;
@@ -20,8 +19,8 @@ import java.util.*;
 
 public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
 
-    //O-3：技能任务句柄化，stop 时取消，避免角色被清除后仍结算伤害
-    private BukkitTask attackTask;
+    //O-3：技能任务句柄化，stop 时取消，避免角色被清除后仍结算伤害（阶段 2 换成平台 Task）
+    private Task attackTask;
 
 
     public MeiqiheziBloodySlashSkill(){
@@ -43,7 +42,7 @@ public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
         instance.decreaseEnergy(getEnergyCost());
 
         instance.startSkillCooldown(getId(), getCooldownTicks());
-        attackTask = new BukkitRunnable() {
+        attackTask = instance.rolesContext().scheduler().runRepeating(new BukkitRunnable() {
 
             private int count = 0;
             private final Player player = caster;
@@ -52,11 +51,11 @@ public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
             public void run() {
                 //实例已失效（角色被清除）时立即停止，不再结算伤害
                 if(!instance.isValid()){
-                    this.cancel();
+                    attackTask.cancel();
                     return;
                 }
                 if (count >= 4) {
-                    this.cancel();
+                    attackTask.cancel();
                     return;
                 }
                 count += 1;
@@ -81,7 +80,7 @@ public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
                 loc.getWorld().playSound(loc, Sound.ITEM_TRIDENT_RIPTIDE_1, 1f, 1f);
             }
 
-        }.runTaskTimer(ShadowHunterRolesPlugin.getInstance(), 0L, 2L);
+        }, 0L, 2L);
 
     }
 

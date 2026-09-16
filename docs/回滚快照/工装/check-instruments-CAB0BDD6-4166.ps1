@@ -51,7 +51,10 @@ foreach ($t in $Tools) {
     $hash = (Get-FileHash $p -Algorithm SHA256).Hash
     $nonAscii = @($bytes | Where-Object { $_ -gt 127 })
     $isPs1 = $t.ToLower().EndsWith('.ps1')
+    # ASCII-only is a .ps1-only rule (PS 5.1 reads BOM-less .ps1 as ANSI). Node reads
+    # .js as UTF-8 by default, so for .js this check is N/A rather than PASS.
     $asciiOk = if ($isPs1) { $nonAscii.Count -eq 0 } else { $true }
+    $asciiNote = if ($isPs1) { '' } else { ' (N/A: rule applies to .ps1 only; Node reads .js as UTF-8)' }
 
     $text = [System.IO.File]::ReadAllText($p)
     $writeVerbs = @()
@@ -65,7 +68,7 @@ foreach ($t in $Tools) {
 
     Write-Output ("[{0}] {1}" -f $status, $t)
     Write-Output ("        bytes={0}  mtime={1}  sha256={2}" -f $fi.Length, $fi.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'), $hash)
-    Write-Output ("        asciiOnly={0} (nonAsciiBytes={1})  archivedUnderInstrumentVersions={2}" -f $asciiOk, $nonAscii.Count, $archived)
+    Write-Output ("        asciiOnly={0}{1} (nonAsciiBytes={2})  archivedUnderInstrumentVersions={3}" -f $asciiOk, $asciiNote, $nonAscii.Count, $archived)
     Write-Output ("        write/processVerbsSeen={0}" -f ($(if ($writeVerbs.Count) { $writeVerbs -join ',' } else { '(none)' })))
 
     $rows += [ordered]@{ tool = $t; bytes = $fi.Length; mtime = $fi.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'); sha256 = $hash; asciiOnly = $asciiOk; archived = $archived; writeVerbs = $writeVerbs }

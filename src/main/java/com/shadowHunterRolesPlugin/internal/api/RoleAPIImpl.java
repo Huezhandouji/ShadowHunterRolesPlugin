@@ -42,6 +42,7 @@ public class RoleAPIImpl implements RoleAPI {
     }
 
     //设置和取消角色
+    @Deprecated
     @Override
     public boolean setPlayerRole(Player player, String roleId) {
         return roleManager.selectRole(player, roleId);
@@ -51,6 +52,7 @@ public class RoleAPIImpl implements RoleAPI {
         return roleManager.selectRole(uuid, roleId);
     }
 
+    @Deprecated
     @Override
     public boolean clearPlayerRole(Player player) {
         return roleManager.clearRole(player);
@@ -69,6 +71,7 @@ public class RoleAPIImpl implements RoleAPI {
         return roleManager.getRoleInstance(uuid);
     }
 
+    @Deprecated
     @Override
     public String getPlayerRoleId(Player player) {
         RoleInstance instance = getRoleInstance(player);
@@ -80,6 +83,7 @@ public class RoleAPIImpl implements RoleAPI {
         return instance != null ? instance.getRole().getId() : null;
     }
 
+    @Deprecated
     @Override
     public Component getPlayerRoleDisplayName(Player player) {
         RoleInstance instance = getRoleInstance(player);
@@ -91,6 +95,7 @@ public class RoleAPIImpl implements RoleAPI {
         return instance != null ? instance.getRole().getDisplayName() : null;
     }
 
+    @Deprecated
     @Override
     public boolean hasRole(Player player) {
         return roleManager.hasRole(player);
@@ -135,6 +140,7 @@ public class RoleAPIImpl implements RoleAPI {
     }
 
     //能量系统
+    @Deprecated
     @Override
     public int getPlayerEnergy(Player player) {
         RoleInstance instance = getRoleInstance(player);
@@ -146,6 +152,7 @@ public class RoleAPIImpl implements RoleAPI {
         return instance != null ? instance.getCurrentEnergy() : -78;
     }
 
+    @Deprecated
     @Override
     public int getPlayerMaxEnergy(Player player) {
         RoleInstance instance = getRoleInstance(player);
@@ -157,6 +164,7 @@ public class RoleAPIImpl implements RoleAPI {
         return instance != null ? instance.getMaxEnergy() : -78;
     }
 
+    @Deprecated
     @Override
     public void setPlayerEnergy(Player player, int amount){
         RoleInstance instance = getRoleInstance(player);
@@ -170,6 +178,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.setCurrentEnergy(amount);
     }
 
+    @Deprecated
     @Override
     public void increaseEnergy(Player player, int amount) {
         RoleInstance instance = getRoleInstance(player);
@@ -183,6 +192,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.increaseEnergy(amount);
     }
 
+    @Deprecated
     @Override
     public void decreaseEnergy(Player player, int amount) {
         RoleInstance instance = getRoleInstance(player);
@@ -197,6 +207,7 @@ public class RoleAPIImpl implements RoleAPI {
     }
 
     //sanTE相关
+    @Deprecated
     @Override
     public int getPlayerSanTE(Player player) {
         RoleInstance instance = getRoleInstance(player);
@@ -208,6 +219,7 @@ public class RoleAPIImpl implements RoleAPI {
         return instance != null ? instance.getCurrentSanTE() : -78;
     }
 
+    @Deprecated
     @Override
     public int getPlayerMaxSanTE(Player player) {
         RoleInstance instance = getRoleInstance(player);
@@ -219,6 +231,7 @@ public class RoleAPIImpl implements RoleAPI {
         return instance != null ? instance.getMaxSanTE() : -78;
     }
 
+    @Deprecated
     @Override
     public void setPlayerSanTE(Player player, int amount) {
         RoleInstance instance = getRoleInstance(player);
@@ -232,6 +245,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.setCurrentSanTE(amount);
     }
 
+    @Deprecated
     @Override
     public void increaseSanTE(Player player, int amount) {
         RoleInstance instance = getRoleInstance(player);
@@ -245,6 +259,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.increaseSanTE(amount);
     }
 
+    @Deprecated
     @Override
     public void decreaseSanTE(Player player, int amount) {
         RoleInstance instance = getRoleInstance(player);
@@ -259,6 +274,7 @@ public class RoleAPIImpl implements RoleAPI {
     }
 
     //生命值相关
+    @Deprecated
     @Override
     public double getPlayerHealth(Player player) {
         return player.getHealth();
@@ -272,6 +288,7 @@ public class RoleAPIImpl implements RoleAPI {
         return player.getHealth();
     }
 
+    @Deprecated
     @Override
     public double getPlayerMaxHealth(Player player) {
         return player.getAttribute(Attribute.MAX_HEALTH).getValue();
@@ -285,6 +302,7 @@ public class RoleAPIImpl implements RoleAPI {
         return player.getAttribute(Attribute.MAX_HEALTH).getValue();
     }
 
+    @Deprecated
     @Override
     public void healPlayer(Player player, double amount) {
         double newHealth = Math.min(player.getHealth() + amount, getPlayerMaxHealth(player));
@@ -299,6 +317,7 @@ public class RoleAPIImpl implements RoleAPI {
     }
 
     //技能相关
+    @Deprecated
     @Override
     public boolean isSkillReady(Player player, String skillId) {
         RoleInstance instance = getRoleInstance(player);
@@ -310,6 +329,7 @@ public class RoleAPIImpl implements RoleAPI {
         return instance != null && instance.isSkillReady(skillId);
     }
 
+    @Deprecated
     @Override
     public int getSkillCooldownTick(Player player, String skillId) {
         RoleInstance instance = getRoleInstance(player);
@@ -322,6 +342,7 @@ public class RoleAPIImpl implements RoleAPI {
     }
 
     //阵营相关
+    @Deprecated
     @Override
     public Faction getFaction(Player player) {
         RoleInstance instance = getRoleInstance(player);
@@ -333,6 +354,7 @@ public class RoleAPIImpl implements RoleAPI {
         return instance != null ? instance.getFaction() : Faction.UNKNOWN;
     }
 
+    @Deprecated
     @Override
     public void setFaction(Player player, Faction faction) {
         RoleInstance instance = getRoleInstance(player);
@@ -346,6 +368,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.setFaction(faction);
     }
 
+    @Deprecated
     @Override
     public void resetFaction(Player player) {
         RoleInstance instance = getRoleInstance(player);
@@ -359,6 +382,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.resetFaction();
     }
 
+    @Deprecated
     @Override
     public boolean areHostile(Player p1, Player p2) {
         return roleManager.areHostile(p1, p2);

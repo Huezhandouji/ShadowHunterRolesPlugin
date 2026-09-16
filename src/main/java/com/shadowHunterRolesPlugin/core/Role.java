@@ -81,8 +81,10 @@ public class Role {
     }
 
     /**
-     * **唯一组件创建点**（阶段 4 的 4.1）：全仓只有这里调用 {@code supplier.get()}，
-     * 回归检查 {@code grep -c "supplier.get()" = 1}。
+     * **唯一组件创建点**（阶段 4 的 4.1）：全仓**创建路径**只有这里调用 {@code supplier.get()}；
+     * {@code Builder} 另有三处**校验用**实例化（{@code :177}/{@code :194}/{@code :208}，"造了再丢"），
+     * **待 4.2 的 {@code ComponentFactory} 收编** —— 判据写作「创建路径唯一（本方法）」+「Builder 三处待收编」，
+     * **不是** {@code grep -c "supplier.get()" = 1}（全仓代码命中实际为 4）。
      * 迁移后的组件将在此处**紧邻** {@code bind(ComponentServices)}（五条件①④，见
      * {@code docs/阶段4-交付小结.md} §5.7），使 bind 不可能被遗漏。
      */

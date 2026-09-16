@@ -31,3 +31,5 @@ Thumbs.db
 *.bak
 *.swp
 local.properties
+# Gradle 本地缓存（本次重构设置的 GRADLE_USER_HOME，属构建缓存、不入库）
+.gradle-work/

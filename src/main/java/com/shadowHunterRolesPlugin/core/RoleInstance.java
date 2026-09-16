@@ -19,8 +19,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.*;
+import java.util.logging.Level;
 
 public class RoleInstance {
 
@@ -31,6 +34,12 @@ public class RoleInstance {
     private int currentSanTE;
 
     private boolean isInSanTEPunishment = false;
+
+    //实例是否仍然有效：clear() 之后置为 false，组件里的延时任务用它做"实例已失效"守卫
+    private boolean valid = true;
+
+    //药水记账（D6 / O-7）：只记录本系统施加到本实例玩家身上的效果类型，clear() 只回收这些
+    private final Set<PotionEffectType> appliedPotionTypes = new LinkedHashSet<>();
 
     //冷却游戏刻时间戳
     private Map<String, Integer> skillCooldowns = new HashMap<>();
@@ -53,6 +62,9 @@ public class RoleInstance {
 
     //buff管理器
     private final BuffManager buffManager;
+
+    //已经上报过update异常的组件，避免每tick刷屏
+    private final Set<String> reportedUpdateErrors = new HashSet<>();
 
     private int updateTaskId = -1;
 
@@ -83,8 +95,9 @@ public class RoleInstance {
         player.getAttribute(Attribute.MAX_HEALTH).addModifier(am);
         player.setHealth(getMaxHealth());
 
-        updateHotbar();
-
+        //生命周期时序：全部组件创建完成 -> awake全部 -> start全部 -> 启动ticker -> 渲染热键栏
+        triggerLifecycleAwake();
+        triggerLifecycleStart();
 
         updateTaskId = Bukkit.getScheduler().runTaskTimer(
                 ShadowHunterRolesPlugin.getInstance(),
@@ -93,7 +106,7 @@ public class RoleInstance {
                 1L
         ).getTaskId();
 
-        triggerLifecycleOnSet();
+        updateHotbar();
     }
 
     private void initComponents(){
@@ -146,10 +159,6 @@ public class RoleInstance {
     }
 
     //技能相关
-    public Skill getSkillById(String skillId){
-        return skillMap.getOrDefault(skillId, null);
-    }
-
     public boolean isSkillReady(String skillId){
         int endTick = skillCooldowns.getOrDefault(skillId, 0);
         return Bukkit.getCurrentTick() >= endTick;
@@ -167,11 +176,6 @@ public class RoleInstance {
                 getRemainingSkillCooldownTicks(skillId)
         );
 
-    }
-
-    public void endSkillCooldown(String skillId){
-        skillCooldowns.remove(skillId);
-        updateHotbar();
     }
 
     public int getRemainingSkillCooldownTicks(String skillId){
@@ -263,11 +267,6 @@ public class RoleInstance {
         );
     }
 
-    public void endMainWeaponCooldown(String weaponId){
-        mainWeaponCooldowns.remove(weaponId);
-        updateHotbar();
-    }
-
     public int getRemainingMainWeaponCooldownTicks(String weaponId){
         int endTick = mainWeaponCooldowns.getOrDefault(weaponId, 0);
         return Math.max(0, endTick - Bukkit.getCurrentTick());
@@ -325,30 +324,6 @@ public class RoleInstance {
 
 
 
-    public Collection<Skill> getSkills(){
-        return skillMap.values();
-    }
-
-    public Collection<PassiveSkill> getPassives(){
-        return passiveMap.values();
-    }
-
-    public Collection<MainWeapon> getMainWeapons(){
-        return mainWeaponMap.values();
-    }
-
-    public Skill getSkill(String skillId){
-        return skillMap.get(skillId);
-    }
-
-    public PassiveSkill getPassive(String passiveId){
-        return passiveMap.get(passiveId);
-    }
-
-    public MainWeapon getMainWeapon(String weaponId){
-        return mainWeaponMap.get(weaponId);
-    }
-
     //更新技能物品栏，设置物品或者替换物品
 
 
@@ -368,7 +343,6 @@ public class RoleInstance {
             //如果是武器
             if(mainWeaponMap.containsKey(id)){
                 MainWeapon weapon = mainWeaponMap.get(id);
-                boolean isReady = isMainWeaponReady(id);
                 inv.setItem(slot, weapon.createIconItem(this));
                 continue;
             }
@@ -376,7 +350,6 @@ public class RoleInstance {
             //如果是技能
             if(skillMap.containsKey(id)){
                 Skill skill = skillMap.get(id);
-                boolean isReady = isSkillReady(id);
                 inv.setItem(slot, skill.createIconItem(this));
             }
         }
@@ -487,10 +460,6 @@ public class RoleInstance {
         Bukkit.getPluginManager().callEvent(event);
     }
 
-    public boolean hasEnoughEnergy(int cost){
-        return currentEnergy >= cost;
-    }
-
     public void decreaseEnergy(int amount){
         setCurrentEnergy(currentEnergy - amount);
     }
@@ -520,10 +489,20 @@ public class RoleInstance {
 
     public int getMaxSanTE() { return role.getMaxSanTE(); }
 
-    public boolean isInSanTEPunishment() { return isInSanTEPunishment; }
-
     public void setIsInSanTEPunishmentState(boolean state){
         this.isInSanTEPunishment = state;
+    }
+
+    //实例是否有效：clear() 之后为 false，供组件里的延时任务做失效守卫
+    public boolean isValid(){
+        return valid;
+    }
+
+    //药水施加入口（记账）：施加到本实例玩家身上的效果记入账本，clear() 时只回收账本里的类型（O-7）
+    public void applyPotionEffect(PotionEffect effect){
+        if(effect == null) return;
+        player.addPotionEffect(effect);
+        appliedPotionTypes.add(effect.getType());
     }
 
     //faction相关
@@ -545,18 +524,19 @@ public class RoleInstance {
             return true;
         }
 
-        Faction thisFaction = getFaction();
         Faction otherFaction = other.getFaction();
 
-        if(thisFaction == otherFaction && thisFaction != Faction.UNKNOWN){
-            return false;
-        }
-        return true;
+        return isHostileTo(otherFaction);
     }
 
     public boolean isHostileTo(Player other){
         RoleInstance otherInstance =  RoleManager.getInstance().getRoleInstance(other);
         return isHostileTo(otherInstance);
+    }
+
+    public boolean isHostileTo(Faction otherFaction){
+        Faction thisFaction = getFaction();
+        return thisFaction != otherFaction || thisFaction == Faction.UNKNOWN;
     }
 
     public static boolean areHostile(Player p1, Player p2){
@@ -578,48 +558,74 @@ public class RoleInstance {
     }
 
     //生命周期触发
-    public void triggerLifecycleOnSet(){
+    //awake阶段：只解析跨组件依赖并缓存引用，必须幂等且不改动玩家可见状态
+    public void triggerLifecycleAwake(){
         if(player == null ) return;
 
         //遍历所有技能
         for(Skill skill : skillMap.values()){
             if(skill instanceof LifecycleAware){
-                ((LifecycleAware) skill).onSet(player, this);
+                ((LifecycleAware) skill).awake(player, this);
             }
         }
 
         for(PassiveSkill passive : passiveMap.values()){
             if(passive instanceof LifecycleAware){
-                ((LifecycleAware) passive).onSet(player, this);
+                ((LifecycleAware) passive).awake(player, this);
             }
         }
 
         for(MainWeapon weapon : mainWeaponMap.values()){
             if(weapon instanceof LifecycleAware){
-                ((LifecycleAware) weapon).onSet(player, this);
+                ((LifecycleAware) weapon).awake(player, this);
             }
         }
     }
 
-    public void triggerLifecycleOnClear(){
+    //start阶段：开始生效，顺序与awake一致（技能/被动/武器）
+    public void triggerLifecycleStart(){
         if(player == null ) return;
 
         //遍历所有技能
         for(Skill skill : skillMap.values()){
             if(skill instanceof LifecycleAware){
-                ((LifecycleAware) skill).onClear(player, this);
+                ((LifecycleAware) skill).start(player, this);
             }
         }
 
         for(PassiveSkill passive : passiveMap.values()){
             if(passive instanceof LifecycleAware){
-                ((LifecycleAware) passive).onClear(player, this);
+                ((LifecycleAware) passive).start(player, this);
             }
         }
 
         for(MainWeapon weapon : mainWeaponMap.values()){
             if(weapon instanceof LifecycleAware){
-                ((LifecycleAware) weapon).onClear(player, this);
+                ((LifecycleAware) weapon).start(player, this);
+            }
+        }
+    }
+
+    //stop阶段：停止生效，遍历顺序与start相反（武器/被动/技能），逆序拆卸
+    public void triggerLifecycleStop(){
+        if(player == null ) return;
+
+        for(MainWeapon weapon : mainWeaponMap.values()){
+            if(weapon instanceof LifecycleAware){
+                ((LifecycleAware) weapon).stop(player, this);
+            }
+        }
+
+        for(PassiveSkill passive : passiveMap.values()){
+            if(passive instanceof LifecycleAware){
+                ((LifecycleAware) passive).stop(player, this);
+            }
+        }
+
+        //遍历所有技能
+        for(Skill skill : skillMap.values()){
+            if(skill instanceof LifecycleAware){
+                ((LifecycleAware) skill).stop(player, this);
             }
         }
     }
@@ -676,19 +682,19 @@ public class RoleInstance {
         //遍历所有技能
         for(Skill skill : skillMap.values()){
             if(skill instanceof UpdateAware){
-                ((UpdateAware) skill).update(player, this);
+                runComponentUpdate("skill", skill.getId(), () -> ((UpdateAware) skill).update(player, this));
             }
         }
 
         for(PassiveSkill passive : passiveMap.values()){
             if(passive instanceof UpdateAware){
-                ((UpdateAware) passive).update(player, this);
+                runComponentUpdate("passive", passive.getId(), () -> ((UpdateAware) passive).update(player, this));
             }
         }
 
         for(MainWeapon weapon : mainWeaponMap.values()){
             if(weapon instanceof UpdateAware){
-                ((UpdateAware) weapon).update(player, this);
+                runComponentUpdate("mainWeapon", weapon.getId(), () -> ((UpdateAware) weapon).update(player, this));
             }
         }
 
@@ -700,6 +706,25 @@ public class RoleInstance {
             updateAllSkillItemMeta();
         }
 
+    }
+
+    //单个组件抛异常时不能中断这一tick其他组件的更新；同一个组件的异常只上报一次，恢复正常后再提示一次
+    private void runComponentUpdate(String componentType, String componentId, Runnable action){
+        String key = componentType + ":" + componentId;
+        try{
+            action.run();
+            if(reportedUpdateErrors.remove(key)){
+                ShadowHunterRolesPlugin.getInstance().getLogger().info(
+                        "Role '" + role.getId() + "' component [" + key + "] recovered from a previous update error.");
+            }
+        }
+        catch(Throwable throwable){
+            if(reportedUpdateErrors.add(key)){
+                ShadowHunterRolesPlugin.getInstance().getLogger().log(Level.SEVERE,
+                        "Role '" + role.getId() + "' component [" + key + "] threw an exception in update(), only this component is skipped. "
+                                + "Repeated errors of this component are suppressed until it recovers.", throwable);
+            }
+        }
     }
 
     //检测是否应该更新物品
@@ -724,7 +749,9 @@ public class RoleInstance {
 
     //清除这个实例时使用，重置玩家状态
     public void clear(){
-        triggerLifecycleOnClear();
+        valid = false;
+
+        triggerLifecycleStop();
 
         Bukkit.getScheduler().cancelTask(updateTaskId);
 
@@ -732,9 +759,11 @@ public class RoleInstance {
 
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(roleHealthModifierKey);
 
-        player.getActivePotionEffects().forEach(potionEffect -> {
-            player.removePotionEffect(potionEffect.getType());
-        });
+        //药水记账（O-7 / D6）：只移除本系统记账过的效果，不再无条件清空玩家身上的所有药水效果
+        for(PotionEffectType type : appliedPotionTypes){
+            player.removePotionEffect(type);
+        }
+        appliedPotionTypes.clear();
 
         buffManager.clearAll();
 

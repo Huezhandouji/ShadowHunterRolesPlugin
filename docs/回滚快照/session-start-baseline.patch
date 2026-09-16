@@ -1,0 +1,1160 @@
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/api/RoleAPI.java b/src/main/java/com/shadowHunterRolesPlugin/api/RoleAPI.java
+index 6bd13ff..a34dbe6 100644
+--- a/src/main/java/com/shadowHunterRolesPlugin/api/RoleAPI.java
++++ b/src/main/java/com/shadowHunterRolesPlugin/api/RoleAPI.java
+@@ -7,6 +7,7 @@ import org.bukkit.entity.LivingEntity;
+ import org.bukkit.entity.Player;
+ import org.bukkit.event.player.PlayerRespawnEvent;
+ 
++import java.util.List;
+ import java.util.UUID;
+ 
+ 
+@@ -44,7 +45,7 @@ public interface RoleAPI {
+ 
+     //角色描述查询
+     Component getRoleDisplayName(String roleId);
+-    Component getRoleDescription(String roleId);
++    List<Component> getRoleDescription(String roleId);
+     Material getRoleIcon(String roleId);
+ 
+     //能量系统
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/api/RoleAPIImpl.java b/src/main/java/com/shadowHunterRolesPlugin/api/RoleAPIImpl.java
+index 9bfa150..efd52ee 100644
+--- a/src/main/java/com/shadowHunterRolesPlugin/api/RoleAPIImpl.java
++++ b/src/main/java/com/shadowHunterRolesPlugin/api/RoleAPIImpl.java
+@@ -13,6 +13,7 @@ import org.bukkit.attribute.Attribute;
+ import org.bukkit.entity.LivingEntity;
+ import org.bukkit.entity.Player;
+ 
++import java.util.List;
+ import java.util.UUID;
+ 
+ public class RoleAPIImpl implements RoleAPI {
+@@ -106,10 +107,10 @@ public class RoleAPIImpl implements RoleAPI {
+     }
+ 
+     @Override
+-    public Component getRoleDescription(String roleID){
++    public List<Component> getRoleDescription(String roleID){
+         Role role = RoleRegistry.getRole(roleID);
+         if(role == null){
+-            return Component.text("");
++            return List.of(Component.text(""));
+         }
+         else{
+             return role.getDescription();
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/core/DamageUtil.java b/src/main/java/com/shadowHunterRolesPlugin/core/DamageUtil.java
+index 50f152d..a48d44c 100644
+--- a/src/main/java/com/shadowHunterRolesPlugin/core/DamageUtil.java
++++ b/src/main/java/com/shadowHunterRolesPlugin/core/DamageUtil.java
+@@ -14,6 +14,9 @@ import java.util.UUID;
+ 
+ public class DamageUtil {
+ 
++    //小于这个水平距离平方时不计算击退，避免向量归一化得到NaN
++    private static final double MIN_KNOCKBACK_LENGTH_SQUARED = 1.0E-6;
++
+     public static final NamespacedKey LAST_DAMAGER_KEY = new NamespacedKey(
+             ShadowHunterRolesPlugin.getInstance(),
+             "last_damager"
+@@ -32,7 +35,7 @@ public class DamageUtil {
+             GameMode gm = player.getGameMode();
+             if(gm == GameMode.CREATIVE || gm == GameMode.SPECTATOR) return;
+ 
+-            DamageUtil.dealtPhysicalDamage(victim, damager, 0);
++            DamageUtil.dealtPhysicalDamage(victim, damager, 0.0001);
+         }
+         victim.setHealth(Math.max(0, victim.getHealth() - amount));
+     }
+@@ -40,6 +43,7 @@ public class DamageUtil {
+     public static void dealtTrueDamage(LivingEntity victim, LivingEntity damager, double amount, double knockbackStrength){
+         if(victim == null || victim.isDead()) return;
+         dealtTrueDamage(victim, damager, amount);
++        if(damager == null) return;
+         applyKnockback(victim, damager.getLocation(), knockbackStrength);
+     }
+ 
+@@ -56,20 +60,29 @@ public class DamageUtil {
+             );
+         }
+         //造成伤害，绕过被玩家伤害事件
++        victim.setNoDamageTicks(0);
+         victim.damage(amount);
+     }
+     //带有击退的重载
+     public static void dealtPhysicalDamage(LivingEntity victim, LivingEntity damager, double amount, double knockbackStrength){
+         if(victim == null || victim.isDead()) return;
+         dealtPhysicalDamage(victim, damager, amount);
++        if(damager == null) return;
+         applyKnockback(victim, damager.getLocation(), knockbackStrength);
+ 
+     }
+ 
+     public static void applyKnockback(LivingEntity target, Location source, double strength){
+-        if(source == null) return;
++        if(target == null || source == null) return;
++        if(target.getWorld() == null || source.getWorld() == null) return;
++        if(!target.getWorld().equals(source.getWorld())) return;
++
+         Vector dir = target.getLocation().toVector().subtract(source.toVector());
+         dir.setY(0);
++
++        //两个实体站在同一个方块里时水平向量长度为0，normalize() 会算出 NaN，setVelocity 会抛 "x not finite"
++        if(dir.lengthSquared() < MIN_KNOCKBACK_LENGTH_SQUARED) return;
++
+         dir.normalize();
+         dir.multiply(strength);
+         dir.setY(strength * 0.2);
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/core/Role.java b/src/main/java/com/shadowHunterRolesPlugin/core/Role.java
+index 9a6b991..7c40a1d 100644
+--- a/src/main/java/com/shadowHunterRolesPlugin/core/Role.java
++++ b/src/main/java/com/shadowHunterRolesPlugin/core/Role.java
+@@ -28,7 +28,7 @@ public class Role {
+ 
+     private final String id;
+     private final Component displayName;
+-    private final Component description;
++    private final List<Component> description;
+ 
+     private final double maxHP;
+     private final double baseATK;
+@@ -93,7 +93,7 @@ public class Role {
+ 
+         private final String id;
+         private Component displayName;
+-        private Component description;
++        private List<Component> description;
+         private double maxHP = 20d;
+         private double baseATK = 10d;
+         private int maxEnergy = 100;
+@@ -119,11 +119,16 @@ public class Role {
+             return this;
+         }
+ 
+-        public Builder description(Component description) {
++        public Builder description(List<Component> description) {
+             this.description = description;
+             return this;
+         }
+ 
++        public Builder addLineOfDescription(Component description){
++            this.description.add(description);
++            return this;
++        }
++
+         public Builder maxHP(double maxHP) {
+             if (maxHP <= 0) {
+                 throw new IllegalArgumentException("Role maxHP cannot be negative.");
+@@ -232,7 +237,7 @@ public class Role {
+ 
+         public Role build(){
+             if(displayName == null) displayName = Component.text(id);
+-            if(description == null) description = Component.text("No description yet.");
++            if(description == null) description = List.of(Component.text("No description yet."));
+ 
+             return new Role(this);
+         }
+@@ -244,7 +249,7 @@ public class Role {
+ 
+     public String getId() { return id; }
+     public Component getDisplayName() { return displayName; }
+-    public Component getDescription() { return description; }
++    public List<Component> getDescription() { return description; }
+     public double getMaxHP() { return maxHP; }
+     public double getBaseATK() { return baseATK; }
+     public int getMaxEnergy() { return maxEnergy; }
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/core/RoleInstance.java b/src/main/java/com/shadowHunterRolesPlugin/core/RoleInstance.java
+index f89648c..89b48c7 100644
+--- a/src/main/java/com/shadowHunterRolesPlugin/core/RoleInstance.java
++++ b/src/main/java/com/shadowHunterRolesPlugin/core/RoleInstance.java
+@@ -21,6 +21,7 @@ import org.bukkit.inventory.ItemStack;
+ import org.bukkit.inventory.meta.ItemMeta;
+ 
+ import java.util.*;
++import java.util.logging.Level;
+ 
+ public class RoleInstance {
+ 
+@@ -54,6 +55,9 @@ public class RoleInstance {
+     //buff管理器
+     private final BuffManager buffManager;
+ 
++    //已经上报过update异常的组件，避免每tick刷屏
++    private final Set<String> reportedUpdateErrors = new HashSet<>();
++
+     private int updateTaskId = -1;
+ 
+     private final NamespacedKey roleHealthModifierKey = new NamespacedKey(
+@@ -545,13 +549,9 @@ public class RoleInstance {
+             return true;
+         }
+ 
+-        Faction thisFaction = getFaction();
+         Faction otherFaction = other.getFaction();
+ 
+-        if(thisFaction == otherFaction && thisFaction != Faction.UNKNOWN){
+-            return false;
+-        }
+-        return true;
++        return isHostileTo(otherFaction);
+     }
+ 
+     public boolean isHostileTo(Player other){
+@@ -559,6 +559,11 @@ public class RoleInstance {
+         return isHostileTo(otherInstance);
+     }
+ 
++    public boolean isHostileTo(Faction otherFaction){
++        Faction thisFaction = getFaction();
++        return thisFaction != otherFaction || thisFaction == Faction.UNKNOWN;
++    }
++
+     public static boolean areHostile(Player p1, Player p2){
+         if(p1 == null || p2 == null) return false;
+         RoleInstance ins1 = RoleManager.getInstance().getRoleInstance(p1);
+@@ -676,19 +681,19 @@ public class RoleInstance {
+         //遍历所有技能
+         for(Skill skill : skillMap.values()){
+             if(skill instanceof UpdateAware){
+-                ((UpdateAware) skill).update(player, this);
++                runComponentUpdate("skill", skill.getId(), () -> ((UpdateAware) skill).update(player, this));
+             }
+         }
+ 
+         for(PassiveSkill passive : passiveMap.values()){
+             if(passive instanceof UpdateAware){
+-                ((UpdateAware) passive).update(player, this);
++                runComponentUpdate("passive", passive.getId(), () -> ((UpdateAware) passive).update(player, this));
+             }
+         }
+ 
+         for(MainWeapon weapon : mainWeaponMap.values()){
+             if(weapon instanceof UpdateAware){
+-                ((UpdateAware) weapon).update(player, this);
++                runComponentUpdate("mainWeapon", weapon.getId(), () -> ((UpdateAware) weapon).update(player, this));
+             }
+         }
+ 
+@@ -702,6 +707,25 @@ public class RoleInstance {
+ 
+     }
+ 
++    //单个组件抛异常时不能中断这一tick其他组件的更新；同一个组件的异常只上报一次，恢复正常后再提示一次
++    private void runComponentUpdate(String componentType, String componentId, Runnable action){
++        String key = componentType + ":" + componentId;
++        try{
++            action.run();
++            if(reportedUpdateErrors.remove(key)){
++                ShadowHunterRolesPlugin.getInstance().getLogger().info(
++                        "Role '" + role.getId() + "' component [" + key + "] recovered from a previous update error.");
++            }
++        }
++        catch(Throwable throwable){
++            if(reportedUpdateErrors.add(key)){
++                ShadowHunterRolesPlugin.getInstance().getLogger().log(Level.SEVERE,
++                        "Role '" + role.getId() + "' component [" + key + "] threw an exception in update(), only this component is skipped. "
++                                + "Repeated errors of this component are suppressed until it recovers.", throwable);
++            }
++        }
++    }
++
+     //检测是否应该更新物品
+     private boolean shouldUpdateHotbar(){
+         for(String skillId : skillCooldowns.keySet()){
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/registry/RoleRegistry.java b/src/main/java/com/shadowHunterRolesPlugin/registry/RoleRegistry.java
+index 7be097f..6d7059b 100644
+--- a/src/main/java/com/shadowHunterRolesPlugin/registry/RoleRegistry.java
++++ b/src/main/java/com/shadowHunterRolesPlugin/registry/RoleRegistry.java
+@@ -2,16 +2,18 @@ package com.shadowHunterRolesPlugin.registry;
+ 
+ import com.shadowHunterRolesPlugin.core.Faction;
+ import com.shadowHunterRolesPlugin.core.Role;
+-import com.shadowHunterRolesPlugin.roleComponent.DefaultSanTEZeroPunishment;
+-import com.shadowHunterRolesPlugin.roleComponent.TestSendSanTEAndEnergyChangeMsgPassive;
+-import com.shadowHunterRolesPlugin.roleComponent.TestSetSanTEToZeroSkill;
++import com.shadowHunterRolesPlugin.roleComponent.*;
+ import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
++import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
+ import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
+ import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
+ import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziUnconcernSkill;
++import com.shadowHunterRolesPlugin.roleComponent.red.*;
+ import net.kyori.adventure.text.Component;
++import org.bukkit.Material;
+ 
+ import java.util.HashMap;
++import java.util.List;
+ import java.util.Map;
+ 
+ public class RoleRegistry {
+@@ -49,7 +51,14 @@ public class RoleRegistry {
+ 
+         Role.Builder builder = new Role.Builder("meiqihezi")
+                 .displayName(Component.text("MeiqiHezi"))
+-                .description(Component.text("A hunter role."))
++                //Component.text("战斗疯子\n普攻20能量以上左键造成范围伤害并消耗能量，20以下只能打一个人\n一技能加速\n二技能三段突进并造成伤害\n三技能圆弧斩，范围真伤")
++                .description(List.of(
++                        Component.text("战斗疯子"),
++                        Component.text("普攻20能量以上左键造成范围伤害并消耗能量，20以下只能打一个人"),
++                        Component.text("一技能加速"),
++                        Component.text("二技能三段突进并造成伤害"),
++                        Component.text("三技能圆弧斩，范围真伤")
++                ))
+                 .maxHP(40)
+                 .baseATK(10)
+                 .maxEnergy(100)
+@@ -61,7 +70,11 @@ public class RoleRegistry {
+                 .faction(Faction.HUNTER)
+                 .addPassive(TestSendSanTEAndEnergyChangeMsgPassive::new)
+                 .addPassive(DefaultSanTEZeroPunishment::new)
+-                .addSkill(TestSetSanTEToZeroSkill::new, 4);
++                .addSkill(TestSetSanTEToZeroSkill::new, 4)
++                .addPassive(AutoRecoverSanTEHealthPassive::new)
++                .addPassive(AutoRecoverEnergyPassive::new)
++                .addPassive(MeiqiheziEquipmentsPassive::new)
++                .icon(Material.DIAMOND_HOE);
+ 
+ 
+         BUILDERS.put("meiqihezi", builder);
+@@ -72,12 +85,27 @@ public class RoleRegistry {
+ 
+         Role.Builder builder = new Role.Builder("red")
+                 .displayName(Component.text("Red"))
+-                .description(Component.text("A shadow role."))
++                //Component.text("待到血腥降临，一切化为土尘\n普攻造成15流血\n一技能捅人恢复生命\n二技能致盲敌人并结算5层流血恢复te\n三技能烧自己te开启狂暴")
++                .description(List.of(
++                        Component.text("待到血腥降临，一切化为土尘"),
++                        Component.text("普攻造成15流血"),
++                        Component.text("一技能捅人恢复生命")
++                ))
+                 .maxHP(40)
+                 .baseATK(10)
+                 .maxEnergy(0)
+                 .maxSanTE(100)
+-                .faction(Faction.SHADOW);
++                .faction(Faction.SHADOW)
++                .addPassive(RedBleedPassive::new)
++                .addMainWeapon(RedSanctifiedBladeMainWeapon::new, 0)
++                .addSkill(RedSolitaryArroganceSkill::new, 1)
++                .addSkill(RedEvilShockSkill::new, 2)
++                .addSkill(RedDeeplySorrowSkill::new, 3)
++                .addPassive(AutoRecoverSanTEHealthPassive::new)
++                .addPassive(RedEquipmentsPassive::new)
++                .addPassive(TestSendSanTEAndEnergyChangeMsgPassive::new)
++                .addPassive(DefaultSanTEZeroPunishment::new)
++                .icon(Material.POPPY);
+ 
+         BUILDERS.put("red", builder);
+         ROLES.put("red", builder.build());
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/AutoRecoverEnergyPassive.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/AutoRecoverEnergyPassive.java
+new file mode 100644
+index 0000000..ec659c2
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/AutoRecoverEnergyPassive.java
+@@ -0,0 +1,37 @@
++package com.shadowHunterRolesPlugin.roleComponent;
++
++import com.shadowHunterRolesPlugin.core.PassiveSkill;
++import com.shadowHunterRolesPlugin.core.RoleComponentAware.UpdateAware;
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import net.kyori.adventure.text.Component;
++import org.bukkit.entity.Player;
++
++public class AutoRecoverEnergyPassive extends PassiveSkill implements UpdateAware {
++
++    private int noEnemySurroundTime = 0;
++    private int tickSecondRecord = 0;
++
++    public AutoRecoverEnergyPassive() {
++        super("autoRecoverEnergy_passive", Component.text("自动恢复能量"), Component.text("周围10格没有敌人时，每秒恢复3点能量"));
++    }
++
++    @Override
++    public void update(Player player, RoleInstance instance) {
++        if(SkillUtil.hasEnemyInRange(instance.getFaction(), player.getLocation(), 10)){
++            if(noEnemySurroundTime != 0) noEnemySurroundTime = 0;
++        }
++        else{
++            if(noEnemySurroundTime < 200){
++                noEnemySurroundTime++;
++            }
++        }
++
++        if(noEnemySurroundTime >= 200){
++            tickSecondRecord++;
++            if(tickSecondRecord >= 20){
++                tickSecondRecord = 0;
++                instance.increaseEnergy(3);
++            }
++        }
++    }
++}
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/AutoRecoverSanTEHealthPassive.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/AutoRecoverSanTEHealthPassive.java
+new file mode 100644
+index 0000000..85452a4
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/AutoRecoverSanTEHealthPassive.java
+@@ -0,0 +1,40 @@
++package com.shadowHunterRolesPlugin.roleComponent;
++
++import com.shadowHunterRolesPlugin.core.PassiveSkill;
++import com.shadowHunterRolesPlugin.core.RoleComponentAware.UpdateAware;
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import net.kyori.adventure.text.Component;
++import org.bukkit.entity.Player;
++
++public class AutoRecoverSanTEHealthPassive extends PassiveSkill implements UpdateAware {
++
++    private int noEnemySurroundTime = 0;
++    private int tickSecondRecord = 0;
++
++    public AutoRecoverSanTEHealthPassive() {
++        super("autoRecoverSanTEPassive", Component.text("自动恢复SanTE"), Component.text("当周围10格没有敌人五秒后, 开始自动恢复SanTE, 每秒3"));
++    }
++
++    @Override
++    public void update(Player player, RoleInstance instance) {
++        if(SkillUtil.hasEnemyInRange(instance.getFaction(), player.getLocation(), 10)){
++            if(noEnemySurroundTime != 0) noEnemySurroundTime = 0;
++        }
++        else{
++            if(noEnemySurroundTime < 200){
++                noEnemySurroundTime++;
++            }
++        }
++
++        if(instance.getCurrentSanTE() <= 0) return;
++
++        if(noEnemySurroundTime >= 200){
++            tickSecondRecord++;
++            if(tickSecondRecord >= 20){
++                tickSecondRecord = 0;
++                instance.increaseSanTE(3);
++                instance.heal(1);
++            }
++        }
++    }
++}
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/SkillUtil.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/SkillUtil.java
+new file mode 100644
+index 0000000..d4f0ff6
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/SkillUtil.java
+@@ -0,0 +1,67 @@
++package com.shadowHunterRolesPlugin.roleComponent;
++
++import com.shadowHunterRolesPlugin.core.Faction;
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import com.shadowHunterRolesPlugin.manager.RoleManager;
++import org.bukkit.Location;
++import org.bukkit.entity.Entity;
++import org.bukkit.entity.Player;
++import org.bukkit.util.RayTraceResult;
++import org.bukkit.util.Vector;
++
++import java.util.*;
++
++
++public class SkillUtil {
++
++    public static boolean hasEnemyInRange(Faction selfFaction, Location loc, double radius){
++        if(loc == null || loc.getWorld() == null) return false;
++
++        for(Player p : loc.getNearbyPlayers(radius)){
++            if(p == null) continue;
++            RoleInstance other = RoleManager.getInstance().getRoleInstance(p);
++            //没有选角色的玩家也要算进来，否则 getRoleInstance() 返回 null 会抛 NPE
++            if(other == null || other.isHostileTo(selfFaction)){
++                return true;
++            }
++        }
++        return false;
++    }
++
++    public static List<Player> getPlayersInSightLine(Player player, double maxDistance, double range) {
++        List<Player> result = new ArrayList<>();
++        Set<Entity> hit = new HashSet<>();
++
++        Location start = player.getEyeLocation().clone();
++        Vector direction = start.getDirection().normalize();
++        double remaining = maxDistance;
++
++        while (remaining > 0) {
++            RayTraceResult rayResult = player.getWorld().rayTraceEntities(
++                    start,
++                    direction,
++                    remaining,
++                    range,
++                    entity -> entity instanceof Player
++                            && !entity.equals(player)
++                            && !hit.contains(entity)
++            );
++
++            if (rayResult == null || rayResult.getHitEntity() == null) break;
++
++            Entity target = rayResult.getHitEntity();
++            result.add((Player) target);
++            hit.add(target);
++
++            // 计算命中点距离，推进起点
++            double distance = start.toVector().distance(rayResult.getHitPosition());
++            if (distance <= 0.0001) break; // 防止死循环
++
++            remaining -= distance;
++            start = rayResult.getHitPosition().toLocation(player.getWorld());
++        }
++
++        return result;
++    }
++
++}
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/meiqiHezi/passive/MeiqiheziEquipmentsPassive.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/meiqiHezi/passive/MeiqiheziEquipmentsPassive.java
+new file mode 100644
+index 0000000..c950391
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/meiqiHezi/passive/MeiqiheziEquipmentsPassive.java
+@@ -0,0 +1,75 @@
++package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.passive;
++
++import com.shadowHunterRolesPlugin.core.PassiveSkill;
++import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import net.kyori.adventure.text.Component;
++import org.bukkit.Color;
++import org.bukkit.Material;
++import org.bukkit.enchantments.Enchantment;
++import org.bukkit.entity.Player;
++import org.bukkit.inventory.ItemStack;
++import org.bukkit.inventory.meta.ItemMeta;
++import org.bukkit.inventory.meta.LeatherArmorMeta;
++
++public class MeiqiheziEquipmentsPassive extends PassiveSkill implements LifecycleAware {
++
++    public MeiqiheziEquipmentsPassive() {
++        super("meiqihezi_equippments_passive", Component.text("穿戴装备"), Component.text("ccb"));
++    }
++
++    @Override
++    public void onSet(Player player, RoleInstance instance) {
++        ItemStack helmet = new ItemStack(Material.IRON_HELMET);
++        {
++            ItemMeta meta = helmet.getItemMeta();
++            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
++            meta.addEnchant(Enchantment.PROTECTION, 1, false);
++            meta.addEnchant(Enchantment.PROJECTILE_PROTECTION, 1, false);
++            meta.setUnbreakable(true);
++            helmet.setItemMeta(meta);
++        }
++
++        ItemStack chestplate = new ItemStack(Material.LEATHER_CHESTPLATE);
++        {
++            ItemMeta meta = chestplate.getItemMeta();
++            LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) meta;
++            leatherArmorMeta.setColor(Color.fromRGB(139, 0, 0));
++            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
++            meta.addEnchant(Enchantment.PROTECTION, 2, false);
++            meta.setUnbreakable(true);
++            chestplate.setItemMeta(meta);
++        }
++
++        ItemStack leggings = new ItemStack(Material.IRON_LEGGINGS);
++        {
++            ItemMeta meta = leggings.getItemMeta();
++            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
++            meta.addEnchant(Enchantment.PROTECTION, 1, false);
++            meta.addEnchant(Enchantment.FIRE_PROTECTION, 1, false);
++            meta.setUnbreakable(true);
++            leggings.setItemMeta(meta);
++        }
++
++        ItemStack boots = new ItemStack(Material.LEATHER_BOOTS);
++        {
++            ItemMeta meta = boots.getItemMeta();
++            LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) meta;
++            leatherArmorMeta.setColor(Color.GRAY);
++            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
++            meta.addEnchant(Enchantment.PROTECTION, 1, false);
++            meta.addEnchant(Enchantment.FEATHER_FALLING, 3, false);
++            meta.setUnbreakable(true);
++            boots.setItemMeta(meta);
++        }
++
++        player.getInventory().setHelmet(helmet);
++        player.getInventory().setChestplate(chestplate);
++        player.getInventory().setLeggings(leggings);
++        player.getInventory().setBoots(boots);
++    }
++
++    @Override
++    public void onClear(Player player, RoleInstance instance) {
++    }
++}
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedBleedPassive.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedBleedPassive.java
+new file mode 100644
+index 0000000..ea900f1
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedBleedPassive.java
+@@ -0,0 +1,217 @@
++package com.shadowHunterRolesPlugin.roleComponent.red;
++
++import com.shadowHunterRolesPlugin.core.DamageUtil;
++import com.shadowHunterRolesPlugin.core.PassiveSkill;
++import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
++import com.shadowHunterRolesPlugin.core.RoleComponentAware.UpdateAware;
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import net.kyori.adventure.text.Component;
++import org.bukkit.Bukkit;
++import org.bukkit.Color;
++import org.bukkit.Particle;
++import org.bukkit.entity.Player;
++import org.bukkit.potion.PotionEffectType;
++
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.UUID;
++
++public class RedBleedPassive extends PassiveSkill implements LifecycleAware, UpdateAware {
++
++    //流血记录保存在 RoleInstance 上下文里的键，红的主武器等其它组件通过它读写同一份数据
++    public static final String BLEED_RECORD_CONTEXT_KEY = "player_bleed_record";
++    //其他技能请求结算流血的记录
++    public static final String BLEED_RESOLVE_REQUESTS_KEY = "player_bleed_resolve_requests";
++
++    //最大流血层数
++    public static final int MAX_BLEED_STACK = 15;
++
++    //每层流血每秒造成的真伤
++    private static final double BLEED_DAMAGE_PER_SECOND = 2d;
++
++    //每次结算流血给红回复的SanTE
++    private static final int BLEED_SANTE_RECOVER = 4;
++
++    //结算流血时赋予红的抗性持续时间
++    private static final int BLEED_RESISTANCE_DURATION_TICKS = 100;
++
++    //流血结算间隔(游戏刻)，20刻 = 1秒
++    private static final int BLEED_SETTLE_INTERVAL_TICKS = 20;
++
++    private final Map<UUID, Integer> playerBleedRecord = new HashMap<>();
++    private final Map<UUID, Integer> playerBleedResolveRequests = new HashMap<>();
++
++    private int secondCountdown = 0;
++
++    public RedBleedPassive() {
++        super("red_bleed_passive", Component.text("流血"), Component.text("红的流血被动"));
++    }
++
++    /**技能初始化时，在角色实例上下文中初始化流血记录**/
++    @Override
++    public void onSet(Player player, RoleInstance instance) {
++        instance.setContext(BLEED_RECORD_CONTEXT_KEY, playerBleedRecord);
++        instance.setContext(BLEED_RESOLVE_REQUESTS_KEY, playerBleedResolveRequests);
++    }
++
++    @Override
++    public void onClear(Player player, RoleInstance instance) {
++        playerBleedRecord.clear();
++        playerBleedResolveRequests.clear();
++    }
++
++    /**供其它组件(技能)登记"结算流血"请求：受害者的UUID -> 请求结算的层数**/
++    @SuppressWarnings("unchecked")
++    public static void requestBleedResolve(RoleInstance instance, Player victim, int stacks){
++        if(instance == null || victim == null || stacks <= 0) return;
++
++        Map<UUID, Integer> requests = instance.getContext(BLEED_RESOLVE_REQUESTS_KEY, Map.class);
++        //流血被动没注册或者上下文被清空时直接忽略，不能把调用方的技能搞崩
++        if(requests == null) return;
++
++        //同一个目标被多个技能同时请求时把层数叠加起来
++        requests.merge(victim.getUniqueId(), stacks, Integer::sum);
++    }
++
++    /**
++     * 这个受害者现在还能不能吃到流血。
++     * 注意不能用 Player#isDead() 判断死亡：它是 CraftEntity 的 !entity.isAlive()，
++     * 也就是"实体是否已经被移除"，躺在死亡界面上的玩家它依然返回 false，血量才是 0。
++     **/
++    public static boolean canReceiveBleed(Player victim){
++        return victim != null
++                && victim.isOnline()
++                && !victim.isDead()
++                && victim.getHealth() > 0d;
++    }
++
++    @Override
++    public void update(Player player, RoleInstance instance) {
++        //每tick先清掉失效记录：受害者退出游戏、死亡(含死亡界面)或者层数已经结算完
++        //死亡必须每tick检查，否则尸体还会继续吃流血，红还能一直从尸体身上拿SanTE
++        purgeInvalidBleedRecords();
++
++        //再处理其它技能登记的结算请求(一次性，处理完就移除)，不受每秒结算节奏限制
++        resolveRequestedBleed(player, instance);
++
++        //每秒结算一次流血
++        secondCountdown++;
++        if(secondCountdown < BLEED_SETTLE_INTERVAL_TICKS) return;
++        secondCountdown = 0;
++
++        //遍历过程中不能直接修改map(会抛ConcurrentModificationException)，先收集需要移除的条目
++        List<UUID> toRemove = new ArrayList<>();
++
++        for(Map.Entry<UUID, Integer> entry : playerBleedRecord.entrySet()) {
++            UUID pid = entry.getKey();
++            Integer recorded = entry.getValue();
++            int curBleed = recorded != null ? recorded : 0;
++
++            Player victim = Bukkit.getPlayer(pid);
++            //双保险：上面的清理已经跑过，这里再挡一次
++            if(!canReceiveBleed(victim) || curBleed <= 0) {
++                toRemove.add(pid);
++                continue;
++            }
++
++            //结算这名受害者的一层流血
++            int newBleed = Math.clamp(curBleed - 1, 0, MAX_BLEED_STACK);
++            playerBleedRecord.put(pid, newBleed);
++
++            //粒子
++            player.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
++            DamageUtil.dealtTrueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
++            //赋予 红 5秒抗性1, 恢复4点SanTE
++            player.addPotionEffect(PotionEffectType.RESISTANCE.createEffect(BLEED_RESISTANCE_DURATION_TICKS, 1));
++            instance.increaseSanTE(BLEED_SANTE_RECOVER);
++
++            if(newBleed <= 0) {
++                toRemove.add(pid);
++            }
++        }
++
++        for(UUID pid : toRemove) {
++            playerBleedRecord.remove(pid);
++        }
++    }
++
++    //清理已经不能继续流血的记录：受害者退出游戏、死亡(死亡界面里 isDead() 仍为false，要用血量判断)或者层数已归零
++    private void purgeInvalidBleedRecords(){
++        if(playerBleedRecord.isEmpty()) return;
++
++        //遍历过程中不能直接修改map，先收集需要移除的条目
++        List<UUID> toRemove = new ArrayList<>();
++
++        for(Map.Entry<UUID, Integer> entry : playerBleedRecord.entrySet()){
++            Integer recorded = entry.getValue();
++            int curBleed = recorded != null ? recorded : 0;
++
++            if(curBleed <= 0 || !canReceiveBleed(Bukkit.getPlayer(entry.getKey()))){
++                toRemove.add(entry.getKey());
++            }
++        }
++
++        for(UUID pid : toRemove){
++            playerBleedRecord.remove(pid);
++        }
++    }
++
++    //处理其它技能登记的流血结算请求，请求是一次性的：无论有没有真的结算成功，处理完就从请求表里移除
++    private void resolveRequestedBleed(Player caster, RoleInstance casterInstance){
++        if(playerBleedResolveRequests.isEmpty()) return;
++
++        //遍历过程中不能直接修改map，先收集已经处理过的键
++        List<UUID> handled = new ArrayList<>();
++
++        for(Map.Entry<UUID, Integer> entry : playerBleedResolveRequests.entrySet()){
++            handled.add(entry.getKey());
++
++            Player victim = Bukkit.getPlayer(entry.getKey());
++            if(victim == null) continue;
++
++            Integer amount = entry.getValue();
++            resolveBleed(victim, caster, casterInstance, amount != null ? amount : 0);
++        }
++
++        for(UUID pid : handled){
++            playerBleedResolveRequests.remove(pid);
++        }
++    }
++
++    private void resolveBleed(Player victim, Player caster, RoleInstance casterInstance, int amount){
++        if(victim == null || caster == null || casterInstance == null || amount <= 0) return;
++
++        UUID pid = victim.getUniqueId();
++
++        //已经死亡的受害者：请求作废，记录一并清掉，不能从尸体上结算出伤害和SanTE
++        if(!canReceiveBleed(victim)){
++            playerBleedRecord.remove(pid);
++            return;
++        }
++
++        Integer recorded = playerBleedRecord.get(pid);
++        int curBleed = recorded != null ? recorded : 0;
++        if(curBleed <= 0) return;
++
++        int finalResolveBleedAmount = Math.min(amount, curBleed);
++        int newBleed = curBleed - finalResolveBleedAmount;
++
++        //结算完就把记录删掉，避免留下0层的空记录
++        if(newBleed <= 0){
++            playerBleedRecord.remove(pid);
++        }
++        else{
++            playerBleedRecord.put(pid, newBleed);
++        }
++
++        DamageUtil.dealtTrueDamage(victim, caster, finalResolveBleedAmount * BLEED_DAMAGE_PER_SECOND);
++
++        //赋予 红 5秒抗性1, 恢复4点SanTE
++        caster.addPotionEffect(PotionEffectType.RESISTANCE.createEffect(BLEED_RESISTANCE_DURATION_TICKS, 1));
++        casterInstance.increaseSanTE(BLEED_SANTE_RECOVER);
++
++        victim.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
++    }
++}
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedDeeplySorrowSkill.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedDeeplySorrowSkill.java
+new file mode 100644
+index 0000000..eadb780
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedDeeplySorrowSkill.java
+@@ -0,0 +1,58 @@
++package com.shadowHunterRolesPlugin.roleComponent.red;
++
++import com.shadowHunterRolesPlugin.core.RoleComponentAware.SanTEChangeAware;
++import com.shadowHunterRolesPlugin.core.RoleComponentAware.UpdateAware;
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import com.shadowHunterRolesPlugin.core.Skill;
++import net.kyori.adventure.text.Component;
++import org.bukkit.Material;
++import org.bukkit.Sound;
++import org.bukkit.entity.Player;
++import org.bukkit.potion.PotionEffectType;
++
++public class RedDeeplySorrowSkill extends Skill implements UpdateAware, SanTEChangeAware {
++
++    //该技能是否在执行中
++    private boolean running = false;
++
++    private int secondTickCount = 0;
++
++    public RedDeeplySorrowSkill() {
++        super("red_deeplySorrow_skill", Component.text("黯然销魂"),
++                Component.text("持续扣减[红]的TE值，每秒10点，在TE值归零前获得持续的生命恢复5与力量2，在TE值归零后结束这个技能"),
++                600,0, Material.REDSTONE_BLOCK);
++    }
++
++    @Override
++    public void onRightClick(Player caster, RoleInstance instance) {
++        if(!instance.getBuffManager().canCastSkill()) return;
++        running = true;
++        instance.startSkillCooldown(getId(), getCooldown());
++        caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_DEATH, 2, 1);
++
++    }
++
++    @Override
++    public void update(Player caster, RoleInstance instance) {
++        if(!running) return;
++
++        secondTickCount++;
++        if(secondTickCount < 20) return;
++        secondTickCount = 0;
++
++        instance.decreaseSanTE(10);
++        caster.addPotionEffect(PotionEffectType.REGENERATION.createEffect(45, 5));
++        caster.addPotionEffect(PotionEffectType.STRENGTH.createEffect(45, 2));
++        instance.startSkillCooldown(getId(), getCooldown());
++
++        caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
++    }
++
++    @Override
++    public void onSanTEChange(Player player, RoleInstance instance, int preSanTE, int newSanTE) {
++        if(newSanTE <= 0){
++            running = false;
++            instance.startSkillCooldown(getId(), getCooldown());
++        }
++    }
++}
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedEquipmentsPassive.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedEquipmentsPassive.java
+new file mode 100644
+index 0000000..26c0300
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedEquipmentsPassive.java
+@@ -0,0 +1,76 @@
++package com.shadowHunterRolesPlugin.roleComponent.red;
++
++import com.shadowHunterRolesPlugin.core.PassiveSkill;
++import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import net.kyori.adventure.text.Component;
++import org.bukkit.Color;
++import org.bukkit.Material;
++import org.bukkit.enchantments.Enchantment;
++import org.bukkit.entity.Player;
++import org.bukkit.inventory.ItemStack;
++import org.bukkit.inventory.meta.ItemMeta;
++import org.bukkit.inventory.meta.LeatherArmorMeta;
++
++public class RedEquipmentsPassive extends PassiveSkill implements LifecycleAware {
++
++    public RedEquipmentsPassive() {
++        super("red_equippments_passive", Component.text("穿戴装备"), Component.text("ccb"));
++    }
++
++    @Override
++    public void onSet(Player player, RoleInstance instance) {
++        player.sendMessage(Component.text("xxb111"));
++        ItemStack helmet = new ItemStack(Material.IRON_HELMET);
++        {
++            ItemMeta meta = helmet.getItemMeta();
++            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
++            meta.addEnchant(Enchantment.PROTECTION, 1, false);
++            meta.addEnchant(Enchantment.PROJECTILE_PROTECTION, 1, false);
++            meta.setUnbreakable(true);
++            helmet.setItemMeta(meta);
++        }
++
++        ItemStack chestplate = new ItemStack(Material.IRON_CHESTPLATE);
++        {
++            ItemMeta meta = chestplate.getItemMeta();
++            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
++            meta.addEnchant(Enchantment.PROTECTION, 2, false);
++            meta.setUnbreakable(true);
++            chestplate.setItemMeta(meta);
++        }
++
++        ItemStack leggings = new ItemStack(Material.LEATHER_LEGGINGS);
++        {
++            ItemMeta meta = leggings.getItemMeta();
++            LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) meta;
++            leatherArmorMeta.setColor(Color.RED);
++            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
++            meta.addEnchant(Enchantment.PROTECTION, 1, false);
++            meta.addEnchant(Enchantment.FIRE_PROTECTION, 1, false);
++            meta.setUnbreakable(true);
++            leggings.setItemMeta(meta);
++        }
++
++        ItemStack boots = new ItemStack(Material.LEATHER_BOOTS);
++        {
++            ItemMeta meta = boots.getItemMeta();
++            LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) meta;
++            leatherArmorMeta.setColor(Color.fromRGB(139, 0, 0));
++            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
++            meta.addEnchant(Enchantment.PROTECTION, 1, false);
++            meta.addEnchant(Enchantment.FEATHER_FALLING, 3, false);
++            meta.setUnbreakable(true);
++            boots.setItemMeta(meta);
++        }
++
++        player.getInventory().setHelmet(helmet);
++        player.getInventory().setChestplate(chestplate);
++        player.getInventory().setLeggings(leggings);
++        player.getInventory().setBoots(boots);
++    }
++
++    @Override
++    public void onClear(Player player, RoleInstance instance) {
++    }
++}
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedEvilShockSkill.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedEvilShockSkill.java
+new file mode 100644
+index 0000000..2418f86
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedEvilShockSkill.java
+@@ -0,0 +1,44 @@
++package com.shadowHunterRolesPlugin.roleComponent.red;
++
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import com.shadowHunterRolesPlugin.core.Skill;
++import net.kyori.adventure.text.Component;
++import org.bukkit.Material;
++import org.bukkit.Sound;
++import org.bukkit.entity.Player;
++import org.bukkit.potion.PotionEffectType;
++
++import java.util.Collection;
++import java.util.HashMap;
++import java.util.Map;
++import java.util.UUID;
++
++public class RedEvilShockSkill extends Skill{
++
++    public RedEvilShockSkill() {
++        super("red_evilShock_skill", Component.text("煞气震赫"),
++                Component.text("对周围5格范围内的敌人造成3秒致盲和缓慢III，结算他们5层流血。恢复[红]的10点TE值"),
++                120,0, Material.REDSTONE);
++    }
++
++    @Override @SuppressWarnings("unchecked")
++    public void onRightClick(Player caster, RoleInstance instance){
++        if(!instance.getBuffManager().canCastSkill()) return;
++        Collection<? extends Player> victims = caster.getLocation().getNearbyPlayers(5);
++        for(Player p : victims){
++            if(instance.isHostileTo(p)){
++                p.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(61, 1));
++                p.addPotionEffect(PotionEffectType.SLOWNESS.createEffect(61, 3));
++                //结算5层流血
++                Map<UUID, Integer> resolveRequests = instance.getContext(RedBleedPassive.BLEED_RESOLVE_REQUESTS_KEY, Map.class);
++                resolveRequests.put(p.getUniqueId(), 5);
++            }
++        }
++        instance.increaseSanTE(10);
++
++        instance.startSkillCooldown(getId(), getCooldown());
++
++        caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITCH_CELEBRATE, 1, 1);
++        caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
++    }
++}
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedSanctifiedBladeMainWeapon.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedSanctifiedBladeMainWeapon.java
+new file mode 100644
+index 0000000..1370c0b
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedSanctifiedBladeMainWeapon.java
+@@ -0,0 +1,53 @@
++package com.shadowHunterRolesPlugin.roleComponent.red;
++
++import com.shadowHunterRolesPlugin.core.DamageUtil;
++import com.shadowHunterRolesPlugin.core.MainWeapon;
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import net.kyori.adventure.text.Component;
++import org.bukkit.Color;
++import org.bukkit.Material;
++import org.bukkit.Particle;
++import org.bukkit.Sound;
++import org.bukkit.entity.Player;
++
++import java.util.Map;
++import java.util.UUID;
++
++public class RedSanctifiedBladeMainWeapon extends MainWeapon {
++
++    //每次普攻施加的流血层数
++    private static final int BLEED_STACKS_PER_HIT = 15;
++
++    public RedSanctifiedBladeMainWeapon() {
++        super(
++                "red_mainWeapon_sanctifiedBlade",
++                Component.text("至洁之刃"),
++                Component.text("攻击施加流血效果"),
++                Material.IRON_SWORD,
++                100
++        );
++    }
++
++    @Override @SuppressWarnings("unchecked")
++    public void onAttack(Player attacker, Player victim, RoleInstance instance){
++        //流血记录由 RedBleedPassive 放进上下文，拿不到时只跳过流血结算，普攻伤害依然生效(不能直接return)
++        //已经死亡(含死亡界面)的玩家不再施加流血，避免尸体继续吃流血结算
++        Map<UUID, Integer> playerBleedRecord = instance.getContext(RedBleedPassive.BLEED_RECORD_CONTEXT_KEY, Map.class);
++        if(playerBleedRecord != null && RedBleedPassive.canReceiveBleed(victim)){
++            UUID victimPid = victim.getUniqueId();
++            int curVictimBleed = playerBleedRecord.getOrDefault(victimPid, 0);
++            int newVictimBleed = Math.clamp(curVictimBleed + BLEED_STACKS_PER_HIT, 0, RedBleedPassive.MAX_BLEED_STACK);
++            playerBleedRecord.put(victimPid, newVictimBleed);
++        }
++
++        DamageUtil.dealtPhysicalDamage(victim, attacker, 8, 1);
++
++        attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ELDER_GUARDIAN_CURSE, 1, 1.8f);
++
++        //INSTANT_EFFECT 的数据类型是 Particle.Spell，必须传数据，否则 Paper 会抛 "missing required data"
++        victim.spawnParticle(Particle.INSTANT_EFFECT, victim.getLocation().clone().add(0, 1, 0), 20, 1, 1, 1, new Particle.Spell(Color.RED, 1f));
++
++        instance.startMainWeaponCooldown(getId(), getCooldown());
++    }
++
++}
+diff --git a/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedSolitaryArroganceSkill.java b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedSolitaryArroganceSkill.java
+new file mode 100644
+index 0000000..cb2cf4d
+--- /dev/null
++++ b/src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedSolitaryArroganceSkill.java
+@@ -0,0 +1,84 @@
++package com.shadowHunterRolesPlugin.roleComponent.red;
++
++import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
++import com.shadowHunterRolesPlugin.core.DamageUtil;
++import com.shadowHunterRolesPlugin.core.RoleInstance;
++import com.shadowHunterRolesPlugin.core.Skill;
++import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
++import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
++import net.kyori.adventure.text.Component;
++import org.bukkit.Location;
++import org.bukkit.Material;
++import org.bukkit.Particle;
++import org.bukkit.Sound;
++import org.bukkit.entity.Player;
++import org.bukkit.util.RayTraceResult;
++import org.bukkit.util.Vector;
++
++import java.util.List;
++import java.util.function.Consumer;
++
++public class RedSolitaryArroganceSkill extends Skill {
++
++    public RedSolitaryArroganceSkill() {
++        super("red_solitaryArrogance_skill", Component.text("孤妄自赏"),
++                Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命"),
++                200,0, Material.FERMENTED_SPIDER_EYE);
++    }
++
++    @Override
++    public void onRightClick(Player caster, RoleInstance instance){
++        if(!instance.getBuffManager().canCastSkill()) return;
++        ShadowHunterRolesPlugin.getInstance().getServer().getGlobalRegionScheduler().runAtFixedRate(
++                ShadowHunterRolesPlugin.getInstance(),
++                new Consumer<ScheduledTask>() {
++                    private Player cas = caster;
++                    private RoleInstance casterIns = instance;
++                    private int cnt = 0;
++
++                    @Override
++                    public void accept(ScheduledTask scheduledTask) {
++                        if(cas == null || !cas.isOnline() || cas.isDead() || casterIns == null) {
++                            scheduledTask.cancel();
++                            return;
++                        }
++
++                        //执行4次
++                        cnt++;
++                        if(cnt > 4){
++                            scheduledTask.cancel();
++                            return;
++                        }
++
++                        //射线检测打中的敌人
++                        List<Player> playersInSightLine = SkillUtil.getPlayersInSightLine(cas, 5, 0.4);
++                        boolean shouldRecoverHealth = false;
++                        for(Player victim : playersInSightLine){
++                            if(victim == null || victim.isDead() || !victim.isOnline()) continue;
++                            if(!casterIns.isHostileTo(victim)) continue;
++
++                            shouldRecoverHealth = true;
++                            DamageUtil.dealtPhysicalDamage(victim, cas, 8);
++                        }
++
++                        if(shouldRecoverHealth){
++                            casterIns.heal(4);
++                        }
++
++                        //特效
++                        Location location = cas.getEyeLocation().clone();
++                        Vector eachForwardDistance = location.getDirection().divide(new Vector(2, 2, 2));
++                        location.subtract(new Vector(0, 0.3, 0));
++                        for(int i = 0; i < 10; i++){
++                            location.add(eachForwardDistance);
++                            //ELECTRIC_SPARK 的数据类型是 Void，不能传 data 参数
++                            location.getWorld().spawnParticle(Particle.END_ROD, location, 3, 0.1, 0.1, 0.1, 0);
++                        }
++                        location.getWorld().playSound(location, Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1, 1);
++                    }
++                },
++                1L, 6
++        );
++        instance.startSkillCooldown(getId(), getCooldown());
++    }
++}

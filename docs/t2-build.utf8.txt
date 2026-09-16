@@ -1,0 +1,56 @@
+Starting a Gradle Daemon, 1 incompatible and 10 stopped Daemons could not be reused, use --status for details
+Reusing configuration cache.
+.\gradlew : Caught exception: Couldn't open current thread, error = 5
+At line:3 char:1
++ .\gradlew build --console=plain 2>&1 | Tee-Object -FilePath "docs\t2- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Caught exceptio...read, error = 5:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Exception in thread "File watcher server" net.rubygrapefruit.platform.NativeException: Couldn't open current thread, er
+ror = 5
+	at org.gradle.fileevents.internal.AbstractNativeFileEventFunctions$NativeFileWatcher.initializeRunLoop0(Native Method)
+	at org.gradle.fileevents.internal.AbstractNativeFileEventFunctions$NativeFileWatcher.initializeRunLoop(AbstractNativeF
+ileEventFunctions.java:25)
+	at org.gradle.fileevents.internal.AbstractFileEventFunctions$AbstractFileWatcher$1.run(AbstractFileEventFunctions.java
+:151)
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :processTestResources NO-SOURCE
+> Task :compileKotlin NO-SOURCE
+> Task :processResources UP-TO-DATE
+
+> Task :compileJava
+注: C:\Users\ROG\Desktop\插件\ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\api\RoleAPIImpl.java使用或覆盖了已过时的 A
+PI。
+注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+
+> Task :classes
+> Task :jar
+> Task :assemble
+> Task :compileTestKotlin NO-SOURCE
+> Task :compileTestJava NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :check UP-TO-DATE
+> Task :build
+> Task :copyPluginJar FAILED
+
+[Incubating] Problems report is available at: file:///C:/Users/ROG/Desktop/%E6%8F%92%E4%BB%B6/ShadowHunterRoles/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':copyPluginJar' (registered in build file 'build.gradle.kts').
+> Could not copy file 'C:\Users\ROG\Desktop\插件\ShadowHunterRoles\build\libs\ShadowHunterRolesPlugin-1.0.0.jar' to 'C:\U
+sers\ROG\Desktop\paper1.21.11\plugins\ShadowHunterRolesPlugin-1.0.0.jar'.
+   > C:\Users\ROG\Desktop\paper1.21.11\plugins\ShadowHunterRolesPlugin-1.0.0.jar (拒绝访问。)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 10s
+4 actionable tasks: 3 executed, 1 up-to-date
+Configuration cache entry reused.

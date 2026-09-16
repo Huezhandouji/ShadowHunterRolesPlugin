@@ -1,0 +1,256 @@
+﻿附录 C（最终重构指南 §附录 C）抽样复核 — 原始输出
+执行者: eng-验证 (verifier) | 执行时刻: 2026-09-16 21:53:34.724 +08:00
+工作树: C:\Users\ROG\Desktop\插件\ShadowHunterRoles
+口径: 命令一律按指南文本原样执行；随后给出递归等价命令作对照。
+
+================ C-1 · 逐行看断言（O-6 taskId 无重入保护）================
+
+PS> Select-String -Path "$src\roleComponent\DefaultSanTEZeroPunishment.java" -Pattern 'taskId' -Context 2,2
+
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:27:    }
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:28:
+> ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:29:    int taskId = -1;
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:30:
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:31:    @Override
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:34:        Faction faction = instance.getFaction();
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:35:
+> ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:36:        taskId = new BukkitRunnable() {
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:37:
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:38:                    int count = 0;
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:112:                        }
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:113:                    }
+> ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:114:                }.runTaskTimer(ShadowHunterRoles
+Plugin.getInstance(), 0L, 40L).getTaskId();
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:115:    }
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:116:
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:122:    @Override
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:123:    public void stop(Player player, RoleInstance
+ instance) {
+> ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:124:        Bukkit.getScheduler().cancelTask(taskId)
+;
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:125:    }
+  ShadowHunterRoles\src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:126:}
+
+
+
+
+================ C-2 · 计数断言（26 处 getInstance）================
+
+PS> (Select-String -Path "$src\*\*.java","$src\*\*\*.java" -Pattern 'ShadowHunterRolesPlugin\.getInstance\(\)' | Measure-Object).Count
+结果 = 24
+
+PS> Get-ChildItem $src -Recurse -File -Filter *.java | Select-String -Pattern 'ShadowHunterRolesPlugin\.getInstance\(\)'   # 递归对照
+递归结果 = 26
+  按目录 core = 17
+  按目录 listener = 2
+  按目录 manager = 2
+  按目录 roleComponent = 1
+  按目录 roleComponent\meiqiHezi\skill = 2
+  按目录 roleComponent\red = 2
+  逐处 文件:行号：
+    src\main\java\com\shadowHunterRolesPlugin\core\DamageUtil.java:21
+    src\main\java\com\shadowHunterRolesPlugin\core\MainWeapon.java:120
+    src\main\java\com\shadowHunterRolesPlugin\core\Role.java:232
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:64
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:95
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:170
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:204
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:222
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:240
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:265
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:294
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:309
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:324
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:743
+    src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java:749
+    src\main\java\com\shadowHunterRolesPlugin\core\Skill.java:127
+    src\main\java\com\shadowHunterRolesPlugin\core\Skill.java:145
+    src\main\java\com\shadowHunterRolesPlugin\listener\MainWeaponListener.java:134
+    src\main\java\com\shadowHunterRolesPlugin\listener\SkillListener.java:136
+    src\main\java\com\shadowHunterRolesPlugin\manager\BuffManager.java:20
+    src\main\java\com\shadowHunterRolesPlugin\manager\BuffManager.java:138
+    src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java:114
+    src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\skill\MeiqiheziBloodySlashSkill.java:74
+    src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\skill\MeiqiheziCircleSlashSkill.java:81
+    src\main\java\com\shadowHunterRolesPlugin\roleComponent\red\RedSolitaryArroganceSkill.java:32
+    src\main\java\com\shadowHunterRolesPlugin\roleComponent\red\RedSolitaryArroganceSkill.java:33
+
+================ C-3 · 死代码断言（PassiveSkill.trigger 零调用）================
+
+PS> Select-String -Path "$src\*\*.java","$src\*\*\*.java" -Pattern '\.trigger\('
+结果条数 = 0（空 = 零命中）
+
+PS> Get-ChildItem $src -Recurse -File -Filter *.java | Select-String -Pattern '\.trigger\('   # 递归对照
+递归结果条数 = 0
+
+================ C-4 · 附录 C 编制时实测汇总：逐条复核 ================
+ShadowHunterRolesPlugin.getInstance() -> 递归命中 26 处
+      BuffManager.java = 2
+      DamageUtil.java = 1
+      DefaultSanTEZeroPunishment.java = 1
+      MainWeapon.java = 1
+      MainWeaponListener.java = 1
+      MeiqiheziBloodySlashSkill.java = 1
+      MeiqiheziCircleSlashSkill.java = 1
+      RedSolitaryArroganceSkill.java = 2
+      Role.java = 1
+      RoleInstance.java = 12
+      Skill.java = 2
+      SkillListener.java = 1
+RoleManager.getInstance() -> 递归命中 8 处
+      MeiqiheziCircleSlashSkill.java = 1
+      RoleInstance.java = 5
+      ShadowHunterRolesPlugin.java = 1
+      SkillUtil.java = 1
+Bukkit.getScheduler() -> 递归命中 15 处
+      BuffManager.java = 2
+      DefaultSanTEZeroPunishment.java = 1
+      MainWeaponListener.java = 1
+      RoleInstance.java = 10
+      SkillListener.java = 1
+getGlobalRegionScheduler -> 递归命中 1 处
+      RedSolitaryArroganceSkill.java = 1
+new BukkitRunnable -> 递归命中 3 处
+      DefaultSanTEZeroPunishment.java = 1
+      MeiqiheziBloodySlashSkill.java = 1
+      MeiqiheziCircleSlashSkill.java = 1
+RoleManager.getInstance() 中位于 roleComponent 的 = 2 处（逐处见 C-2b 段）
+roleComponent\meiqiHezi\skill\MeiqiheziCircleSlashSkill.java:72 是声明后未使用的局部变量 —— 见下方原行：
+      src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\skill\MeiqiheziCircleSlashSkill.java:72: RoleManager roleManager = RoleManager.getInstance();
+RoleInstance.java 行数 = 798
+javap -classpath build\classes\java\main com.shadowHunterRolesPlugin.core.RoleInstance -> public 成员 = 73（其中含 1 个构造器）
+src 下 .java 文件数 = 47
+src 下 .java 总行数（ReadAllLines 口径，含空行）= 4825
+src 下 .java 总行数（LF 字节口径）= 4825
+src 下 .java 总行数（Get-Content | Measure-Object -Line 口径，不计空行）= 3831
+
+================ C-5 · 附录 C 的 glob 覆盖面（-Path 通配符只匹配单层目录）================
+  *.java -> 2 个文件
+  *\*.java -> 30 个文件
+  *\*\*.java -> 10 个文件
+  *\*\*\*.java -> 5 个文件
+  递归全量 = 47 个文件 → 附录 C 的 4 层通配合计覆盖 47 个
+
+================ C-6 · 附录 B 产物与新鲜度 ================
+build\libs\ShadowHunterRolesPlugin-1.0.0.jar : 102878 bytes, mtime 2026-09-15 22:25:22.767
+build\classes 下最新 .class mtime = 09/15/2026 22:25:22
+src 下新于 jar 的 .java 数 = 0  (指南 §1 断言 0)
+
+================ C-7 · 本快照自检（SHA256 清单 ↔ 快照文件一一对应）================
+SHA256.txt 行数 = 51 ；快照受管文件数 = 51
+逐行校验：不符/缺失条数 = 0（0 = 全部通过）
+
+================ C-8 · 快照 ↔ 活动工作树一致性（逐文件哈希 + mtime）================
+哈希不符 = 0 ；mtime 不同 = 0 （0/0 = 快照是活动工作树的逐字节 + 逐 mtime 副本）
+
+================ C-9 · 旧快照未被改动 ================
+before/ 48 个文件 vs integrity-sha256.txt：一致 = 48 ；不一致 = 0
+before/ 递归最大 mtime = 09/15/2026 21:56:52（< 冻结时刻 2026-09-16 21:52:36 → 未被重写）
+  CE3E5E7B0A4BED22834D7D8EF76AC193FC528846173335125EC73AFFF965D50C  integrity-sha256.txt  7213 bytes  2026-09-15 21:56:53.260
+  08ADCD6F7FFA46FE0AAB39E5119C1C4F6847769FA08B71C6C26C616F058325BB  README-回滚说明.md  6469 bytes  2026-09-15 21:57:05.073
+  23C8F34CEDE60FE609F3AB745109FC8AFB0EA6EE3A14AFA4B3800AF01A82EE07  session-start-baseline.patch  50091 bytes  2026-09-15 21:56:38.447
+
+================ C-10 · verifier 未改动 src/ ================
+src/ 下 mtime >= 冻结时刻(2026-09-16 21:52:36) 的文件数 = 0
+src/ 递归最大 mtime = 09/15/2026 22:22:43
+
+================ C-11 · 附录 C 的计数命令为何得 24 而非 26（算术核对）================
+各层文件数：0层=2  1层=30  2层=10  3层=5  合计=47
+附录 C 命令原文（只有 1 层 + 2 层两个通配）：
+   (Select-String -Path "$src\*\*.java","$src\*\*\*.java" -Pattern 'ShadowHunterRolesPlugin\.getInstance\(\)' | Measure-Object).Count
+   → 覆盖面 = 30 + 10 = 40 / 47 个文件；未覆盖 = 0 层 2 个 + 3 层 5 个 = 7 个
+未被附录 C 命令覆盖的 7 个文件：
+    roleComponent\meiqiHezi\mainWeapon\MeiqiheziJuejueMainWeapon.java
+    roleComponent\meiqiHezi\passive\MeiqiheziEquipmentsPassive.java
+    roleComponent\meiqiHezi\skill\MeiqiheziBloodySlashSkill.java
+    roleComponent\meiqiHezi\skill\MeiqiheziCircleSlashSkill.java
+    roleComponent\meiqiHezi\skill\MeiqiheziUnconcernSkill.java
+    ShadowHunterRolesPlugin.java
+    ShadowHunterRolesPluginLoader.java
+这 7 个文件中含 ShadowHunterRolesPlugin.getInstance() 的：
+    src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\skill\MeiqiheziBloodySlashSkill.java:74  → }.runTaskTimer(ShadowHunterRolesPlugin.getInstance(), 0L, 2L);
+    src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\skill\MeiqiheziCircleSlashSkill.java:81  → }.runTaskLater(ShadowHunterRolesPlugin.getInstance(), 20L);
+算术核对：30+10 层内命中 24 处（附录 C 实测值） + 漏覆盖文件中命中 2 处 = 26 处（递归实测值）
+
+================ C-12 · 最终快照布局与再校验 ================
+DIR        _meta
+   8874  _meta\baseline-files.tsv
+   9231  _meta\before-快照-参照清单.tsv
+  10094  _meta\证据-附录C复核.txt
+   1541  build.gradle.kts
+    116  gradle.properties
+    220  settings.gradle.kts
+   7155  SHA256.txt
+DIR        src
+DIR        src\main
+DIR        src\main\java
+DIR        src\main\java\com
+DIR        src\main\java\com\shadowHunterRolesPlugin
+DIR        src\main\java\com\shadowHunterRolesPlugin\api
+   3663  src\main\java\com\shadowHunterRolesPlugin\api\RoleAPI.java
+  11909  src\main\java\com\shadowHunterRolesPlugin\api\RoleAPIImpl.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\command
+   8148  src\main\java\com\shadowHunterRolesPlugin\command\RoleCommand.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\core
+    642  src\main\java\com\shadowHunterRolesPlugin\core\Buff.java
+    109  src\main\java\com\shadowHunterRolesPlugin\core\BuffType.java
+   3733  src\main\java\com\shadowHunterRolesPlugin\core\DamageUtil.java
+    110  src\main\java\com\shadowHunterRolesPlugin\core\Faction.java
+   5210  src\main\java\com\shadowHunterRolesPlugin\core\MainWeapon.java
+    737  src\main\java\com\shadowHunterRolesPlugin\core\ParticleUtil.java
+    722  src\main\java\com\shadowHunterRolesPlugin\core\PassiveSkill.java
+   9749  src\main\java\com\shadowHunterRolesPlugin\core\Role.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\core\RoleComponentAware
+    294  src\main\java\com\shadowHunterRolesPlugin\core\RoleComponentAware\EnergyChangeAware.java
+    898  src\main\java\com\shadowHunterRolesPlugin\core\RoleComponentAware\LifecycleAware.java
+    290  src\main\java\com\shadowHunterRolesPlugin\core\RoleComponentAware\SanTEChangeAware.java
+    250  src\main\java\com\shadowHunterRolesPlugin\core\RoleComponentAware\UpdateAware.java
+  26141  src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java
+   5806  src\main\java\com\shadowHunterRolesPlugin\core\Skill.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\event
+   1945  src\main\java\com\shadowHunterRolesPlugin\event\EnergyChangeEvent.java
+   1897  src\main\java\com\shadowHunterRolesPlugin\event\SanTEChangeEvent.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\listener
+    825  src\main\java\com\shadowHunterRolesPlugin\listener\DamageTrackerListener.java
+   5197  src\main\java\com\shadowHunterRolesPlugin\listener\MainWeaponListener.java
+   1072  src\main\java\com\shadowHunterRolesPlugin\listener\PlayerListener.java
+    809  src\main\java\com\shadowHunterRolesPlugin\listener\RoleEventListener.java
+   4861  src\main\java\com\shadowHunterRolesPlugin\listener\SkillListener.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\manager
+   5695  src\main\java\com\shadowHunterRolesPlugin\manager\BuffManager.java
+   3484  src\main\java\com\shadowHunterRolesPlugin\manager\RoleManager.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\registry
+   4830  src\main\java\com\shadowHunterRolesPlugin\registry\RoleRegistry.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\roleComponent
+   1299  src\main\java\com\shadowHunterRolesPlugin\roleComponent\AutoRecoverEnergyPassive.java
+   1413  src\main\java\com\shadowHunterRolesPlugin\roleComponent\AutoRecoverSanTEHealthPassive.java
+   5454  src\main\java\com\shadowHunterRolesPlugin\roleComponent\DefaultSanTEZeroPunishment.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi
+DIR        src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\mainWeapon
+   2139  src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\mainWeapon\MeiqiheziJuejueMainWeapon.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\passive
+   3111  src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\passive\MeiqiheziEquipmentsPassive.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\skill
+   6337  src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\skill\MeiqiheziBloodySlashSkill.java
+   6616  src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\skill\MeiqiheziCircleSlashSkill.java
+   1517  src\main\java\com\shadowHunterRolesPlugin\roleComponent\meiqiHezi\skill\MeiqiheziUnconcernSkill.java
+DIR        src\main\java\com\shadowHunterRolesPlugin\roleComponent\red
+   8971  src\main\java\com\shadowHunterRolesPlugin\roleComponent\red\RedBleedPassive.java
+   2235  src\main\java\com\shadowHunterRolesPlugin\roleComponent\red\RedDeeplySorrowSkill.java
+   3133  src\main\java\com\shadowHunterRolesPlugin\roleComponent\red\RedEquipmentsPassive.java
+   1879  src\main\java\com\shadowHunterRolesPlugin\roleComponent\red\RedEvilShockSkill.java
+   2363  src\main\java\com\shadowHunterRolesPlugin\roleComponent\red\RedSanctifiedBladeMainWeapon.java
+   3794  src\main\java\com\shadowHunterRolesPlugin\roleComponent\red\RedSolitaryArroganceSkill.java
+    523  src\main\java\com\shadowHunterRolesPlugin\roleComponent\SampleMainWeapon.java
+   2387  src\main\java\com\shadowHunterRolesPlugin\roleComponent\SkillUtil.java
+   1462  src\main\java\com\shadowHunterRolesPlugin\roleComponent\TestSendSanTEAndEnergyChangeMsgPassive.java
+    922  src\main\java\com\shadowHunterRolesPlugin\roleComponent\TestSetSanTEToZeroSkill.java
+   2151  src\main\java\com\shadowHunterRolesPlugin\ShadowHunterRolesPlugin.java
+    355  src\main\java\com\shadowHunterRolesPlugin\ShadowHunterRolesPluginLoader.java
+DIR        src\main\resources
+    374  src\main\resources\plugin.yml
+SHA256.txt 行数 = 51 ；顶层基线副本数（不含 SHA256.txt 与 _meta/） = 51 ；逐行校验不符 = 0
+_meta/ 文件（快照元数据，不属于基线副本）：
+    90832F72F38E482935D47743598A90FA1F5EA42FBFEEE575221588A9514721D4  8874  baseline-files.tsv
+    458106D553D0B891D36D0B8DBE6E482AF7DCF3569972D13C58E4B1D9D96B55FE  9231  before-快照-参照清单.tsv
+    E5C79FCA5E8754BBF58C200B08ACCCFE13DC4856F7C1F97DF18344186CBE0EAE  10094  证据-附录C复核.txt

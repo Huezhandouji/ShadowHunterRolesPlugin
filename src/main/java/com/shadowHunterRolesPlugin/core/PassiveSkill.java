@@ -1,8 +1,6 @@
 package com.shadowHunterRolesPlugin.core;
 
-import jdk.jfr.Event;
 import net.kyori.adventure.text.Component;
-import org.bukkit.entity.Player;
 
 public abstract class PassiveSkill {
 
@@ -15,8 +13,6 @@ public abstract class PassiveSkill {
         this.displayName = displayName;
         this.description = description;
     }
-
-    public void trigger(Player caster, RoleInstance instance){}
 
     public String getId() { return id; }
     public Component getDisplayName() { return displayName; }

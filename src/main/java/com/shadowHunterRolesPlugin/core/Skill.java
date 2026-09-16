@@ -13,9 +13,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
-import javax.naming.Name;
-import java.awt.*;
-import java.net.http.WebSocket;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,7 +42,7 @@ public abstract class Skill {
 
     public void onDrop(Player caster, RoleInstance instance){}
 
-    public int getCooldown() { return cooldown; }
+    public int getCooldownTicks() { return cooldown; }
     public String getId() { return id; }
     public Component getDisplayName() { return displayName; }
     public Component getDescription() { return description; }
@@ -144,13 +141,9 @@ public abstract class Skill {
             ItemMeta meta = item.getItemMeta();
             if(meta == null) return null;
 
-            NamespacedKey key = new NamespacedKey(
-                    ShadowHunterRolesPlugin.getInstance(),
-                    "skill_id"
-            );
             PersistentDataContainer container = meta.getPersistentDataContainer();
-            if(!container.has(key, PersistentDataType.STRING)) return null;
-            return container.get(key, PersistentDataType.STRING);
+            if(!container.has(SKILL_KEY, PersistentDataType.STRING)) return null;
+            return container.get(SKILL_KEY, PersistentDataType.STRING);
         }
 
     }

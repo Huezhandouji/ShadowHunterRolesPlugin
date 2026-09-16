@@ -36,8 +36,6 @@ public abstract class MainWeapon {
 
     public void onLeftClick(Player player, RoleInstance instance){}
 
-    public boolean canRightClick() { return false; }
-
     public void onRightClick(Player player, RoleInstance instance){}
 
     public void onDrop(Player player, RoleInstance instance){}
@@ -142,6 +140,6 @@ public abstract class MainWeapon {
     public Component getDisplayName() { return displayName; }
     public Component getDescription() { return description; }
     public Material getIcon() { return icon; }
-    public int getCooldown() { return cooldown; }
+    public int getCooldownTicks() { return cooldown; }
 
 }

@@ -1,0 +1,231 @@
+﻿===== core\RoleComponentAware\LifecycleAware.java =====
+diff --git "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_core_RoleComponentAware_LifecycleAware.java" "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\core\\RoleComponentAware\\LifecycleAware.java"
+index f1a6c47..51f2d17 100644
+--- "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_core_RoleComponentAware_LifecycleAware.java"
++++ "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\core\\RoleComponentAware\\LifecycleAware.java"
+@@ -6,10 +6,15 @@ import org.bukkit.entity.Player;
+ public interface LifecycleAware {
+ 
+-    //如果一个角色组件需要在设置角色和清理角色时执行操作，实现这个接口
++    //如果一个角色组件需要在角色开始生效和停止生效时执行操作，实现这个接口
+ 
+-    void onSet(Player player, RoleInstance instance);
++    //awake阶段的目的是解析跨组件依赖并缓存引用，在全部组件创建完成之后、start之前执行
++    //必须保证幂等，且不得改动任何玩家可见状态：此时stop尚未调用，重入会叠加效果
++    default void awake(Player player, RoleInstance instance) {}
+ 
+-    //在清理时，必须清理在onSet创建的所有资源
+-    void onClear(Player player, RoleInstance instance);
++    //开始生效：初始化数据、发放装备、注册tick等
++    void start(Player player, RoleInstance instance);
++
++    //停止生效，与start严格对称：在stop时，必须清理在start创建的所有资源
++    void stop(Player player, RoleInstance instance);
+ 
+ 
+===== core\RoleInstance.java =====
+diff --git "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_core_RoleInstance.java" "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\core\\RoleInstance.java"
+index 89b48c7..f3642a6 100644
+--- "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_core_RoleInstance.java"
++++ "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\core\\RoleInstance.java"
+@@ -88,6 +88,7 @@ public class RoleInstance {
+         player.setHealth(getMaxHealth());
+ 
+-        updateHotbar();
+-
++        //生命周期时序：全部组件创建完成 -> awake全部 -> start全部 -> 启动ticker -> 渲染热键栏
++        triggerLifecycleAwake();
++        triggerLifecycleStart();
+ 
+         updateTaskId = Bukkit.getScheduler().runTaskTimer(
+@@ -98,5 +99,5 @@ public class RoleInstance {
+         ).getTaskId();
+ 
+-        triggerLifecycleOnSet();
++        updateHotbar();
+     }
+ 
+@@ -584,5 +585,6 @@ public class RoleInstance {
+ 
+     //生命周期触发
+-    public void triggerLifecycleOnSet(){
++    //awake阶段：只解析跨组件依赖并缓存引用，必须幂等且不改动玩家可见状态
++    public void triggerLifecycleAwake(){
+         if(player == null ) return;
+ 
+@@ -590,5 +592,5 @@ public class RoleInstance {
+         for(Skill skill : skillMap.values()){
+             if(skill instanceof LifecycleAware){
+-                ((LifecycleAware) skill).onSet(player, this);
++                ((LifecycleAware) skill).awake(player, this);
+             }
+         }
+@@ -596,5 +598,5 @@ public class RoleInstance {
+         for(PassiveSkill passive : passiveMap.values()){
+             if(passive instanceof LifecycleAware){
+-                ((LifecycleAware) passive).onSet(player, this);
++                ((LifecycleAware) passive).awake(player, this);
+             }
+         }
+@@ -602,10 +604,11 @@ public class RoleInstance {
+         for(MainWeapon weapon : mainWeaponMap.values()){
+             if(weapon instanceof LifecycleAware){
+-                ((LifecycleAware) weapon).onSet(player, this);
++                ((LifecycleAware) weapon).awake(player, this);
+             }
+         }
+     }
+ 
+-    public void triggerLifecycleOnClear(){
++    //start阶段：开始生效，顺序与awake一致（技能/被动/武器）
++    public void triggerLifecycleStart(){
+         if(player == null ) return;
+ 
+@@ -613,5 +616,5 @@ public class RoleInstance {
+         for(Skill skill : skillMap.values()){
+             if(skill instanceof LifecycleAware){
+-                ((LifecycleAware) skill).onClear(player, this);
++                ((LifecycleAware) skill).start(player, this);
+             }
+         }
+@@ -619,5 +622,5 @@ public class RoleInstance {
+         for(PassiveSkill passive : passiveMap.values()){
+             if(passive instanceof LifecycleAware){
+-                ((LifecycleAware) passive).onClear(player, this);
++                ((LifecycleAware) passive).start(player, this);
+             }
+         }
+@@ -625,5 +628,29 @@ public class RoleInstance {
+         for(MainWeapon weapon : mainWeaponMap.values()){
+             if(weapon instanceof LifecycleAware){
+-                ((LifecycleAware) weapon).onClear(player, this);
++                ((LifecycleAware) weapon).start(player, this);
++            }
++        }
++    }
++
++    //stop阶段：停止生效，遍历顺序与start相反（武器/被动/技能），逆序拆卸
++    public void triggerLifecycleStop(){
++        if(player == null ) return;
++
++        for(MainWeapon weapon : mainWeaponMap.values()){
++            if(weapon instanceof LifecycleAware){
++                ((LifecycleAware) weapon).stop(player, this);
++            }
++        }
++
++        for(PassiveSkill passive : passiveMap.values()){
++            if(passive instanceof LifecycleAware){
++                ((LifecycleAware) passive).stop(player, this);
++            }
++        }
++
++        //遍历所有技能
++        for(Skill skill : skillMap.values()){
++            if(skill instanceof LifecycleAware){
++                ((LifecycleAware) skill).stop(player, this);
+             }
+         }
+@@ -749,5 +776,5 @@ public class RoleInstance {
+     //清除这个实例时使用，重置玩家状态
+     public void clear(){
+-        triggerLifecycleOnClear();
++        triggerLifecycleStop();
+ 
+         Bukkit.getScheduler().cancelTask(updateTaskId);
+===== roleComponent\TestSendSanTEAndEnergyChangeMsgPassive.java =====
+diff --git "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_TestSendSanTEAndEnergyChangeMsgPassive.java" "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\TestSendSanTEAndEnergyChangeMsgPassive.java"
+index b391c78..37f6183 100644
+--- "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_TestSendSanTEAndEnergyChangeMsgPassive.java"
++++ "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\TestSendSanTEAndEnergyChangeMsgPassive.java"
+@@ -18,11 +18,11 @@ public class TestSendSanTEAndEnergyChangeMsgPassive extends PassiveSkill impleme
+ 
+     @Override
+-    public void onSet(Player player, RoleInstance instance) {
+-        player.sendMessage(Component.text("onSet() triggered!"));
++    public void start(Player player, RoleInstance instance) {
++        player.sendMessage(Component.text("start() triggered!"));
+     }
+ 
+     @Override
+-    public void onClear(Player player, RoleInstance instance) {
+-        player.sendMessage(Component.text("onClear() triggered!"));
++    public void stop(Player player, RoleInstance instance) {
++        player.sendMessage(Component.text("stop() triggered!"));
+     }
+ 
+===== roleComponent\DefaultSanTEZeroPunishment.java =====
+diff --git "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_DefaultSanTEZeroPunishment.java" "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\DefaultSanTEZeroPunishment.java"
+index 85c2624..05e2ad7 100644
+--- "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_DefaultSanTEZeroPunishment.java"
++++ "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\DefaultSanTEZeroPunishment.java"
+@@ -116,10 +116,10 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
+ 
+     @Override
+-    public void onSet(Player player, RoleInstance instance) {
++    public void start(Player player, RoleInstance instance) {
+ 
+     }
+ 
+     @Override
+-    public void onClear(Player player, RoleInstance instance) {
++    public void stop(Player player, RoleInstance instance) {
+         Bukkit.getScheduler().cancelTask(taskId);
+     }
+===== roleComponent\red\RedEquipmentsPassive.java =====
+diff --git "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_red_RedEquipmentsPassive.java" "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\red\\RedEquipmentsPassive.java"
+index 26c0300..00635ce 100644
+--- "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_red_RedEquipmentsPassive.java"
++++ "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\red\\RedEquipmentsPassive.java"
+@@ -20,5 +20,5 @@ public class RedEquipmentsPassive extends PassiveSkill implements LifecycleAware
+ 
+     @Override
+-    public void onSet(Player player, RoleInstance instance) {
++    public void start(Player player, RoleInstance instance) {
+         player.sendMessage(Component.text("xxb111"));
+         ItemStack helmet = new ItemStack(Material.IRON_HELMET);
+@@ -72,5 +72,5 @@ public class RedEquipmentsPassive extends PassiveSkill implements LifecycleAware
+ 
+     @Override
+-    public void onClear(Player player, RoleInstance instance) {
++    public void stop(Player player, RoleInstance instance) {
+     }
+ }
+===== roleComponent\red\RedBleedPassive.java =====
+diff --git "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_red_RedBleedPassive.java" "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\red\\RedBleedPassive.java"
+index ea900f1..22f5d0f 100644
+--- "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_red_RedBleedPassive.java"
++++ "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\red\\RedBleedPassive.java"
+@@ -52,5 +52,5 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
+     /**技能初始化时，在角色实例上下文中初始化流血记录**/
+     @Override
+-    public void onSet(Player player, RoleInstance instance) {
++    public void start(Player player, RoleInstance instance) {
+         instance.setContext(BLEED_RECORD_CONTEXT_KEY, playerBleedRecord);
+         instance.setContext(BLEED_RESOLVE_REQUESTS_KEY, playerBleedResolveRequests);
+@@ -58,5 +58,5 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
+ 
+     @Override
+-    public void onClear(Player player, RoleInstance instance) {
++    public void stop(Player player, RoleInstance instance) {
+         playerBleedRecord.clear();
+         playerBleedResolveRequests.clear();
+===== roleComponent\meiqiHezi\passive\MeiqiheziEquipmentsPassive.java =====
+diff --git "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_meiqiHezi_passive_MeiqiheziEquipmentsPassive.java" "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\meiqiHezi\\passive\\MeiqiheziEquipmentsPassive.java"
+index c950391..e9fb9df 100644
+--- "a/C:\\Users\\ROG\\AppData\\Local\\Temp\\dsh-V6WkrG\\t2-snapshot-cmp\\A_roleComponent_meiqiHezi_passive_MeiqiheziEquipmentsPassive.java"
++++ "b/C:\\Users\\ROG\\Desktop\\\346\217\222\344\273\266\\ShadowHunterRoles\\src\\main\\java\\com\\shadowHunterRolesPlugin\\roleComponent\\meiqiHezi\\passive\\MeiqiheziEquipmentsPassive.java"
+@@ -20,5 +20,5 @@ public class MeiqiheziEquipmentsPassive extends PassiveSkill implements Lifecycl
+ 
+     @Override
+-    public void onSet(Player player, RoleInstance instance) {
++    public void start(Player player, RoleInstance instance) {
+         ItemStack helmet = new ItemStack(Material.IRON_HELMET);
+         {
+@@ -71,5 +71,5 @@ public class MeiqiheziEquipmentsPassive extends PassiveSkill implements Lifecycl
+ 
+     @Override
+-    public void onClear(Player player, RoleInstance instance) {
++    public void stop(Player player, RoleInstance instance) {
+     }
+ }

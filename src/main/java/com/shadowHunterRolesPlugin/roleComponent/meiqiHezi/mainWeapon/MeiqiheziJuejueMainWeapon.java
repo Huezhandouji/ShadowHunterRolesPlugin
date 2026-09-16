@@ -1,14 +1,10 @@
 package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.mainWeapon;
 
 import com.destroystokyo.paper.ParticleBuilder;
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
-import com.shadowHunterRolesPlugin.command.RoleCommand;
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.manager.RoleManager;
 import net.kyori.adventure.text.Component;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Collection;
 
@@ -30,14 +26,14 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
 
         //如果能量大于20，则进行范围伤害，写在onLeftClick，不进入这个逻辑
         if(instance.getCurrentEnergy() >= 20) return;
-        instance.startMainWeaponCooldown(getId(), getCooldown());
+        instance.startMainWeaponCooldown(getId(), getCooldownTicks());
         DamageUtil.dealtPhysicalDamage(victim, attacker, 8, 0.5);
     }
 
     @Override
     public void onLeftClick(Player player, RoleInstance instance){
         if(instance.getCurrentEnergy() < 20) return;
-        instance.startMainWeaponCooldown(getId(), getCooldown());
+        instance.startMainWeaponCooldown(getId(), getCooldownTicks());
         instance.decreaseEnergy(5);
 
         Location loc = player.getLocation();

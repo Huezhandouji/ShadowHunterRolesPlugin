@@ -27,7 +27,7 @@ public class RedDeeplySorrowSkill extends Skill implements UpdateAware, SanTECha
     public void onRightClick(Player caster, RoleInstance instance) {
         if(!instance.getBuffManager().canCastSkill()) return;
         running = true;
-        instance.startSkillCooldown(getId(), getCooldown());
+        instance.startSkillCooldown(getId(), getCooldownTicks());
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_DEATH, 2, 1);
 
     }
@@ -41,9 +41,10 @@ public class RedDeeplySorrowSkill extends Skill implements UpdateAware, SanTECha
         secondTickCount = 0;
 
         instance.decreaseSanTE(10);
-        caster.addPotionEffect(PotionEffectType.REGENERATION.createEffect(45, 5));
-        caster.addPotionEffect(PotionEffectType.STRENGTH.createEffect(45, 2));
-        instance.startSkillCooldown(getId(), getCooldown());
+        //药水记账（O-7）：经 RoleInstance 施加，clear() 时只回收本系统施加的效果
+        instance.applyPotionEffect(PotionEffectType.REGENERATION.createEffect(45, 5));
+        instance.applyPotionEffect(PotionEffectType.STRENGTH.createEffect(45, 2));
+        instance.startSkillCooldown(getId(), getCooldownTicks());
 
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
     }
@@ -52,7 +53,7 @@ public class RedDeeplySorrowSkill extends Skill implements UpdateAware, SanTECha
     public void onSanTEChange(Player player, RoleInstance instance, int preSanTE, int newSanTE) {
         if(newSanTE <= 0){
             running = false;
-            instance.startSkillCooldown(getId(), getCooldown());
+            instance.startSkillCooldown(getId(), getCooldownTicks());
         }
     }
 }

@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent.red;
 
 import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.DamageUtil;
+import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
@@ -18,7 +19,11 @@ import org.bukkit.util.Vector;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class RedSolitaryArroganceSkill extends Skill {
+public class RedSolitaryArroganceSkill extends Skill implements LifecycleAware {
+
+    //O-5：任务句柄化（Folia 语义的 ScheduledTask），stop 时取消
+    private ScheduledTask attackTask;
+
 
     public RedSolitaryArroganceSkill() {
         super("red_solitaryArrogance_skill", Component.text("孤妄自赏"),
@@ -29,7 +34,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     @Override
     public void onRightClick(Player caster, RoleInstance instance){
         if(!instance.getBuffManager().canCastSkill()) return;
-        ShadowHunterRolesPlugin.getInstance().getServer().getGlobalRegionScheduler().runAtFixedRate(
+        attackTask = ShadowHunterRolesPlugin.getInstance().getServer().getGlobalRegionScheduler().runAtFixedRate(
                 ShadowHunterRolesPlugin.getInstance(),
                 new Consumer<ScheduledTask>() {
                     private Player cas = caster;
@@ -38,7 +43,8 @@ public class RedSolitaryArroganceSkill extends Skill {
 
                     @Override
                     public void accept(ScheduledTask scheduledTask) {
-                        if(cas == null || !cas.isOnline() || cas.isDead() || casterIns == null) {
+                        //实例已失效（角色被清除）时立即停止，不再以旧实例结算伤害
+                        if(cas == null || !cas.isOnline() || cas.isDead() || casterIns == null || !casterIns.isValid()) {
                             scheduledTask.cancel();
                             return;
                         }
@@ -79,6 +85,18 @@ public class RedSolitaryArroganceSkill extends Skill {
                 },
                 1L, 6
         );
-        instance.startSkillCooldown(getId(), getCooldown());
+        instance.startSkillCooldown(getId(), getCooldownTicks());
+    }
+
+    @Override
+    public void start(Player player, RoleInstance instance) {
+    }
+
+    @Override
+    public void stop(Player player, RoleInstance instance) {
+        if(attackTask != null){
+            attackTask.cancel();
+            attackTask = null;
+        }
     }
 }

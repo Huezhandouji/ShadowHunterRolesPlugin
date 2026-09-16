@@ -20,7 +20,6 @@ public class RedEquipmentsPassive extends PassiveSkill implements LifecycleAware
 
     @Override
     public void start(Player player, RoleInstance instance) {
-        player.sendMessage(Component.text("xxb111"));
         ItemStack helmet = new ItemStack(Material.IRON_HELMET);
         {
             ItemMeta meta = helmet.getItemMeta();

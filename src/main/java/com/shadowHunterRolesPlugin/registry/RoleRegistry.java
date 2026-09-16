@@ -21,19 +21,12 @@ public class RoleRegistry {
     //角色模板缓存
     private static final Map<String, Role> ROLES = new HashMap<>();
 
-    //装配器缓存
-    private static final Map<String, Role.Builder> BUILDERS = new HashMap<>();
-
     public static boolean hasRole(String roleId){
         return ROLES.containsKey(roleId);
     }
 
     public static Role getRole(String roleId){
         return ROLES.getOrDefault(roleId, null);
-    }
-
-    public static Role.Builder getBuilder(String roleId){
-        return BUILDERS.getOrDefault(roleId, null);
     }
 
     //静态初始化块,注册所有角色
@@ -75,7 +68,6 @@ public class RoleRegistry {
                 .icon(Material.DIAMOND_HOE);
 
 
-        BUILDERS.put("meiqihezi", builder);
         ROLES.put("meiqihezi", builder.build());
     }
 
@@ -104,7 +96,6 @@ public class RoleRegistry {
                 .addPassive(DefaultSanTEZeroPunishment::new)
                 .icon(Material.POPPY);
 
-        BUILDERS.put("red", builder);
         ROLES.put("red", builder.build());
 
     }

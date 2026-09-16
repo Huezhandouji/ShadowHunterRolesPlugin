@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 
 import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -12,12 +12,17 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
 import java.util.*;
 
 
-public class MeiqiheziBloodySlashSkill extends Skill {
+public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
+
+    //O-3：技能任务句柄化，stop 时取消，避免角色被清除后仍结算伤害
+    private BukkitTask attackTask;
+
 
     public MeiqiheziBloodySlashSkill(){
         super(
@@ -37,14 +42,19 @@ public class MeiqiheziBloodySlashSkill extends Skill {
         if(!instance.getBuffManager().canCastSkill()) return;
         instance.decreaseEnergy(getEnergyCost());
 
-        instance.startSkillCooldown(getId(), 160);
-        new BukkitRunnable() {
+        instance.startSkillCooldown(getId(), getCooldownTicks());
+        attackTask = new BukkitRunnable() {
 
             private int count = 0;
             private final Player player = caster;
 
             @Override
             public void run() {
+                //实例已失效（角色被清除）时立即停止，不再结算伤害
+                if(!instance.isValid()){
+                    this.cancel();
+                    return;
+                }
                 if (count >= 4) {
                     this.cancel();
                     return;
@@ -73,6 +83,18 @@ public class MeiqiheziBloodySlashSkill extends Skill {
 
         }.runTaskTimer(ShadowHunterRolesPlugin.getInstance(), 0L, 2L);
 
+    }
+
+    @Override
+    public void start(Player player, RoleInstance instance) {
+    }
+
+    @Override
+    public void stop(Player player, RoleInstance instance) {
+        if(attackTask != null){
+            attackTask.cancel();
+            attackTask = null;
+        }
     }
 
     @Override

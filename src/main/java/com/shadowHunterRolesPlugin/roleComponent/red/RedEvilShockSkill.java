@@ -31,12 +31,14 @@ public class RedEvilShockSkill extends Skill{
                 p.addPotionEffect(PotionEffectType.SLOWNESS.createEffect(61, 3));
                 //结算5层流血
                 Map<UUID, Integer> resolveRequests = instance.getContext(RedBleedPassive.BLEED_RESOLVE_REQUESTS_KEY, Map.class);
+                //O-9：流血被动未注册或上下文被清空时直接跳过，不能让本技能抛 NPE
+                if(resolveRequests == null) continue;
                 resolveRequests.put(p.getUniqueId(), 5);
             }
         }
         instance.increaseSanTE(10);
 
-        instance.startSkillCooldown(getId(), getCooldown());
+        instance.startSkillCooldown(getId(), getCooldownTicks());
 
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITCH_CELEBRATE, 1, 1);
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);

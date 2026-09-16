@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.core;
 
 
-import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import net.kyori.adventure.text.Component;
@@ -91,7 +90,8 @@ public class Role {
 
         private final String id;
         private Component displayName;
-        private List<Component> description;
+        //O-11：默认空表，addLineOfDescription 在 description(...) 之前调用时不再 NPE
+        private List<Component> description = new ArrayList<>();
         private double maxHP = 20d;
         private double baseATK = 10d;
         private int maxEnergy = 100;
@@ -118,7 +118,8 @@ public class Role {
         }
 
         public Builder description(List<Component> description) {
-            this.description = description;
+            //归一为可变列表，避免传入不可变列表后 addLineOfDescription 抛 UnsupportedOperationException
+            this.description = description != null ? new ArrayList<>(description) : new ArrayList<>();
             return this;
         }
 
@@ -171,9 +172,7 @@ public class Role {
             if(skillId == null || skillId.trim().isEmpty()){
                 throw new IllegalArgumentException("Skill ID cannot be null or empty.");
             }
-            if (skillSuppliers.containsKey(skillId)) {
-                throw new IllegalArgumentException("Skill already registered: " + skillId);
-            }
+            ensureIdNotRegistered("Skill", skillId);
 
             validateSlot(slot);
 
@@ -190,9 +189,7 @@ public class Role {
             if (passiveId == null || passiveId.trim().isEmpty()) {
                 throw new IllegalArgumentException("Passive skill ID cannot be null or empty");
             }
-            if (skillSuppliers.containsKey(passiveId)) {
-                throw new IllegalArgumentException("Passive already registered: " + passiveId);
-            }
+            ensureIdNotRegistered("Passive", passiveId);
 
             passiveSuppliers.put(passiveId, supplier);
 
@@ -206,9 +203,7 @@ public class Role {
             if(mainWeaponId == null || mainWeaponId.trim().isEmpty()){
                 throw new IllegalArgumentException("MainWeapon ID cannot be null or empty.");
             }
-            if (skillSuppliers.containsKey(mainWeaponId)) {
-                throw new IllegalArgumentException("MainWeapon already registered: " + mainWeaponId);
-            }
+            ensureIdNotRegistered("MainWeapon", mainWeaponId);
 
             validateSlot(slot);
 
@@ -224,18 +219,27 @@ public class Role {
             return this;
         }
 
+        //O-10：id 去重必须是跨类型的 —— 技能/被动/主武器共用同一个 id 命名空间，任一重复都抛异常
+        private void ensureIdNotRegistered(String type, String id){
+            if (skillSuppliers.containsKey(id) || passiveSuppliers.containsKey(id) || mainWeaponSuppliers.containsKey(id)) {
+                throw new IllegalArgumentException(type + " already registered: " + id);
+            }
+        }
+
+        //O-12：槽位冲突 fail-fast（§10 裁决 1）—— 抛异常、该角色不注册，不再"告警 + 覆盖"
         private void validateSlot(int slot){
             if(slot < 0 || slot > 8){
                 throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
             }
             if(slotMap.containsKey(slot)){
-                ShadowHunterRolesPlugin.getInstance().getLogger().warning("Slot " + slot + " is already occupied, but you overrode it with a new skill or mainWeapon!");
+                throw new IllegalArgumentException("Slot " + slot + " is already occupied by '" + slotMap.get(slot) + "'.");
             }
         }
 
         public Role build(){
             if(displayName == null) displayName = Component.text(id);
-            if(description == null) description = List.of(Component.text("No description yet."));
+            //空表仍给占位文案，保持与原 build() 兜底一致的可见输出
+            if(description.isEmpty()) description = new ArrayList<>(List.of(Component.text("No description yet.")));
 
             return new Role(this);
         }
@@ -260,18 +264,6 @@ public class Role {
     }
     public Set<String> getMainWeaponIds(){
         return mainWeaponSuppliers.keySet();
-    }
-
-    public Supplier<MainWeapon> getMainWeaponSupplier(String weaponId){
-        return mainWeaponSuppliers.get(weaponId);
-    }
-
-    public Supplier<Skill> getSkillSupplier(String skillId){
-        return skillSuppliers.get(skillId);
-    }
-
-    public Supplier<PassiveSkill> getPassiveSupplier(String passiveId){
-        return passiveSuppliers.get(passiveId);
     }
 
     public Faction getFaction() { return faction; }

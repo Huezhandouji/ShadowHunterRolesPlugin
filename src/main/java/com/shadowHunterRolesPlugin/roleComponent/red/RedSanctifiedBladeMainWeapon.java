@@ -47,7 +47,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
         //INSTANT_EFFECT 的数据类型是 Particle.Spell，必须传数据，否则 Paper 会抛 "missing required data"
         victim.spawnParticle(Particle.INSTANT_EFFECT, victim.getLocation().clone().add(0, 1, 0), 20, 1, 1, 1, new Particle.Spell(Color.RED, 1f));
 
-        instance.startMainWeaponCooldown(getId(), getCooldown());
+        instance.startMainWeaponCooldown(getId(), getCooldownTicks());
     }
 
 }

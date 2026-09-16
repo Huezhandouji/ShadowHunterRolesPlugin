@@ -62,19 +62,6 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
         playerBleedResolveRequests.clear();
     }
 
-    /**供其它组件(技能)登记"结算流血"请求：受害者的UUID -> 请求结算的层数**/
-    @SuppressWarnings("unchecked")
-    public static void requestBleedResolve(RoleInstance instance, Player victim, int stacks){
-        if(instance == null || victim == null || stacks <= 0) return;
-
-        Map<UUID, Integer> requests = instance.getContext(BLEED_RESOLVE_REQUESTS_KEY, Map.class);
-        //流血被动没注册或者上下文被清空时直接忽略，不能把调用方的技能搞崩
-        if(requests == null) return;
-
-        //同一个目标被多个技能同时请求时把层数叠加起来
-        requests.merge(victim.getUniqueId(), stacks, Integer::sum);
-    }
-
     /**
      * 这个受害者现在还能不能吃到流血。
      * 注意不能用 Player#isDead() 判断死亡：它是 CraftEntity 的 !entity.isAlive()，
@@ -123,8 +110,8 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
             //粒子
             player.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
             DamageUtil.dealtTrueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
-            //赋予 红 5秒抗性1, 恢复4点SanTE
-            player.addPotionEffect(PotionEffectType.RESISTANCE.createEffect(BLEED_RESISTANCE_DURATION_TICKS, 1));
+            //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经实例施加，clear 时只回收本系统施加的效果）
+            instance.applyPotionEffect(PotionEffectType.RESISTANCE.createEffect(BLEED_RESISTANCE_DURATION_TICKS, 1));
             instance.increaseSanTE(BLEED_SANTE_RECOVER);
 
             if(newBleed <= 0) {
@@ -208,8 +195,8 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
 
         DamageUtil.dealtTrueDamage(victim, caster, finalResolveBleedAmount * BLEED_DAMAGE_PER_SECOND);
 
-        //赋予 红 5秒抗性1, 恢复4点SanTE
-        caster.addPotionEffect(PotionEffectType.RESISTANCE.createEffect(BLEED_RESISTANCE_DURATION_TICKS, 1));
+        //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经实例施加，clear 时只回收本系统施加的效果）
+        casterInstance.applyPotionEffect(PotionEffectType.RESISTANCE.createEffect(BLEED_RESISTANCE_DURATION_TICKS, 1));
         casterInstance.increaseSanTE(BLEED_SANTE_RECOVER);
 
         victim.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));

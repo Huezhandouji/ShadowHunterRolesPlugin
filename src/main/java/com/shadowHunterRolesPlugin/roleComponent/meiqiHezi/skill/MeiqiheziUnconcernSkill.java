@@ -27,7 +27,7 @@ public class MeiqiheziUnconcernSkill extends Skill {
     @Override
     public void onRightClick(Player caster, RoleInstance instance) {
         if(!instance.getBuffManager().canCastSkill()) return;
-        instance.startSkillCooldown(getId(), getCooldown());
+        instance.startSkillCooldown(getId(), getCooldownTicks());
 
         PotionEffect speedEffect = new PotionEffect(
                 PotionEffectType.SPEED,
@@ -36,7 +36,8 @@ public class MeiqiheziUnconcernSkill extends Skill {
                 false,
                 true
         );
-        caster.addPotionEffect(speedEffect);
+        //药水记账（O-7）：经 RoleInstance 施加，clear() 时只回收本系统施加的效果
+        instance.applyPotionEffect(speedEffect);
 
         caster.getWorld().playSound(
                 caster.getLocation(),

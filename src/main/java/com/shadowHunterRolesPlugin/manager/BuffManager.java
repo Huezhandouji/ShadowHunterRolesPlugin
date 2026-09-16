@@ -110,14 +110,14 @@ public class BuffManager {
         }
     }
 
-    //加原版药水效果
+    //加原版药水效果（经 RoleInstance 记账，clear() 时只回收本系统施加的效果）
     private void applyPotionEffect(BuffType type, int durationTicks){
         switch (type){
             case STUN:
-                player.addPotionEffect(new PotionEffect(
+                instance.applyPotionEffect(new PotionEffect(
                         PotionEffectType.BLINDNESS, durationTicks, 1, false, true
                 ));
-                player.addPotionEffect(new PotionEffect(
+                instance.applyPotionEffect(new PotionEffect(
                         PotionEffectType.DARKNESS, durationTicks, 1, false, true
                 ));
                 break;

@@ -51,7 +51,7 @@ public class MainWeaponListener implements Listener {
         }
 
         //开始冷却
-        instance.startMainWeaponCooldown(weaponId, weapon.getCooldown());
+        instance.startMainWeaponCooldown(weaponId, weapon.getCooldownTicks());
 
         //执行攻击逻辑
         weapon.onAttack(attacker, victim, instance);

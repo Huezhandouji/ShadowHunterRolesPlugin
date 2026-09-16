@@ -3,7 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -15,12 +15,17 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-public class MeiqiheziCircleSlashSkill extends Skill {
+public class MeiqiheziCircleSlashSkill extends Skill implements LifecycleAware {
+
+    //O-4：前摇任务句柄化，stop 时取消
+    private BukkitTask castTask;
+
 
     public MeiqiheziCircleSlashSkill(){
         super(
@@ -38,10 +43,11 @@ public class MeiqiheziCircleSlashSkill extends Skill {
         if (instance.getCurrentEnergy() < getEnergyCost()) return;
         if(!instance.getBuffManager().canCastSkill()) return;
         instance.decreaseEnergy(getEnergyCost());
-        instance.startSkillCooldown(getId(), getCooldown());
+        instance.startSkillCooldown(getId(), getCooldownTicks());
 
         PotionEffect slowness = new PotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
-        caster.addPotionEffect(slowness);
+        //药水记账（O-7）：经 RoleInstance 施加，clear() 时只回收本系统施加的效果
+        instance.applyPotionEffect(slowness);
 
         Location loc = caster.getLocation();
 
@@ -49,10 +55,15 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
 
 
-        new BukkitRunnable(){
+        castTask = new BukkitRunnable(){
 
             @Override
             public void run() {
+                //实例已失效（角色被清除）时立即停止，不再以旧实例结算真伤
+                if(!instance.isValid()){
+                    this.cancel();
+                    return;
+                }
                 if(caster.isDead() || !caster.isOnline()){
                     this.cancel();
                     return;
@@ -69,8 +80,6 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
                 Collection<? extends Player> victims = loc.getNearbyPlayers(7);
 
-                RoleManager roleManager = RoleManager.getInstance();
-
                 for(Player victim : victims){
                     if (!instance.isHostileTo(victim)) continue;
                     DamageUtil.dealtTrueDamage(victim, caster, 20);
@@ -79,6 +88,18 @@ public class MeiqiheziCircleSlashSkill extends Skill {
                 loc.getWorld().playSound(loc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1f, 1f);
             }
         }.runTaskLater(ShadowHunterRolesPlugin.getInstance(), 20L);
+    }
+
+    @Override
+    public void start(Player player, RoleInstance instance) {
+    }
+
+    @Override
+    public void stop(Player player, RoleInstance instance) {
+        if(castTask != null){
+            castTask.cancel();
+            castTask = null;
+        }
     }
 
 

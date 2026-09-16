@@ -26,12 +26,19 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
         );
     }
 
-    int taskId = -1;
+    //O-6：没有在跑任务时的哨兵值（抽成常量，守卫里不再重复写字面量）
+    private static final int NO_TASK_ID = -1;
+
+    int taskId = NO_TASK_ID;
 
     @Override
     public void onSanTEChange(Player player, RoleInstance instance, int preSanTE, int newSanTE) {
         if(newSanTE > 0) return;
         Faction faction = instance.getFaction();
+
+        //O-6：重入保护 —— 先取消仍在跑的旧惩罚任务再起新任务
+        //（原实现直接覆盖 taskId，旧任务永远无法取消，泄漏且会在结束后改写 SanTE）
+        cancelPunishmentTask();
 
         taskId = new BukkitRunnable() {
 
@@ -119,8 +126,16 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
 
     }
 
+    //取消仍在运行的惩罚任务并复位句柄（O-6）
+    private void cancelPunishmentTask(){
+        if(taskId != NO_TASK_ID){
+            Bukkit.getScheduler().cancelTask(taskId);
+            taskId = NO_TASK_ID;
+        }
+    }
+
     @Override
     public void stop(Player player, RoleInstance instance) {
-        Bukkit.getScheduler().cancelTask(taskId);
+        cancelPunishmentTask();
     }
 }

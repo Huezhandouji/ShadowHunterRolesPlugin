@@ -67,15 +67,6 @@ public class RoleManager {
         return playerRoleMap.getOrDefault(uuid, null);
     }
 
-    public Role getCurrentRole(Player player){
-        RoleInstance instance = getRoleInstance(player);
-        return instance != null ? instance.getRole() : null;
-    }
-    public Role getCurrentRole(UUID uuid){
-        RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? instance.getRole() : null;
-    }
-
     //检查玩家是否已经选择了角色
     public boolean hasRole(Player player){
         return playerRoleMap.containsKey(player.getUniqueId());
@@ -85,24 +76,13 @@ public class RoleManager {
     }
 
 
+    //插件禁用/重载时：走 instance.clear() 逐个回收（属性修饰符、记账内的药水、热键栏、任务），
+    //不再只把 map 清空（O-8）
     public void clearAllPlayersRole(){
-        playerRoleMap.clear();
-    }
-
-    public int getPlayersWithRoleCount(){
-        return playerRoleMap.size();
-    }
-
-    public List<Player> getAllPlayersWithRole(){
-        List<Player> players = new ArrayList<>();
-        for(UUID uuid : playerRoleMap.keySet()){
-            Player player = Bukkit.getPlayer(uuid);
-            if(player != null && player.isOnline()){
-                players.add(player);
-            }
+        for(RoleInstance instance : new ArrayList<>(playerRoleMap.values())){
+            instance.clear();
         }
-
-        return players;
+        playerRoleMap.clear();
     }
 
     //清除玩家的角色

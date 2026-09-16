@@ -15,16 +15,20 @@ public class RoleManager {
     //阶段 2：去掉静态单例，改由主类在 onEnable 构造并注入平台上下文
     private final RolesContext context;
 
-    public RoleManager(RolesContext context){
+    //阶段 4（⑤）：RoleRegistry 改为构造注入（D-2 静态桥已删）
+    private final RoleRegistry roleRegistry;
+
+    public RoleManager(RolesContext context, RoleRegistry roleRegistry){
         this.context = context;
+        this.roleRegistry = roleRegistry;
     }
 
     //选择角色
     public boolean selectRole(Player player, String roleId){
-        if(!RoleRegistry.hasRole(roleId)) return false;
+        if(!roleRegistry.contains(roleId)) return false;
 
 
-        Role role = RoleRegistry.getRole(roleId);
+        Role role = roleRegistry.get(roleId);
         if(role == null) return false;
 
         if(hasRole(player)) clearRole(player);
@@ -36,12 +40,12 @@ public class RoleManager {
         return true;
     }
     public boolean selectRole(UUID uuid, String roleId){
-        if(!RoleRegistry.hasRole(roleId)) return false;
+        if(!roleRegistry.contains(roleId)) return false;
 
         Player player = Bukkit.getPlayer(uuid);
         if(player == null) return false;
 
-        Role role = RoleRegistry.getRole(roleId);
+        Role role = roleRegistry.get(roleId);
         if(role == null) return false;
 
         if(hasRole(uuid)) clearRole(uuid);

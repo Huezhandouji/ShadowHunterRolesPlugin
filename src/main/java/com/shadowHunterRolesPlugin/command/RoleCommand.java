@@ -13,9 +13,12 @@ import org.jetbrains.annotations.NotNull;
 public class RoleCommand implements CommandExecutor {
 
     private final RoleManager roleManager;
+    //阶段 4（⑤）：RoleRegistry 改为构造注入（D-2 静态桥已删）
+    private final RoleRegistry roleRegistry;
 
-    public RoleCommand(RoleManager roleManager){
+    public RoleCommand(RoleManager roleManager, RoleRegistry roleRegistry){
         this.roleManager = roleManager;
+        this.roleRegistry = roleRegistry;
     }
 
 
@@ -137,7 +140,7 @@ public class RoleCommand implements CommandExecutor {
     }
 
     private void handleSet(Player sender, String roleId, String targetName){
-        if(!RoleRegistry.hasRole(roleId)){
+        if(!roleRegistry.contains(roleId)){
             sender.sendMessage(Component.text("Role '" + roleId + "' not exist!"));
             return;
         }
@@ -157,8 +160,8 @@ public class RoleCommand implements CommandExecutor {
 
         boolean success = roleManager.selectRole(target, roleId);
         if(success){
-            if(targetName == null) sender.sendMessage(Component.text("Your role has been set: " + RoleRegistry.getRole(roleId).getId()));
-            else sender.sendMessage(Component.text("The role of player [ " + targetName + "] has been set: " + RoleRegistry.getRole(roleId).getId()));
+            if(targetName == null) sender.sendMessage(Component.text("Your role has been set: " + roleRegistry.get(roleId).getId()));
+            else sender.sendMessage(Component.text("The role of player [ " + targetName + "] has been set: " + roleRegistry.get(roleId).getId()));
         }
         else{
             sender.sendMessage(Component.text("Role set operation failed."));

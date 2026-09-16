@@ -59,19 +59,19 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         RoleRegistry roleRegistry = new RoleRegistry();
         RoleLoader roleLoader = new RoleLoader(getLogger());
         int loadedRoles = roleLoader.loadInto(roleRegistry);
-        RoleRegistry.install(roleRegistry);
+        //阶段 4（⑤）：D-2 静态兼容桥已删除 —— 容器改为**构造注入**给 RoleManager 与 RoleCommand
         if (loadedRoles == 0) {
             getLogger().severe("No role templates were registered; /role and SHDF role selection will be unavailable.");
         }
 
-        roleManager = new RoleManager(rolesContext);
+        roleManager = new RoleManager(rolesContext, roleRegistry);
 
         PluginCommand roleCommand = getCommand("role");
         if(roleCommand == null){
             getLogger().warning("Command 'role' is not declared in plugin.yml; /role is unavailable.");
         }
         else{
-            roleCommand.setExecutor(new RoleCommand(roleManager));
+            roleCommand.setExecutor(new RoleCommand(roleManager, roleRegistry));
         }
 
         Bukkit.getPluginManager().registerEvents(new SkillListener(roleManager, rolesContext), this);

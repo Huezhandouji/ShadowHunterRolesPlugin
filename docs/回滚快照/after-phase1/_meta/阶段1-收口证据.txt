@@ -1,0 +1,30 @@
+after-phase1 快照证据（t8 整合结案，2026-09-16）
+
+一、快照内容
+- 文件数 = 48（src/** 45 = 44 个 .java + src/main/resources/plugin.yml；另加 build.gradle.kts / gradle.properties / settings.gradle.kts）
+- 与 after-baseline 的 51 个文件集相比：少 3 个——阶段 1 按 §2.5 强制删除的 3 个未使用类（SampleMainWeapon.java / TestSendSanTEAndEnergyChangeMsgPassive.java / TestSetSanTEToZeroSkill.java），即 47 → 44 个 .java
+- SHA256.txt = 48 行，格式 `<SHA256>  <相对路径>`（与 after-baseline/SHA256.txt 同格式）
+- 生成时刻：2026-09-16 23:23:16（本地 UTC+8）
+
+二、自身校验
+- 逐行复算 SHA256.txt vs 副本文件：checked = 48 / bad = 0
+
+三、旧快照未被改动（本次实测，2026-09-16 23:2x）
+- docs/回滚快照/before/：按 `docs/回滚快照/integrity-sha256.txt` 复算 src/** 共 48 个文件 → checked = 48 / bad = 0；该清单自身 7 213 B / mtime 2026-09-15 21:56:53 / SHA256 CE3E5E7B0A4BED22834D7D8EF76AC193FC528846173335125EC73AFFF965D50C（未变）
+  · 清单中另有第 49 行 `docs/回滚快照/session-start-baseline.patch`（不在 before/ 下）：实测存在且哈希与清单一致
+- docs/回滚快照/after-baseline/：按自身 SHA256.txt 复算 51 个文件 → checked = 51 / bad = 0；SHAS256.txt 自身 7 155 B / mtime 2026-09-16 21:52:42 / SHA256 230464328BE7E2E2E65981C00EA424EEEB09740F0F9633626A122A6EB0A2FEAF（未变）
+- 本快照目录为**新建**，未覆盖任何既有快照（生成前先 Test-Path，存在即拒绝）
+
+四、被验事实的版本身份（供引用）
+- 交付小结（阶段 0 / 1 / 1.8）：docs/阶段0-交付小结.md、docs/阶段1-交付小结.md（38 004 B / 23:07:59 / SHA256 965BFD2501F47D9695D4816DA9425C9FB7B7FAEDE179405F0D8B492511A74409）、docs/阶段1.8-交付小结.md
+- 独立验证报告（t7）：docs/阶段0-1-验证报告.md = 19 295 B / 23:17:07 / SHA256 FE951307CB7BBDD77F8EF92CC281F16D0A9D554D8ADDF3E29C30A854FB04EF7F
+- 评审报告（t10）：docs/阶段0-1-评审报告.md = 26 588 B / 23:21:53 / SHA256 CCE2F5E0BF98631FDAEA8DC7A7B24FAAD7D467CEFE711C3A2E71D925BFFD9952
+- 回滚演练（t12）：docs/阶段0-回滚演练记录.md
+- 起服证据（权威副本，均在 docs/ 下）：阶段1-起服锚点-t2ModeB.log（6 199 B / 22:01:20）、阶段1-起服日志-t5ModeB.log（6 076 B / 22:22:30）、阶段1.8-起服日志-t6ModeB.log（9 786 B / 22:54:49）
+- 构建产物（t6 当次）：build/libs/ShadowHunterRolesPlugin-1.0.0.jar = 99 659 B / mtime 2026-09-16 22:36:34 / SHA256 F94CDE7128F5A5F067F4286B89FF09CB9023EFCB7C2DD6F8892F9DA34C151908
+
+五、生成命令（可复现）
+1) 建目录 + 复制 src/** 与 3 个构建文件；
+2) 逐文件 `Get-FileHash -Algorithm SHA256`，按相对路径升序写入 SHA256.txt（UTF-8 无 BOM + CRLF，整表重写）；
+3) 逐行复算校验。
+（生成脚本未落盘为独立文件；命令见 docs/阶段1-收口记录.md §3）

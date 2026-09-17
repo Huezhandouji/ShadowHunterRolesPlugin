@@ -44,7 +44,6 @@ public class RoleInstance {
     private int currentEnergy;
     private int currentSanTE;
 
-    private boolean isInSanTEPunishment = false;
 
     //实例是否仍然有效：clear() 之后置为 false，组件里的延时任务用它做"实例已失效"守卫
     private boolean valid = true;
@@ -559,10 +558,6 @@ public class RoleInstance {
 
     public int getMaxSanTE() { return role.getMaxSanTE(); }
 
-    public void setIsInSanTEPunishmentState(boolean state){
-        this.isInSanTEPunishment = state;
-    }
-
     //实例是否有效：clear() 之后为 false，供组件里的延时任务做失效守卫
     public boolean isValid(){
         return valid;
@@ -730,6 +725,11 @@ public class RoleInstance {
     public void triggerSanTEChange(int preSanTE, int newSanTE){
         if(player == null ) return;
 
+        //阶段 4（B⑨）：**真变化才派发**（已申报可见变化，裁定 (i)）——
+        //SanTE 已为 0 时再扣（0 → 0）不再通知组件 ⇒ 惩罚不再被重复触发/延长（O-6 重复任务路径由此闭合）。
+        //注意：`SanTEChangeEvent` 的对外发布仍然**无条件**（第三方挂点），此处只收紧**组件侧钩子**。
+        if(preSanTE == newSanTE) return;
+
         //遍历所有技能
         for(Skill skill : skillMap.values()){
             if(skill instanceof SanTEChangeAware){
@@ -747,6 +747,13 @@ public class RoleInstance {
             if(weapon instanceof SanTEChangeAware){
                 ((SanTEChangeAware) weapon).onSanTEChange(player, this, preSanTE, newSanTE);
             }
+        }
+
+        //阶段 4（B⑨）：为**注册表内组件**广播新基类钩子 onSanTEChange(pre, now)（顺序 = 注册表顺序，
+        //与 update()/start()/stop() 的新钩子广播同源）；异常隔离复用 runComponentUpdate。
+        //已迁移组件**不再 implements SanTEChangeAware** ⇒ 只被这一条路径调用，不会双触发。
+        for(RoleComponent component : componentRegistry.all()){
+            runComponentUpdate("registered", component.getId(), () -> component.onSanTEChange(preSanTE, newSanTE));
         }
     }
 

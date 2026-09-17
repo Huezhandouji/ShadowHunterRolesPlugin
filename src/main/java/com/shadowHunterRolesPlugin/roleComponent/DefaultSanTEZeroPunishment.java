@@ -1,8 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.SanTEChangeAware;
 import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -15,7 +13,21 @@ import org.bukkit.entity.Player;
 
 import java.time.Duration;
 
-public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEChangeAware, LifecycleAware {
+/**
+ * 默认的「SanTE 归零惩罚」被动（组件侧最后一批 B⑨ 迁移）。
+ * <p><b>迁移口径</b>：
+ * <ul>
+ *   <li>去 legacy `SanTEChangeAware` 与 `LifecycleAware` ⇒ 改走基类新钩子
+ *       {@link RoleComponent#onSanTEChange(int, int)} 与无参 {@code stop()}（容器按注册表顺序直接派发，
+ *       不再经事件总线绕行）；</li>
+ *   <li>惩罚状态 `isInSanTEPunishment` 由聚合根搬进**组件私有字段**（该状态本就不该上 `RoleInstance`）；</li>
+ *   <li>任务经 `svc().timers()` 登记本组件资源表、Buff 经 `svc().buffs()`、SanTE 经 `svc().sante()`、
+ *       真伤经 `svc().damage()`；**表现层（粒子/标题/音效）与全部数值逐字不变**；</li>
+ *   <li>**已申报可见变化（裁定 (i)）**：容器侧收紧为「**真变化才派发**」（见 `RoleInstance.triggerSanTEChange`）
+ *       ⇒ SanTE 已为 0 时再扣不再重复派发 ⇒ **惩罚不再被重复触发/延长**（O-6 的重复任务路径由本批闭合）。</li>
+ * </ul>
+ */
+public class DefaultSanTEZeroPunishment extends PassiveSkill {
     public DefaultSanTEZeroPunishment() {
         super(
                 "default_san_te_zero_punishment",
@@ -27,19 +39,22 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
     //O-6：任务句柄（阶段 2 换成平台 Task，null = 没有任务在跑）
     private Task punishmentTask;
 
+    //B⑨：惩罚状态搬进组件私有字段（原 RoleInstance.isInSanTEPunishment 已删）
+    private boolean inSanTEPunishment = false;
+
     @Override
-    public void onSanTEChange(Player player, RoleInstance instance, int preSanTE, int newSanTE) {
-        if(newSanTE > 0) return;
-        Faction faction = instance.getFaction();
+    public void onSanTEChange(int pre, int now) {
+        if(now > 0) return;
+        Faction faction = svc().factions().faction();
 
         //O-6：重入保护 —— 先取消仍在跑的旧惩罚任务再起新任务
         //（原实现直接覆盖 taskId，旧任务永远无法取消，泄漏且会在结束后改写 SanTE）
         cancelPunishmentTask();
 
-        punishmentTask = instance.rolesContext().scheduler().runRepeating(new Runnable() {
+        punishmentTask = svc().timers().runRepeating(0L, 40L, new Runnable() {
 
                     int count = 0;
-                    Player player = instance.getPlayer();
+                    Player player = svc().self().player();
 
                     double totalDamageAmount = player.getAttribute(Attribute.MAX_HEALTH) != null ?
                             player.getAttribute(Attribute.MAX_HEALTH).getValue() * 0.3d : 20;
@@ -62,9 +77,9 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
                         Location loc = player.getLocation();
 
                         if (count == 1) {
-                            instance.setIsInSanTEPunishmentState(true);
+                            inSanTEPunishment = true;
 
-                            instance.getBuffManager().addBuff(BuffType.STUN, 100);
+                            svc().buffs().add(BuffType.STUN, 100);
                             player.playSound(loc, Sound.ITEM_TOTEM_USE, 1f, 1f);
 
                             Location particleLoc = loc.clone().add(0, 1, 0);
@@ -106,20 +121,15 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
                             Location particleLoc = loc.clone().add(0, 1, 0);
                             particleLoc.getWorld().spawnParticle(Particle.SCULK_SOUL, particleLoc, 30, 0.5d, 0.5d, 0.5d);
                         }
-                        DamageUtil.dealtTrueDamage(player, null, totalDamageAmount * 0.33333d);
+                        svc().damage().trueDamage(player, null, totalDamageAmount * 0.33333d);
 
                         if (count == 3) {
-                            instance.setIsInSanTEPunishmentState(false);
-                            instance.setCurrentSanTE(instance.getMaxSanTE());
-                            instance.setIsInSanTEPunishmentState(false);
+                            inSanTEPunishment = false;
+                            svc().sante().set(svc().sante().max());
+                            inSanTEPunishment = false;
                         }
                     }
-                }, 0L, 40L);
-    }
-
-    @Override
-    public void start(Player player, RoleInstance instance) {
-
+                });
     }
 
     //取消仍在运行的惩罚任务并复位句柄（O-6）
@@ -130,8 +140,11 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECha
         }
     }
 
+    /**
+     * 停止生效（新钩子，无参）：取消任务。框架 `cancelAllAndClear()` 兜底取消同一句柄 ⇒ 幂等。
+     */
     @Override
-    public void stop(Player player, RoleInstance instance) {
+    public void stop() {
         cancelPunishmentTask();
     }
 }

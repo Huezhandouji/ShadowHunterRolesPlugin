@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
@@ -13,7 +12,7 @@ import org.bukkit.util.Vector;
 import java.util.*;
 
 
-public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
+public class MeiqiheziBloodySlashSkill extends Skill {
 
     //O-3：技能任务句柄化，stop 时取消，避免角色被清除后仍结算伤害（阶段 2 换成平台 Task）
     private Task attackTask;
@@ -86,11 +85,7 @@ public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
     }
 
     @Override
-    public void start(Player player, RoleInstance instance) {
-    }
-
-    @Override
-    public void stop(Player player, RoleInstance instance) {
+    public void stop() {
         if(attackTask != null){
             attackTask.cancel();
             attackTask = null;

@@ -3,6 +3,8 @@ package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
+import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
+import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -35,18 +37,24 @@ public class MeiqiheziCircleSlashSkill extends Skill implements LifecycleAware {
                 15,
                 Material.GOLD_INGOT
         );
+        markMigrated();
     }
 
+    /**
+     * 批次②（B②-b-2）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
+     * 能量 = `tryConsume`（旧"先比较再 decreaseEnergy"合一）；`canCastSkill` 不满足 → `NO_COOLDOWN`
+     * （旧路径直接 return、**不启冷却**）；冷却改为 `CAST` 由框架按声明值 **200** 启动；
+     * 缓慢用 **5 参重载**（`ambient=true, particles=false` 逐字保真，R-1 方法族）；
+     * 前摇任务改由 `svc().timers()` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
+     */
     @Override
-    public void onRightClick(Player caster, RoleInstance instance){
-        if (instance.getCurrentEnergy() < getEnergyCost()) return;
-        if(!instance.getBuffManager().canCastSkill()) return;
-        instance.decreaseEnergy(getEnergyCost());
-        instance.startSkillCooldown(getId(), getCooldownTicks());
+    public CastResult onCast(CastSignal signal){
+        Player caster = svc().self().player();
+        if(!svc().energy().tryConsume(getEnergyCost())) return CastResult.NO_COOLDOWN;
+        if(!svc().buffs().canCastSkill()) return CastResult.NO_COOLDOWN;
 
-        PotionEffect slowness = new PotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
-        //药水记账（O-7）：经 RoleInstance 施加，clear() 时只回收本系统施加的效果
-        instance.applyPotionEffect(slowness);
+        //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果（标志位与旧写法逐字一致）
+        svc().buffs().applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
 
         Location loc = caster.getLocation();
 
@@ -54,15 +62,10 @@ public class MeiqiheziCircleSlashSkill extends Skill implements LifecycleAware {
 
 
 
-        castTask = instance.rolesContext().scheduler().runLater(new BukkitRunnable(){
+        castTask = svc().timers().runLater(20L, new Runnable(){
 
             @Override
             public void run() {
-                //实例已失效（角色被清除）时立即停止，不再以旧实例结算真伤
-                if(!instance.isValid()){
-                    castTask.cancel();
-                    return;
-                }
                 if(caster.isDead() || !caster.isOnline()){
                     castTask.cancel();
                     return;
@@ -80,13 +83,14 @@ public class MeiqiheziCircleSlashSkill extends Skill implements LifecycleAware {
                 Collection<? extends Player> victims = loc.getNearbyPlayers(7);
 
                 for(Player victim : victims){
-                    if (!instance.isHostileTo(victim)) continue;
-                    DamageUtil.dealtTrueDamage(victim, caster, 20);
+                    if (!svc().factions().isHostile(victim)) continue;
+                    svc().damage().trueDamage(victim, caster, 20);
                 }
 
                 loc.getWorld().playSound(loc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1f, 1f);
             }
-        }, 20L);
+        });
+        return CastResult.CAST;
     }
 
     @Override

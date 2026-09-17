@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.BuffType;
 import com.shadowHunterRolesPlugin.core.ports.BuffPort;
+import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 /** {@link BuffPort} 的独立适配器：闸门语义仍由 {@code BuffManager} 单一实现。 */
@@ -46,5 +47,14 @@ final class BuffPortImpl implements BuffPort {
     @Override
     public void applyPotionEffect(PotionEffectType type, int durationTicks, int amplifier) {
         owner.applyPotionEffect(type.createEffect(durationTicks, amplifier));
+    }
+
+    /**
+     * R-1 方法族的**标志位保真版**：`ambient`/`particles` 逐字进入效果对象（`PotionEffect` 5 参构造的
+     * `icon` 默认 true，与 `CircleSlash` 旧写法一致）；同样**直接委托**已记账路径，不绕过记账。
+     */
+    @Override
+    public void applyPotionEffect(PotionEffectType type, int durationTicks, int amplifier, boolean ambient, boolean particles) {
+        owner.applyPotionEffect(new PotionEffect(type, durationTicks, amplifier, ambient, particles));
     }
 }

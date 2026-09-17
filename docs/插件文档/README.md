@@ -1,7 +1,7 @@
 # ShadowHunterRolesPlugin · 使用文档（使用者向）
 
 > **写作口径（重要）**
-> 1. 本文每条技术断言都给出 `路径:符号/行` 作为出处，**行号是 2026-09-17 17:42（UTC+8）时点的读数**，会随重构漂移；复核一律以「标识符 + 内容片段」为准（口径出处：`docs/重构进度与交接.md:69`）。
+> 1. 本文每条技术断言都给出 `路径:符号/行` 作为出处，**行号是 2026-09-17 17:42（UTC+8）时点的读数**，会随重构漂移；复核一律以「标识符 + 内容片段」为准（口径出处：`docs/重构进度与交接.md` §4 纪律（身份一律现算））。
 > 2. **身份一律现算**：本文出现的字节数 / mtime / SHA256 只是"当时的读数"，任何人要引用都必须现场重算（`Get-Item` + `Get-FileHash`），不得直接抄本文的数字。
 > 3. 本文只写**已实现**的行为。计划中的东西一律标注「**待阶段 N**」并指回设计文档，绝不写成已实现。
 > 4. 本文属于**插件文档类**（使用者/开发者文档）；重构过程的交付小结、验证/评审报告属于**重构证据类**，两者分开存放，索引见 `docs/README-文档索引.md`。
@@ -15,7 +15,7 @@ ShadowHunterRolesPlugin 是给 Minecraft Java 版（Paper）服务端用的**角
 - 主类：`src/main/java/com/shadowHunterRolesPlugin/ShadowHunterRolesPlugin.java:23`（`public final class ShadowHunterRolesPlugin extends JavaPlugin`）
 - 入口装配全部发生在 `onEnable()`：`ShadowHunterRolesPlugin.java:33-89`
 - 对外 API：`com.shadowHunterRolesPlugin.api.RoleAPI`，在 `onEnable` 里注册进 Bukkit 服务表 —— `ShadowHunterRolesPlugin.java:83-85`（`Bukkit.getServicesManager().register(RoleAPI.class, roleAPI, this, ServicePriority.Normal)`）；接口定义见 `api/RoleAPI.java:15`
-- **没有配置文件**：本工程当前不引入 `config.yml`（设计裁决见 `docs/组件系统设计-Unity风格.md:557-561`），所有数值都写在 Java 里（`registry/RoleLoader.java` 的角色定义 + 各组件构造器）。
+- **没有配置文件**：本工程当前不引入 `config.yml`（设计裁决见 `docs/组件系统设计-Unity风格.md` §9.1 掉线即销毁），所有数值都写在 Java 里（`registry/RoleLoader.java` 的角色定义 + 各组件构造器）。
 
 ### 与下游插件的关系
 同工作区的 `SHDFGamePlugin` 声明了硬依赖：`../SHDFGamePlugin/src/main/resources/plugin.yml`（`depend:\n  - ShadowHunterRolesPlugin`）。因此**服务端上必须先有本插件**，否则下游插件无法加载。
@@ -54,14 +54,14 @@ $env:GRADLE_USER_HOME = "$PWD\.gradle-work"      # 本地缓存目录（.gitigno
 ```
 
 - `build` 结束时会 `finalizedBy("copyPluginJar")`（`build.gradle.kts:66-68`），把 `build/libs/${project.name}-${project.version}.jar` 拷到 `C:/Users/ROG/Desktop/paper1.21.11/plugins`（`build.gradle.kts:59-64`）；不需要自动拷贝时用 `-x copyPluginJar` 跳过。
-- **判定口径**：不要只看退出码，要看 `BUILD SUCCESSFUL` + 最新 `.class` 的 mtime 是否刷新（工程纪律见 `docs/最终重构指南.md:1090-1103`）。
+- **判定口径**：不要只看退出码，要看 `BUILD SUCCESSFUL` + 最新 `.class` 的 mtime 是否刷新（工程纪律见 `docs/最终重构指南.md` 附录 B 命令速查（构建判定））。
 
 ### 3.2 本地起服（开发环境）
 ```powershell
 .\gradlew runServer        # 使用 build.gradle.kts:39-45 的配置（1.21.11 / 2G 内存）
 ```
 - 服务端目录 = `run/`（`run/server.properties`、`run/plugins/`、`run/logs/latest.log`）。
-- 起服判据（工程口径，**必须写明模式**）：见 `docs/最终重构指南.md:743-751`。摘要：
+- 起服判据（工程口径，**必须写明模式**）：见 `docs/最终重构指南.md` §6.3 构建与起服验收。摘要：
   - **Mode B（稳态，本项目采用）**：不安装 `SHDFGamePlugin`。合格线 = 「**三行 + 无新增 ERROR/Exception + 第 3 行（下游依赖发现行）的替代证据**」。
   - **Mode A（备选）**：把下游 jar 拷进 `run/plugins/` 后起服，期望四行齐。
   - **禁止**把"三行"当作"四行等价"通过；「无新增错误」必须锚定明确的基线日志文件。
@@ -138,7 +138,7 @@ $env:GRADLE_USER_HOME = "$PWD\.gradle-work"      # 本地缓存目录（.gitigno
    - 左键 / 右键 / `Q`（丢弃键）= 触发当前手持的技能或主武器（`listener/SkillListener.java:28/68/108`、`listener/MainWeaponListener.java:63/92/116`）。
    - 用主武器**攻击玩家**时走攻击路径（`MainWeaponListener.java:29-60`）。
 4. **物品保护**：技能/主武器物品**不能被丢弃、不能被塞进容器**（`InventoryClickEvent` 直接取消：`SkillListener.java:145-159`、`MainWeaponListener.java:151-165`）。
-5. **掉线**：掉线**立即销毁角色实例**（不保留、重连后没有角色）——`listener/PlayerListener.java:39-43` 调 `roleManager.clearRole(uuid)`。设计裁决见 `docs/组件系统设计-Unity风格.md:557-561`。
+5. **掉线**：掉线**立即销毁角色实例**（不保留、重连后没有角色）——`listener/PlayerListener.java:39-43` 调 `roleManager.clearRole(uuid)`。设计裁决见 `docs/组件系统设计-Unity风格.md` §9.1 掉线即销毁。
 6. **死亡**：死亡即清角色，并把 9 个快捷栏里的技能/武器物品清掉（`PlayerListener.java:21-28`）；重生时也再清一次（`:30-34`）。
 
 ---
@@ -172,7 +172,7 @@ Select-String -Path src/main/java/com/shadowHunterRolesPlugin/listener/PlayerLis
 
 | # | 事实 | 出处 |
 |---|---|---|
-| 1 | **掉线角色不保留**（重连后需重新 `/role set`） | `PlayerListener.java:39-43`、`docs/组件系统设计-Unity风格.md:557-561` |
+| 1 | **掉线角色不保留**（重连后需重新 `/role set`） | `PlayerListener.java:39-43`、`docs/组件系统设计-Unity风格.md` §9.1 掉线即销毁 |
 | 2 | 死亡清角色时，若玩家身上还挂着本系统发放的装备被动，`stop()` 会**无条件清空**头盔/胸甲/腿甲/靴子四个槽位（连带玩家自己的装备） | `roleComponent/meiqiHezi/passive/MeiqiheziEquipmentsPassive.java:72-81`、`roleComponent/red/RedEquipmentsPassive.java:72-81`（裁决依据：`docs/最终重构指南.md` §10 裁决 3，见这两处注释） |
 | 3 | 主武器**攻击玩家**时无条件进入冷却（即使武器自身逻辑没做事） | `listener/MainWeaponListener.java:50-55`（`startMainWeaponCooldown` 后才是 `onAttack`/`onLeftClick`） |
 | 4 | `/role` 无参数、`/role energy set abc` 都是**静默**的，没有任何提示 | `RoleCommand.java:32-35`、`:131-137` |

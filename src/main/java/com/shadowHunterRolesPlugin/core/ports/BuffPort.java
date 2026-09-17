@@ -24,4 +24,12 @@ public interface BuffPort {
 
     /** 施加药水效果（**组件侧唯一入口**；实现委托 {@code RoleInstance.applyPotionEffect} 的已记账路径）。 */
     void applyPotionEffect(PotionEffectType type, int durationTicks, int amplifier);
+
+    /**
+     * 施加药水效果（**标志位保真版**，设计文档 §5.1 R-1 方法族）：当旧写法显式指定了
+     * {@code ambient}/{@code particles}（如 {@code new PotionEffect(type, dur, amp, true, false)}）时必须用本重载，
+     * 否则会引入**未申报的可见变化**（粒子漩涡/图标明暗）。实现同样走已记账路径：
+     * {@code owner.applyPotionEffect(new PotionEffect(type, durationTicks, amplifier, ambient, particles))}。
+     */
+    void applyPotionEffect(PotionEffectType type, int durationTicks, int amplifier, boolean ambient, boolean particles);
 }

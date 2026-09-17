@@ -282,13 +282,9 @@ public class RoleInstance {
         Skill skill = skillMap.get(skillId);
         if(skill == null){
             caster.sendMessage(Component.text("unknown skill!"));
-            return false;
         }
-        //T-1 (4) 残留项：RedDeeplySorrowSkill 仍是**未迁移**组件（其施放走该 legacy 入口）⇒ 暂留回退调用与 1t 热键栏刷新；
-        //T-1b：该组件已在 T-2 迁到 onCast(CastSignal)（迁移标记已删）⇒ 本回退与 Skill.onRightClick 声明可在后续小卡删除。
-        skill.onRightClick(caster, this);
-        platform.scheduler().runLater(this::updateHotbar, 1L);
-        return true;
+        //T-2c：T-1 的未迁移回退已删（组件侧一律走新管道）；可见刷新由 handleCast 的 markDirty() + updateHotbar 每 tick 保证。
+        return false;
     }
 
     public boolean castSkillQDrop(String skillId, Player caster){

@@ -28,7 +28,7 @@ public abstract class MainWeapon extends ActiveComponent implements CombatHook {
      * 今天武器没有 energyCost 字段，填非 0 会让武器图标多出一个今天不存在的 `ENERGY LACK` 态）。
      * 五个字段与对应 getter 已上移到基类；**构造参数顺序不变**（icon 在 cooldown 之前）
      * ⇒ 2 个武器子类的 `super(...)` 一字不改。旧回调 `onAttack/onLeftClick/onRightClick/onDrop`（后者已在 T-1 ④ 删除）
-     * 保留（收尾开关 false、`isMigrated()` 全 false ⇒ 派发仍全走旧路径）。
+     * （组件侧一律走新钩子；T-2 后无迁移标记）。
      */
     public MainWeapon(String id, Component displayName, Component description, Material icon, int cooldown){
         super(id, displayName, description, cooldown, 0, icon, ItemKind.MAIN_WEAPON);

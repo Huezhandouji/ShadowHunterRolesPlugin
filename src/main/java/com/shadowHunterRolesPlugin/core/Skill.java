@@ -25,18 +25,12 @@ public abstract class Skill extends ActiveComponent {
      * 阶段 4 B0b-2：改基到 {@link ActiveComponent}（kind = SKILL）。
      * 六个字段与对应 getter 已上移到基类（基类 getter 是 `final`）；**构造参数顺序不变**
      * ⇒ 7 个技能子类的 `super(...)` 一字不改。旧回调 `onRightClick/onLeftClick/onDrop` 已在 T-1 ④ 删除（组件侧一律走新钩子 `onCast`）
-     * （收尾开关为 false、`isMigrated()` 全 false ⇒ 派发仍全走旧路径）。
+     * （组件侧一律走新钩子；T-2 后无迁移标记）。
      */
     public Skill(String id, Component displayName, Component description, int cooldown, int energyCost, Material icon){
         super(id, displayName, description, cooldown, energyCost, icon, ItemKind.SKILL);
     }
 
-    /**
-     * T-1 (4) 的残留项（需 T-1b 收口）：RedDeeplySorrowSkill 仍是未迁移组件、其施放仍走该 legacy 入口
-     * （@Override public void onRightClick(Player, RoleInstance)）⇒ 基类声明暂留，待该组件的施放路径迁到
-     * onCast(CastSignal) + markMigrated() 后与 T-1b 一并删除。
-     */
-    public void onRightClick(Player caster, RoleInstance instance){}
 
 
     //技能物品

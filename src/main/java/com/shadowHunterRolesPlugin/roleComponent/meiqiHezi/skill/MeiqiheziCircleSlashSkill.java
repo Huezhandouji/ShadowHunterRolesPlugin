@@ -43,8 +43,8 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     @Override
     public CastResult onCast(CastSignal signal){
         Player caster = svc().self().player();
+        if(!svc().buffs().canCastSkill()) return CastResult.REJECTED_DISABLED;
         if(!svc().energy().tryConsume(getEnergyCost())) return CastResult.NO_COOLDOWN;
-        if(!svc().buffs().canCastSkill()) return CastResult.NO_COOLDOWN;
 
         //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果（标志位与旧写法逐字一致）
         svc().buffs().applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);

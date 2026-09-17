@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
 import com.shadowHunterRolesPlugin.core.MainWeapon;
-import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import net.kyori.adventure.text.Component;
@@ -28,9 +27,10 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
     }
 
     /**
-     * 攻击路径（新管道）。语义与旧 `onAttack(Player, Player, RoleInstance)` **逐条等价**：
-     * 流血层数经 {@code RedBleedPassive.applyStacks(...)} 写入**同一份私有账本**（B⑦ 删掉上下文设施后
-     * 的唯一通路）；**拿不到账本时只跳过流血、继续结算普攻伤害**（原意保留）；伤害 `8` / 击退 `1` 逐字不变。
+     * 攻击路径（新管道；B⑦ 已把 `MainWeaponListener.onAttackPlayer` 接到 `instance.handleAttack`）。
+     * 语义与旧 `onAttack(Player, Player, RoleInstance)` **逐条等价**：流血层数经
+     * {@code RedBleedPassive.applyStacks(...)} 写入**同一份私有账本**；**拿不到账本时只跳过流血、
+     * 继续结算普攻伤害**（原意保留）；伤害 `8` / 击退 `1` 逐字不变；冷却由框架按声明值启动。
      */
     @Override
     public CastResult onAttack(AttackSignal signal) {
@@ -57,17 +57,6 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
 
         //冷却由框架按 getCooldownTicks() 启动（声明值是唯一真值来源）
         return CastResult.CAST;
-    }
-
-    /**
-     * **过渡委托壳（B⑦ 保留，待接线后删除）**：`MainWeaponListener:58` 仍直接调本签名（攻击路径尚未接线到
-     * `RoleInstance.handleAttack`，该方法全树 0 调用点）⇒ 为**不产生"近战静默空操作"的回归**，本壳仅
-     * 1 行转调新钩子；冷却仍由 listener `:55` 按旧行为启动，**不存在双启动**。
-     * 待 `listener/MainWeaponListener.java` 接线（另卡）后，本壳删除。
-     */
-    @Override
-    public void onAttack(Player attacker, Player victim, RoleInstance instance) {
-        onAttack(new AttackSignal(victim));
     }
 
 }

@@ -1,9 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
-import com.shadowHunterRolesPlugin.core.DamageUtil;
 import com.shadowHunterRolesPlugin.core.PassiveSkill;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.UpdateAware;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -18,7 +16,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class RedBleedPassive extends PassiveSkill implements LifecycleAware, UpdateAware {
+/**
+ * 红的流血被动。
+ * <p><b>批次⑥/B⑥（裁定 (A)）的迁移口径</b>：
+ * <ul>
+ *   <li><b>保留 `implements LifecycleAware`</b>（`start/stop(Player, RoleInstance)` 原样，**仅供发布过渡桥**）——
+ *       过渡桥两行 `instance.setContext(...)` 需要 `RoleInstance`；而"去 `LifecycleAware`"会让 `start/stop`
+ *       变无参、拿不到 `instance`。在**不新增 `ComponentServices` 成员（白名单 10 不动）**的前提下二者不可兼得
+ *       ⇒ captain 裁 **(A)**：本批保留、**B⑦ 与 context 设施一起清**。</li>
+ *   <li><b>只把 `update(Player, RoleInstance)` 转无参 `update()`</b>，并去掉 `UpdateAware`（其 tick 扇出由容器
+ *       B⑤ 落地的新钩子广播承接）。</li>
+ *   <li><b>等价说明（本批关键）</b>：本组件的 `RoleInstance` ≡ `svc()` —— 组件与角色实例**一对一**
+ *       （`bind` 注入的 `ComponentServices` 恒定指向所属实例），因此旧签名里的 `instance` / `player`
+ *       改由 `svc()` 取，**语义逐字不变**（数值、粒子、结算节奏、记账路径均未动）。</li>
+ * </ul>
+ */
+public class RedBleedPassive extends PassiveSkill implements LifecycleAware {
 
     //流血记录保存在 RoleInstance 上下文里的键，红的主武器等其它组件通过它读写同一份数据
     public static final String BLEED_RECORD_CONTEXT_KEY = "player_bleed_record";
@@ -53,7 +66,7 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
      * **写流血结算请求的唯一公开入口**（阶段 4 硬约束第 18 条「跨批 API 前移」，批次①/B① 前移落地）。
      * <p>语义与旧路径**逐条等价**：写入的是 `start()` 里发布出去的那**同一份** {@code playerBleedResolveRequests}
      * （**不另建并行存储**），键 = 受害者 UUID、值 = 待结算层数；结算时点仍由 {@code update()} 的
-     * {@code resolveRequestedBleed(...)} 决定。批次⑥ 会保留本方法并把账本私有化。
+     * {@code resolveRequestedBleed(...)} 决定。批次⑥ 保留本方法并完成账本私有化。
      */
     public void requestResolve(UUID victimId, int stacks) {
         if (victimId == null) {
@@ -88,7 +101,13 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
         return playerBleedRecord.getOrDefault(victimId, 0);
     }
 
-    /**技能初始化时，在角色实例上下文中初始化流血记录**/
+    /**
+     * 技能初始化时，在角色实例上下文中初始化流血记录。
+     * <p><b>过渡桥（本批保留、B⑦ 删除）</b>：这两行把**同一份**私有账本公开给尚未迁移的武器侧读取
+     * （`RedSanctifiedBladeMainWeapon:35` 仍 `getContext(BLEED_RECORD_CONTEXT_KEY, …)`）——
+     * **不另建并行存储**；B⑦ 把武器改成 `getComponent(RedBleedPassive.class).stacksOf(...)` 后，
+     * 桥与本 `LifecycleAware` 一起消失。
+     */
     @Override
     public void start(Player player, RoleInstance instance) {
         instance.setContext(BLEED_RECORD_CONTEXT_KEY, playerBleedRecord);
@@ -114,13 +133,16 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
     }
 
     @Override
-    public void update(Player player, RoleInstance instance) {
+    public void update() {
+        //等价说明：本组件与角色实例一对一 ⇒ `svc()` 恒定指向所属实例（旧签名里的 instance/player 由它代替）
+        Player player = svc().self().player();
+
         //每tick先清掉失效记录：受害者退出游戏、死亡(含死亡界面)或者层数已经结算完
         //死亡必须每tick检查，否则尸体还会继续吃流血，红还能一直从尸体身上拿SanTE
         purgeInvalidBleedRecords();
 
         //再处理其它技能登记的结算请求(一次性，处理完就移除)，不受每秒结算节奏限制
-        resolveRequestedBleed(player, instance);
+        resolveRequestedBleed(player);
 
         //每秒结算一次流血
         secondCountdown++;
@@ -148,10 +170,10 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
 
             //粒子
             player.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
-            DamageUtil.dealtTrueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
-            //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经实例施加，clear 时只回收本系统施加的效果）
-            instance.applyPotionEffect(PotionEffectType.RESISTANCE.createEffect(BLEED_RESISTANCE_DURATION_TICKS, 1));
-            instance.increaseSanTE(BLEED_SANTE_RECOVER);
+            svc().damage().trueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
+            //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 svc().buffs() 走 RoleInstance 的**同一条已记账路径**）
+            svc().buffs().applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
+            svc().sante().gain(BLEED_SANTE_RECOVER);
 
             if(newBleed <= 0) {
                 toRemove.add(pid);
@@ -185,7 +207,7 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
     }
 
     //处理其它技能登记的流血结算请求，请求是一次性的：无论有没有真的结算成功，处理完就从请求表里移除
-    private void resolveRequestedBleed(Player caster, RoleInstance casterInstance){
+    private void resolveRequestedBleed(Player caster){
         if(playerBleedResolveRequests.isEmpty()) return;
 
         //遍历过程中不能直接修改map，先收集已经处理过的键
@@ -198,7 +220,7 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
             if(victim == null) continue;
 
             Integer amount = entry.getValue();
-            resolveBleed(victim, caster, casterInstance, amount != null ? amount : 0);
+            resolveBleed(victim, caster, amount != null ? amount : 0);
         }
 
         for(UUID pid : handled){
@@ -206,8 +228,8 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
         }
     }
 
-    private void resolveBleed(Player victim, Player caster, RoleInstance casterInstance, int amount){
-        if(victim == null || caster == null || casterInstance == null || amount <= 0) return;
+    private void resolveBleed(Player victim, Player caster, int amount){
+        if(victim == null || caster == null || amount <= 0) return;
 
         UUID pid = victim.getUniqueId();
 
@@ -232,11 +254,11 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
             playerBleedRecord.put(pid, newBleed);
         }
 
-        DamageUtil.dealtTrueDamage(victim, caster, finalResolveBleedAmount * BLEED_DAMAGE_PER_SECOND);
+        svc().damage().trueDamage(victim, caster, finalResolveBleedAmount * BLEED_DAMAGE_PER_SECOND);
 
-        //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经实例施加，clear 时只回收本系统施加的效果）
-        casterInstance.applyPotionEffect(PotionEffectType.RESISTANCE.createEffect(BLEED_RESISTANCE_DURATION_TICKS, 1));
-        casterInstance.increaseSanTE(BLEED_SANTE_RECOVER);
+        //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 svc().buffs() 走 RoleInstance 的**同一条已记账路径**）
+        svc().buffs().applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
+        svc().sante().gain(BLEED_SANTE_RECOVER);
 
         victim.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
     }

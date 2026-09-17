@@ -91,6 +91,7 @@
 | `docs/阶段4-起服日志-B1-§20修正.log` | **§20 总闸修正之后**的 Mode B 证据；`docs/阶段4-迁移清单.md` §2 B① 完成态（运行证据行） 以它作为 B① 通过核验的运行证据 | **否** |
 | `docs/阶段4-起服日志-B2a.log` | 阶段 4 批次 **B②-a**（R-1 端口方法落地，commit `f830b38`）的 Mode B 证据 | **否** |
 | `docs/阶段4-起服日志-B2b1.log` | 阶段 4 批次 **B②-b-1**（`MeiqiheziUnconcernSkill` 迁移，commit `5d0c2d3`）的 Mode B 证据 | **否** |
+| `docs/阶段4-起服日志-B2b2.log` | 阶段 4 批次 **B②-b-2**（`MeiqiheziCircleSlashSkill` 迁移，commit `6fa2887`）的 Mode B 证据 | **否** |
 | `docs/t2-build.log`、`docs/t2-阶段0-build.log` | 早期构建日志；**已于 2026-09-17 升格为冻结证据并入库**（理由与现算身份见 `docs/插件文档/日志与证据归档规范.md` §3.1） | **否** |
 
 ### 2.8 早期/一次性产物（会话前基线与 A 流工具输出）

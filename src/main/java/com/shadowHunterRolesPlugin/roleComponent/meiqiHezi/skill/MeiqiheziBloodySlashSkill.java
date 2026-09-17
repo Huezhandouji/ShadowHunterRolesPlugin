@@ -2,16 +2,12 @@ package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
+import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
+import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 import java.util.*;
@@ -32,28 +28,32 @@ public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
                 8,
                 Material.IRON_INGOT
         );
+        markMigrated();
     }
 
 
+    /**
+     * 右击施放（新管道；批次⑧-b/B⑧-b 迁移）。与旧 `onRightClick(Player, RoleInstance)` **逐条等价**：
+     * 能量不足 / 被禁用时**直接返回且不启动冷却**（旧代码即如此）⇒ 返回 {@code NO_COOLDOWN}；
+     * 否则扣能量 `8`、以 `0L` 初始延迟 / `2L` 周期启动前摇任务（**登记进本组件资源表**，角色清除时由框架兜底取消
+     * ⇒ 原 `isValid()` 守卫不需要）、四周 `4` 格内敌对目标各受 `14` 点物理伤害、粒子/音效逐字不变；
+     * 冷却改为 `CAST`，由框架按声明值 **160** 启动。
+     */
     @Override
-    public void onRightClick(Player caster, RoleInstance instance) {
-        if (instance.getCurrentEnergy() < getEnergyCost()) return;
-        if(!instance.getBuffManager().canCastSkill()) return;
-        instance.decreaseEnergy(getEnergyCost());
+    public CastResult onCast(CastSignal signal) {
+        Player caster = svc().self().player();
 
-        instance.startSkillCooldown(getId(), getCooldownTicks());
-        attackTask = instance.rolesContext().scheduler().runRepeating(new BukkitRunnable() {
+        if (svc().energy().current() < getEnergyCost()) return CastResult.NO_COOLDOWN;
+        if(!svc().buffs().canCastSkill()) return CastResult.NO_COOLDOWN;
+        svc().energy().tryConsume(getEnergyCost());
+
+        attackTask = svc().timers().runRepeating(0L, 2L, new Runnable() {
 
             private int count = 0;
             private final Player player = caster;
 
             @Override
             public void run() {
-                //实例已失效（角色被清除）时立即停止，不再结算伤害
-                if(!instance.isValid()){
-                    attackTask.cancel();
-                    return;
-                }
                 if (count >= 4) {
                     attackTask.cancel();
                     return;
@@ -67,9 +67,9 @@ public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
                 Collection<? extends Player> victims = loc.getNearbyPlayers(4);
 
                 for (Player victim : victims) {
-                    if (!instance.isHostileTo(victim)) continue;
+                    if (!svc().factions().isHostile(victim)) continue;
                     victim.setNoDamageTicks(0);
-                    victim.damage(14, player);
+                    svc().damage().physicalDamage(victim, player, 14);
                 }
 
                 loc.getWorld().spawnParticle(Particle.EXPLOSION, loc, 1);
@@ -80,8 +80,9 @@ public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
                 loc.getWorld().playSound(loc, Sound.ITEM_TRIDENT_RIPTIDE_1, 1f, 1f);
             }
 
-        }, 0L, 2L);
+        });
 
+        return CastResult.CAST;
     }
 
     @Override
@@ -96,86 +97,4 @@ public class MeiqiheziBloodySlashSkill extends Skill implements LifecycleAware {
         }
     }
 
-    @Override
-    public ItemStack createIconItem(RoleInstance instance) {
-        if(instance == null) return null;
-        boolean isReady = instance.isSkillReady(getId());
-        boolean canCast = instance.getBuffManager().canCastSkill();
-        Material material;
-
-        if (!isReady) {
-            material = Material.STRUCTURE_VOID;
-        } else if (!canCast) {
-            material = Material.BARRIER;
-        } else if(instance.getCurrentEnergy() < getEnergyCost()) {
-            material = Material.STRUCTURE_VOID;
-        }
-        else {
-            material = getIcon();
-        }
-
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-
-        List<Component> lore = new ArrayList<>();
-
-        if(!isReady){
-            meta.displayName(getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD).append(Component.text(" " + String.format("%.1f", instance.getRemainingSkillCooldownSeconds(getId())) + "s")
-                    .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)));
-            lore.add(Component.text("Skill is on cooldown."));
-        }
-        else if(!canCast){
-            meta.displayName(getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
-                    .color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
-            lore.add(Component.text("Skill has been disabled."));
-        }
-        else if(instance.getCurrentEnergy() < getEnergyCost()){
-            meta.displayName(getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD).append(Component.text(" ENERGY LACK"))
-                    .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
-        }
-        else {
-            meta.displayName(getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
-            lore.add(Component.text("Skill is ready."));
-        }
-
-        lore.add(Component.text("===================="));
-        lore.add(getDescription());
-
-        meta.lore(lore);
-
-        meta.getPersistentDataContainer().set(Utils.SKILL_KEY, PersistentDataType.STRING, getId());
-
-        item.setItemMeta(meta);
-
-        return item;
-
-
-    }
-
-    @Override
-    public Component getDisplayName(RoleInstance instance){
-        if(instance == null){
-            return Component.text("RoleInstance is Null!");
-        }
-
-        boolean isReady = instance.isSkillReady(getId());
-        boolean canCast = instance.getBuffManager().canCastSkill();
-
-        if(!isReady){
-            return getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD).append(Component.text(" " + String.format("%.1f", instance.getRemainingSkillCooldownSeconds(getId())) + "s")
-                    .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
-        }
-        else if(!canCast){
-            return getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
-                    .color(NamedTextColor.RED).decorate(TextDecoration.BOLD);
-        }
-        else if(instance.getCurrentEnergy() < getEnergyCost()){
-            return getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD).append(Component.text(" ENERGY LACK"))
-                    .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD);
-        }
-        else {
-            return getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD);
-        }
-
-    }
 }

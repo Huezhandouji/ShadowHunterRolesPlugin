@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.Faction;
-import com.shadowHunterRolesPlugin.core.RoleInstance;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -13,21 +12,10 @@ import java.util.*;
 
 public class SkillUtil {
 
-    //阶段 2：不再查 RoleManager 单例，改走 RoleInstance 注入的 FactionLookup（未选角色 → 敌对）
-    public static boolean hasEnemyInRange(RoleInstance self, Location loc, double radius){
-        if(loc == null || loc.getWorld() == null) return false;
-
-        Faction selfFaction = self.getFaction();
-
-        for(Player p : loc.getNearbyPlayers(radius)){
-            if(p == null) continue;
-            //没有选角色的玩家也要算进来（FactionLookup 对未选角色返回敌对）
-            if(self.rolesContext().factions().isHostile(selfFaction, p)){
-                return true;
-            }
-        }
-        return false;
-    }
+    //阶段 4（B⑤）：`hasEnemyInRange(RoleInstance, …)` 已**删除** —— 它当时唯一的剩余调用点是
+    //`core/FactionPortImpl`，其逻辑已**逐字搬入**该适配器的 `hasEnemyInRange(radius)`
+    //（含 `loc == null || world == null` 短路与"**未选角色的玩家也算敌人**"语义）。
+    //本类现在只剩**无状态几何工具** `getPlayersInSightLine`（纯射线几何、不查阵营、零插件依赖）。
 
     public static List<Player> getPlayersInSightLine(Player player, double maxDistance, double range) {
         List<Player> result = new ArrayList<>();

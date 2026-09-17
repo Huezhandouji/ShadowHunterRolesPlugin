@@ -27,7 +27,7 @@ public abstract class MainWeapon extends ActiveComponent implements CombatHook {
      * 阶段 4 B0b-3：改基到 {@link ActiveComponent}（kind = MAIN_WEAPON、**`energyCost` 恒传 0**：
      * 今天武器没有 energyCost 字段，填非 0 会让武器图标多出一个今天不存在的 `ENERGY LACK` 态）。
      * 五个字段与对应 getter 已上移到基类；**构造参数顺序不变**（icon 在 cooldown 之前）
-     * ⇒ 2 个武器子类的 `super(...)` 一字不改。旧回调 `onAttack/onLeftClick/onRightClick/onDrop`
+     * ⇒ 2 个武器子类的 `super(...)` 一字不改。旧回调 `onAttack/onLeftClick/onRightClick/onDrop`（后者已在 T-1 ④ 删除）
      * 保留（收尾开关 false、`isMigrated()` 全 false ⇒ 派发仍全走旧路径）。
      */
     public MainWeapon(String id, Component displayName, Component description, Material icon, int cooldown){
@@ -39,14 +39,6 @@ public abstract class MainWeapon extends ActiveComponent implements CombatHook {
     public CastResult onAttack(AttackSignal signal){
         return CastResult.SUCCEED;
     }
-
-    public void onAttack(Player attacker, Player victim, RoleInstance instance){}
-
-    public void onLeftClick(Player player, RoleInstance instance){}
-
-    public void onRightClick(Player player, RoleInstance instance){}
-
-    public void onDrop(Player player, RoleInstance instance){}
 
     //创建物品
     public ItemStack createIconItem(RoleInstance instance) {

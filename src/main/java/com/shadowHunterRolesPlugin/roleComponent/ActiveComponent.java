@@ -22,13 +22,8 @@ public abstract class ActiveComponent extends RoleComponent implements HotbarIte
     private final ItemKind kind;
 
     /**
-     * 迁移标记（阶段 4 混合派发判据，硬约束第 12 条）：**默认 false**。
-     * <b>严禁</b>用 {@code instanceof ActiveComponent/RoleComponent} 作派据 —— 三个薄基类改基之后
-     * 全部 10 个组件都会 instanceof，未迁移组件会被送进新管道而其 {@link #onCast} 默认是 no-op
-     * ⇒ 旧回调（onRightClick/onLeftClick/onDrop/onAttack）永不触发 = 行为静默回归。
-     * 因此只有**显式标记**（{@link #markMigrated()}）的组件才走新管道。
+     * T-2 ① 后**不再有迁移标记**：所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）；
      */
-    private boolean migrated = false;
 
     protected ActiveComponent(String id, Component displayName, Component description,
                               int cooldownTicks, int energyCost, Material icon, ItemKind kind) {
@@ -41,15 +36,6 @@ public abstract class ActiveComponent extends RoleComponent implements HotbarIte
         this.kind = kind;
     }
 
-    /** 是否已迁移到新管道（默认 false；由迁移该组件的批次在自己的构造器里调用 {@link #markMigrated()}）。 */
-    public final boolean isMigrated() {
-        return migrated;
-    }
-
-    /** 由迁移批次的组件构造器调用一次：把自己标记为"走新管道"。 */
-    protected final void markMigrated() {
-        this.migrated = true;
-    }
 
     @Override
     public final Component getDisplayName() {

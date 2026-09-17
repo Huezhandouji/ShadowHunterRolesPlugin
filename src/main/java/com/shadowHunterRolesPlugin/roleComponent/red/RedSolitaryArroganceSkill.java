@@ -26,7 +26,6 @@ public class RedSolitaryArroganceSkill extends Skill {
         super("red_solitaryArrogance_skill", Component.text("孤妄自赏"),
                 Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命"),
                 200,0, Material.FERMENTED_SPIDER_EYE);
-        markMigrated();
     }
 
     /**

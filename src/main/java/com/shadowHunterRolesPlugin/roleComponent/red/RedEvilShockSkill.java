@@ -15,7 +15,6 @@ public class RedEvilShockSkill extends Skill{
         super("red_evilShock_skill", Component.text("煞气震赫"),
                 Component.text("对周围5格范围内的敌人造成3秒致盲和缓慢III，结算他们5层流血。恢复[红]的10点TE值"),
                 120,0, Material.REDSTONE);
-        markMigrated();
     }
 
     /**

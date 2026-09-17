@@ -28,7 +28,6 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
                 Material.DIAMOND_HOE,
                 20
         );
-        markMigrated();
     }
 
     /**

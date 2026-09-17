@@ -29,7 +29,6 @@ public class MeiqiheziCircleSlashSkill extends Skill {
                 15,
                 Material.GOLD_INGOT
         );
-        markMigrated();
     }
 
     /**

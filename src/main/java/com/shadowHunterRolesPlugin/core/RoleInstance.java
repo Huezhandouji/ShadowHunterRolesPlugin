@@ -1,9 +1,5 @@
 package com.shadowHunterRolesPlugin.core;
 
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.EnergyChangeAware;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.SanTEChangeAware;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.UpdateAware;
 import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
@@ -85,7 +81,7 @@ public class RoleInstance {
     private final HotbarRenderer hotbarRenderer = new HotbarRenderer();
     private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
 
-    //阶段 4 硬约束 §20：**不再有任何全局开关** —— 混合期判据只认组件自身的迁移标记 `isMigrated()`。
+    //T-2 ①③：迁移标记已删 —— 所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）。
 
     public RoleInstance(Player player, Role role, RolesContext platform){
         this.player = player;
@@ -180,7 +176,7 @@ public class RoleInstance {
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
-        if(!(component instanceof ActiveComponent active) || !active.isMigrated()) return false;
+        if(!(component instanceof ActiveComponent active)) return false;
 
         CastResult result = active.onCast(new CastSignal(trigger));
         if(result == CastResult.SUCCEED){
@@ -200,7 +196,7 @@ public class RoleInstance {
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
-        if(!(component instanceof CombatHook hook) || !((ActiveComponent) component).isMigrated()) return false;
+        if(!(component instanceof CombatHook hook)) return false;
 
         CastResult result = hook.onAttack(new AttackSignal(victim));
         if(result == CastResult.SUCCEED){
@@ -272,57 +268,41 @@ public class RoleInstance {
 
     //技能释放
     public boolean castSkillLeftClick(String skillId, Player caster){
-        if(runComponentPipeline(CastTrigger.LEFT_CLICK, skillId, caster)) return true;
-        Skill skill = skillMap.get(skillId);
-        if(skill == null){
+        if(runComponentPipeline(CastTrigger.LEFT_CLICK, caster)) return true;
+        //T-1 (4)：旧派发入口（onLeftClick）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
+        //未迁移组件（T-1 后已无）不再有特殊落点。
+        if(skillMap.get(skillId) == null){
             caster.sendMessage(Component.text("unknown skill!"));
-            return false;
         }
-        skill.onLeftClick(caster, this);
-
-        //在1t后更新技能物品
-        platform.scheduler().runLater(this::updateHotbar, 1L);
-
-        return true;
+        return false;
     }
 
     public boolean castSkillRightClick(String skillId, Player caster){
-        if(runComponentPipeline(CastTrigger.RIGHT_CLICK, skillId, caster)) return true;
+        if(runComponentPipeline(CastTrigger.RIGHT_CLICK, caster)) return true;
         Skill skill = skillMap.get(skillId);
         if(skill == null){
             caster.sendMessage(Component.text("unknown skill!"));
             return false;
         }
+        //T-1 (4) 残留项：RedDeeplySorrowSkill 仍是**未迁移**组件（其施放走该 legacy 入口）⇒ 暂留回退调用与 1t 热键栏刷新；
+        //T-1b：该组件已在 T-2 迁到 onCast(CastSignal)（迁移标记已删）⇒ 本回退与 Skill.onRightClick 声明可在后续小卡删除。
         skill.onRightClick(caster, this);
-
-        //在1t后更新技能物品
         platform.scheduler().runLater(this::updateHotbar, 1L);
-
         return true;
     }
 
     public boolean castSkillQDrop(String skillId, Player caster){
-        if(runComponentPipeline(CastTrigger.DROP, skillId, caster)) return true;
-        Skill skill = skillMap.get(skillId);
-        if(skill == null){
+        if(runComponentPipeline(CastTrigger.DROP, caster)) return true;
+        //T-1 (4)：旧派发入口（onDrop）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
+        //未迁移组件（T-1 后已无）不再有特殊落点。
+        if(skillMap.get(skillId) == null){
             caster.sendMessage(Component.text("unknown skill!"));
-            return false;
         }
-        skill.onDrop(caster, this);
-
-        //在1t后更新技能物品
-        platform.scheduler().runLater(this::updateHotbar, 1L);
-
-        return true;
+        return false;
     }
 
-    /**
-     * 混合派发短路（**硬约束 §20 修正后**）：判据**只认迁移标记** `isMigrated()`，**不存在全局开关**。
-     * 未迁移组件 → 返回 false，调用方继续旧路径；已迁移组件 → **永远走新管道**（单一入口 = {@link #handleCast}）。
-     */
-    private boolean runComponentPipeline(CastTrigger trigger, String componentId, Player caster){
-        RoleComponent component = componentRegistry.getById(componentId);
-        if(!(component instanceof ActiveComponent active) || !active.isMigrated()) return false;
+    /** T-2 (3)：**纯委派**（迁移标记已删）—— 组件一律走新管道，单一入口 = {@link #handleCast}。 */
+    private boolean runComponentPipeline(CastTrigger trigger, Player caster){
         return handleCast(trigger, caster);
     }
 
@@ -356,39 +336,33 @@ public class RoleInstance {
 
     //释放主武器技能
     public boolean castMainWeaponLeftClick(String weaponId, Player caster){
-        if(runComponentPipeline(CastTrigger.LEFT_CLICK, weaponId, caster)) return true;
-        MainWeapon mainWeapon = mainWeaponMap.get(weaponId);
-        if(mainWeapon == null){
+        if(runComponentPipeline(CastTrigger.LEFT_CLICK, caster)) return true;
+        //T-1 (4)：旧派发入口（onLeftClick）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
+        //未迁移组件（T-1 后已无）不再有特殊落点。
+        if(mainWeaponMap.get(weaponId) == null){
             caster.sendMessage(Component.text("unknown mainWeapon!"));
-            return false;
         }
-        mainWeapon.onLeftClick(caster, this);
-        platform.scheduler().runLater(this::updateHotbar, 1L);
-        return true;
+        return false;
     }
 
     public boolean castMainWeaponRightClick(String weaponId, Player caster){
-        if(runComponentPipeline(CastTrigger.RIGHT_CLICK, weaponId, caster)) return true;
-        MainWeapon mainWeapon = mainWeaponMap.get(weaponId);
-        if(mainWeapon == null){
+        if(runComponentPipeline(CastTrigger.RIGHT_CLICK, caster)) return true;
+        //T-1 (4)：旧派发入口（onRightClick）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
+        //未迁移组件（T-1 后已无）不再有特殊落点。
+        if(mainWeaponMap.get(weaponId) == null){
             caster.sendMessage(Component.text("unknown mainWeapon!"));
-            return false;
         }
-        mainWeapon.onRightClick(caster, this);
-        platform.scheduler().runLater(this::updateHotbar, 1L);
-        return true;
+        return false;
     }
 
     public boolean castMainWeaponQDrop(String weaponId, Player caster){
-        if(runComponentPipeline(CastTrigger.DROP, weaponId, caster)) return true;
-        MainWeapon mainWeapon = mainWeaponMap.get(weaponId);
-        if(mainWeapon == null){
+        if(runComponentPipeline(CastTrigger.DROP, caster)) return true;
+        //T-1 (4)：旧派发入口（onDrop）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
+        //未迁移组件（T-1 后已无）不再有特殊落点。
+        if(mainWeaponMap.get(weaponId) == null){
             caster.sendMessage(Component.text("unknown mainWeapon!"));
-            return false;
         }
-        mainWeapon.onDrop(caster, this);
-        platform.scheduler().runLater(this::updateHotbar, 1L);
-        return true;
+        return false;
     }
 
 
@@ -609,28 +583,9 @@ public class RoleInstance {
     public void triggerLifecycleAwake(){
         if(player == null ) return;
 
-        //遍历所有技能
-        for(Skill skill : skillMap.values()){
-            if(skill instanceof LifecycleAware){
-                ((LifecycleAware) skill).awake(player, this);
-            }
-        }
-
-        for(PassiveSkill passive : passiveMap.values()){
-            if(passive instanceof LifecycleAware){
-                ((LifecycleAware) passive).awake(player, this);
-            }
-        }
-
-        for(MainWeapon weapon : mainWeaponMap.values()){
-            if(weapon instanceof LifecycleAware){
-                ((LifecycleAware) weapon).awake(player, this);
-            }
-        }
-
         //阶段 4（B②-c）：为**注册表内组件**广播新基类钩子 awake()。
-        //广播给"全部注册组件"（不按 isMigrated 分支）：未迁移组件的新钩子是基类**默认空实现** ⇒ 无行为影响；
-        //按迁移状态分支会引入第二套判据（与硬约束 §20 删总闸的教训同类）。legacy LifecycleAware 扇出保持不变。
+        //广播给"全部注册组件"：所有组件的新钩子由各组件自行实现（基类提供默认空实现）；
+        //按迁移状态分支会引入第二套判据（与硬约束 §20 删总闸的教训同类）。legacy 生命周期扇出已在 T-1 ④ 删除。
         for(RoleComponent component : componentRegistry.all()){
             component.awake();
         }
@@ -640,57 +595,19 @@ public class RoleInstance {
     public void triggerLifecycleStart(){
         if(player == null ) return;
 
-        //遍历所有技能
-        for(Skill skill : skillMap.values()){
-            if(skill instanceof LifecycleAware){
-                ((LifecycleAware) skill).start(player, this);
-            }
-        }
-
-        for(PassiveSkill passive : passiveMap.values()){
-            if(passive instanceof LifecycleAware){
-                ((LifecycleAware) passive).start(player, this);
-            }
-        }
-
-        for(MainWeapon weapon : mainWeaponMap.values()){
-            if(weapon instanceof LifecycleAware){
-                ((LifecycleAware) weapon).start(player, this);
-            }
-        }
-
         //阶段 4（B②-c）：为注册表内组件广播新基类钩子 start()（顺序 = 注册表顺序；理由同 awake 处注释）
         for(RoleComponent component : componentRegistry.all()){
             component.start();
         }
     }
 
-    //stop阶段：停止生效，遍历顺序与start相反（武器/被动/技能），逆序拆卸
+    //stop阶段：停止生效（T-1 ④ 后仅剩新钩子广播，按注册表顺序）
     public void triggerLifecycleStop(){
         if(player == null ) return;
 
-        for(MainWeapon weapon : mainWeaponMap.values()){
-            if(weapon instanceof LifecycleAware){
-                ((LifecycleAware) weapon).stop(player, this);
-            }
-        }
-
-        for(PassiveSkill passive : passiveMap.values()){
-            if(passive instanceof LifecycleAware){
-                ((LifecycleAware) passive).stop(player, this);
-            }
-        }
-
-        //遍历所有技能
-        for(Skill skill : skillMap.values()){
-            if(skill instanceof LifecycleAware){
-                ((LifecycleAware) skill).stop(player, this);
-            }
-        }
-
         //阶段 4（B②-c）：为注册表内组件广播新基类钩子 stop()。
-        //**顺序说明**：legacy 停止是逆序（武器→被动→技能，上方三段）；新钩子按**注册表顺序**停止。
-        //两者不会对同一组件双触发同一逻辑 —— 迁移后的组件**不再 implements LifecycleAware**，
+        //**顺序说明**：新钩子按**注册表顺序**停止（legacy 逆序扇出已在 T-1 ④ 删除）。
+        //两者不会对同一组件双触发同一逻辑 —— 迁移后的组件**不再实现 legacy 生命周期接口**，
         //未迁移组件则对基类 stop() 是**默认空实现** ⇒ 任一组件在任一时刻只被"真实逻辑"处理一次。
         //**幂等说明**：若组件在 stop() 里自行取消任务，随后 clear() 的 cancelAllAndClear() 仍会取消其
         //资源表内的同一句柄 ⇒ 重复 cancel 幂等（Task.cancel() 对已取消句柄是 no-op）。
@@ -701,25 +618,6 @@ public class RoleInstance {
 
     public void triggerEnergyChange(int preEnergy, int newEnergy){
         if(player == null ) return;
-
-        //遍历所有技能
-        for(Skill skill : skillMap.values()){
-            if(skill instanceof EnergyChangeAware){
-                ((EnergyChangeAware) skill).onEnergyChange(player, this, preEnergy, newEnergy);
-            }
-        }
-
-        for(PassiveSkill passive : passiveMap.values()){
-            if(passive instanceof EnergyChangeAware){
-                ((EnergyChangeAware) passive).onEnergyChange(player, this, preEnergy, newEnergy);
-            }
-        }
-
-        for(MainWeapon weapon : mainWeaponMap.values()){
-            if(weapon instanceof EnergyChangeAware){
-                ((EnergyChangeAware) weapon).onEnergyChange(player, this, preEnergy, newEnergy);
-            }
-        }
     }
 
     public void triggerSanTEChange(int preSanTE, int newSanTE){
@@ -730,28 +628,9 @@ public class RoleInstance {
         //注意：`SanTEChangeEvent` 的对外发布仍然**无条件**（第三方挂点），此处只收紧**组件侧钩子**。
         if(preSanTE == newSanTE) return;
 
-        //遍历所有技能
-        for(Skill skill : skillMap.values()){
-            if(skill instanceof SanTEChangeAware){
-                ((SanTEChangeAware) skill).onSanTEChange(player, this, preSanTE, newSanTE);
-            }
-        }
-
-        for(PassiveSkill passive : passiveMap.values()){
-            if(passive instanceof SanTEChangeAware){
-                ((SanTEChangeAware) passive).onSanTEChange(player, this, preSanTE, newSanTE);
-            }
-        }
-
-        for(MainWeapon weapon : mainWeaponMap.values()){
-            if(weapon instanceof SanTEChangeAware){
-                ((SanTEChangeAware) weapon).onSanTEChange(player, this, preSanTE, newSanTE);
-            }
-        }
-
         //阶段 4（B⑨）：为**注册表内组件**广播新基类钩子 onSanTEChange(pre, now)（顺序 = 注册表顺序，
         //与 update()/start()/stop() 的新钩子广播同源）；异常隔离复用 runComponentUpdate。
-        //已迁移组件**不再 implements SanTEChangeAware** ⇒ 只被这一条路径调用，不会双触发。
+        //已迁移组件**不再实现 legacy SanTE 接口** ⇒ 只被这一条路径调用，不会双触发。
         for(RoleComponent component : componentRegistry.all()){
             runComponentUpdate("registered", component.getId(), () -> component.onSanTEChange(preSanTE, newSanTE));
         }
@@ -760,29 +639,10 @@ public class RoleInstance {
     public void triggerUpdate(){
         if(player == null ) return;
 
-        //遍历所有技能
-        for(Skill skill : skillMap.values()){
-            if(skill instanceof UpdateAware){
-                runComponentUpdate("skill", skill.getId(), () -> ((UpdateAware) skill).update(player, this));
-            }
-        }
-
-        for(PassiveSkill passive : passiveMap.values()){
-            if(passive instanceof UpdateAware){
-                runComponentUpdate("passive", passive.getId(), () -> ((UpdateAware) passive).update(player, this));
-            }
-        }
-
-        for(MainWeapon weapon : mainWeaponMap.values()){
-            if(weapon instanceof UpdateAware){
-                runComponentUpdate("mainWeapon", weapon.getId(), () -> ((UpdateAware) weapon).update(player, this));
-            }
-        }
-
         //阶段 4（B⑤）：为**注册表内组件**广播新基类钩子 update()。
         //**顺序说明**：放在 legacy 三段扇出**之后**（既有"技能→被动→武器"顺序不变），按注册表顺序遍历；
         //未迁移组件对基类 update() 是**默认空实现** ⇒ 无行为影响；已迁移组件（本批两个 AutoRecover*）
-        //**不再 implements UpdateAware** ⇒ 只被这一条路径调用，不会双触发；异常隔离复用 runComponentUpdate。
+        //**不再实现 legacy 更新接口** ⇒ 只被这一条路径调用，不会双触发；异常隔离复用 runComponentUpdate。
         for(RoleComponent component : componentRegistry.all()){
             runComponentUpdate("registered", component.getId(), component::update);
         }

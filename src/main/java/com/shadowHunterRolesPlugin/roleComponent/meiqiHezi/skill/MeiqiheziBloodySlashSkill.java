@@ -27,7 +27,6 @@ public class MeiqiheziBloodySlashSkill extends Skill {
                 8,
                 Material.IRON_INGOT
         );
-        markMigrated();
     }
 
 

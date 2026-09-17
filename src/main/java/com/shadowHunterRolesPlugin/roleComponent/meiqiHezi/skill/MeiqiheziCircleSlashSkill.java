@@ -6,20 +6,13 @@ import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 public class MeiqiheziCircleSlashSkill extends Skill {
 

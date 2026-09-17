@@ -1,8 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
 import com.shadowHunterRolesPlugin.core.PassiveSkill;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
-import com.shadowHunterRolesPlugin.core.RoleInstance;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -18,25 +16,17 @@ import java.util.UUID;
 
 /**
  * 红的流血被动。
- * <p><b>批次⑥/B⑥（裁定 (A)）的迁移口径</b>：
+ * <p><b>批次⑦/B⑦（2026-09-17，跟随 t33/B⑥ 的第二次改动）的迁移口径</b>：
  * <ul>
- *   <li><b>保留 `implements LifecycleAware`</b>（`start/stop(Player, RoleInstance)` 原样，**仅供发布过渡桥**）——
- *       过渡桥两行 `instance.setContext(...)` 需要 `RoleInstance`；而"去 `LifecycleAware`"会让 `start/stop`
- *       变无参、拿不到 `instance`。在**不新增 `ComponentServices` 成员（白名单 10 不动）**的前提下二者不可兼得
- *       ⇒ captain 裁 **(A)**：本批保留、**B⑦ 与 context 设施一起清**。</li>
- *   <li><b>只把 `update(Player, RoleInstance)` 转无参 `update()`</b>，并去掉 `UpdateAware`（其 tick 扇出由容器
- *       B⑤ 落地的新钩子广播承接）。</li>
- *   <li><b>等价说明（本批关键）</b>：本组件的 `RoleInstance` ≡ `svc()` —— 组件与角色实例**一对一**
- *       （`bind` 注入的 `ComponentServices` 恒定指向所属实例），因此旧签名里的 `instance` / `player`
- *       改由 `svc()` 取，**语义逐字不变**（数值、粒子、结算节奏、记账路径均未动）。</li>
+ *   <li>**删除过渡桥**（两个上下文键常量 + 两处上下文写入）与 **legacy 生命周期接口声明** ——
+ *       账本与其唯一外部使用者（`RedSanctifiedBladeMainWeapon`）都已改为经 `getComponent(...)` 读写
+ *       **同一份私有账本** ⇒ 桥的最后使用者已消失（§2.0 第 ⑦ 条）。</li>
+ *   <li>legacy 的带参 `start/stop` → **无参 `start()/stop()`**（新钩子；`stop()` 仍清空两个账本 Map，
+ *       与原 `stop()` 语义一致；`start()` 无需再做任何事 ⇒ 不再覆写）。</li>
+ *   <li>保留 `update()` 的无参形态与全部端口化（B⑥/t33 落地）；**数值/结算节奏/记账路径逐字不变**。</li>
  * </ul>
  */
-public class RedBleedPassive extends PassiveSkill implements LifecycleAware {
-
-    //流血记录保存在 RoleInstance 上下文里的键，红的主武器等其它组件通过它读写同一份数据
-    public static final String BLEED_RECORD_CONTEXT_KEY = "player_bleed_record";
-    //其他技能请求结算流血的记录
-    public static final String BLEED_RESOLVE_REQUESTS_KEY = "player_bleed_resolve_requests";
+public class RedBleedPassive extends PassiveSkill {
 
     //最大流血层数
     public static final int MAX_BLEED_STACK = 15;
@@ -102,20 +92,12 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware {
     }
 
     /**
-     * 技能初始化时，在角色实例上下文中初始化流血记录。
-     * <p><b>过渡桥（本批保留、B⑦ 删除）</b>：这两行把**同一份**私有账本公开给尚未迁移的武器侧读取
-     * （`RedSanctifiedBladeMainWeapon:35` 仍 `getContext(BLEED_RECORD_CONTEXT_KEY, …)`）——
-     * **不另建并行存储**；B⑦ 把武器改成 `getComponent(RedBleedPassive.class).stacksOf(...)` 后，
-     * 桥与本 `LifecycleAware` 一起消失。
+     * 停止生效（新钩子，无参）：清空两个账本 Map。
+     * <p>与旧 `stop(Player, RoleInstance)` **语义一致**（原实现只做这两件清空）；`start()` 在 B⑦ 之后
+     * 无需再做任何事（过渡桥已删）⇒ **不再覆写**（基类默认空实现）。
      */
     @Override
-    public void start(Player player, RoleInstance instance) {
-        instance.setContext(BLEED_RECORD_CONTEXT_KEY, playerBleedRecord);
-        instance.setContext(BLEED_RESOLVE_REQUESTS_KEY, playerBleedResolveRequests);
-    }
-
-    @Override
-    public void stop(Player player, RoleInstance instance) {
+    public void stop() {
         playerBleedRecord.clear();
         playerBleedResolveRequests.clear();
     }

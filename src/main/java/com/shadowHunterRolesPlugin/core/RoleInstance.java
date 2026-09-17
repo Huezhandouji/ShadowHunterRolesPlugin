@@ -68,9 +68,6 @@ public class RoleInstance {
     //阵营信息，构造时将从Role里面复制，方便以后插件可以通过设置这个信息来实现无差别pvp
     private Faction faction;
 
-    //上下文（阶段 2：平台层剥离后，领域层唯一的平台入口）
-    private final Map<String, Object> context = new HashMap<>();
-
     //平台上下文（调度/日志/键/阵营查询）
     private final RolesContext platform;
 
@@ -246,25 +243,6 @@ public class RoleInstance {
 
 
 
-
-    //武器，各个技能直接通信，用于角色组件之间关联
-    public void setContext(String key, Object value){
-        context.put(key, value);
-    }
-
-    public <T> T getContext(String key, Class<T> type){
-        Object value = context.get(key);
-        if(value == null) return null;
-        return type.cast(value);
-    }
-
-    public void removeContext(String key){
-        context.remove(key);
-    }
-
-    public boolean hasContext(String key){
-        return context.containsKey(key);
-    }
 
     //技能相关
     public boolean isSkillReady(String skillId){
@@ -880,7 +858,6 @@ public class RoleInstance {
 
         skillCooldowns.clear();
         mainWeaponCooldowns.clear();
-        context.clear();
     }
 
 }

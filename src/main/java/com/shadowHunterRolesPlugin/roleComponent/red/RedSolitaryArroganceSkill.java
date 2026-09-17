@@ -1,9 +1,8 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
-import com.shadowHunterRolesPlugin.core.DamageUtil;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
-import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.Skill;
+import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
+import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
 import net.kyori.adventure.text.Component;
@@ -17,7 +16,7 @@ import org.bukkit.util.Vector;
 
 import java.util.List;
 
-public class RedSolitaryArroganceSkill extends Skill implements LifecycleAware {
+public class RedSolitaryArroganceSkill extends Skill {
 
     //O-5：任务句柄化，stop 时取消（阶段 2 由平台 Scheduler 提供，同时去掉 Folia 全局调度器误用）
     private Task attackTask;
@@ -27,21 +26,30 @@ public class RedSolitaryArroganceSkill extends Skill implements LifecycleAware {
         super("red_solitaryArrogance_skill", Component.text("孤妄自赏"),
                 Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命"),
                 200,0, Material.FERMENTED_SPIDER_EYE);
+        markMigrated();
     }
 
+    /**
+     * 批次③（B③）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
+     * `canCastSkill` 不满足 → {@link CastResult#NO_COOLDOWN}（**旧写法 `:34` 就是直接 return、不启冷却**，已现场核）；
+     * 循环任务由 `svc().timers().runRepeating(1L, 6, …)` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）；
+     * `:57` 射线几何仍用**静态** `SkillUtil.getPlayersInSightLine`（无状态工具，不进端口白名单）；
+     * 伤害 8 与回血 4 **逐字不变**；冷却改为 `CAST`，由框架按声明值 **200** 启动。
+     * <p>`isValid()` 守卫按四步等价链删除：任务登记进资源表 ⇒ `clear()` 的 `cancelAllAndClear()` 必取消它 ⇒
+     * 延迟体在 `valid=false` 之后不可达。
+     */
     @Override
-    public void onRightClick(Player caster, RoleInstance instance){
-        if(!instance.getBuffManager().canCastSkill()) return;
-        attackTask = instance.rolesContext().scheduler().runRepeating(
+    public CastResult onCast(CastSignal signal){
+        Player caster = svc().self().player();
+        if(!svc().buffs().canCastSkill()) return CastResult.NO_COOLDOWN;
+        attackTask = svc().timers().runRepeating(1L, 6,
                 new Runnable() {
                     private Player cas = caster;
-                    private RoleInstance casterIns = instance;
                     private int cnt = 0;
 
                     @Override
                     public void run() {
-                        //实例已失效（角色被清除）时立即停止，不再以旧实例结算伤害
-                        if(cas == null || !cas.isOnline() || cas.isDead() || casterIns == null || !casterIns.isValid()) {
+                        if(cas == null || !cas.isOnline() || cas.isDead()) {
                             attackTask.cancel();
                             return;
                         }
@@ -58,14 +66,14 @@ public class RedSolitaryArroganceSkill extends Skill implements LifecycleAware {
                         boolean shouldRecoverHealth = false;
                         for(Player victim : playersInSightLine){
                             if(victim == null || victim.isDead() || !victim.isOnline()) continue;
-                            if(!casterIns.isHostileTo(victim)) continue;
+                            if(!svc().factions().isHostile(victim)) continue;
 
                             shouldRecoverHealth = true;
-                            DamageUtil.dealtPhysicalDamage(victim, cas, 8);
+                            svc().damage().physicalDamage(victim, cas, 8);
                         }
 
                         if(shouldRecoverHealth){
-                            casterIns.heal(4);
+                            svc().vitals().heal(4);
                         }
 
                         //特效
@@ -79,18 +87,21 @@ public class RedSolitaryArroganceSkill extends Skill implements LifecycleAware {
                         }
                         location.getWorld().playSound(location, Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1, 1);
                     }
-                },
-                1L, 6
+                }
         );
-        instance.startSkillCooldown(getId(), getCooldownTicks());
+        return CastResult.CAST;
     }
 
     @Override
-    public void start(Player player, RoleInstance instance) {
+    public void start() {
     }
 
+    /**
+     * 新基类（RoleComponent）停止钩子（阶段 4 B③ 同批完成 legacy→新钩子 转换）：容器在 legacy 扇出之后、
+     * `cancelAllAndClear()` **之前**广播 ⇒ 与旧 `LifecycleAware.stop(...)` 等价（O-5 的取消）；框架另有兜底（幂等）。
+     */
     @Override
-    public void stop(Player player, RoleInstance instance) {
+    public void stop() {
         if(attackTask != null){
             attackTask.cancel();
             attackTask = null;

@@ -49,6 +49,19 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
         super("red_bleed_passive", Component.text("流血"), Component.text("红的流血被动"));
     }
 
+    /**
+     * **写流血结算请求的唯一公开入口**（阶段 4 硬约束第 18 条「跨批 API 前移」，批次①/B① 前移落地）。
+     * <p>语义与旧路径**逐条等价**：写入的是 `start()` 里发布出去的那**同一份** {@code playerBleedResolveRequests}
+     * （**不另建并行存储**），键 = 受害者 UUID、值 = 待结算层数；结算时点仍由 {@code update()} 的
+     * {@code resolveRequestedBleed(...)} 决定。批次⑥ 会保留本方法并把账本私有化。
+     */
+    public void requestResolve(UUID victimId, int stacks) {
+        if (victimId == null) {
+            return;
+        }
+        playerBleedResolveRequests.put(victimId, stacks);
+    }
+
     /**技能初始化时，在角色实例上下文中初始化流血记录**/
     @Override
     public void start(Player player, RoleInstance instance) {

@@ -89,11 +89,7 @@ public class RoleInstance {
     private final HotbarRenderer hotbarRenderer = new HotbarRenderer();
     private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
 
-    /**
-     * 新旧路径开关（阶段 4 的 4.2）：批次迁移期默认走**旧路径**（listener + 组件自己启冷却），
-     * 行为逐字不变；批次 ①–⑨ 全部迁完后翻成 {@code true} 并删除旧路径。
-     */
-    private static final boolean USE_COMPONENT_PIPELINE = false;
+    //阶段 4 硬约束 §20：**不再有任何全局开关** —— 混合期判据只认组件自身的迁移标记 `isMigrated()`。
 
     public RoleInstance(Player player, Role role, RolesContext platform){
         this.player = player;
@@ -180,7 +176,7 @@ public class RoleInstance {
      * 开关关闭、或该 id 尚未迁移到 {@link RoleComponent} 时返回 {@code false}，交回旧路径。
      */
     public boolean handleCast(CastTrigger trigger, Player caster){
-        if(!USE_COMPONENT_PIPELINE || caster == null) return false;
+        if(caster == null) return false;
 
         ItemStack item = caster.getInventory().getItemInMainHand();
         String id = Skill.Utils.getSkillId(item);
@@ -188,7 +184,7 @@ public class RoleInstance {
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
-        if(!(component instanceof ActiveComponent active)) return false;
+        if(!(component instanceof ActiveComponent active) || !active.isMigrated()) return false;
 
         CastResult result = active.onCast(new CastSignal(trigger));
         if(result == CastResult.CAST){
@@ -201,14 +197,14 @@ public class RoleInstance {
 
     /** 新路径攻击入口（主武器）。语义同 {@link #handleCast}。 */
     public boolean handleAttack(Player victim, Player attacker){
-        if(!USE_COMPONENT_PIPELINE || victim == null || attacker == null) return false;
+        if(victim == null || attacker == null) return false;
 
         ItemStack item = attacker.getInventory().getItemInMainHand();
         String id = MainWeapon.Utils.getWeaponId(item);
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
-        if(!(component instanceof CombatHook hook)) return false;
+        if(!(component instanceof CombatHook hook) || !((ActiveComponent) component).isMigrated()) return false;
 
         CastResult result = hook.onAttack(new AttackSignal(victim));
         if(result == CastResult.CAST){
@@ -344,24 +340,13 @@ public class RoleInstance {
     }
 
     /**
-     * 混合派发短路（B0a：硬约束第 12/13 条）：只有"该 id 的组件是**已迁移的** {@link ActiveComponent}"
-     * **且**收尾开关 `USE_COMPONENT_PIPELINE` 为真时，才走新管道并返回 true；否则返回 false，调用方继续旧路径。
-     * <p>
-     * <b>不可达性（B0a 必证）</b>：① 开关恒为 false；② 此刻**不存在任何 {@link ActiveComponent} 实例**
-     * （`Skill`/`MainWeapon`/`PassiveSkill` 尚未改基）⇒ 本方法在任何输入下都在第一行或第三行返回 false。
+     * 混合派发短路（**硬约束 §20 修正后**）：判据**只认迁移标记** `isMigrated()`，**不存在全局开关**。
+     * 未迁移组件 → 返回 false，调用方继续旧路径；已迁移组件 → **永远走新管道**（单一入口 = {@link #handleCast}）。
      */
     private boolean runComponentPipeline(CastTrigger trigger, String componentId, Player caster){
-        if(!USE_COMPONENT_PIPELINE) return false;
         RoleComponent component = componentRegistry.getById(componentId);
         if(!(component instanceof ActiveComponent active) || !active.isMigrated()) return false;
-
-        CastResult result = active.onCast(new CastSignal(trigger));
-        if(result == CastResult.CAST){
-            //声明值是唯一真值来源：框架按 getCooldownTicks() 启动冷却
-            componentServices.get(component).cooldowns().start(active.getCooldownTicks());
-        }
-        hotbarRenderer.markDirty();
-        return true;
+        return handleCast(trigger, caster);
     }
 
 

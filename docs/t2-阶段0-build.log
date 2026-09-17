@@ -1,0 +1,46 @@
+# 阶段 0（t2）构建日志 · 原文留存
+# 任务：t2 阶段 0 收口 · attempt 1 · 执行者 eng-止血
+# 命令：cd ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"; .\gradlew build -x copyPluginJar --console=plain
+# 运行时刻：2026-09-16 21:59（本文件由 t2 执行者在任务完成后按 captain 追加要求留存，UTF-8 无 BOM）
+# 产物前后对比：jar 102878 B @2026-09-15 22:25:22 → 102926 B @2026-09-16 21:59:13
+#              变更类 build/classes/java/main/.../red/RedEquipmentsPassive.class @2026-09-16 21:59:12
+#              源码新于 jar 的 .java 数 = 0
+# 说明：进程退出码 = 1，原因是沙箱下 Gradle 文件监视线程抛 "Couldn't open current thread, error = 5"（既有环境噪声），
+#       按项目纪律**不以退出码判定**，判据为下方 BUILD SUCCESSFUL 与 jar/classes mtime 刷新。
+# 注意：`copyPluginJar` 已用 -x 排除（其目标 C:/Users/ROG/Desktop/paper1.21.11/plugins 在工作区外，沙箱不可写）。
+
+--- stdout（逐字）---
+Starting a Gradle Daemon, 1 incompatible and 1 stopped Daemons could not be reused, use --status for details
+Reusing configuration cache.
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :processTestResources NO-SOURCE
+> Task :compileKotlin NO-SOURCE
+> Task :processResources UP-TO-DATE
+> Task :compileJava
+> Task :classes
+> Task :jar
+> Task :assemble
+> Task :compileTestKotlin NO-SOURCE
+> Task :compileTestJava NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :check UP-TO-DATE
+> Task :build
+
+BUILD SUCCESSFUL in 11s
+3 actionable tasks: 2 executed, 1 up-to-date
+Configuration cache entry reused.
+
+--- stderr（逐字）---
+.\gradlew : Caught exception: Couldn't open current thread, error = 5
+At line:1 char:172
++ ... \.gradle-work"; .\gradlew build -x copyPluginJar --console=plain 2>&1
++                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Caught exceptio...read, error = 5:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+Exception in thread "File watcher server" net.rubygrapefruit.platform.NativeException: Couldn't open current thread, er
+ror = 5
+	at org.gradle.fileevents.internal.AbstractNativeFileEventFunctions$NativeFileWatcher.initializeRunLoop0(Native Method)
+	at org.gradle.fileevents.internal.AbstractNativeFileEventFunctions$NativeFileWatcher.initializeRunLoop(AbstractNativeFileEventFunctions.java:25)
+	at org.gradle.fileevents.internal.AbstractFileEventFunctions$AbstractFileWatcher$1.run(AbstractFileEventFunctions.java:151)

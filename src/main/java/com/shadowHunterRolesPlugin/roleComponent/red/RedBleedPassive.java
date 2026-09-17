@@ -62,6 +62,32 @@ public class RedBleedPassive extends PassiveSkill implements LifecycleAware, Upd
         playerBleedResolveRequests.put(victimId, stacks);
     }
 
+    /**
+     * **累加流血层数**（批次⑥/B⑥ 冻结的唯一写入口之一；B⑦ 的两个主武器子类只允许调
+     * `requestResolve` / `applyStacks` / `stacksOf` 这三个公开入口，不得再碰账本内部结构）。
+     * <p>语义：键 = 受害者 `UUID`；累加后 `Math.clamp(…, 0, MAX_BLEED_STACK = 15)`（上限与旧逻辑一致）；
+     * 结算时点不变（仍由 {@code update()} 里 `secondCountdown >= BLEED_SETTLE_INTERVAL_TICKS = 20` 后触发）。
+     * <b>一经冻结不得再改。</b>
+     */
+    public void applyStacks(UUID victimId, int amount) {
+        if (victimId == null) {
+            return;
+        }
+        int current = playerBleedRecord.getOrDefault(victimId, 0);
+        playerBleedRecord.put(victimId, Math.clamp(current + amount, 0, MAX_BLEED_STACK));
+    }
+
+    /**
+     * **只读查询某受害者当前流血层数**（B⑥ 冻结的公开入口之一；无副作用）。
+     * <b>一经冻结不得再改。</b>
+     */
+    public int stacksOf(UUID victimId) {
+        if (victimId == null) {
+            return 0;
+        }
+        return playerBleedRecord.getOrDefault(victimId, 0);
+    }
+
     /**技能初始化时，在角色实例上下文中初始化流血记录**/
     @Override
     public void start(Player player, RoleInstance instance) {

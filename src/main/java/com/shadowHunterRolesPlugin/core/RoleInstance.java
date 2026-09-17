@@ -794,6 +794,14 @@ public class RoleInstance {
             }
         }
 
+        //阶段 4（B⑤）：为**注册表内组件**广播新基类钩子 update()。
+        //**顺序说明**：放在 legacy 三段扇出**之后**（既有"技能→被动→武器"顺序不变），按注册表顺序遍历；
+        //未迁移组件对基类 update() 是**默认空实现** ⇒ 无行为影响；已迁移组件（本批两个 AutoRecover*）
+        //**不再 implements UpdateAware** ⇒ 只被这一条路径调用，不会双触发；异常隔离复用 runComponentUpdate。
+        for(RoleComponent component : componentRegistry.all()){
+            runComponentUpdate("registered", component.getId(), component::update);
+        }
+
         if(shouldUpdateHotbar()){
             updateHotbar();
         }

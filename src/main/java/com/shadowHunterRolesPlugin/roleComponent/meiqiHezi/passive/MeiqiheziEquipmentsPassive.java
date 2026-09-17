@@ -1,8 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.passive;
 
 import com.shadowHunterRolesPlugin.core.PassiveSkill;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
-import com.shadowHunterRolesPlugin.core.RoleInstance;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Color;
 import org.bukkit.Material;
@@ -12,14 +10,20 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 
-public class MeiqiheziEquipmentsPassive extends PassiveSkill implements LifecycleAware {
+public class MeiqiheziEquipmentsPassive extends PassiveSkill {
 
     public MeiqiheziEquipmentsPassive() {
         super("meiqihezi_equippments_passive", Component.text("穿戴装备"), Component.text("ccb"));
     }
 
+    /**
+     * 批次④（B④）迁移：改**无参新钩子**（容器 B②-c 已广播），装备发放逻辑**逐字未动**
+     * （四槽 = IRON_HELMET / LEATHER_CHESTPLATE / IRON_LEGGINGS / LEATHER_BOOTS；
+     * 设置顺序 helmet→chestplate→leggings→boots 不变）。
+     */
     @Override
-    public void start(Player player, RoleInstance instance) {
+    public void start() {
+        Player player = svc().self().player();
         ItemStack helmet = new ItemStack(Material.IRON_HELMET);
         {
             ItemMeta meta = helmet.getItemMeta();
@@ -70,7 +74,8 @@ public class MeiqiheziEquipmentsPassive extends PassiveSkill implements Lifecycl
     }
 
     @Override
-    public void stop(Player player, RoleInstance instance) {
+    public void stop() {
+        Player player = svc().self().player();
         // 与 start 严格对称：回收 4 件装备。
         // 按《最终重构指南》§10 裁决 3：无条件清空 helmet/chestplate/leggings/boots，
         // 不判断归属、不加 PDC 标记（已知代价：玩家原本穿在这 4 个槽位的其它装备会被一并删除）。

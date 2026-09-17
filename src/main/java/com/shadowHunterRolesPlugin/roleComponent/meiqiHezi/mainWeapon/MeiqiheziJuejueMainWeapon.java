@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.mainWeapon;
 
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.core.MainWeapon;
 import com.shadowHunterRolesPlugin.core.ParticleUtil;
@@ -20,9 +21,10 @@ import java.util.Collection;
 public class MeiqiheziJuejueMainWeapon extends MainWeapon {
 
 
-    public MeiqiheziJuejueMainWeapon() {
+    public MeiqiheziJuejueMainWeapon(String id, ComponentServices services) {
         super(
-                "meiqihezi_mainWeapon_juejue",
+                id,
+                services,
                 Component.text("Jue Jue"),
                 Component.text("A ShadowHunter mainWeapon"),
                 Material.DIAMOND_HOE,

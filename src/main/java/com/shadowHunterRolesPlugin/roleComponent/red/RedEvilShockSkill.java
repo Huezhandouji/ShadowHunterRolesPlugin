@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.red;
 import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -11,8 +12,8 @@ import org.bukkit.potion.PotionEffectType;
 
 public class RedEvilShockSkill extends Skill{
 
-    public RedEvilShockSkill() {
-        super("red_evilShock_skill", Component.text("煞气震赫"),
+    public RedEvilShockSkill(String id, ComponentServices services) {
+        super(id, services, Component.text("煞气震赫"),
                 Component.text("对周围5格范围内的敌人造成3秒致盲和缓慢III，结算他们5层流血。恢复[红]的10点TE值"),
                 120,0, Material.REDSTONE);
     }

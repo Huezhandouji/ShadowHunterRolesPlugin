@@ -134,31 +134,31 @@ public class RoleInstance {
     public ComponentRegistry componentRegistry() { return componentRegistry; }
 
     /**
-     * 唯一创建点之后的**紧邻两步**（五条件①④）：{@code new → bind → register}。
-     * 只对已迁移到 {@link RoleComponent} 的组件生效；未迁移组件继续走旧路径（本轮为零迁移 ⇒ 不触发）。
+     * 组件与其**一对一**的服务集（含按本组件 id/kind 构造的冷却端口、按本组件 id 定位资源表的定时器端口）。
+     * 收尾批⑤：改按 {@code (id, kind)} 构造 —— 服务集必须先于组件实例存在（构造期注入）。
      */
-    private void bindAndRegister(Object component, ItemKind kind){
-        if(!(component instanceof RoleComponent roleComponent)) return;
-        ComponentServices services = createServices(roleComponent, kind);
-        roleComponent.bind(services);          // ① 注册/钩子之前；② bind 只允许一次
-        componentServices.put(roleComponent, services);
-        componentRegistry.register(roleComponent);
-    }
-
-    /** 组件与它**一对一**的服务集（含构造期绑定本组件 id/kind 的冷却端口、指向本组件资源表的定时器端口）。 */
-    private ComponentServices createServices(RoleComponent component, ItemKind kind){
+    private ComponentServices createServices(String componentId, ItemKind kind){
         return new ComponentServices(
                 new SelfImpl(this),
                 new EnergyPortImpl(this),
                 new SanTEPortImpl(this),
                 new VitalsPortImpl(this),
-                new CooldownPortImpl(this, component.getId(), kind),
+                new CooldownPortImpl(this, componentId, kind),
                 new BuffPortImpl(this),
                 new FactionPortImpl(this),
                 new DamagePortImpl(),
-                new TimerPortImpl(this, componentRegistry, component),
+                new TimerPortImpl(this, componentRegistry, componentId),
                 new ComponentLookupImpl(componentRegistry)
         );
+    }
+
+    /**
+     * 组件创建之后的**紧邻登记**（五条件①④）：服务集与组件一对一进表，组件同时进注册表。
+     * 服务集是在**构造期**交给组件的（{@code factory.create(id, services)}）⇒ 不存在"创建后尚未注入"的窗口。
+     */
+    private void registerCreated(RoleComponent component, ComponentServices services){
+        componentServices.put(component, services);
+        componentRegistry.register(component);
     }
 
     // ───────── 阶段 4：施放 / 攻击管道（新旧路径并存；开关默认旧路径 ⇒ 行为不变） ─────────
@@ -208,26 +208,29 @@ public class RoleInstance {
 
     private void initComponents(){
         for(String skillId : role.getSkillIds()){
-            Skill skill = role.createSkill(skillId);
+            ComponentServices services = createServices(skillId, ItemKind.SKILL);
+            Skill skill = role.createSkill(skillId, services);
             if(skill != null){
                 skillMap.put(skillId, skill);
-                bindAndRegister(skill, ItemKind.SKILL);
+                registerCreated(skill, services);
             }
         }
 
         for(String passiveId : role.getPassiveSkillIds()){
-            PassiveSkill passive = role.createPassive(passiveId);
+            ComponentServices services = createServices(passiveId, ItemKind.SKILL);
+            PassiveSkill passive = role.createPassive(passiveId, services);
             if(passive != null){
                 passiveMap.put(passiveId, passive);
-                bindAndRegister(passive, ItemKind.SKILL);
+                registerCreated(passive, services);
             }
         }
 
         for(String weaponId : role.getMainWeaponIds()){
-            MainWeapon mainWeapon = role.createMainWeapon(weaponId);
+            ComponentServices services = createServices(weaponId, ItemKind.MAIN_WEAPON);
+            MainWeapon mainWeapon = role.createMainWeapon(weaponId, services);
             if(mainWeapon != null){
-                 mainWeaponMap.put(weaponId, mainWeapon);
-                 bindAndRegister(mainWeapon, ItemKind.MAIN_WEAPON);
+                mainWeaponMap.put(weaponId, mainWeapon);
+                registerCreated(mainWeapon, services);
             }
         }
     }
@@ -636,8 +639,8 @@ public class RoleInstance {
         if(player == null ) return;
 
         //阶段 4（B⑤）：为**注册表内组件**广播新基类钩子 update()。
-        //**顺序说明**：放在 legacy 三段扇出**之后**（既有"技能→被动→武器"顺序不变），按注册表顺序遍历；
-        //未迁移组件对基类 update() 是**默认空实现** ⇒ 无行为影响；已迁移组件（本批两个 AutoRecover*）
+        //**顺序说明**：按**注册表顺序**遍历（legacy 三段扇出已在 T-1 ④ 删除，无先后关系）；
+        //所有组件都对基类 update() 自行实现（基类默认空实现）；本批组件均已迁移（T-2 ① 后无迁移标记）
         //**不再实现 legacy 更新接口** ⇒ 只被这一条路径调用，不会双触发；异常隔离复用 runComponentUpdate。
         for(RoleComponent component : componentRegistry.all()){
             runComponentUpdate("registered", component.getId(), component::update);

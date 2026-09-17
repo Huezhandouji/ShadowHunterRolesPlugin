@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -22,8 +23,8 @@ public class RedSolitaryArroganceSkill extends Skill {
     private Task attackTask;
 
 
-    public RedSolitaryArroganceSkill() {
-        super("red_solitaryArrogance_skill", Component.text("孤妄自赏"),
+    public RedSolitaryArroganceSkill(String id, ComponentServices services) {
+        super(id, services, Component.text("孤妄自赏"),
                 Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命"),
                 200,0, Material.FERMENTED_SPIDER_EYE);
     }

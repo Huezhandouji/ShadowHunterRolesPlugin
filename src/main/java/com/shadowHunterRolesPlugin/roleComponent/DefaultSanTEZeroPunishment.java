@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -28,9 +29,10 @@ import java.time.Duration;
  * </ul>
  */
 public class DefaultSanTEZeroPunishment extends PassiveSkill {
-    public DefaultSanTEZeroPunishment() {
+    public DefaultSanTEZeroPunishment(String id, ComponentServices services) {
         super(
-                "default_san_te_zero_punishment",
+                id,
+                services,
                 null,
                 null
         );

@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
@@ -18,9 +19,10 @@ public class MeiqiheziBloodySlashSkill extends Skill {
     private Task attackTask;
 
 
-    public MeiqiheziBloodySlashSkill(){
+    public MeiqiheziBloodySlashSkill(String id, ComponentServices services){
         super(
-                "meiqihezi_skill_bloody_slash",
+                id,
+                services,
                 Component.text("血腥连斩"),
                 Component.text("向前移动4格并斩击，重复四次"),
                 160,

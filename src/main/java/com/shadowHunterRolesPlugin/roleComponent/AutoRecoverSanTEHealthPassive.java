@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.PassiveSkill;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 
 public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
@@ -8,8 +9,8 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
     private int noEnemySurroundTime = 0;
     private int tickSecondRecord = 0;
 
-    public AutoRecoverSanTEHealthPassive() {
-        super("autoRecoverSanTEPassive", Component.text("自动恢复SanTE"), Component.text("当周围10格没有敌人五秒后, 开始自动恢复SanTE, 每秒3"));
+    public AutoRecoverSanTEHealthPassive(String id, ComponentServices services) {
+        super(id, services, Component.text("自动恢复SanTE"), Component.text("当周围10格没有敌人五秒后, 开始自动恢复SanTE, 每秒3"));
     }
 
     /**

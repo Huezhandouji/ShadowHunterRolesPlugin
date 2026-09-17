@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
 import com.shadowHunterRolesPlugin.core.PassiveSkill;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -48,8 +49,8 @@ public class RedBleedPassive extends PassiveSkill {
 
     private int secondCountdown = 0;
 
-    public RedBleedPassive() {
-        super("red_bleed_passive", Component.text("流血"), Component.text("红的流血被动"));
+    public RedBleedPassive(String id, ComponentServices services) {
+        super(id, services, Component.text("流血"), Component.text("红的流血被动"));
     }
 
     /**

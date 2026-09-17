@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.red;
 import com.shadowHunterRolesPlugin.core.MainWeapon;
 import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Color;
 import org.bukkit.Material;
@@ -15,9 +16,10 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
     //每次普攻施加的流血层数
     private static final int BLEED_STACKS_PER_HIT = 15;
 
-    public RedSanctifiedBladeMainWeapon() {
+    public RedSanctifiedBladeMainWeapon(String id, ComponentServices services) {
         super(
-                "red_mainWeapon_sanctifiedBlade",
+                id,
+                services,
                 Component.text("至洁之刃"),
                 Component.text("攻击施加流血效果"),
                 Material.IRON_SWORD,

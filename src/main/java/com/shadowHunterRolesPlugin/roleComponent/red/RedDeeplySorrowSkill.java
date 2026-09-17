@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -34,8 +35,8 @@ public class RedDeeplySorrowSkill extends Skill {
 
     private int secondTickCount = 0;
 
-    public RedDeeplySorrowSkill() {
-        super("red_deeplySorrow_skill", Component.text("黯然销魂"),
+    public RedDeeplySorrowSkill(String id, ComponentServices services) {
+        super(id, services, Component.text("黯然销魂"),
                 Component.text("持续扣减[红]的TE值，每秒10点，在TE值归零前获得持续的生命恢复5与力量2，在TE值归零后结束这个技能"),
                 600,0, Material.REDSTONE_BLOCK);
     }

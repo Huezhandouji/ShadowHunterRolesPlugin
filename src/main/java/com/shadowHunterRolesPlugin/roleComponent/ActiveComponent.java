@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.HotbarActionable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 
@@ -25,9 +26,9 @@ public abstract class ActiveComponent extends RoleComponent implements HotbarIte
      * T-2 ① 后**不再有迁移标记**：所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）；
      */
 
-    protected ActiveComponent(String id, Component displayName, Component description,
+    protected ActiveComponent(String id, ComponentServices services, Component displayName, Component description,
                               int cooldownTicks, int energyCost, Material icon, ItemKind kind) {
-        super(id);
+        super(id, services);
         this.displayName = displayName;
         this.description = description;
         this.icon = icon;

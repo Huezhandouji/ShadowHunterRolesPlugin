@@ -5,10 +5,9 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 /**
  * 组件工厂：**构造期注入** {@link ComponentServices} 的唯一入口。
  *
- * <p>阶段 4 / T 块 ⑤ 原子批（`bind` → `ComponentFactory`）的产物：装配表由
- * `(id, Supplier)` 改为 `(id, ComponentFactory)`，容器在**创建组件时就**把
- * {@code ComponentServices} 传进构造器 ⇒ 组件在 {@code awake()} 之前即持有服务，
- * 与旧 {@code bind(...)} 的语义等价，但**没有"创建后再注入"的中间态**
+ * <p>阶段 4 / T 块 ⑤ 原子批的产物：装配表由 `(id, Supplier)` 改为 `(id, ComponentFactory)`，
+ * 容器在**创建组件时就**把 {@code ComponentServices} 传进构造器 ⇒ 组件在 {@code awake()} 之前
+ * 即持有服务，与旧的过渡期"创建后一次性注入"语义等价，但**没有"创建后再注入"的中间态**
  * （旧 `RoleComponent.bind` 及其异常文案随之删除）。
  *
  * <p>泛型 {@code T} 保留具体组件类型，便于调用方拿到强类型返回值；实现通常写作方法引用，

@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
@@ -20,9 +21,10 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     private Task castTask;
 
 
-    public MeiqiheziCircleSlashSkill(){
+    public MeiqiheziCircleSlashSkill(String id, ComponentServices services){
         super(
-                "meiqihezi_skill_circle_slash",
+                id,
+                services,
                 Component.text("圆弧斩"),
                 Component.text("前摇1秒后对7m范围内所有敌人造成20真实伤害"),
                 200,

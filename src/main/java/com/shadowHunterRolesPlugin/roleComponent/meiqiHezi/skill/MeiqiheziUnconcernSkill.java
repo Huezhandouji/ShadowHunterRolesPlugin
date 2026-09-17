@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.Particle;
@@ -13,9 +14,10 @@ import org.bukkit.potion.PotionEffectType;
 
 public class MeiqiheziUnconcernSkill extends Skill {
 
-    public MeiqiheziUnconcernSkill(){
+    public MeiqiheziUnconcernSkill(String id, ComponentServices services){
         super(
-                "meiqihezi_skill_unconcern",
+                id,
+                services,
                 Component.text("漫不经心"),
                 Component.text("获得2秒速度5"),
                 100,

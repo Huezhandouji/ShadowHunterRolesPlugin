@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
 import com.shadowHunterRolesPlugin.core.PassiveSkill;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Color;
 import org.bukkit.Material;
@@ -12,8 +13,8 @@ import org.bukkit.inventory.meta.LeatherArmorMeta;
 
 public class RedEquipmentsPassive extends PassiveSkill {
 
-    public RedEquipmentsPassive() {
-        super("red_equippments_passive", Component.text("穿戴装备"), Component.text("ccb"));
+    public RedEquipmentsPassive(String id, ComponentServices services) {
+        super(id, services, Component.text("穿戴装备"), Component.text("ccb"));
     }
 
     /**

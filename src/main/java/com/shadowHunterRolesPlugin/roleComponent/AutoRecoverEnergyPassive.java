@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.PassiveSkill;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 
 public class AutoRecoverEnergyPassive extends PassiveSkill {
@@ -8,8 +9,8 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
     private int noEnemySurroundTime = 0;
     private int tickSecondRecord = 0;
 
-    public AutoRecoverEnergyPassive() {
-        super("autoRecoverEnergy_passive", Component.text("自动恢复能量"), Component.text("周围10格没有敌人时，每秒恢复3点能量"));
+    public AutoRecoverEnergyPassive(String id, ComponentServices services) {
+        super(id, services, Component.text("自动恢复能量"), Component.text("周围10格没有敌人时，每秒恢复3点能量"));
     }
 
     /**

@@ -42,6 +42,27 @@ public class RoleLoader {
     /** 一条角色定义：id 仅用于日志定位，构建逻辑由 {@code builder} 提供（便于注入失败用例做校验）。 */
     public record Definition(String id, Supplier<Role.Builder> builder) { }
 
+    /**
+     * 组件 id 常量（收尾批⑤）：**每个 id 字面量在整个仓里只声明一次** —— 组件构造器不再硬编码 id，
+     * 装配条目统一写作 {@code (id, 组件::new, slot)}；id 由本处声明，容器在构造期把它与服务集一起交给组件。
+     * （字符串多重集净变化 = 0：旧构造器里的 14 处字面量原值移到这里。）
+     */
+    private static final String ID_AUTO_RECOVER_ENERGY = "autoRecoverEnergy_passive";
+    private static final String ID_AUTO_RECOVER_SANTE_HEALTH = "autoRecoverSanTEPassive";
+    private static final String ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT = "default_san_te_zero_punishment";
+    private static final String ID_MEIQIHEZI_JUEJUE_MAIN_WEAPON = "meiqihezi_mainWeapon_juejue";
+    private static final String ID_MEIQIHEZI_EQUIPMENTS = "meiqihezi_equippments_passive";
+    private static final String ID_MEIQIHEZI_BLOODY_SLASH = "meiqihezi_skill_bloody_slash";
+    private static final String ID_MEIQIHEZI_CIRCLE_SLASH = "meiqihezi_skill_circle_slash";
+    private static final String ID_MEIQIHEZI_UNCONCERN = "meiqihezi_skill_unconcern";
+    private static final String ID_RED_BLEED = "red_bleed_passive";
+    private static final String ID_RED_DEEPLY_SORROW = "red_deeplySorrow_skill";
+    private static final String ID_RED_EQUIPMENTS = "red_equippments_passive";
+    private static final String ID_RED_EVIL_SHOCK = "red_evilShock_skill";
+    private static final String ID_RED_SANCTIFIED_BLADE = "red_mainWeapon_sanctifiedBlade";
+    private static final String ID_RED_SOLITARY_ARROGANCE = "red_solitaryArrogance_skill";
+
+
     private final Logger logger;
 
     public RoleLoader(Logger logger) {
@@ -103,15 +124,15 @@ public class RoleLoader {
                 .baseATK(10)
                 .maxEnergy(100)
                 .maxSanTE(100)
-                .addSkill(MeiqiheziUnconcernSkill::new, 1)
-                .addSkill(MeiqiheziBloodySlashSkill::new, 2)
-                .addSkill(MeiqiheziCircleSlashSkill::new, 3)
-                .addMainWeapon(MeiqiheziJuejueMainWeapon::new, 0)
+                .addSkill(ID_MEIQIHEZI_UNCONCERN, MeiqiheziUnconcernSkill::new, 1)
+                .addSkill(ID_MEIQIHEZI_BLOODY_SLASH, MeiqiheziBloodySlashSkill::new, 2)
+                .addSkill(ID_MEIQIHEZI_CIRCLE_SLASH, MeiqiheziCircleSlashSkill::new, 3)
+                .addMainWeapon(ID_MEIQIHEZI_JUEJUE_MAIN_WEAPON, MeiqiheziJuejueMainWeapon::new, 0)
                 .faction(Faction.HUNTER)
-                .addPassive(DefaultSanTEZeroPunishment::new)
-                .addPassive(AutoRecoverSanTEHealthPassive::new)
-                .addPassive(AutoRecoverEnergyPassive::new)
-                .addPassive(MeiqiheziEquipmentsPassive::new)
+                .addPassive(ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT, DefaultSanTEZeroPunishment::new)
+                .addPassive(ID_AUTO_RECOVER_SANTE_HEALTH, AutoRecoverSanTEHealthPassive::new)
+                .addPassive(ID_AUTO_RECOVER_ENERGY, AutoRecoverEnergyPassive::new)
+                .addPassive(ID_MEIQIHEZI_EQUIPMENTS, MeiqiheziEquipmentsPassive::new)
                 .icon(Material.DIAMOND_HOE);
     }
 
@@ -130,14 +151,14 @@ public class RoleLoader {
                 .maxEnergy(0)
                 .maxSanTE(100)
                 .faction(Faction.SHADOW)
-                .addPassive(RedBleedPassive::new)
-                .addMainWeapon(RedSanctifiedBladeMainWeapon::new, 0)
-                .addSkill(RedSolitaryArroganceSkill::new, 1)
-                .addSkill(RedEvilShockSkill::new, 2)
-                .addSkill(RedDeeplySorrowSkill::new, 3)
-                .addPassive(AutoRecoverSanTEHealthPassive::new)
-                .addPassive(RedEquipmentsPassive::new)
-                .addPassive(DefaultSanTEZeroPunishment::new)
+                .addPassive(ID_RED_BLEED, RedBleedPassive::new)
+                .addMainWeapon(ID_RED_SANCTIFIED_BLADE, RedSanctifiedBladeMainWeapon::new, 0)
+                .addSkill(ID_RED_SOLITARY_ARROGANCE, RedSolitaryArroganceSkill::new, 1)
+                .addSkill(ID_RED_EVIL_SHOCK, RedEvilShockSkill::new, 2)
+                .addSkill(ID_RED_DEEPLY_SORROW, RedDeeplySorrowSkill::new, 3)
+                .addPassive(ID_AUTO_RECOVER_SANTE_HEALTH, AutoRecoverSanTEHealthPassive::new)
+                .addPassive(ID_RED_EQUIPMENTS, RedEquipmentsPassive::new)
+                .addPassive(ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT, DefaultSanTEZeroPunishment::new)
                 .icon(Material.POPPY);
     }
 

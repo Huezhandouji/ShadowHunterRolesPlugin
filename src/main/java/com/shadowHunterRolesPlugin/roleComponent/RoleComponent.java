@@ -6,54 +6,35 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
  * 新侧组件基类（设计 §2 / §4.4）。**只允许出现 `svc` 字段 + 钩子方法 + `getComponent`** ——
  * 任何"顺手加个 helper"都属越界（那属于端口或组件私有方法的职责）。
  * <p>
- * <b>svc 注入（过渡期形态，队长批准，五条件）</b>：终态是构造期注入（`ComponentFactory`）；
- * 过渡期由容器在创建组件后**立刻** `bind(...)`：
- * ① 容器在 `supplier.get()` 之后、任何注册/钩子（含 `awake`）之前调用；
- * ② 只允许一次（重复调用、或进入生命周期之后再调用 → 抛异常）；
- * ③ 未绑定时经 {@link #svc()} 访问 → 抛 `IllegalStateException`（禁止静默 null）；
- * ④ 组件构造点唯一（容器内单一创建路径），使 bind 不可能被遗漏；
- * ⑤ 终态收尾必须切回构造期注入并删除 `bind`（阶段 4 收尾批次，见交付小结的待办）。
+ * <b>svc 注入（终态形态：构造期注入，五条件）</b>：容器经 {@link ComponentFactory} 在**创建组件时**
+ * 就把服务集交给本构造函数，**没有"创建后再注入"的中间态**：
+ * ① 注入必然是构造的一部分，因此必然发生在任何注册/钩子（含 `awake()`）之前；
+ * ② 服务集由 `final` 字段承接 ⇒ 只可能注入一次，重复注入在类型上不可表达；
+ * ③ {@link #svc()} 保留"未注入即抛"的防御语义（禁止静默 null）；
+ * ④ 组件构造点唯一（容器内单一创建路径）⇒ id 与服务集只可能成对产生；
+ * ⑤ 过渡期的"先创建再注入"方法已在阶段 4 收尾批次删除（见交付小结的待办）。
  */
 public abstract class RoleComponent {
 
     private final String id;
+    private final ComponentServices svc;
 
-    private ComponentServices svc;
-    private boolean lifecycleStarted;
-
-    protected RoleComponent(String id) {
+    protected RoleComponent(String id, ComponentServices services) {
         if (id == null || id.trim().isEmpty()) {
             throw new IllegalArgumentException("Component id cannot be null or empty.");
         }
+        if (services == null) {
+            throw new NullPointerException("ComponentServices");
+        }
         this.id = id;
+        this.svc = services;
     }
 
     public final String getId() {
         return id;
     }
 
-    // ───────────── 容器专用（条件 ①②④） ─────────────
-
-    /** ★容器专用：仅单一创建路径在创建组件后立刻调用。 */
-    public final void bind(ComponentServices services) {
-        if (services == null) {
-            throw new NullPointerException("ComponentServices");
-        }
-        if (this.svc != null) {
-            throw new IllegalStateException("ComponentServices already bound for component '" + id + "'.");
-        }
-        if (this.lifecycleStarted) {
-            throw new IllegalStateException("bind() is only allowed before the component lifecycle starts (component '" + id + "').");
-        }
-        this.svc = services;
-    }
-
-    /** ★容器专用：进入 `awake` 阶段前调用；此后 `bind` 一律抛异常（条件 ②）。 */
-    public final void markLifecycleStarted() {
-        this.lifecycleStarted = true;
-    }
-
-    /** 受保护访问器（条件 ③）：未绑定时抛异常，绝不静默返回 null。 */
+    /** 受保护访问器（条件 ③）：服务集在构造期注入，这里仍保留防御性检查，绝不静默返回 null。 */
     protected final ComponentServices svc() {
         ComponentServices current = this.svc;
         if (current == null) {

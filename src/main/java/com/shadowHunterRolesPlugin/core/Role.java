@@ -1,9 +1,12 @@
 package com.shadowHunterRolesPlugin.core;
 
 
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
+import com.shadowHunterRolesPlugin.roleComponent.ComponentFactory;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -19,7 +22,6 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 
 public class Role {
@@ -33,9 +35,9 @@ public class Role {
     private final int maxEnergy;
     private final int maxSanTE;
 
-    private final Map<String, Supplier<Skill>> skillSuppliers;
-    private final Map<String, Supplier<PassiveSkill>> passiveSuppliers;
-    private final Map<String, Supplier<MainWeapon>> mainWeaponSuppliers;
+    private final Map<String, ComponentFactory<Skill>> skillFactories;
+    private final Map<String, ComponentFactory<PassiveSkill>> passiveFactories;
+    private final Map<String, ComponentFactory<MainWeapon>> mainWeaponFactories;
     //武器和技能所在的栏位
     private final Map<Integer, String> slotMap;
 
@@ -55,9 +57,9 @@ public class Role {
         this.maxSanTE = builder.maxSanTE;
         this.faction = builder.faction;
 
-        this.skillSuppliers = Collections.unmodifiableMap(builder.skillSuppliers);
-        this.passiveSuppliers = Collections.unmodifiableMap(builder.passiveSuppliers);
-        this.mainWeaponSuppliers = Collections.unmodifiableMap(builder.mainWeaponSuppliers);
+        this.skillFactories = Collections.unmodifiableMap(builder.skillFactories);
+        this.passiveFactories = Collections.unmodifiableMap(builder.passiveFactories);
+        this.mainWeaponFactories = Collections.unmodifiableMap(builder.mainWeaponFactories);
         this.slotMap = Collections.unmodifiableMap(builder.slotMap);
 
         this.icon = builder.icon;
@@ -68,28 +70,27 @@ public class Role {
         return new RoleInstance(player, this, context);
     }
 
-    public Skill createSkill(String skillId){
-        return createComponent(skillSuppliers.get(skillId));
+    public Skill createSkill(String skillId, ComponentServices services){
+        return createComponent(skillId, skillFactories.get(skillId), services);
     }
 
-    public PassiveSkill createPassive(String passiveId){
-        return createComponent(passiveSuppliers.get(passiveId));
+    public PassiveSkill createPassive(String passiveId, ComponentServices services){
+        return createComponent(passiveId, passiveFactories.get(passiveId), services);
     }
 
-    public MainWeapon createMainWeapon(String weaponId){
-        return createComponent(mainWeaponSuppliers.get(weaponId));
+    public MainWeapon createMainWeapon(String weaponId, ComponentServices services){
+        return createComponent(weaponId, mainWeaponFactories.get(weaponId), services);
     }
 
     /**
-     * **唯一组件创建点**（阶段 4 的 4.1）：全仓**创建路径**只有这里调用 {@code supplier.get()}；
-     * {@code Builder} 另有三处**校验用**实例化（{@code :177}/{@code :194}/{@code :208}，"造了再丢"），
-     * **待 4.2 的 {@code ComponentFactory} 收编** —— 判据写作「创建路径唯一（本方法）」+「Builder 三处待收编」，
-     * **不是** {@code grep -c "supplier.get()" = 1}（全仓代码命中实际为 4）。
-     * 迁移后的组件将在此处**紧邻** {@code bind(ComponentServices)}（五条件①④，见
-     * {@code docs/阶段4-交付小结.md} §5.7），使 bind 不可能被遗漏。
+     * **唯一组件创建点**（阶段 4 的 4.1）：全仓**创建路径**只有这里调用 {@code ComponentFactory.create}；
+     * {@code Builder} 过去的三处**校验用**实例化（"造了再丢"）已在收尾批⑤随 id 上移（注册处声明）而删除，
+     * 全仓不再有"为取 id 而临时造一个组件"的代码 —— 判据是「创建路径唯一（本方法）」。
+     * 服务集**在构造期**交给组件（见 {@code roleComponent.ComponentFactory}）：组件返回时即已持有它，
+     * 容器随后立刻登记（五条件①④，见 {@code docs/阶段4-交付小结.md} §5.7），注入不可能被遗漏。
      */
-    private <T> T createComponent(Supplier<T> supplier){
-        return supplier != null ? supplier.get() : null;
+    private <T extends RoleComponent> T createComponent(String id, ComponentFactory<T> factory, ComponentServices services){
+        return factory != null ? factory.create(id, services) : null;
     }
 
     public Material getIcon(){
@@ -108,9 +109,9 @@ public class Role {
         private int maxSanTE = 100;
         private Faction faction = Faction.UNKNOWN;
 
-        private final Map<String, Supplier<Skill>> skillSuppliers = new LinkedHashMap<>();
-        private final Map<String, Supplier<PassiveSkill>> passiveSuppliers = new LinkedHashMap<>();
-        private final Map<String, Supplier<MainWeapon>> mainWeaponSuppliers = new LinkedHashMap<>();
+        private final Map<String, ComponentFactory<Skill>> skillFactories = new LinkedHashMap<>();
+        private final Map<String, ComponentFactory<PassiveSkill>> passiveFactories = new LinkedHashMap<>();
+        private final Map<String, ComponentFactory<MainWeapon>> mainWeaponFactories = new LinkedHashMap<>();
         private final Map<Integer, String> slotMap = new HashMap<>();
 
         private Material icon;
@@ -175,9 +176,13 @@ public class Role {
             return this;
         }
 
-        public Builder addSkill(Supplier<Skill> supplier, int slot){
-            Skill temp = supplier.get();
-            String skillId = temp.getId();
+        /**
+         * 装配一条技能：**id 由调用方（注册处）声明** —— 不再"造一个临时实例取 id"。
+         * 收尾批⑤：装配条目 = {@code (id, ComponentFactory)}；容器在**构造期**把服务集交给组件。
+         */
+        public Builder addSkill(String skillId, ComponentFactory<Skill> factory, int slot){
+            // 与迁移前临时实例取 id 的 fail-fast 等价：null 工厂在**装配期**立刻 NPE，而不是拖到实例创建
+            Objects.requireNonNull(factory);
 
             if(skillId == null || skillId.trim().isEmpty()){
                 throw new IllegalArgumentException("Skill ID cannot be null or empty.");
@@ -186,29 +191,33 @@ public class Role {
 
             validateSlot(slot);
 
-            skillSuppliers.put(skillId, supplier);
+            skillFactories.put(skillId, factory);
             slotMap.put(slot, skillId);
 
             return this;
         }
 
-        public Builder addPassive(Supplier<PassiveSkill> supplier){
-            PassiveSkill temp = supplier.get();
-            String passiveId = temp.getId();
+        /**
+         * 装配一条被动：**id 由注册处声明**（无槽位）；装配条目 = {@code (id, ComponentFactory)}。
+         */
+        public Builder addPassive(String passiveId, ComponentFactory<PassiveSkill> factory){
+            Objects.requireNonNull(factory);
 
             if (passiveId == null || passiveId.trim().isEmpty()) {
                 throw new IllegalArgumentException("Passive skill ID cannot be null or empty");
             }
             ensureIdNotRegistered("Passive", passiveId);
 
-            passiveSuppliers.put(passiveId, supplier);
+            passiveFactories.put(passiveId, factory);
 
             return this;
         }
 
-        public Builder addMainWeapon(Supplier<MainWeapon> supplier, int slot){
-            MainWeapon temp = supplier.get();
-            String mainWeaponId = temp.getId();
+        /**
+         * 装配一条主武器：**id 由注册处声明**；装配条目 = {@code (id, ComponentFactory)}。
+         */
+        public Builder addMainWeapon(String mainWeaponId, ComponentFactory<MainWeapon> factory, int slot){
+            Objects.requireNonNull(factory);
 
             if(mainWeaponId == null || mainWeaponId.trim().isEmpty()){
                 throw new IllegalArgumentException("MainWeapon ID cannot be null or empty.");
@@ -217,7 +226,7 @@ public class Role {
 
             validateSlot(slot);
 
-            mainWeaponSuppliers.put(mainWeaponId, supplier);
+            mainWeaponFactories.put(mainWeaponId, factory);
             slotMap.put(slot, mainWeaponId);
 
             return this;
@@ -231,7 +240,7 @@ public class Role {
 
         //O-10：id 去重必须是跨类型的 —— 技能/被动/主武器共用同一个 id 命名空间，任一重复都抛异常
         private void ensureIdNotRegistered(String type, String id){
-            if (skillSuppliers.containsKey(id) || passiveSuppliers.containsKey(id) || mainWeaponSuppliers.containsKey(id)) {
+            if (skillFactories.containsKey(id) || passiveFactories.containsKey(id) || mainWeaponFactories.containsKey(id)) {
                 throw new IllegalArgumentException(type + " already registered: " + id);
             }
         }
@@ -267,13 +276,13 @@ public class Role {
     public int getMaxEnergy() { return maxEnergy; }
     public int getMaxSanTE() { return maxSanTE; }
     public Set<String> getSkillIds(){
-        return skillSuppliers.keySet();
+        return skillFactories.keySet();
     }
     public Set<String> getPassiveSkillIds() {
-        return passiveSuppliers.keySet();
+        return passiveFactories.keySet();
     }
     public Set<String> getMainWeaponIds(){
-        return mainWeaponSuppliers.keySet();
+        return mainWeaponFactories.keySet();
     }
 
     public Faction getFaction() { return faction; }

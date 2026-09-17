@@ -33,3 +33,7 @@ Thumbs.db
 local.properties
 # Gradle 本地缓存（本次重构设置的 GRADLE_USER_HOME，属构建缓存、不入库）
 .gradle-work/
+
+# 调试日志目录（忽略内容，只保留说明；冻结证据放 docs/ 并 -f 入库）
+debug-logs/*
+!debug-logs/README.md

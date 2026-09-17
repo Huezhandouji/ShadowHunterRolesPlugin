@@ -2,7 +2,6 @@ package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 
 import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.core.RoleComponentAware.LifecycleAware;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
@@ -22,7 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-public class MeiqiheziCircleSlashSkill extends Skill implements LifecycleAware {
+public class MeiqiheziCircleSlashSkill extends Skill {
 
     //O-4：前摇任务句柄化，stop 时取消（阶段 2 换成平台 Task）
     private Task castTask;
@@ -94,11 +93,16 @@ public class MeiqiheziCircleSlashSkill extends Skill implements LifecycleAware {
     }
 
     @Override
-    public void start(Player player, RoleInstance instance) {
+    public void start() {
     }
 
+    /**
+     * 新基类（RoleComponent）的停止钩子（阶段 4 B②-c）：容器在 legacy 扇出之后、`cancelAllAndClear()`
+     * **之前**广播 ⇒ 与旧 `LifecycleAware.stop(...)` 的行为等价（O-4 的前摇取消）；框架还会兜底取消本组件
+     * 资源表内的任务（重复取消幂等）。
+     */
     @Override
-    public void stop(Player player, RoleInstance instance) {
+    public void stop() {
         if(castTask != null){
             castTask.cancel();
             castTask = null;

@@ -654,6 +654,13 @@ public class RoleInstance {
                 ((LifecycleAware) weapon).awake(player, this);
             }
         }
+
+        //阶段 4（B②-c）：为**注册表内组件**广播新基类钩子 awake()。
+        //广播给"全部注册组件"（不按 isMigrated 分支）：未迁移组件的新钩子是基类**默认空实现** ⇒ 无行为影响；
+        //按迁移状态分支会引入第二套判据（与硬约束 §20 删总闸的教训同类）。legacy LifecycleAware 扇出保持不变。
+        for(RoleComponent component : componentRegistry.all()){
+            component.awake();
+        }
     }
 
     //start阶段：开始生效，顺序与awake一致（技能/被动/武器）
@@ -678,6 +685,11 @@ public class RoleInstance {
                 ((LifecycleAware) weapon).start(player, this);
             }
         }
+
+        //阶段 4（B②-c）：为注册表内组件广播新基类钩子 start()（顺序 = 注册表顺序；理由同 awake 处注释）
+        for(RoleComponent component : componentRegistry.all()){
+            component.start();
+        }
     }
 
     //stop阶段：停止生效，遍历顺序与start相反（武器/被动/技能），逆序拆卸
@@ -701,6 +713,16 @@ public class RoleInstance {
             if(skill instanceof LifecycleAware){
                 ((LifecycleAware) skill).stop(player, this);
             }
+        }
+
+        //阶段 4（B②-c）：为注册表内组件广播新基类钩子 stop()。
+        //**顺序说明**：legacy 停止是逆序（武器→被动→技能，上方三段）；新钩子按**注册表顺序**停止。
+        //两者不会对同一组件双触发同一逻辑 —— 迁移后的组件**不再 implements LifecycleAware**，
+        //未迁移组件则对基类 stop() 是**默认空实现** ⇒ 任一组件在任一时刻只被"真实逻辑"处理一次。
+        //**幂等说明**：若组件在 stop() 里自行取消任务，随后 clear() 的 cancelAllAndClear() 仍会取消其
+        //资源表内的同一句柄 ⇒ 重复 cancel 幂等（Task.cancel() 对已取消句柄是 no-op）。
+        for(RoleComponent component : componentRegistry.all()){
+            component.stop();
         }
     }
 

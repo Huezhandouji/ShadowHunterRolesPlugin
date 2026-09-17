@@ -50,7 +50,10 @@ public abstract class Skill extends ActiveComponent {
             material = Material.STRUCTURE_VOID;
         } else if (!canCast) {
             material = Material.BARRIER;
-        } else {
+        } else if(instance.getCurrentEnergy() < getEnergyCost()) {
+            material = Material.STRUCTURE_VOID;
+        }
+        else {
             material = getIcon();
         }
 
@@ -68,7 +71,12 @@ public abstract class Skill extends ActiveComponent {
             meta.displayName(getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
                             .color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
             lore.add(Component.text("Skill has been disabled."));
-        }else {
+        }
+        else if(instance.getCurrentEnergy() < getEnergyCost()){
+            meta.displayName(getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD).append(Component.text(" ENERGY LACK"))
+                    .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
+        }
+        else {
             meta.displayName(getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
             lore.add(Component.text("Skill is ready."));
         }
@@ -103,7 +111,12 @@ public abstract class Skill extends ActiveComponent {
         else if(!canCast){
            return getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
                     .color(NamedTextColor.RED).decorate(TextDecoration.BOLD);
-        }else {
+        }
+        else if(instance.getCurrentEnergy() < getEnergyCost()){
+            return getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD).append(Component.text(" ENERGY LACK"))
+                    .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD);
+        }
+        else {
             return getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD);
         }
 

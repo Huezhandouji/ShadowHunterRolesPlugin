@@ -12,24 +12,32 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
+import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
+import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
+import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
+import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import java.util.ArrayList;
 import java.util.List;
 
 
-public abstract class MainWeapon {
+public abstract class MainWeapon extends ActiveComponent implements CombatHook {
 
-    private final String id;
-    private final Component displayName;
-    private final Component description;
-    private final Material icon;
-    private final int cooldown;
-
+    /**
+     * 阶段 4 B0b-3：改基到 {@link ActiveComponent}（kind = MAIN_WEAPON、**`energyCost` 恒传 0**：
+     * 今天武器没有 energyCost 字段，填非 0 会让武器图标多出一个今天不存在的 `ENERGY LACK` 态）。
+     * 五个字段与对应 getter 已上移到基类；**构造参数顺序不变**（icon 在 cooldown 之前）
+     * ⇒ 2 个武器子类的 `super(...)` 一字不改。旧回调 `onAttack/onLeftClick/onRightClick/onDrop`
+     * 保留（收尾开关 false、`isMigrated()` 全 false ⇒ 派发仍全走旧路径）。
+     */
     public MainWeapon(String id, Component displayName, Component description, Material icon, int cooldown){
-        this.id = id;
-        this.displayName = displayName;
-        this.description = description;
-        this.icon = icon;
-        this.cooldown = cooldown;
+        super(id, displayName, description, cooldown, 0, icon, ItemKind.MAIN_WEAPON);
+    }
+
+    /** 攻击路径的新契约：今天 listener 在攻击后**无条件**启动武器冷却 ⇒ 默认 `CAST`（设计 §4.3）。 */
+    @Override
+    public CastResult onAttack(AttackSignal signal){
+        return CastResult.CAST;
     }
 
     public void onAttack(Player attacker, Player victim, RoleInstance instance){}
@@ -43,7 +51,7 @@ public abstract class MainWeapon {
     //创建物品
     public ItemStack createIconItem(RoleInstance instance) {
         if(instance == null) return null;
-        boolean isReady = instance.isMainWeaponReady(id);
+        boolean isReady = instance.isMainWeaponReady(getId());
         boolean canCast = instance.getBuffManager().canUseMainWeapon();
         Material material;
 
@@ -52,7 +60,7 @@ public abstract class MainWeapon {
         } else if (!canCast) {
             material = Material.BARRIER;
         } else {
-            material = icon;
+            material = getIcon();
         }
 
         ItemStack item = new ItemStack(material);
@@ -61,24 +69,24 @@ public abstract class MainWeapon {
         List<Component> lore = new ArrayList<>();
 
         if(!isReady){
-            meta.displayName(displayName.color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
+            meta.displayName(getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
             lore.add(Component.text("MainWeapon is on cooldown."));
         }
         else if(!canCast){
-            meta.displayName(displayName.color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
+            meta.displayName(getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
                     .color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
             lore.add(Component.text("MainWeapon has been disabled."));
         }else {
-            meta.displayName(displayName.color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
+            meta.displayName(getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
             lore.add(Component.text("MainWeapon is ready."));
         }
 
         lore.add(Component.text("===================="));
-        lore.add(description);
+        lore.add(getDescription());
 
         meta.lore(lore);
 
-        meta.getPersistentDataContainer().set(Utils.MAIN_WEAPON_KEY, PersistentDataType.STRING, id);
+        meta.getPersistentDataContainer().set(Utils.MAIN_WEAPON_KEY, PersistentDataType.STRING, getId());
 
         item.setItemMeta(meta);
 
@@ -93,18 +101,18 @@ public abstract class MainWeapon {
             return Component.text("RoleInstance is Null!");
         }
 
-        boolean isReady = instance.isMainWeaponReady(id);
+        boolean isReady = instance.isMainWeaponReady(getId());
         boolean canCast = instance.getBuffManager().canUseMainWeapon();
 
         if(!isReady){
-            return displayName.color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)
+            return getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)
                     .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD);
         }
         else if(!canCast){
-            return displayName.color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
+            return getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
                     .color(NamedTextColor.RED).decorate(TextDecoration.BOLD);
         }else {
-            return displayName.color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD);
+            return getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD);
         }
 
     }
@@ -134,11 +142,6 @@ public abstract class MainWeapon {
 
     }
 
-    //getters
-    public String getId() { return id; }
-    public Component getDisplayName() { return displayName; }
-    public Component getDescription() { return description; }
-    public Material getIcon() { return icon; }
-    public int getCooldownTicks() { return cooldown; }
+    //getters 已上移到 ActiveComponent（getId/getDisplayName/getDescription/getIcon/getCooldownTicks/getEnergyCost/getKind）
 
 }

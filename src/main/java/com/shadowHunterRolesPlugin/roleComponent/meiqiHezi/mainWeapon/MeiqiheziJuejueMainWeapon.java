@@ -39,7 +39,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
      *       调用同一套范围逻辑（{@link #castAreaDamage(Player)}），**行为等价**；</li>
      *   <li>能量 `< 20`：单体 `8` 物理伤害 + `0.5` 击退（逐字不变）。</li>
      * </ul>
-     * 两条分支都返回 {@code CAST}（旧路径的冷却由 listener 在调用前启动 ⇒ 等价、且**不双启动**）。
+     * 两条分支都返回 {@code SUCCEED}（旧路径的冷却由 listener 在调用前启动 ⇒ 等价、且**不双启动**）。
      */
     @Override
     public CastResult onAttack(AttackSignal signal) {
@@ -49,19 +49,19 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         //如果能量大于20，则进行范围伤害（旧写法在 onLeftClick 里，由 listener 同帧调用）—— 不能直接 return
         if (svc().energy().current() >= 20) {
             castAreaDamage(attacker);
-            return CastResult.CAST;
+            return CastResult.SUCCEED;
         }
 
         if (victim != null) {
             svc().damage().physicalDamage(victim, attacker, 8, 0.5);
         }
-        return CastResult.CAST;
+        return CastResult.SUCCEED;
     }
 
     /**
      * 左键路径（新管道，`CastTrigger.LEFT_CLICK` 分支）。语义与旧 `onLeftClick(Player, RoleInstance)`
      * **逐条等价**：能量 `< 20` 时**不做事且不启动冷却**（旧代码直接 return）⇒ 返回 {@code NO_COOLDOWN}；
-     * 能量 `>= 20` 时打出范围伤害 ⇒ 返回 {@code CAST}（冷却由框架按声明值启动）。
+     * 能量 `>= 20` 时打出范围伤害 ⇒ 返回 {@code SUCCEED}（冷却由框架按声明值启动）。
      */
     @Override
     public CastResult onCast(CastSignal signal) {
@@ -73,7 +73,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         if (svc().energy().current() < 20) return CastResult.NO_COOLDOWN;
 
         castAreaDamage(player);
-        return CastResult.CAST;
+        return CastResult.SUCCEED;
     }
 
     /**

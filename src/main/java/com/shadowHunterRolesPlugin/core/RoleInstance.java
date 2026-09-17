@@ -184,7 +184,7 @@ public class RoleInstance {
         if(!(component instanceof ActiveComponent active) || !active.isMigrated()) return false;
 
         CastResult result = active.onCast(new CastSignal(trigger));
-        if(result == CastResult.CAST){
+        if(result == CastResult.SUCCEED){
             //声明值是唯一真值来源（4.7/O-13）：框架按 getCooldownTicks() 启动冷却
             componentServices.get(component).cooldowns().start(active.getCooldownTicks());
         }
@@ -204,7 +204,7 @@ public class RoleInstance {
         if(!(component instanceof CombatHook hook) || !((ActiveComponent) component).isMigrated()) return false;
 
         CastResult result = hook.onAttack(new AttackSignal(victim));
-        if(result == CastResult.CAST){
+        if(result == CastResult.SUCCEED){
             componentServices.get(component).cooldowns().start(((ActiveComponent) component).getCooldownTicks());
         }
         hotbarRenderer.markDirty();

@@ -7,7 +7,7 @@ package com.shadowHunterRolesPlugin.core.dispatch;
 public enum CastResult {
 
     /** 施放成功 → 框架按 {@code HotbarItem#getCooldownTicks()} 启动冷却。 */
-    CAST,
+    SUCCEED,
 
     /** 组件已自行处理（含"不做事"）→ 框架不动冷却。 */
     NO_COOLDOWN,

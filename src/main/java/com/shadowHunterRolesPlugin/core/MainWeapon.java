@@ -34,10 +34,10 @@ public abstract class MainWeapon extends ActiveComponent implements CombatHook {
         super(id, displayName, description, cooldown, 0, icon, ItemKind.MAIN_WEAPON);
     }
 
-    /** 攻击路径的新契约：今天 listener 在攻击后**无条件**启动武器冷却 ⇒ 默认 `CAST`（设计 §4.3）。 */
+    /** 攻击路径的新契约：今天 listener 在攻击后**无条件**启动武器冷却 ⇒ 默认 `SUCCEED`（设计 §4.3）。 */
     @Override
     public CastResult onAttack(AttackSignal signal){
-        return CastResult.CAST;
+        return CastResult.SUCCEED;
     }
 
     public void onAttack(Player attacker, Player victim, RoleInstance instance){}

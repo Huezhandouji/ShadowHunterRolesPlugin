@@ -46,7 +46,7 @@ public class MainWeaponListener implements Listener {
         //取消原版事件
         event.setCancelled(true);
 
-        //先走新管道（阶段 4 B⑦ 接线）：已迁移武器（isMigrated()==true）由框架统一处理并在 CAST 时启动冷却；
+        //先走新管道（阶段 4 B⑦ 接线）：已迁移武器（isMigrated()==true）由框架统一处理并在 SUCCEED 时启动冷却；
         //未迁移武器返回 false ⇒ 落到下面的 legacy 分支，行为（含冷却启动时点）逐字不变、且不会双启动。
         if(instance.handleAttack(victim, attacker)){
             return;

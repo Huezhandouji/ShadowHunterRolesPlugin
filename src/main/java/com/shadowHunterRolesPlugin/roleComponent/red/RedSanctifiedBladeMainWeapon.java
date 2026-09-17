@@ -56,7 +56,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
         }
 
         //冷却由框架按 getCooldownTicks() 启动（声明值是唯一真值来源）
-        return CastResult.CAST;
+        return CastResult.SUCCEED;
     }
 
 }

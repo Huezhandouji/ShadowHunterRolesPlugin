@@ -328,6 +328,8 @@ public class RoleCommand implements CommandExecutor {
     // ③d 生产适配器 BukkitSchedulerAdapter.runRepeating(0,10)（内含 0→1 归一）；另测适配器 run() / runLater(20) 与 Task 句柄取消；
     // ④m **归一化矩阵**：8 组声明值（5 个生产形态 (1,1)/(0,1)/(0,2)/(0,40)/(1,6) + (0,10)/(1,2)/(1,10)）
     //     分别走原生 Bukkit 与适配器，逐组打印首/次触发 tick ⇒ 判据 = 两路径首/次触发逐字相同；
+    // ④p **端口链**：走组件侧真入口 `svc().timers().runRepeating(0L, 10L, …)`（TimerPort 的 task-在末位签名）
+    //     ⇒ 覆盖 TimerPortImpl 的转调 + 双入口归一；与 ④m 的 (0,10)=1/11 比对（无角色时打印 SKIPPED）；
     // ④ ScheduledTask.cancel() 返回值 / isCancelled() / getExecutionState() / 重复 cancel；⑤ 一句话结论（由本次原始值现算，不只给结论）。
     // 删除清单（逐条；判据 = `git grep -n "sched" -- src/main/java` 归零）：
     //   ① 本段整体：本注释块 + handleDebugSched(Player, String[])（本类唯一新增方法）；
@@ -356,7 +358,7 @@ public class RoleCommand implements CommandExecutor {
         }
 
         //观测位（局部 ⇒ 删除本方法即无残留）：str = 线程名/取消原始值/边界值；tick = 实际触发 tick 相对命令 tick 的差值
-        final String[] str = new String[8];
+        final String[] str = new String[9];
         final int[] tick = new int[13];
         for(int i = 0; i < tick.length; i++) tick[i] = -1;
         final int[] grrCount = {0};
@@ -583,6 +585,52 @@ public class RoleCommand implements CommandExecutor {
             player.sendMessage(Component.text("[sched] ④m verdict | " + str[7]));
         }, 50L);
 
+        //④p **端口链实测**（规格 B③"双入口归一"：TimerPortImpl → Scheduler → 适配器 → GlobalRegionScheduler）：
+        //    走组件侧真入口 `svc().timers().runRepeating(0L, 10L, …)`（TimerPort 的 task-在末位签名）⇒
+        //    与 ④m 的 (0,10) 期望值 **1/11** 比对。**仅当玩家已有角色时可测**（服务集构造期注入）；
+        //    无角色 ⇒ 明确打印 SKIPPED（不伪造）
+        final int[] portTicks = {-1, -1};
+        final int[] portCount = {0};
+        final Task[] portHolder = new Task[1];
+        ComponentServices portServices = null;
+        if(roleManager.hasRole(player)){
+            RoleInstance portInstance = roleManager.getRoleInstance(player);
+            String[] candidates = {"autoRecoverEnergy_passive", "autoRecoverSanTEPassive", "default_san_te_zero_punishment",
+                    "meiqihezi_mainWeapon_juejue", "meiqihezi_equippments_passive", "red_equippments_passive"};
+            if(portInstance != null){
+                for(String candidate : candidates){
+                    if(portInstance.servicesOf(candidate) != null){
+                        portServices = portInstance.servicesOf(candidate);
+                        str[8] = candidate;
+                        break;
+                    }
+                }
+            }
+        }
+        if(portServices == null){
+            str[8] = "portLeg=SKIPPED(no role or no bound services)";
+            player.sendMessage(Component.text("[sched] ④p port leg | " + str[8]));
+        }
+        else{
+            final ComponentServices portSvc = portServices;
+            portHolder[0] = portSvc.timers().runRepeating(0L, 10L, () -> {
+                int now = Bukkit.getCurrentTick();
+                portCount[0]++;
+                int k = portCount[0];
+                if(k <= 2){
+                    portTicks[k - 1] = now - baseTick;
+                    player.sendMessage(Component.text("[sched] ④p port(TimerPortImpl) delay=0 period=10 #" + k
+                            + " | tick=" + now + " | delta=" + (now - baseTick) + " | component=" + str[8]));
+                }
+                if(k == 2){
+                    portHolder[0].cancel();
+                    str[8] = str[8] + ",portFirstSecond=" + portTicks[0] + "/" + portTicks[1];
+                    player.sendMessage(Component.text("[sched] ④p port leg | component=" + str[8]
+                            + " | expectedByMatrix(0,10)=1/11 | identical=" + (portTicks[0] == 1 && portTicks[1] == 11)));
+                }
+            });
+        }
+
         //⑤ 结论：70 tick 后（全部周期任务均已自取消）以本次原始值现算"能否直切"
         grs.runDelayed(plugin, task -> {
             int globalPeriod = (tick[1] >= 0 && tick[3] >= 0) ? tick[3] - tick[1] : -1;
@@ -598,8 +646,11 @@ public class RoleCommand implements CommandExecutor {
             boolean adapterCancelOk = str[6] != null && str[6].contains("isCancelledAfter=true")
                     && str[6].contains("isCancelledAfterSecondCancel=true");
             boolean matrixEquivalent = str[7] != null && str[7].contains("matrixAllPairsMatch=true");
+            boolean portLegCovered = str[8] != null && str[8].contains("portFirstSecond=");
+            boolean portLegEquivalent = portLegCovered && str[8].endsWith("portFirstSecond=1/11");
             boolean adapterEquivalent = sameThread && periodEquivalent && delayedEquivalent && cancelSemanticsOk
-                    && clampEquivalent && adapterDelayedEquivalent && adapterCancelOk && matrixEquivalent;
+                    && clampEquivalent && adapterDelayedEquivalent && adapterCancelOk && matrixEquivalent
+                    && (!portLegCovered || portLegEquivalent);
             player.sendMessage(Component.text("[sched] ⑤ raw | globalThread=" + str[0]
                     + " | bukkitThread=" + str[1]
                     + " | globalDeltas=" + tick[1] + "/" + tick[2] + "/" + tick[3] + " (declared 1/10)"
@@ -618,6 +669,8 @@ public class RoleCommand implements CommandExecutor {
                     + " | adapterDelayedEquivalent=" + adapterDelayedEquivalent
                     + " | adapterCancelOk=" + adapterCancelOk
                     + " | matrixEquivalent=" + matrixEquivalent
+                    + " | portLeg=" + str[8]
+                    + " | portLegEquivalent=" + portLegEquivalent
                     + " | CONCLUSION=" + (adapterEquivalent
                         ? "CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (raw APIs differ only on initialDelay<=0; the adapter normalises 0 -> 1 and the A/B on the production declaration 0/10 is tick-identical)"
                         : "CANNOT swap the adapter as-is: at least one measured item differs (see the raw values above)")));

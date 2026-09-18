@@ -519,6 +519,9 @@ public class RoleInstance {
 
         SanTEChangeEvent event = new SanTEChangeEvent(player, this, preSanTE, currentSanTE, role.getMaxSanTE());
         Bukkit.getPluginManager().callEvent(event);
+
+        //I-15：容器**直派**（不再经 RoleEventListener 转发；上一行的事件发布保持不变）
+        dispatchSanTEChange(preSanTE, currentSanTE);
     }
 
     public void increaseSanTE(int amount){
@@ -615,21 +618,53 @@ public class RoleInstance {
         }
     }
 
-    public void triggerEnergyChange(int preEnergy, int newEnergy){
-        if(player == null ) return;
-    }
+    //I-14：SanTE 派发的重入护栏状态。哨兵 Integer.MIN_VALUE = 无待发值；
+    //派发期间的组件重入写入只记最新值（禁止嵌套），返回后合并补发一次。
+    private boolean sanTEDispatching = false;
+    private int sanTEPendingValue = Integer.MIN_VALUE;
 
-    public void triggerSanTEChange(int preSanTE, int newSanTE){
+    /**
+     * SanTE 变更的**唯一派发点**（阶段 4 追补 I-15 容器直派 + I-14 重入护栏）。
+     * <ul>
+     *   <li><b>真变化才派发</b>（{@code pre == now} 直接返回）—— B⑨ 口径不变：SanTE 已为 0 时再扣不再通知组件；</li>
+     *   <li><b>禁止嵌套派发</b>：派发期间组件再次改写 SanTE ⇒ 只把最新值记为待发并立即返回；</li>
+     *   <li><b>合并成末次一次</b>：本次派发返回后，若期间有重入写入，则对"末次待发值"补发**一次**（中间态被合并掉）；</li>
+     *   <li>异常隔离沿用 {@link #runComponentUpdate}（单个组件抛异常不影响其余组件）。</li>
+     * </ul>
+     * 现存两个实现者（{@code DefaultSanTEZeroPunishment} / {@code RedDeeplySorrowSkill} 的
+     * {@code onSanTEChange}）都**不在钩子内同步写 SanTE**（前者只调度任务、后者只起冷却）
+     * ⇒ 护栏在当前组件集下**不可达**，属防御性设施。
+     */
+    private void dispatchSanTEChange(int preSanTE, int newSanTE){
         if(player == null ) return;
-
-        //阶段 4（B⑨）：**真变化才派发**（已申报可见变化，裁定 (i)）——
-        //SanTE 已为 0 时再扣（0 → 0）不再通知组件 ⇒ 惩罚不再被重复触发/延长（O-6 重复任务路径由此闭合）。
-        //注意：`SanTEChangeEvent` 的对外发布仍然**无条件**（第三方挂点），此处只收紧**组件侧钩子**。
         if(preSanTE == newSanTE) return;
 
-        //阶段 4（B⑨）：为**注册表内组件**广播新基类钩子 onSanTEChange(pre, now)（顺序 = 注册表顺序，
-        //与 update()/start()/stop() 的新钩子广播同源）；异常隔离复用 runComponentUpdate。
-        //已迁移组件**不再实现 legacy SanTE 接口** ⇒ 只被这一条路径调用，不会双触发。
+        if(sanTEDispatching){
+            sanTEPendingValue = newSanTE;
+            return;
+        }
+
+        sanTEDispatching = true;
+        try{
+            int notified = newSanTE;
+            broadcastSanTEChange(preSanTE, newSanTE);
+
+            while(sanTEPendingValue != Integer.MIN_VALUE){
+                int target = sanTEPendingValue;
+                sanTEPendingValue = Integer.MIN_VALUE;
+                if(notified != target){
+                    broadcastSanTEChange(notified, target);
+                    notified = target;
+                }
+            }
+        }
+        finally{
+            sanTEDispatching = false;
+        }
+    }
+
+    /** 按注册表顺序广播组件侧 {@code onSanTEChange(pre, now)}（顺序与 update()/start()/stop() 同源）。 */
+    private void broadcastSanTEChange(int preSanTE, int newSanTE){
         for(RoleComponent component : componentRegistry.all()){
             runComponentUpdate("registered", component.getId(), () -> component.onSanTEChange(preSanTE, newSanTE));
         }

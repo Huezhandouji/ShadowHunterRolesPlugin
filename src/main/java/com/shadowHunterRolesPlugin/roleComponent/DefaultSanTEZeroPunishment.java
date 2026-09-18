@@ -24,7 +24,7 @@ import java.time.Duration;
  *   <li>惩罚状态 `isInSanTEPunishment` 由聚合根搬进**组件私有字段**（该状态本就不该上 `RoleInstance`）；</li>
  *   <li>任务经 `svc().timers()` 登记本组件资源表、Buff 经 `svc().buffs()`、SanTE 经 `svc().sante()`、
  *       真伤经 `svc().damage()`；**表现层（粒子/标题/音效）与全部数值逐字不变**；</li>
- *   <li>**已申报可见变化（裁定 (i)）**：容器侧收紧为「**真变化才派发**」（见 `RoleInstance.triggerSanTEChange`）
+ *   <li>**已申报可见变化（裁定 (i)）**：容器侧收紧为「**真变化才派发**」（见 `RoleInstance.dispatchSanTEChange`）
  *       ⇒ SanTE 已为 0 时再扣不再重复派发 ⇒ **惩罚不再被重复触发/延长**（O-6 的重复任务路径由本批闭合）。</li>
  * </ul>
  */

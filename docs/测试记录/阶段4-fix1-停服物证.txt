@@ -1,0 +1,62 @@
+================================================================================
+阶段 4 追补 · fix1（I-15 容器直派 + I-14 重入护栏 + F6 死路径收口）
+—— 起服/停服物证（**当轮即时记录**，2026-09-18 19:18–19:20）
+================================================================================
+
+编制：eng-收尾          记录方式：**停机后立即在本轮会话内实测并落盘**（非事后补记）
+文件位置：`docs/测试记录/`（按 `.gitignore` 新约定：测试记录文件夹内的日志/证据正常跟踪，无需 `git add -f`）
+
+--------------------------------------------------------------------------------
+§1. 起服（Mode B）
+--------------------------------------------------------------------------------
+[1.1] 起服命令：`$env:GRADLE_USER_HOME="<repo>\.gradle-work"; .\gradlew runServer --console=plain`
+      （后台作业；起服前已按纪律**广播"我要起服"**）
+[1.2] 三行齐（逐字，取自 `run/logs/latest.log`）：
+      [19:19:32] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+      [19:19:32] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+      [19:19:33] [Server thread/INFO]: Done (18.078s)! For help, type "help"
+[1.3] 日志冻结（**停机前**）：`docs/测试记录/阶段4-起服日志-fix1.log` =
+      **6075 B / mtime 2026-09-18 19:20:00 /
+      SHA256 4298E23CF5D5E96A73201517FFCFC181407E7A4B458957BACF77A67CE23E4AA3**
+[1.4] 正序集合差（`log-delta.ps1`，锚 = `docs/测试记录/阶段4-起服日志-T2b.log`，只看 C）：
+      anchor 13 / current 13 行 WARN|ERROR|SEVERE；**ADDED 0 / REMOVED 0 / C = 0**
+      （A) oshi 硬件探测噪声 = 0；B) 世界态实体噪声 = 0）
+
+--------------------------------------------------------------------------------
+§2. 停服（**当时实测**，非事后）
+--------------------------------------------------------------------------------
+[2.1] 停服动作（19:20:0x）：`job_kill <runServer 后台作业 id>` —— **只 job_kill + 等待，未强杀 java**
+[2.2] **停服完成判定 @ 19:20:14**：
+      command : `[System.IO.File]::Open('run\logs\latest.log','Open','Read','None')`（FileShare.None 独占打开）
+      result  : **打开成功（True）** ⇒ 该文件的持有者（Paper）已收尾、无进程持锁
+[2.3] 端口 @ 19:20:14：
+      command : `(Get-NetTCPConnection -LocalPort 25566 -ErrorAction SilentlyContinue).Count`
+      result  : **0**
+[2.4] 进程 @ 19:20:14：
+      command : `Get-Process java | Select Id,StartTime`
+      result  : 共 **3** 个，StartTime = 19:01:13 / 19:01:35 / 19:01:40（**均为 Gradle daemon**）；
+      **启动于 19:18 之后（本批 Paper）的 java 进程数 = 0** ⇒ 服务器进程已退出
+[2.5] `run/logs/latest.log` = **6074 B / mtime 19:19:34**（自稳态起未被写入；无第三方新起服写入）
+
+--------------------------------------------------------------------------------
+§3. 本批代码身份（供物证配套引用）
+--------------------------------------------------------------------------------
+[3.1] 改动面 = **3 个 src 文件**（工作树现算，未做 git 写）：
+      `core/RoleInstance.java`（+46/−11）· `listener/RoleEventListener.java`（+11/−17）·
+      `roleComponent/DefaultSanTEZeroPunishment.java`（+1/−1，仅 javadoc 引用改名）
+[3.2] 构建：`BUILD SUCCESSFUL in 23s`（`-x copyPluginJar`）；
+      jar = **135249 B / 2026-09-18 19:17:04 /
+      SHA256 94F7C59A33AF51ADC1F0CA06FCCE17F98197546FB414649C682DAA517103E66D**；
+      最新 `.class` @ 19:17:04；**`src 新于 jar = 0`**
+[3.3] 双口径（`.scratch\bot\numeric-multiset.ps1 -Mode both`，比较开工前快照 ↔ 现 src）：
+      **numeric 379 → 379（diff 0）**、**string 180 → 180（diff 0）** ⇒ **零字面量变化、(d) 申报 0 条**
+[3.4] 运行深度声明：**只到「插件启用 + 服务器空闲（Done）」**；
+      **无玩家登录、无选角色、未实测 SanTE 派发路径**（本批为容器侧派发改造，其运行期行为需玩家/组件触发才能覆盖）
+
+--------------------------------------------------------------------------------
+§4. 边界
+--------------------------------------------------------------------------------
+- 本文件为**当轮即时记录**（19:20:14 实测）；§1.3 的日志冻结发生在停机**之前**。
+- 未伪造任何"控制台停服行"：本批 `job_kill` 路径不产生可归档的 `Stopping server` 行 ⇒ 停服判定以 §2.2/§2.3/§2.4 三条独立实测为准。
+- 本批**未改 `event/**`、`api/**`、`ComponentServices`（10 成员）、`ShadowHunterRolesPlugin.java`（注册行）**。
+================================================================================

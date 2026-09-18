@@ -52,3 +52,13 @@ sha256 = 0F2D901C6B6FE301E32CDA2B52C7377E940F8C6D058A7E96B6B92D1C3377DF74
 覆盖证据 = 阶段5-起服日志-控制台输出.log（Mode B 三行 + 正序集合差只看 C=0 + 停机前先在仍在线时冻结 + 只 job_kill 后停服三路互证 + **15 行 [command-debug] 控制台输出**（含 ④m verdict / ⑤ raw / ⑤ verdict / CONCLUSION=）+ 4 条 issued server command；F1 链 jar 21:41:02 < log 21:43:14 < 说明）
 与前代关系 = 前代 53CBEB65…(158875, t59 指令体系) 的**同一批指令代码 + 仅新增日志出口**：探针与冷却的**玩家侧输出文本逐字未变**（26 条 [sched] 字面量多重集仍全等）⇒ 与 t59 代语义等价；本代自带运行证据
 备注 = 本代只新增 3 条字符串字面量（"[command-debug]" · 分隔符 " " · ④m 矩阵说明句），**数值字面量 diff = 0**（658 → 658）；改动面 = command/** 3 个 Debug* 文件
+
+# --- 登记 5 ---
+登记时刻 = 2026-09-18 21:57:00
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260918-214102-0F2D901C.jar
+bytes = 159652
+mtime = 2026-09-18 21:41:02.153
+sha256 = 0F2D901C6B6FE301E32CDA2B52C7377E940F8C6D058A7E96B6B92D1C3377DF74
+覆盖证据 = 阶段5-起服日志-控制台输出-取证.log（39033 B / 223 行 / 2026-09-18 21:55:30.018 / SHA256 972AAE6E90A5B8D11268265956E8FE482B44397FF9F72625BB37D2A55BF7D326）：Mode B 三行 + 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log，13/13 行全等、ADDED=0）+ 主冻结在仍在线时 + 只 job_kill + 停服三路互证 + 运行级锚（[command-debug]=99 · [sched]=72 · matrixAllPairsMatch==6 · portLegEquivalent==6 · CONCLUSION==6 · ERROR/SEVERE=0）；bot 冒烟 mineflayer 双路径 + op 门控双窗，断言 failed=0
+与前代关系 = 与登记 4 为同一字节制品（同一 jar 文件：不重复复制、不重建）：Gradle 全部任务 UP-TO-DATE（输入/输出哈希匹配）⇒ 该 jar 即提交态 src 的制品；重建只会改其 mtime 并反转登记 4 的 F1 链（协同规范 §3.4）
+备注 = 本登记只追加"提交态"第二轮运行证据；F1 链 = jar 21:41:02 < freezeA 21:49:37.907 < freezeB 21:55:30.018 < 本登记；提交绑定 commit = b42d775aef2f7163ffcc34c39e5af2a93a655bf8（起服时 HEAD；src/main tree = beed92cb9997049d8b086f164b9f386a74eae1ba，与取证时刻 HEAD 889e95c1b47a249150e9f7e3091e82b4bc0d9dee 的 src/main tree 逐字相同）

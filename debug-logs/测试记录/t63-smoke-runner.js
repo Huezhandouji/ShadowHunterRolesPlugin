@@ -38,7 +38,9 @@ const HOST = process.env.MC_HOST || '127.0.0.1'
 const PORT = parseInt(process.env.MC_PORT || '25566', 10)
 const VERSION = process.env.MC_VERSION || '1.21.11'
 const OP_BOT = process.env.SMOKE_BOT || 'HueZhandouji'          // must be op (run/ops.json)
-const NOOP_BOT = process.env.SMOKE_BOT_NOOP || ('smoke_probe_' + Math.floor(Math.random() * 1e6))
+const NOOP_BOT = process.env.SMOKE_BOT_NOOP || ('probe' + Math.floor(Math.random() * 1e6))
+// NOTE offline login names must be <= 16 chars ([A-Za-z0-9_]): the first version
+// used 'smoke_probe_' + 6 digits = 18 chars and never reached 'spawn'.
 const ROLE_CANDIDATES = (process.env.SMOKE_ROLES || 'meiqihezi,red').split(',')
 const LOG_PATH = process.env.SMOKE_LOG ||
   path.resolve(__dirname, '..', '..', 'ShadowHunterRoles', 'run', 'logs', 'latest.log')
@@ -99,6 +101,24 @@ function evaluate (text, kind, label) {
 
 // ---- op-gate assertions ----------------------------------------------------
 function evaluateGate (g) {
+  // Normalise tab-complete payloads. REAL mineflayer 4.39 returns packet.matches
+  // as an array of OBJECTS: [{match:"debug"}, ...] - NOT plain strings. The first
+  // version assumed strings, so four CORRECT op results were reported MISMATCH
+  // (trap family 10: the assertion set itself was wrong). null = no response.
+  const N = (v) => {
+    if (v === null || v === undefined) return null
+    if (!Array.isArray(v)) return v
+    return v.map((x) => (x && typeof x === 'object' && 'match' in x) ? x.match : x)
+  }
+  g = {
+    ...g,
+    opRoot: N(g.opRoot), opDebug: N(g.opDebug), opCooldown: N(g.opCooldown), opSched: N(g.opSched),
+    noRoot: N(g.noRoot), noDebug: N(g.noDebug), noCooldown: N(g.noCooldown)
+  }
+  // "no topics offered" = an empty list, OR no response at all (observed: when the
+  // completer returns List.of() the server sends nothing back, so the client times
+  // out). This is only meaningful together with the same-bot positive control below.
+  const noTopics = (v) => v === null || (Array.isArray(v) && v.length === 0)
   const checks = []
   const add = (name, ok, detail) => checks.push({ name, ok, detail })
 
@@ -115,8 +135,10 @@ function evaluateGate (g) {
     Array.isArray(g.opSched) && g.opSched.includes('all'), JSON.stringify(g.opSched))
 
   // gate side 1: tab completion
-  add('GATE tab: non-op /role debug -> EMPTY', Array.isArray(g.noDebug) && g.noDebug.length === 0, JSON.stringify(g.noDebug))
-  add('GATE tab: non-op /role debug cooldown -> EMPTY', Array.isArray(g.noCooldown) && g.noCooldown.length === 0, JSON.stringify(g.noCooldown))
+  add('GATE tab: non-op /role debug -> no debug topics offered (empty or no response)',
+    noTopics(g.noDebug), JSON.stringify(g.noDebug))
+  add('GATE tab: non-op /role debug cooldown -> no topics offered',
+    noTopics(g.noCooldown), JSON.stringify(g.noCooldown))
   add('non-op tab /role -> contains "debug" (same instrument, gate is topic-level)',
     Array.isArray(g.noRoot) && g.noRoot.includes('debug'), JSON.stringify(g.noRoot))
 
@@ -188,12 +210,26 @@ function selftest () {
   const leakedTab = { ...goodGate, noDebug: ['cooldown', 'sched'] }        // simulated tab-completion leak
   const leakedChat = { ...goodGate, noChat: 'You do not have permission to use this command.\n[sched] ① oops' }
   expectPass('gate/clean (expect all OK)', evaluateGate(goodGate).checks)
+  // REGRESSION FIXTURE: the real mineflayer API returns object-shaped matches and
+  // sends nothing at all for a gated (empty) completer. The string-only fixture above
+  // missed both, which is exactly how the first live run mis-reported 4 correct op
+  // results as MISMATCH (trap family 10).
+  expectPass('gate/object-shaped matches + no-response non-op (MUST pass)',
+    evaluateGate({
+      ...goodGate,
+      opRoot: [{ match: 'debug' }, { match: 'help' }],
+      opDebug: [{ match: 'cooldown' }, { match: 'sched' }],
+      opCooldown: [{ match: 'status' }, { match: 'end' }, { match: 'restart' }],
+      opSched: [{ match: 'all' }],
+      noDebug: null, noCooldown: null
+    }).checks)
   expectFail('gate/tab-leak (MUST be caught)', evaluateGate(leakedTab).checks)
   expectFail('gate/chat-leak (MUST be caught)', evaluateGate(leakedChat).checks)
 
   console.log(`\n==== selftest total: ok=${ok} bad=${bad} ====`)
-  console.log('EXPECTED: ok=8 bad=0  (2 known-true + 1 empty-refusal + 1 garbage +')
-  console.log('          1 leaked tab + 1 leaked chat caught + 1 clean gate + 1 garbage-anchor-count)')
+  console.log('EXPECTED: ok=9 bad=0  (2 known-true + 1 empty-refusal + 1 garbage +')
+  console.log('          1 leaked tab + 1 leaked chat caught + 1 clean gate + 1 object-shaped gate +')
+  console.log('          1 garbage-anchor-count)')
   process.exit(bad === 0 ? 0 : 1)
 }
 
@@ -202,6 +238,10 @@ async function live (outFile) {
   const mineflayer = require('mineflayer')
   const lines = []
   const log = (...a) => { const s = a.join(' '); lines.push(s); console.log(s) }
+  // never lose the transcript, even if a later phase throws (observed once: a
+  // non-op spawn timeout killed the run before the final write)
+  const flush = () => { try { if (outFile) fs.writeFileSync(outFile, lines.join('\n') + '\n', 'utf8') } catch (e) { console.error('transcript flush failed:', e.message) } }
+  process.on('exit', flush)
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const readLog = () => (fs.existsSync(LOG_PATH) ? fs.readFileSync(LOG_PATH, 'utf8') : '')
   const sliceFrom = (whole, off) => whole.length > off ? whole.slice(off) : ''
@@ -238,13 +278,14 @@ async function live (outFile) {
     bot.chat(cmd)
     await sleep(waitMs || 1600)
   }
+  const normTab = (raw) => (raw || []).map((x) => (x && typeof x === 'object' && 'match' in x) ? x.match : x)
   async function tab (text) {
     try {
-      const m = await bot.tabComplete(text, true, false, 5000)
+      const m = normTab(await bot.tabComplete(text, true, false, 5000))
       log(`>>> TAB "${text}" -> ${JSON.stringify(m)}`)
       return m
     } catch (e) {
-      log(`>>> TAB "${text}" -> ERROR ${e.message}`)
+      log(`>>> TAB "${text}" -> NO RESPONSE / ERROR: ${e.message}`)
       return null
     }
   }
@@ -291,17 +332,23 @@ async function live (outFile) {
   await step('/role debug sched', 1500)                               // usage of sched
   await step('/role debug sched all', 14000)                          // the probe (needs ticks)
 
+  await step('/role clear', 1500)                                    // leave server state as found (op bot only)
   const off1 = logLen()
   log(`console offset1 = ${off1} (op window ends here)`)
   await sleep(600)
 
   // ---------- non-op phase (op gate) ----------
+  // The op bot disconnects first so the op/non-op console windows never overlap.
+  // (max-players is 20, so the earlier "noop spawn timeout" was NOT a full server:
+  //  the first non-op name was 18 chars, over the 16-char offline-name limit.)
+  try { bot.quit() } catch (e) {}
+  await sleep(3500)
   const nb = makeBot(NOOP_BOT)
   await new Promise((res, rej) => { nb.once('spawn', res); nb.once('error', rej); setTimeout(() => rej(new Error('noop spawn timeout')), 60000) })
   log('non-op spawn ok')
   await sleep(1500)
   async function ntab (text) {
-    try { const m = await nb.tabComplete(text, true, false, 5000); log(`>>> NOOP TAB "${text}" -> ${JSON.stringify(m)}`); return m } catch (e) { log(`>>> NOOP TAB "${text}" -> ERROR ${e.message}`); return null }
+    try { const m = normTab(await nb.tabComplete(text, true, false, 5000)); log(`>>> NOOP TAB "${text}" -> ${JSON.stringify(m)}`); return m } catch (e) { log(`>>> NOOP TAB "${text}" -> NO RESPONSE / ERROR: ${e.message}`); return null }
   }
   const noRoot = await ntab('/role ')
   const noDebug = await ntab('/role debug ')
@@ -315,8 +362,7 @@ async function live (outFile) {
   log(`console offset2 = ${off2} (non-op window ends here)`)
   await sleep(600)
 
-  // cleanup: leave server state as found
-  await step('/role clear', 1500)
+  // cleanup: the op-side role was already cleared before the op bot disconnected
   try { nb.quit() } catch (e) {}
   try { bot.quit() } catch (e) {}
   await sleep(1200)

@@ -1,0 +1,83 @@
+================================================================================
+阶段5 · 勘误与读法说明（**非证据本体**；本件不修改、不覆盖任何既有冻结件）
+—— 立件依据：队长 2026-09-18 指令（"请照此写进说明件"）+ `eng-平台`/`eng-验证` 的独立复核
+—— 覆盖三件：① `portLegEquivalent=false` 的读法 ② t59 行号引用勘误 ③ 制品/提交绑定与可复算提取命令
+================================================================================
+
+§1 读法说明（**必读**）：`portLegEquivalent=false` 不代表回归 ✗
+--------------------------------------------------------------------------------
+本轮（t61 · 开发轮，冻结件 `阶段5-起服日志-控制台输出.log`）的 `[sched] ⑤ verdict` 行同时含：
+```
+portLeg=portLeg=SKIPPED(no role or no bound services)   ← 该腿【被跳过】
+portLegEquivalent=false                                  ← 由"跳过"派生，不是失败
+matrixEquivalent=true      ·  CONCLUSION=CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference …
+```
+**照此读**（队长给定措辞，逐字）：
+> 本轮 **端口腿被 SKIP**（`portLeg=SKIPPED(no role or no bound services)` ⇒ bot 未绑角色/服务）⇒ **判定依据 = 矩阵腿**
+> （`matrixEquivalent=true` / `CONCLUSION=CAN …` ✓）；**端口链的独立实测仍是 `t51` 那一轮**（`portFirstSecond=1/11` ✓）
+> —— 故 `portLegEquivalent=false` **不代表回归** ✗。
+**为什么必须写**：这是"**同名字段 + 不同前置条件**"的经典陷阱 —— `eng-平台` 早前那一轮**真跑过端口链**（`portLegEquivalent=true`），
+两轮**前置条件不同、不可直接比较**；只贴 `false` 不解释会被误读成回归 ✗。
+
+§2 勘误：t59 交付里的 `issued server command` **行号区间写错了**
+--------------------------------------------------------------------------------
+- **错误值**（写在两份**已入库**的 t59 证据件里）：`:52`–`:65`
+  · `debug-logs/测试记录/阶段5-指令体系整合-说明.txt`（§6.3）
+  · `debug-logs/测试记录/阶段5-指令整合-停服物证.txt`（§2.2）
+- **正确值**：**`:61`–`:74`**（**计数 14 不变** ✓；`阶段5-起服日志-指令整合.log`，`C79EBCBD…AA70`）
+- **可复算**：`Select-String -Path <冻结件> -Pattern 'issued server command'` ⇒ `count = 14 ; lines = 61..74`
+- **处置**：**不修改冻结件** ✓（避免覆盖证据）⇒ 以本件为准；**并采纳规范 §7.3**：**引内容锚，不引行号** ✓
+  （行号是移动靶；本卡两轮的行号引用此后一律改为"冻结件内 14 行 `issued server command`，序列与矩阵逐条一致"）
+- **影响面（如实）**：仅引用便利性 —— **计数 14、`C = 0`、Mode B 三行、F1 链、冻结/停机顺序全部不变** ✓
+
+§3 制品 / 提交绑定（t61 开发轮）+ 权威轮安排
+--------------------------------------------------------------------------------
+[3.1] **本轮的运行证据锚定这一代**：
+      `build/libs/ShadowHunterRolesPlugin-1.0.0.jar` = **159652 B / mtime 2026-09-18 21:41:02.153 /
+      SHA256 `0F2D901C6B6FE301E32CDA2B52C7377E940F8C6D058A7E96B6B92D1C3377DF74`**
+      —— 自证：冻结件内 `[PluginRemapper] Remapping plugin '…\build\libs\ShadowHunterRolesPlugin-1.0.0.jar'` 行指向同一路径 ✓
+[3.2] **显式声明（队长要求的 (a) 条）**：该 jar 的**源码内容 = 队长提交后的那一版**（提交 **`b42d775`**，`git merge-base --is-ancestor b42d775 HEAD` = 0 ⇒ 已在 HEAD 中），
+      判据 = `src 新于 jar = 0` ✓ + 本轮 3 个源码文件的逐文件 SHA256（与 HEAD 逐字一致，`git status --porcelain -- command/` = 0）：
+      | 文件 | bytes | 行 | SHA256 |
+      |---|---|---|---|
+      | `command/DebugCommand.java` | 4322 | 95 | `8863A67D9E807D80F47E658EC8ADC0BA0A83008A080BFFE113A334CC0A653652` |
+      | `command/DebugCooldownCommand.java` | 5744 | 131 | `97073E8950A2D7A7ED18806D3946E801B8AEF5E195111E02C8C3455BEE669301` |
+      | `command/DebugSchedCommand.java` | 25171 | 395 | `143296D36D8D8B6AB1E12CC587D2E26CF99BD6B3CE8F18B00EA8F63260FD7224` |
+      ⇒ 即：**"本轮为开发构建轮"的顾虑不成立** —— 制品与其源码**同源且已提交**；F1 链 `jar 21:41:02.153 < log 21:43:14.996 < 物证 21:45:02 < 说明 21:46:30` ✓
+[3.3] **权威运行证据安排（无冲突）**：`t63`（`eng-取证`）在**提交后重建**的那一代上出权威轮（现算第 5 代
+      `…-220106-21002ABC.jar` = 159661 B / 22:01:06.944 / `21002ABC…`，已归档 = `MANIFEST` **登记 6**）
+      ⇒ **登记 4（`0F2D901C`，我的开发轮）与登记 5/6 并存、append-only、互不覆盖** ✓
+
+§4 可复算提取命令：「26 条 `[sched]` 字面量多重集全等」主张
+--------------------------------------------------------------------------------
+[4.1] **口径（作用域 + 匹配形态 + 注释扣除）**：工具 `.scratch\bot\t59-numeric-lines.ps1 -Mode string` ——
+      **整文件**剥离块注释/行注释（**按匹配长度置空、保留换行**）⇒ javadoc/注释**全部剔除**，随后逐行抽取**双引号字符串字面量**（含续行）。
+      （注意：**不能按行剥多行 javadoc** —— 那会多算；此为 t61 说明 §5.5 自曝并修掉的仪器缺陷。）
+[4.2] **两侧**：`t59 之前`（单文件 `command/RoleCommand.java`，存于 `.scratch\bot\t59cmd-base\command`）
+      vs `t59 定稿`（`command/` 包，存于 `.scratch\bot\t61-before\src\main\java\com\shadowHunterRolesPlugin\command`）。
+[4.3] **命令**：
+```powershell
+$bot = "C:\Users\ROG\Desktop\插件\.scratch\bot"
+powershell -NoProfile -ExecutionPolicy Bypass -File "$bot\t59-numeric-lines.ps1" -Dir "$bot\t59cmd-base\command" -Mode string > old.txt
+powershell -NoProfile -ExecutionPolicy Bypass -File "$bot\t59-numeric-lines.ps1" -Dir "$bot\t61-before\src\main\java\com\shadowHunterRolesPlugin\command" -Mode string > new.txt
+Get-Content old.txt | %{ ($_ -split "`t")[1] } | ?{ $_ -match '\[sched\]' } | Sort-Object > o.sorted
+Get-Content new.txt | %{ ($_ -split "`t")[1] } | ?{ $_ -match '\[sched\]' } | Sort-Object > n.sorted
+Compare-Object (Get-Content o.sorted) (Get-Content n.sorted)     # 多重集：逐行计数比较，**不要** -Unique
+```
+[4.4] **现跑输出（2026-09-18 现算）**：`pre-t59 = 26` · `t59 定稿 = 26` · **`diff rows = 0`** ✓ ⇒ 主张成立（**未为对上数字而改口径**）。
+[4.5] **与验证方的 28 / 27 不矛盾（不同代）**：**命中行 28 = 输出字面量 27 + javadoc 行 1**（`DebugSchedCommand.java:42`）；
+      t59 代 = **27 / 26 / 1**，t61 新增 1 条输出字面量（`[sched] ④m matrix: per-row tick detail … stays player-side only`）⇒ **两代各自自洽** ✓
+
+§5 改名说明（队长立卡致 t61/t63 同名；已追认）
+--------------------------------------------------------------------------------
+- **我的那份**（内容未动、仅改名）：`debug-logs/测试记录/阶段5-控制台输出-停服物证-开发轮.txt`
+  = **8423 B / mtime 2026-09-18 21:45:02.003 / SHA256 `1ABBCB91932A107F1E79617A7C61228C12AE37BD85F16697CB519B64D5E1F7F1`**
+- **原名现归 `t63`（权威轮）**：`debug-logs/测试记录/阶段5-控制台输出-停服物证.txt` = **7624 B / 21:57:37**（**不同字节** ⇒ 不撞车 ✓）
+- 引用纪律：按**代次 + 路径**引用；旧名曾指向我的开发轮，**不要**用它引用开发轮 ✗
+
+§6 本件身份与边界
+--------------------------------------------------------------------------------
+- 本件 = **勘误/读法说明，非证据本体**；**未修改任何既有冻结件** ✓、**未做 git 写** ✓（入库需队长 `git add -f`）
+- 适用边界：本件**只纠正引用与读法**，**不改变任何结论** —— t59/t61 的 Mode B 三行、`C = 0`、F1 链、冻结先于停机、双口径 (d)、逐文件 SHA256 全部**不变** ✓
+- 自身身份按入库时现算即可（按队内新纪律不内嵌自身哈希，避免自指失效）
+================================================================================

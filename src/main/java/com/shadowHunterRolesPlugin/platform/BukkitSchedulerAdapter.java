@@ -6,7 +6,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
 /**
- * 普通 Paper / Folia 上的 {@link Scheduler} 实现：**以 {@link GlobalRegionScheduler} 为唯一实现**（Folia-ready），
+ * 普通 Paper 上的 {@link Scheduler} 实现：**以 Paper 提供的 {@link GlobalRegionScheduler} 为唯一实现**
+ * （宿主仍为 Paper；**用户裁定：本工程不做 Folia 适配** ✗ —— 该 API 是 Paper 自己实现的同一套接口，并非 Folia 专属），
  * 把 {@link ScheduledTask} 包成 {@link Task} 句柄。
  *
  * <p>接口面（{@link Scheduler} / {@link Task}）与全部调用方**零改动**：两者句柄的差异

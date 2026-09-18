@@ -4,8 +4,9 @@ package com.shadowHunterRolesPlugin.platform;
  * 调度句柄：{@code platform} 层对底层调度任务句柄的**抽象**（调用方只依赖 {@link #cancel()} / {@link #isCancelled()}）。
  *
  * <p><b>现状口径（t53 修订）</b>：当前唯一实现 = {@link BukkitSchedulerAdapter}（底层 {@code GlobalRegionScheduler}）
- * ⇒ 本接口包装的是**Folia 语义的 {@code ScheduledTask}**，**不再直接包装 {@code BukkitTask}**
- * （早期文档"统一包装 {@code BukkitTask} / Folia {@code ScheduledTask}（两者无共同父类型）"的表述**已作废** ✗）。
+ * ⇒ 本接口包装的是 **Paper 侧 {@code GlobalRegionScheduler} 提供的 {@code ScheduledTask}**，
+ * **不再直接包装 {@code BukkitTask}**（**用户裁定：服务端仍为 Paper，不做 Folia 适配** ✗ —— 该 API **非 Folia 专属**）；
+ * （早期文档"统一包装 {@code BukkitTask} / Folia {@code ScheduledTask}（两者无共同父类型）"的表述**已作废** ✗，仅存留痕。）
  * 两者句柄形态不同，其差异在本接口边界内被吸收：
  * <ul>
  *   <li>{@link #cancel()} —— 调 {@code ScheduledTask.cancel()} 并**吞掉其 {@code CancelledState} 返回值**

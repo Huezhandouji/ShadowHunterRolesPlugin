@@ -2,7 +2,9 @@ package com.shadowHunterRolesPlugin.platform;
 
 /**
  * 调度端口：领域层只依赖它，不直接碰 Bukkit 调度器。
- * 不预置 runOnEntity —— 当前唯一运行环境是普通 Paper，Folia 分支无法验证（见指南 §3.3 注 ②）。
+ * 不预置 runOnEntity / RegionScheduler / EntityScheduler —— **用户裁定：服务端仍为 Paper，不做 Folia 适配** ✗
+ * （既不加 Folia 分支/守卫，也不做 Folia 真机验证；见指南 §3.3 注 ②）。当前实现 = Paper 提供的
+ * {@code GlobalRegionScheduler}（Paper 自己实现的同一套 API，**非 Folia 专属**）。
  *
  * <p><b>⚠ 参数顺序易错点（与 {@code core.ports.TimerPort} 的<b>同名</b>方法恰好相反）</b>：
  * 本接口的 {@code task} 在**前** —— {@code runLater(Runnable task, long delayTicks)}、

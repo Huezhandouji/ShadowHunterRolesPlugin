@@ -178,11 +178,9 @@ public class RoleInstance {
         RoleComponent component = componentRegistry.getById(id);
         if(!(component instanceof ActiveComponent active)) return false;
 
-        CastResult result = active.onCast(new CastSignal(trigger));
-        if(result == CastResult.SUCCEED){
-            //声明值是唯一真值来源（4.7/O-13）：框架按 getCooldownTicks() 启动冷却
-            componentServices.get(component).cooldowns().start(active.getCooldownTicks());
-        }
+        //冷却自管理（D1）：框架**不再**代启动冷却 —— 组件在施放成功处自行 svc().cooldowns().start(getCooldownTicks())；
+        //声明值仍是唯一真值来源（4.7/O-13），启动点与启动值都与旧框架代启动逐字一致 ⇒ 可观察行为不变。
+        active.onCast(new CastSignal(trigger));
         hotbarRenderer.markDirty();
         return true;
     }
@@ -198,10 +196,8 @@ public class RoleInstance {
         RoleComponent component = componentRegistry.getById(id);
         if(!(component instanceof CombatHook hook)) return false;
 
-        CastResult result = hook.onAttack(new AttackSignal(victim));
-        if(result == CastResult.SUCCEED){
-            componentServices.get(component).cooldowns().start(((ActiveComponent) component).getCooldownTicks());
-        }
+        //冷却自管理（D1）：框架不再代启动冷却（同 handleCast）
+        hook.onAttack(new AttackSignal(victim));
         hotbarRenderer.markDirty();
         return true;
     }
@@ -331,6 +327,82 @@ public class RoleInstance {
 
     public float getRemainingMainWeaponCooldownSeconds(String weaponId){
         return getRemainingMainWeaponCooldownTicks(weaponId) / 20f;
+    }
+
+    // ───────── 冷却自管理（阶段 4 追补 D1/D2/D3/D4）─────────
+
+    private Map<String, Integer> cooldownTable(ItemKind kind){
+        return kind == ItemKind.SKILL ? skillCooldowns : mainWeaponCooldowns;
+    }
+
+    /** 冷却是否**正在进行**（条目存在且未到期）。与 {@code isReady()} 互补：后者对"无条目/已到期"都返回 true。 */
+    boolean isCooling(String componentId, ItemKind kind){
+        Integer endTick = cooldownTable(kind).get(componentId);
+        return endTick != null && Bukkit.getCurrentTick() < endTick;
+    }
+
+    /** 重启顶替（S2）：旧段**未到期** ⇒ 清掉旧条目（调用方随后回调 {@code RESTARTED} 并起新冷却）；返回是否确实顶替了一段冷却。 */
+    boolean clearCooldownForRestart(String componentId, ItemKind kind){
+        if(!isCooling(componentId, kind)) return false;
+        cooldownTable(kind).remove(componentId);
+        return true;
+    }
+
+    /**
+     * 显式结束冷却（S3）：**仅在冷却中生效** ⇒ 移除条目 + 回调 {@code ENDED_BY_COMPONENT} + 一次可见刷新；
+     * 不在冷却中 ⇒ 无副作用（幂等）。
+     * @return 是否确实结束了一段冷却
+     */
+    boolean endCooldown(String componentId, ItemKind kind){
+        if(!isCooling(componentId, kind)) return false;
+        cooldownTable(kind).remove(componentId);
+        dispatchCooldownEnd(componentId, ActiveComponent.CooldownEndReason.ENDED_BY_COMPONENT);
+        updateHotbar();
+        return true;
+    }
+
+    /**
+     * 每 tick 扫描两张冷却表：**到期 ⇒ 移除条目**（关闭 O-21：条目不再永驻）＋ 回调 {@code EXPIRED} ＋ **一次**可见刷新。
+     * 复用既有每 tick 路径（{@link #triggerUpdate()}），**不新建 ticker**（与 t17 划界）。
+     */
+    private void scanCooldowns(){
+        boolean removed = false;
+        for(String skillId : expiredIds(skillCooldowns)){
+            skillCooldowns.remove(skillId);
+            dispatchCooldownEnd(skillId, ActiveComponent.CooldownEndReason.EXPIRED);
+            removed = true;
+        }
+        for(String weaponId : expiredIds(mainWeaponCooldowns)){
+            mainWeaponCooldowns.remove(weaponId);
+            dispatchCooldownEnd(weaponId, ActiveComponent.CooldownEndReason.EXPIRED);
+            removed = true;
+        }
+        if(removed){
+            //D3 第一步：可见刷新仍走 updateHotbar（runLater(updateHotbar) 机制保留）；换 markDirty 留到 4.4。
+            updateHotbar();
+        }
+    }
+
+    /** 先收集到期 id 再移除（避免边遍历边改表）；只遍历尚未到期的条目，到期即移除 ⇒ 扫描开销有界。 */
+    private List<String> expiredIds(Map<String, Integer> table){
+        List<String> ids = new ArrayList<>();
+        for(Map.Entry<String, Integer> entry : table.entrySet()){
+            if(Bukkit.getCurrentTick() >= entry.getValue()){
+                ids.add(entry.getKey());
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * 冷却结束回调的唯一派发点（D4）：**先移除条目、再回调** ⇒ 回调内再 {@code end()} 只会得到 {@code false}（不递归重入）；
+     * 异常隔离沿用 {@link #runComponentUpdate}（与 update()/onSanTEChange 同键）。
+     */
+    void dispatchCooldownEnd(String componentId, ActiveComponent.CooldownEndReason reason){
+        RoleComponent component = componentRegistry.getById(componentId);
+        if(component instanceof ActiveComponent active){
+            runComponentUpdate("registered", active.getId(), () -> active.onCooldownEnd(reason));
+        }
     }
 
     //释放主武器技能
@@ -688,6 +760,9 @@ public class RoleInstance {
         for(RoleComponent component : componentRegistry.all()){
             runComponentUpdate("registered", component.getId(), component::update);
         }
+
+        //阶段 4 追补（冷却自管理 · D2）：到期条目 ⇒ 移除 + 回调 + 一次刷新（关闭 O-21）
+        scanCooldowns();
 
         if(shouldUpdateHotbar()){
             updateHotbar();

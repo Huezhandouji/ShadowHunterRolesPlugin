@@ -21,7 +21,7 @@ public class RedEvilShockSkill extends Skill{
     /**
      * 批次①（B①）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
      * 触发条件/范围/持续时间/增幅/层数/音效均不变；`canCastSkill` 不满足时返回 {@link CastResult#NO_COOLDOWN}
-     * （今天该路径直接 return、**不启冷却**）；冷却改为 {@link CastResult#SUCCEED}，由框架按声明值启动。
+     * （今天该路径直接 return、**不启冷却**）；冷却改为 {@link CastResult#SUCCEED}，由本组件在施放成功处按声明值启动。
      */
     @Override
     public CastResult onCast(CastSignal signal){
@@ -44,6 +44,7 @@ public class RedEvilShockSkill extends Skill{
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITCH_CELEBRATE, 1, 1);
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
 
+        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
         return CastResult.SUCCEED;
     }
 }

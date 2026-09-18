@@ -32,7 +32,7 @@ public class MeiqiheziUnconcernSkill extends Skill {
      * （效果类型 SPEED / 时长 40 / 增幅 4 逐字不变；`new PotionEffect(type,40,4,false,true)` 与
      * `type.createEffect(40,4)` 的 ambient=false、particles=true 一致）。
      * `canCastSkill` 不满足时返回 {@link CastResult#NO_COOLDOWN}（今天该路径直接 return、**不启冷却**）；
-     * 冷却改为 {@link CastResult#SUCCEED}，由框架按声明值（100）启动。
+     * 冷却改为 {@link CastResult#SUCCEED}，由本组件在施放成功处按声明值（100）启动。
      */
     @Override
     public CastResult onCast(CastSignal signal){
@@ -51,6 +51,7 @@ public class MeiqiheziUnconcernSkill extends Skill {
 
         caster.getWorld().spawnParticle(Particle.EXPLOSION, caster.getLocation(), 1);
 
+        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
         return CastResult.SUCCEED;
     }
 

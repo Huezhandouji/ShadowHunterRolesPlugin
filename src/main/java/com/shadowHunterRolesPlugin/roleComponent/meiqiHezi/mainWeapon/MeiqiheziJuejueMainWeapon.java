@@ -50,19 +50,21 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         //如果能量大于20，则进行范围伤害（旧写法在 onLeftClick 里，由 listener 同帧调用）—— 不能直接 return
         if (svc().energy().current() >= 20) {
             castAreaDamage(attacker);
+            svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
             return CastResult.SUCCEED;
         }
 
         if (victim != null) {
             svc().damage().physicalDamage(victim, attacker, 8, 0.5);
         }
+        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
         return CastResult.SUCCEED;
     }
 
     /**
      * 左键路径（新管道，`CastTrigger.LEFT_CLICK` 分支）。语义与旧 `onLeftClick(Player, RoleInstance)`
      * **逐条等价**：能量 `< 20` 时**不做事且不启动冷却**（旧代码直接 return）⇒ 返回 {@code NO_COOLDOWN}；
-     * 能量 `>= 20` 时打出范围伤害 ⇒ 返回 {@code SUCCEED}（冷却由框架按声明值启动）。
+     * 能量 `>= 20` 时打出范围伤害 ⇒ 返回 {@code SUCCEED}（冷却由本组件在施放成功处按声明值启动）。
      */
     @Override
     public CastResult onCast(CastSignal signal) {
@@ -74,6 +76,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         if (svc().energy().current() < 20) return CastResult.NO_COOLDOWN;
 
         castAreaDamage(player);
+        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
         return CastResult.SUCCEED;
     }
 

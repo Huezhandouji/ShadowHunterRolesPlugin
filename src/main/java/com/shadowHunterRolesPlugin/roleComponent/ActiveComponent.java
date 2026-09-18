@@ -76,4 +76,22 @@ public abstract class ActiveComponent extends RoleComponent implements HotbarIte
     public CastResult onCast(CastSignal signal) {
         return CastResult.NO_COOLDOWN;
     }
+
+    /**
+     * 冷却结束通知（阶段 4 追补 · 冷却自管理 D4）：默认**空实现** ⇒ 既有组件零改动即可编译。
+     * <p>允许在回调里再 {@code start(...)}（例如"到点立刻接下一段"）；容器**先移除冷却条目、再回调**
+     * ⇒ 回调内再 {@code end()} 只会得到 {@code false}（不会同步递归重入）。
+     */
+    public void onCooldownEnd(CooldownEndReason reason) {
+    }
+
+    /** 冷却结束的原因（D4 三分法）。 */
+    public enum CooldownEndReason {
+        /** 自然到期。 */
+        EXPIRED,
+        /** 被组件/外部显式 {@code end()} 结束（"冷却中结束冷却"的情形）。 */
+        ENDED_BY_COMPONENT,
+        /** 在冷却中被再次 {@code start(...)} 顶替（重复开启按新的来）。 */
+        RESTARTED
+    }
 }

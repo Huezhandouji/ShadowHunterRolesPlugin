@@ -37,7 +37,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
      * 能量不足 / 被禁用时**直接返回且不启动冷却**（旧代码即如此）⇒ 返回 {@code NO_COOLDOWN}；
      * 否则扣能量 `8`、以 `0L` 初始延迟 / `2L` 周期启动前摇任务（**登记进本组件资源表**，角色清除时由框架兜底取消
      * ⇒ 原 `isValid()` 守卫不需要）、四周 `4` 格内敌对目标各受 `14` 点物理伤害、粒子/音效逐字不变；
-     * 冷却改为 `SUCCEED`，由框架按声明值 **160** 启动。
+     * 冷却改为 `SUCCEED`，由本组件在施放成功处按声明值 **160** 启动。
      */
     @Override
     public CastResult onCast(CastSignal signal) {
@@ -82,6 +82,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
 
         });
 
+        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
         return CastResult.SUCCEED;
     }
 

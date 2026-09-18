@@ -7,6 +7,8 @@ import com.shadowHunterRolesPlugin.core.ports.CooldownPort;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
+import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
@@ -322,11 +324,14 @@ public class RoleCommand implements CommandExecutor {
     // 逐条打印原始值：① execute 回调内线程名；② run / runDelayed / runAtFixedRate 的线程名 + 实际触发 tick（与声明值并排）
     // + initialDelay=0 边界实测（runAtFixedRate vs runTaskTimer，异常原文照打）；
     // ③ 同周期 Bukkit.getScheduler().runTaskTimer 对照任务的线程名 + 实际触发 tick（声明值逐字相同）+ ③b runTaskLater 延时对照；
+    // ③c/③d **新实现验证**：对**生产声明值 0/10** 做 A/B —— ③c 原生 Bukkit runTaskTimer(0,10) vs
+    // ③d 生产适配器 BukkitSchedulerAdapter.runRepeating(0,10)（内含 0→1 归一）；另测适配器 run() / runLater(20) 与 Task 句柄取消；
     // ④ ScheduledTask.cancel() 返回值 / isCancelled() / getExecutionState() / 重复 cancel；⑤ 一句话结论（由本次原始值现算，不只给结论）。
     // 删除清单（逐条；判据 = `git grep -n "sched" -- src/main/java` 归零）：
     //   ① 本段整体：本注释块 + handleDebugSched(Player, String[])（本类唯一新增方法）；
     //   ② onCommand 的 case "debug" 内新增的 1 行 `if(handleDebugSched(player, args)) return true;`（含其上方 1 行注释）；
-    //   ③ 本段新增的 4 个 import：com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin、
+    //   ③ 本段新增的 6 个 import：com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin、
+    //      com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter、com.shadowHunterRolesPlugin.platform.Task、
     //      io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler、
     //      io.papermc.paper.threadedregions.scheduler.ScheduledTask、org.bukkit.scheduler.BukkitTask；
     //   ④ 无新增字段、无新增注册路径、plugin.yml 与 onEnable 零改动。
@@ -349,8 +354,8 @@ public class RoleCommand implements CommandExecutor {
         }
 
         //观测位（局部 ⇒ 删除本方法即无残留）：str = 线程名/取消原始值/边界值；tick = 实际触发 tick 相对命令 tick 的差值
-        final String[] str = new String[6];
-        final int[] tick = new int[8];
+        final String[] str = new String[7];
+        final int[] tick = new int[13];
         for(int i = 0; i < tick.length; i++) tick[i] = -1;
         final int[] grrCount = {0};
         final int[] bukkitCount = {0};
@@ -474,7 +479,59 @@ public class RoleCommand implements CommandExecutor {
                     + " | delta=" + tick[7] + " | thread=" + Thread.currentThread().getName()));
         }, 20L);
 
-        //⑤ 结论：60 tick 后（两个周期任务均已自取消）以本次原始值现算"能否直切"
+        //③c 对照（**生产声明值 0/10** 的原生 Bukkit 行为）：runTaskTimer(0,10) → 首次与第三次触发 tick
+        final int[] rawZeroCount = {0};
+        final BukkitTask[] rawZeroHolder = new BukkitTask[1];
+        rawZeroHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            int now = Bukkit.getCurrentTick();
+            rawZeroCount[0]++;
+            if(rawZeroCount[0] == 1) tick[8] = now - baseTick;
+            player.sendMessage(Component.text("[sched] ③c raw bukkit runTaskTimer #" + rawZeroCount[0]
+                    + " | declared delay=0 period=10 | tick=" + now + " | delta=" + (now - baseTick)
+                    + " | thread=" + Thread.currentThread().getName()));
+            if(rawZeroCount[0] == 3){
+                tick[9] = now - baseTick;
+                rawZeroHolder[0].cancel();
+            }
+        }, 0L, 10L);
+
+        //③d **新实现验证**：直接调**生产适配器**（BukkitSchedulerAdapter = GlobalRegionScheduler 唯一实现），
+        //    与 ③c 用同一生产声明值 0/10 做 A/B（适配器内部把 0 归一为 1）；另测 run() / runLater(20) 与 Task 句柄取消
+        final BukkitSchedulerAdapter probeAdapter = new BukkitSchedulerAdapter(plugin);
+        probeAdapter.run(() -> {
+            int now = Bukkit.getCurrentTick();
+            player.sendMessage(Component.text("[sched] ③d adapter.run() | thread=" + Thread.currentThread().getName()
+                    + " | tick=" + now + " | delta=" + (now - baseTick)));
+        });
+        probeAdapter.runLater(() -> {
+            int now = Bukkit.getCurrentTick();
+            tick[12] = now - baseTick;
+            player.sendMessage(Component.text("[sched] ③d adapter.runLater(20) | declaredDelay=20 | tick=" + now
+                    + " | delta=" + tick[12] + " | thread=" + Thread.currentThread().getName()));
+        }, 20L);
+        final int[] adapterCount = {0};
+        final Task[] adapterHolder = new Task[1];
+        adapterHolder[0] = probeAdapter.runRepeating(() -> {
+            int now = Bukkit.getCurrentTick();
+            adapterCount[0]++;
+            if(adapterCount[0] == 1) tick[10] = now - baseTick;
+            player.sendMessage(Component.text("[sched] ③d adapter.runRepeating #" + adapterCount[0]
+                    + " | declared initialDelay=0 period=10 (adapter normalises 0 -> 1) | tick=" + now
+                    + " | delta=" + (now - baseTick) + " | thread=" + Thread.currentThread().getName()));
+            if(adapterCount[0] == 3){
+                tick[11] = now - baseTick;
+                boolean before = adapterHolder[0].isCancelled();
+                adapterHolder[0].cancel();
+                boolean after = adapterHolder[0].isCancelled();
+                adapterHolder[0].cancel();
+                str[6] = "isCancelledBefore=" + before + ",isCancelledAfter=" + after
+                        + ",isCancelledAfterSecondCancel=" + adapterHolder[0].isCancelled();
+                player.sendMessage(Component.text("[sched] ③d adapter Task.cancel() -> void | " + str[6]
+                        + " | repeated cancel: no exception = idempotent"));
+            }
+        }, 0L, 10L);
+
+        //⑤ 结论：60 tick 后（全部周期任务均已自取消）以本次原始值现算"能否直切"
         grs.runDelayed(plugin, task -> {
             int globalPeriod = (tick[1] >= 0 && tick[3] >= 0) ? tick[3] - tick[1] : -1;
             int bukkitPeriod = (tick[4] >= 0 && tick[6] >= 0) ? tick[6] - tick[4] : -1;
@@ -482,21 +539,33 @@ public class RoleCommand implements CommandExecutor {
             boolean periodEquivalent = globalPeriod > 0 && globalPeriod == bukkitPeriod;
             boolean delayedEquivalent = tick[0] >= 0 && tick[0] == tick[7];
             boolean cancelSemanticsOk = str[2] != null && str[2].contains("isCancelled1=true");
-            boolean zeroDelayPolicySame = str[4] != null && str[5] != null
+            boolean rawInitialDelayPolicySame = str[4] != null && str[5] != null
                     && str[4].startsWith("initialDelay0=ACCEPTED") == str[5].startsWith("initialDelay0=ACCEPTED");
+            boolean clampEquivalent = tick[8] >= 0 && tick[9] >= 0 && tick[8] == tick[10] && tick[9] == tick[11];
+            boolean adapterDelayedEquivalent = tick[12] >= 0 && tick[12] == tick[0];
+            boolean adapterCancelOk = str[6] != null && str[6].contains("isCancelledAfter=true")
+                    && str[6].contains("isCancelledAfterSecondCancel=true");
+            boolean adapterEquivalent = sameThread && periodEquivalent && delayedEquivalent && cancelSemanticsOk
+                    && clampEquivalent && adapterDelayedEquivalent && adapterCancelOk;
             player.sendMessage(Component.text("[sched] ⑤ raw | globalThread=" + str[0]
                     + " | bukkitThread=" + str[1]
                     + " | globalDeltas=" + tick[1] + "/" + tick[2] + "/" + tick[3] + " (declared 1/10)"
                     + " | bukkitDeltas=" + tick[4] + "/" + tick[5] + "/" + tick[6] + " (declared 1/10)"
                     + " | globalRunDelayedDelta=" + tick[0] + " | bukkitRunTaskLaterDelta=" + tick[7] + " (declared 20)"
-                    + " | globalCancel=" + str[2] + " | bukkitCancel=" + str[3]));
+                    + " | adapterRunLaterDelta=" + tick[12]
+                    + " | A/B(declared 0/10) rawBukkitFirstThird=" + tick[8] + "/" + tick[9]
+                    + " adapterFirstThird=" + tick[10] + "/" + tick[11]
+                    + " | globalCancel=" + str[2] + " | bukkitCancel=" + str[3] + " | adapterCancel=" + str[6]));
             player.sendMessage(Component.text("[sched] ⑤ verdict | sameThread=" + sameThread
                     + " | periodEquivalent=" + periodEquivalent + " (global=" + globalPeriod + " bukkit=" + bukkitPeriod + ", declared 20)"
                     + " | delayedEquivalent=" + delayedEquivalent
                     + " | cancelSemanticsOk=" + cancelSemanticsOk
-                    + " | initialDelayPolicySame=" + zeroDelayPolicySame + " (global: " + str[4] + " / bukkit: " + str[5] + ")"
-                    + " | CONCLUSION=" + (sameThread && periodEquivalent && delayedEquivalent && cancelSemanticsOk && zeroDelayPolicySame
-                        ? "CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (same thread + same tick timing + equivalent cancel semantics)"
+                    + " | rawInitialDelayPolicySame=" + rawInitialDelayPolicySame + " (global: " + str[4] + " / bukkit: " + str[5] + ")"
+                    + " | clampEquivalent=" + clampEquivalent
+                    + " | adapterDelayedEquivalent=" + adapterDelayedEquivalent
+                    + " | adapterCancelOk=" + adapterCancelOk
+                    + " | CONCLUSION=" + (adapterEquivalent
+                        ? "CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (raw APIs differ only on initialDelay<=0; the adapter normalises 0 -> 1 and the A/B on the production declaration 0/10 is tick-identical)"
                         : "CANNOT swap the adapter as-is: at least one measured item differs (see the raw values above)")));
         }, 60L);
         return true;

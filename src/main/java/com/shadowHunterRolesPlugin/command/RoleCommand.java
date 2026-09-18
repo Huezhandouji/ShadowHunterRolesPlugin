@@ -326,6 +326,8 @@ public class RoleCommand implements CommandExecutor {
     // ③ 同周期 Bukkit.getScheduler().runTaskTimer 对照任务的线程名 + 实际触发 tick（声明值逐字相同）+ ③b runTaskLater 延时对照；
     // ③c/③d **新实现验证**：对**生产声明值 0/10** 做 A/B —— ③c 原生 Bukkit runTaskTimer(0,10) vs
     // ③d 生产适配器 BukkitSchedulerAdapter.runRepeating(0,10)（内含 0→1 归一）；另测适配器 run() / runLater(20) 与 Task 句柄取消；
+    // ④m **归一化矩阵**：8 组声明值（5 个生产形态 (1,1)/(0,1)/(0,2)/(0,40)/(1,6) + (0,10)/(1,2)/(1,10)）
+    //     分别走原生 Bukkit 与适配器，逐组打印首/次触发 tick ⇒ 判据 = 两路径首/次触发逐字相同；
     // ④ ScheduledTask.cancel() 返回值 / isCancelled() / getExecutionState() / 重复 cancel；⑤ 一句话结论（由本次原始值现算，不只给结论）。
     // 删除清单（逐条；判据 = `git grep -n "sched" -- src/main/java` 归零）：
     //   ① 本段整体：本注释块 + handleDebugSched(Player, String[])（本类唯一新增方法）；
@@ -354,7 +356,7 @@ public class RoleCommand implements CommandExecutor {
         }
 
         //观测位（局部 ⇒ 删除本方法即无残留）：str = 线程名/取消原始值/边界值；tick = 实际触发 tick 相对命令 tick 的差值
-        final String[] str = new String[7];
+        final String[] str = new String[8];
         final int[] tick = new int[13];
         for(int i = 0; i < tick.length; i++) tick[i] = -1;
         final int[] grrCount = {0};
@@ -531,7 +533,57 @@ public class RoleCommand implements CommandExecutor {
             }
         }, 0L, 10L);
 
-        //⑤ 结论：60 tick 后（全部周期任务均已自取消）以本次原始值现算"能否直切"
+        //④m 归一化矩阵（队长裁定要求的实测）：8 组声明值 —— 含**全部 5 个生产形态** (1,1)/(0,1)/(0,2)/(0,40)/(1,6)
+        //    与队长网格 (0,10)/(1,2)/(1,10)。每组**用同一声明值分别走原生 Bukkit 与生产适配器**，
+        //    打印各自第 1/第 2 次触发 tick ⇒ 判据 = 两路径首/次触发**逐字相同**（第 2 次还须 > 第 1 次）
+        final long[][] mPairs = {{0,1},{0,2},{0,10},{0,40},{1,1},{1,2},{1,6},{1,10}};
+        final int[][] mTicks = new int[8][4];
+        final int[] mCount = new int[16];
+        final BukkitTask[] mRawHolders = new BukkitTask[8];
+        final Task[] mAdpHolders = new Task[8];
+        for(int i = 0; i < mPairs.length; i++){
+            final int idx = i;
+            final long d = mPairs[i][0];
+            final long p = mPairs[i][1];
+            mRawHolders[idx] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+                int now = Bukkit.getCurrentTick();
+                mCount[idx * 2]++;
+                int k = mCount[idx * 2];
+                if(k <= 2){
+                    mTicks[idx][k - 1] = now - baseTick;
+                    player.sendMessage(Component.text("[sched] ④m rawBukkit delay=" + d + " period=" + p + " #" + k
+                            + " | tick=" + now + " | delta=" + (now - baseTick)));
+                }
+                if(k == 2) mRawHolders[idx].cancel();
+            }, d, p);
+            mAdpHolders[idx] = probeAdapter.runRepeating(() -> {
+                int now = Bukkit.getCurrentTick();
+                mCount[idx * 2 + 1]++;
+                int k = mCount[idx * 2 + 1];
+                if(k <= 2){
+                    mTicks[idx][k + 1] = now - baseTick;
+                    player.sendMessage(Component.text("[sched] ④m adapter   delay=" + d + " period=" + p + " #" + k
+                            + " | tick=" + now + " | delta=" + (now - baseTick)));
+                }
+                if(k == 2) mAdpHolders[idx].cancel();
+            }, d, p);
+        }
+        grs.runDelayed(plugin, task -> {
+            boolean matrixAllMatch = true;
+            for(int i = 0; i < mPairs.length; i++){
+                boolean firstIdentical = mTicks[i][0] == mTicks[i][2] && mTicks[i][0] > 0;
+                boolean secondIdentical = mTicks[i][1] == mTicks[i][3] && mTicks[i][1] > mTicks[i][0];
+                if(!firstIdentical || !secondIdentical) matrixAllMatch = false;
+                player.sendMessage(Component.text("[sched] ④m pair delay=" + mPairs[i][0] + " period=" + mPairs[i][1]
+                        + " | rawBukkitFirstSecond=" + mTicks[i][0] + "/" + mTicks[i][1]
+                        + " | adapterFirstSecond=" + mTicks[i][2] + "/" + mTicks[i][3]
+                        + " | firstIdentical=" + firstIdentical + " | secondIdentical=" + secondIdentical));
+            }
+            str[7] = "matrixAllPairsMatch=" + matrixAllMatch;
+            player.sendMessage(Component.text("[sched] ④m verdict | " + str[7]));
+        }, 50L);
+
+        //⑤ 结论：70 tick 后（全部周期任务均已自取消）以本次原始值现算"能否直切"
         grs.runDelayed(plugin, task -> {
             int globalPeriod = (tick[1] >= 0 && tick[3] >= 0) ? tick[3] - tick[1] : -1;
             int bukkitPeriod = (tick[4] >= 0 && tick[6] >= 0) ? tick[6] - tick[4] : -1;
@@ -545,8 +597,9 @@ public class RoleCommand implements CommandExecutor {
             boolean adapterDelayedEquivalent = tick[12] >= 0 && tick[12] == tick[0];
             boolean adapterCancelOk = str[6] != null && str[6].contains("isCancelledAfter=true")
                     && str[6].contains("isCancelledAfterSecondCancel=true");
+            boolean matrixEquivalent = str[7] != null && str[7].contains("matrixAllPairsMatch=true");
             boolean adapterEquivalent = sameThread && periodEquivalent && delayedEquivalent && cancelSemanticsOk
-                    && clampEquivalent && adapterDelayedEquivalent && adapterCancelOk;
+                    && clampEquivalent && adapterDelayedEquivalent && adapterCancelOk && matrixEquivalent;
             player.sendMessage(Component.text("[sched] ⑤ raw | globalThread=" + str[0]
                     + " | bukkitThread=" + str[1]
                     + " | globalDeltas=" + tick[1] + "/" + tick[2] + "/" + tick[3] + " (declared 1/10)"
@@ -564,6 +617,7 @@ public class RoleCommand implements CommandExecutor {
                     + " | clampEquivalent=" + clampEquivalent
                     + " | adapterDelayedEquivalent=" + adapterDelayedEquivalent
                     + " | adapterCancelOk=" + adapterCancelOk
+                    + " | matrixEquivalent=" + matrixEquivalent
                     + " | CONCLUSION=" + (adapterEquivalent
                         ? "CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (raw APIs differ only on initialDelay<=0; the adapter normalises 0 -> 1 and the A/B on the production declaration 0/10 is tick-identical)"
                         : "CANNOT swap the adapter as-is: at least one measured item differs (see the raw values above)")));

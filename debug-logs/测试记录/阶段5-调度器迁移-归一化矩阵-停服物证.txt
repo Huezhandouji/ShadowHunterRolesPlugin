@@ -1,0 +1,203 @@
+================================================================================
+t51 承批（队长 2026-09-18 裁定）· **`initialDelay <= 0` 归一化：实测矩阵 + 全量调用点审计 + 方案改判**
+—— 起服/停服物证（当轮即时记录 2026-09-18 20:11–20:14）
+   · 探针 **④m 归一化矩阵**原始输出（8 组声明值 × 原生 Bukkit vs 生产适配器）
+   · `runRepeating` **全量调用点审计**（含 `period <= 0` 边界核验）· 《调度器迁移方案》改判记录
+   · 双口径 (d) · 回滚单元 · 运行深度声明
+================================================================================
+
+§0 结论摘要（一句话）
+--------------------------------------------------------------------------------
+**归一化成立且已实测**：8 组声明值（含**全部 5 个生产形态**）下，**原生 `BukkitScheduler`** 与**生产适配器**（`GlobalRegionScheduler` + `0→1` 归一）
+的**首次与第二次触发 tick 逐组逐字相同**（`matrixAllPairsMatch=true`）；**全量 5 个 `runRepeating` 调用点均无 `period <= 0`**；
+《调度器迁移方案》§2 D6「语义应等价」已按实测**改判**为"入参校验差异、由适配层吸收"，§3.3/§3.4/§5 同步更新。
+
+§1 本增量改动面（2 文件；`platform/**` 与文档路径均由队长书面追认）
+--------------------------------------------------------------------------------
+| 文件 | 身份（现算） | 性质 |
+|---|---|---|
+| `command/RoleCommand.java` | **34814 B / 635 行 / `7260D44400AE10AE27F0372F56A70239F574BCCDA1010BF7D823E0A875AD3A2B`** | 探针新增 **④m 矩阵腿**（临时件，可整段删除） |
+| `debug-logs/调度器迁移方案.md` | **14747 B / 131 行 / `BECEFE51B6EF5D3AD90F98212816697147DC9BB8BEBF428F60741821C0C26AFE`** | §2 D6 **改判** + 新增 **§2.1 实测等价矩阵** + §3.3/§3.4/§5 同步 |
+| `platform/BukkitSchedulerAdapter.java` | **3508 B / 69 行 / `3DC66F6013F9CA1BAA9F049D66DD05E82C2C58A9B9949A545CF916D1CAE031C5`** | **本增量未改**（与 build C 逐字节相同 ⇒ 上一份物证的**角色生命周期实跑证据继续适用** ✓） |
+
+§2 队长要求 ①：归一化矩阵（**实测**，不靠论证）
+--------------------------------------------------------------------------------
+设计：每组声明值 `(delay, period)` **分别**用 `Bukkit.getScheduler().runTaskTimer` 与**生产适配器**
+`new BukkitSchedulerAdapter(plugin).runRepeating` 起任务，各自打印**第 1/第 2 次触发 tick**（相对命令 tick），第 2 次后自取消。
+覆盖：**5 个生产形态** `(1,1)(0,1)(0,2)(0,40)(1,6)` + 队长网格 `(0,10)(1,2)(1,10)`。
+
+原始输出（bot op 实跑，逐字粘贴 56 行）：
+--------------------------------------------------------------------------------
+[12:13:09.574] BOT login
+[12:13:09.586] CHAT HueZhandouji joined the game
+[12:13:09.620] BOT spawn as HueZhandouji
+[12:13:12.136] BOT >> /role debug sched
+[12:13:12.155] CHAT [sched] probe start | commandThread=Server thread | commandTick=853 | primaryThread=true | declared: runDelayed=20t, runAtFixedRate=1/10t, bukkit runTaskTimer=1/10t, boundary=0/10t
+[12:13:12.160] CHAT [sched] ② boundary | GlobalRegionScheduler.runAtFixedRate(0,10) -> initialDelay0=REJECTED(IllegalArgumentException: Initial delay ticks may not be <= 0) | Bukkit.getScheduler().runTaskTimer(0,10) -> initialDelay0=ACCEPTED
+[12:13:12.222] CHAT [sched] ③c raw bukkit runTaskTimer #1 | declared delay=0 period=10 | tick=854 | delta=1 | thread=Server thread
+[12:13:12.222] CHAT [sched] ④m rawBukkit delay=0 period=1 #1 | tick=854 | delta=1
+[12:13:12.222] CHAT [sched] ④m rawBukkit delay=0 period=2 #1 | tick=854 | delta=1
+[12:13:12.223] CHAT [sched] ④m rawBukkit delay=0 period=10 #1 | tick=854 | delta=1
+[12:13:12.223] CHAT [sched] ④m rawBukkit delay=0 period=40 #1 | tick=854 | delta=1
+[12:13:12.223] CHAT [sched] ③ bukkit runTaskTimer #1 | declared delay=1 period=10 | tick=854 | delta=1 | thread=Server thread
+[12:13:12.223] CHAT [sched] ④m rawBukkit delay=1 period=1 #1 | tick=854 | delta=1
+[12:13:12.223] CHAT [sched] ④m rawBukkit delay=1 period=2 #1 | tick=854 | delta=1
+[12:13:12.223] CHAT [sched] ④m rawBukkit delay=1 period=6 #1 | tick=854 | delta=1
+[12:13:12.223] CHAT [sched] ④m rawBukkit delay=1 period=10 #1 | tick=854 | delta=1
+[12:13:12.224] CHAT [sched] ① execute | thread=Server thread | tick=854 | delta=1 | primaryThread=true
+[12:13:12.224] CHAT [sched] ② run | thread=Server thread | tick=854 | delta=1 | owningPluginIsUs=true | isRepeatingTask=false | getExecutionState=RUNNING | isCancelled=false
+[12:13:12.224] CHAT [sched] ② runAtFixedRate #1 | declared initialDelay=1 period=10 | tick=854 | delta=1 | thread=Server thread | isRepeatingTask=true | getExecutionState=RUNNING | isCancelled=false
+[12:13:12.224] CHAT [sched] ③d adapter.run() | thread=Server thread | tick=854 | delta=1
+[12:13:12.224] CHAT [sched] ③d adapter.runRepeating #1 | declared initialDelay=0 period=10 (adapter normalises 0 -> 1) | tick=854 | delta=1 | thread=Server thread
+[12:13:12.224] CHAT [sched] ④m adapter   delay=0 period=1 #1 | tick=854 | delta=1
+[12:13:12.225] CHAT [sched] ④m adapter   delay=0 period=2 #1 | tick=854 | delta=1
+[12:13:12.225] CHAT [sched] ④m adapter   delay=0 period=10 #1 | tick=854 | delta=1
+[12:13:12.225] CHAT [sched] ④m adapter   delay=0 period=40 #1 | tick=854 | delta=1
+[12:13:12.225] CHAT [sched] ④m adapter   delay=1 period=1 #1 | tick=854 | delta=1
+[12:13:12.225] CHAT [sched] ④m adapter   delay=1 period=2 #1 | tick=854 | delta=1
+[12:13:12.225] CHAT [sched] ④m adapter   delay=1 period=6 #1 | tick=854 | delta=1
+[12:13:12.225] CHAT [sched] ④m adapter   delay=1 period=10 #1 | tick=854 | delta=1
+[12:13:12.548] CHAT [sched] ④m rawBukkit delay=0 period=1 #2 | tick=855 | delta=2
+[12:13:12.548] CHAT [sched] ④m rawBukkit delay=1 period=1 #2 | tick=855 | delta=2
+[12:13:12.548] CHAT [sched] ④m adapter   delay=0 period=1 #2 | tick=855 | delta=2
+[12:13:12.548] CHAT [sched] ④m adapter   delay=1 period=1 #2 | tick=855 | delta=2
+[12:13:12.587] CHAT [sched] ④m rawBukkit delay=0 period=2 #2 | tick=856 | delta=3
+[12:13:12.587] CHAT [sched] ④m rawBukkit delay=1 period=2 #2 | tick=856 | delta=3
+[12:13:12.587] CHAT [sched] ④m adapter   delay=0 period=2 #2 | tick=856 | delta=3
+[12:13:12.587] CHAT [sched] ④m adapter   delay=1 period=2 #2 | tick=856 | delta=3
+[12:13:12.659] CHAT [sched] ④m rawBukkit delay=1 period=6 #2 | tick=860 | delta=7
+[12:13:12.660] CHAT [sched] ④m adapter   delay=1 period=6 #2 | tick=860 | delta=7
+[12:13:12.745] CHAT [sched] ③ bukkit runTaskTimer #2 | declared delay=1 period=10 | tick=864 | delta=11 | thread=Server thread
+[12:13:12.746] CHAT [sched] ③c raw bukkit runTaskTimer #2 | declared delay=0 period=10 | tick=864 | delta=11 | thread=Server thread
+[12:13:12.746] CHAT [sched] ④m rawBukkit delay=0 period=10 #2 | tick=864 | delta=11
+[12:13:12.746] CHAT [sched] ④m rawBukkit delay=1 period=10 #2 | tick=864 | delta=11
+[12:13:12.746] CHAT [sched] ② runAtFixedRate #2 | declared initialDelay=1 period=10 | tick=864 | delta=11 | thread=Server thread | isRepeatingTask=true | getExecutionState=RUNNING | isCancelled=false
+[12:13:12.746] CHAT [sched] ③d adapter.runRepeating #2 | declared initialDelay=0 period=10 (adapter normalises 0 -> 1) | tick=864 | delta=11 | thread=Server thread
+[12:13:12.746] CHAT [sched] ④m adapter   delay=0 period=10 #2 | tick=864 | delta=11
+[12:13:12.746] CHAT [sched] ④m adapter   delay=1 period=10 #2 | tick=864 | delta=11
+[12:13:13.199] CHAT [sched] ③b bukkit runTaskLater | declaredDelay=20 | tick=873 | delta=20 | thread=Server thread
+[12:13:13.199] CHAT [sched] ② runDelayed | declaredDelay=20 | tick=873 | delta=20 | thread=Server thread | isRepeatingTask=false | getExecutionState=RUNNING | isCancelled=false
+[12:13:13.199] CHAT [sched] ③d adapter.runLater(20) | declaredDelay=20 | tick=873 | delta=20 | thread=Server thread
+[12:13:13.245] CHAT [sched] ③ bukkit runTaskTimer #3 | declared delay=1 period=10 | tick=874 | delta=21 | thread=Server thread
+[12:13:13.246] CHAT [sched] ④(BukkitTask) cancel() -> void | isCancelled() before=false | after=true | no exception = idempotent
+[12:13:13.246] CHAT [sched] ③c raw bukkit runTaskTimer #3 | declared delay=0 period=10 | tick=874 | delta=21 | thread=Server thread
+[12:13:13.246] CHAT [sched] ② runAtFixedRate #3 | declared initialDelay=1 period=10 | tick=874 | delta=21 | thread=Server thread | isRepeatingTask=true | getExecutionState=RUNNING | isCancelled=false
+[12:13:13.246] CHAT [sched] ④ cancel() #1 -> NEXT_RUNS_CANCELLED | isCancelled()=true | getExecutionState()=CANCELLED_RUNNING
+[12:13:13.246] CHAT [sched] ④ cancel() #2 (repeat) -> NEXT_RUNS_CANCELLED_ALREADY | isCancelled()=true | getExecutionState()=CANCELLED_RUNNING | no exception = idempotent
+[12:13:13.246] CHAT [sched] ③d adapter.runRepeating #3 | declared initialDelay=0 period=10 (adapter normalises 0 -> 1) | tick=874 | delta=21 | thread=Server thread
+[12:13:13.246] CHAT [sched] ③d adapter Task.cancel() -> void | isCancelledBefore=false,isCancelledAfter=true,isCancelledAfterSecondCancel=true | repeated cancel: no exception = idempotent
+[12:13:14.232] CHAT [sched] ④m rawBukkit delay=0 period=40 #2 | tick=894 | delta=41
+[12:13:14.232] CHAT [sched] ④m adapter   delay=0 period=40 #2 | tick=894 | delta=41
+[12:13:14.681] CHAT [sched] ④m pair delay=0 period=1 | rawBukkitFirstSecond=1/2 | adapterFirstSecond=1/2 | firstIdentical=true | secondIdentical=true
+[12:13:14.681] CHAT [sched] ④m pair delay=0 period=2 | rawBukkitFirstSecond=1/3 | adapterFirstSecond=1/3 | firstIdentical=true | secondIdentical=true
+[12:13:14.681] CHAT [sched] ④m pair delay=0 period=10 | rawBukkitFirstSecond=1/11 | adapterFirstSecond=1/11 | firstIdentical=true | secondIdentical=true
+[12:13:14.681] CHAT [sched] ④m pair delay=0 period=40 | rawBukkitFirstSecond=1/41 | adapterFirstSecond=1/41 | firstIdentical=true | secondIdentical=true
+[12:13:14.681] CHAT [sched] ④m pair delay=1 period=1 | rawBukkitFirstSecond=1/2 | adapterFirstSecond=1/2 | firstIdentical=true | secondIdentical=true
+[12:13:14.681] CHAT [sched] ④m pair delay=1 period=2 | rawBukkitFirstSecond=1/3 | adapterFirstSecond=1/3 | firstIdentical=true | secondIdentical=true
+[12:13:14.682] CHAT [sched] ④m pair delay=1 period=6 | rawBukkitFirstSecond=1/7 | adapterFirstSecond=1/7 | firstIdentical=true | secondIdentical=true
+[12:13:14.682] CHAT [sched] ④m pair delay=1 period=10 | rawBukkitFirstSecond=1/11 | adapterFirstSecond=1/11 | firstIdentical=true | secondIdentical=true
+[12:13:14.682] CHAT [sched] ④m verdict | matrixAllPairsMatch=true
+[12:13:15.188] CHAT [sched] ⑤ raw | globalThread=Server thread | bukkitThread=Server thread | globalDeltas=1/11/21 (declared 1/10) | bukkitDeltas=1/11/21 (declared 1/10) | globalRunDelayedDelta=20 | bukkitRunTaskLaterDelta=20 (declared 20) | adapterRunLaterDelta=20 | A/B(declared 0/10) rawBukkitFirstThird=1/21 adapterFirstThird=1/21 | globalCancel=cancel1=NEXT_RUNS_CANCELLED,isCancelled1=true,state1=CANCELLED_RUNNING,cancel2=NEXT_RUNS_CANCELLED_ALREADY,isCancelled2=true,state2=CANCELLED_RUNNING | bukkitCancel=isCancelledBefore=false,isCancelledAfter=true | adapterCancel=isCancelledBefore=false,isCancelledAfter=true,isCancelledAfterSecondCancel=true
+[12:13:15.188] CHAT [sched] ⑤ verdict | sameThread=true | periodEquivalent=true (global=20 bukkit=20, declared 20) | delayedEquivalent=true | cancelSemanticsOk=true | rawInitialDelayPolicySame=false (global: initialDelay0=REJECTED(IllegalArgumentException: Initial delay ticks may not be <= 0) / bukkit: initialDelay0=ACCEPTED) | clampEquivalent=true | adapterDelayedEquivalent=true | adapterCancelOk=true | matrixEquivalent=true | CONCLUSION=CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (raw APIs differ only on initialDelay<=0; the adapter normalises 0 -> 1 and the A/B on the production declaration 0/10 is tick-identical)
+[12:13:19.058] BOT >> quit
+[12:13:19.060] BOT end: sched probe done
+--------------------------------------------------------------------------------
+
+矩阵汇总（由原始值整理；**判据 = 两路径首/次触发 tick 逐字相同，且第 2 次 > 第 1 次**）：
+| 声明值 `(delay, period)` | 原生 Bukkit 首/次 | 适配器 首/次 | 生产对应 |
+|---|---|---|---|
+| **(0, 1)** | **1 / 2** | **1 / 2** | `manager/BuffManager.java:136`（buff 每秒刷新） |
+| **(0, 2)** | **1 / 3** | **1 / 3** | `MeiqiheziBloodySlashSkill.java:50`（致伤 2 tick 循环） |
+| (0, 10) | 1 / 11 | 1 / 11 | 队长网格 |
+| **(0, 40)** | **1 / 41** | **1 / 41** | `DefaultSanTEZeroPunishment.java:56`（惩罚 40 tick 循环） |
+| **(1, 1)** | **1 / 2** | **1 / 2** | `core/RoleInstance.java:118`（**角色 ticker，最热路径**） |
+| (1, 2) | 1 / 3 | 1 / 3 | 队长网格 |
+| **(1, 6)** | **1 / 7** | **1 / 7** | `RedSolitaryArroganceSkill.java:45` |
+| (1, 10) | 1 / 11 | 1 / 11 | 队长网格 |
+⇒ `④m verdict | matrixAllPairsMatch=true`；⑤ 结论行新增 `matrixEquivalent=true`，`CONCLUSION=` 仍为
+**"CAN swap … zero visible difference"** ✓（探针残留反证：末条 ④m 于 `12:13:14.682`，quit 于 `12:13:19.058` —— 4.4 秒内无新 `[sched]` 行 ⇒ 无残留任务）。
+> 口径说明：本矩阵**只测前两次触发**（足以定"首次相位 + 周期"）；三次以上的相位漂移不在本判据内，
+> 但 ③/② 腿已用 #1/#2/#3 覆盖 `period=10` 的第 3 次（两侧同为 delta 21）。
+
+§3 队长要求 ②：`runRepeating` 全量调用点审计（含 `period <= 0` 边界）
+--------------------------------------------------------------------------------
+现算口径：`git grep -n "runRepeating(" -- src/main/java`（**大小写敏感、字面量匹配、作用域 = src/main/java 全树**）= **13 行命中**，逐行分类：
+
+| # | 位置 | delay | period | 判定 |
+|---|---|---|---|---|
+| 1 | `core/RoleInstance.java:118`（角色 ticker） | **1** | **1** | ✓ `period ≥ 1` |
+| 2 | `manager/BuffManager.java:136`（`0L` 在 `:138`） | **0** | **1** | ✓ |
+| 3 | `roleComponent/DefaultSanTEZeroPunishment.java:56` | **0** | **40** | ✓ |
+| 4 | `roleComponent/meiqiHezi/skill/MeiqiheziBloodySlashSkill.java:50` | **0** | **2** | ✓ |
+| 5 | `roleComponent/red/RedSolitaryArroganceSkill.java:45` | **1** | **6** | ✓ |
+| — | 其余 8 行**非调用点**：`platform/Scheduler.java:13`（接口声明）、`platform/BukkitSchedulerAdapter.java:48`（实现声明）、`core/ports/TimerPort.java:15`（接口声明）、`core/TimerPortImpl.java:48`（实现声明）/:49（端口转发）、`command/RoleCommand.java:328`（注释）/:514（探针） | — | — | 不适用 |
+
+⇒ **生产调用点 = 5 个；`delay ∈ {0,1}`、`period ∈ {1,2,6,40}` ⇒ 不存在 `period <= 0`** ✓
+（辅助判据：`git grep -nE "runRepeating\([^)]*,\s*0L\s*\)" -- src/main/java` = **0**；并对上表 5 处**人工读取实参**复核 ✓。
+⚠ 口径提醒：**裸计数 ≠ 使用点** —— 13 行里有 4 行是声明、1 行是转发、2 行是注释/探针，必须逐行分类后才有意义。）
+
+§4 队长要求 ③：《调度器迁移方案》改判记录（文档已就地修正）
+--------------------------------------------------------------------------------
+| 位置 | 原判 | 改判后（现算行号） |
+|---|---|---|
+| §2 差异表 **D6**（`:34`） | "**语义应等价** ⇒ 由探针用'实际触发 tick 间隔'验证" | "单位与**实测触发**均等价 ✓，但 **`initialDelay <= 0` 的入参校验不同** ✗ ⇒ **原判'语义应等价'已被证伪**，改判见 §2.1" |
+| **§2.1（新增，`:38`）** | （无） | **实测等价矩阵**（线程 / 一次性 run / 延时 / 周期 / 取消 / `initialDelay<=0` 六行，逐行给实测依据）＋**归一化 A/B 与全量调用点审计**＋**裁决与注**（含"一次性 `run` 相位无 A/B"的申报） |
+| §3 第 3 条 | "实现替换（**下一张卡**）" | "**已落地 `cba1488`**"＋三条映射＋**禁项复核**（未用 `execute()`、类名未改、接口未改） |
+| §3 第 4 条 | "**待探针结论**——若…不需要开关；若线程/周期有差异 ⇒ …" | "**结论已出 ⇒ 不需要开关**；唯一差异是入参校验 ⇒ 由**适配层归一**吸收；**不**引入'D2 待裁定'、**不**保留 Bukkit 兜底" |
+| §5 回滚单元 R1 | "单文件 `git checkout` / revert ✓" | 追加"**已执行切换** `cba1488`；验证见 `阶段5-调度器迁移-停服物证.txt`" |
+
+§5 起服（Mode B）· 日志反证 · 停服（当时实测）
+--------------------------------------------------------------------------------
+[5.1] 起服前**已广播**（20:11，已发 eng-验证）；窗口核查：`25566` TCP connect 失败（无 LISTENING）、java = 3（均 19:01 daemon）。
+[5.2] 构建（build D）：`BUILD SUCCESSFUL in 14s`；jar = **147227 B / 2026-09-18 20:11:15.978 /
+      `2AE7F9A97D67937E5DA8538085682F0CBF7644391A3B45B82918CB5CA9756833`**；最新 `.class` = `ShadowHunterRolesPlugin.class @20:11:15.420`；
+      `src 新于 jar = 0` ✓（`compileJava` / `jar` 实跑）。
+[5.3] Mode B 三行齐（逐字，`debug-logs/测试记录/阶段5-起服日志-调度器迁移-矩阵.log`）：
+      `:45` `[20:12:27] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0`
+      `:46` `[20:12:28] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.`
+      `:50` `[20:12:28] [Server thread/INFO]: Done (14.362s)! For help, type "help"`；SHDF 依赖行 **0 命中** ✓
+[5.4] 冻结日志 = **6074 B / 20:12:30.101 / `88BDEF4C6EF21629E5539B363B2C722FB7A7DA15CA0DF62974A14BB9AD8122B2`**
+[5.5] 正序集合差（锚 `阶段4-起服日志-T2b.log`，direction 已打印，**只看 C**）：anchor 13 / current 13；
+      **ADDED 0 / REMOVED 0 / A) oshi 0 / B) 世界状态 0 / C) OTHER 0** ✓；对**整轮结束后的实时日志**（含 bot 会话）复跑：**同样 C = 0** ✓
+[5.6] 停服：`job_kill pwsh-15` + 等待（未强杀 java）；判定 @ **20:13:52.270** ——
+      TCP connect 25566 = **FAILED** ✓ · `latest.log` 独占打开 = **SUCCEEDED** ✓ · netstat 无 LISTENING（仅 1 条 TIME_WAIT）✓ · java = 2（19:01 daemon）✓。
+[5.7] 探针输出侧旁证：`[20:13:12] [Server thread/INFO]: HueZhandouji issued server command: /role debug sched` ✓
+
+§6 双口径（base = **本增量开工前**的 src 树：HEAD 版 `RoleCommand.java` 覆盖到快照 `t51c-before`）
+--------------------------------------------------------------------------------
+[6.1] **numeric**：before **547** → after **603**，diff **56**，**全部新增、删除方向 0** ✓
+      逐值：`0`×13 · `1`×15 · `2`×12 · `3`×2 · `4`×1 · `6`×1 · `7`×3 · `8`×4 · `10`×2 · `16`×1 · `40`×1 · `50L`×1
+      （含义：8 组矩阵声明值与其数组下标 `mTicks[i][j]`、`mCount[idx*2(+1)]`、循环上界 8/16、汇总延时 50L）
+[6.2] **string**：before **342** → after **364**，diff **22**，**全部新增、删除方向 0** ✓
+      逐值：`"[sched] ④m rawBukkit delay="` · `"[sched] ④m adapter   delay="` · `" period="` · `" #"` · `" | tick="` · `" | delta="` ·
+      `"[sched] ④m pair delay="` · `" | rawBukkitFirstSecond="` · `" | adapterFirstSecond="` · `" | firstIdentical="` ·
+      `" | secondIdentical="` · `"/"` · `"[sched] ④m verdict | "` · `"matrixAllPairsMatch="` · `"matrixAllPairsMatch=true"` · `" | matrixEquivalent="`
+      （**全部只服务临时探针的矩阵腿**；删探针即消失）
+[6.3] 生产文件（`platform/BukkitSchedulerAdapter.java`）**本增量零改动**（hash 与 build C 相同）⇒ 其字面量净变化为 **0** ✓
+
+§7 回滚单元与逐文件 SHA256
+--------------------------------------------------------------------------------
+- **回滚单元 A（生产）**：`platform/BukkitSchedulerAdapter.java`（**1 文件**）—— **本增量未改**；其切换回滚见 `cba1488` 的单文件 revert ✓
+- **回滚单元 B（本增量）**：`command/RoleCommand.java` 的 **④m 矩阵段整段删除**（临时件；删除清单见 `RoleCommand.java` 注释块）
+- 逐文件 SHA256：见 §1 表 + §5.4（日志）+ 本文件（交卡 output）
+- `debug-logs/调度器迁移方案.md` 为**文档修正**（无回滚风险；改动即"改判留痕"）
+
+§8 运行深度声明（如实）
+--------------------------------------------------------------------------------
+[8.1] 服务端侧达到「插件启用 + 服务器空闲（`Done`）」= Mode B 深度 ✓（§5）。
+[8.2] **加深（已申报）**：一次 bot 登录（op `HueZhandouji`）跑完探针全腿（② boundary / ③c / ③d / ④m 矩阵 / ⑤ 结论）。加深不改变 Mode B 口径（冻结在 bot 登录之前；整轮级别行集合差仍 `C = 0`）。
+[8.3] **复用（已申报）**：**角色生命周期实跑证据沿用上一份物证**（`阶段5-调度器迁移-停服物证.txt` §5）——依据是适配器**逐字节未变**（`3DC66F60…`）⇒ 无需重复起服。
+[8.4] **未覆盖**：① 四行合格线（25565 装 SHDF）未执行；② Folia 真机未验证；③ 一次性 `run` 的**相位**无原生对照腿（申报于 §2.1 注；`timers().run(` 调用点 = 0 无影响）；④ 组件业务触发（受击/技能命中链路）仍需玩家操作。
+[8.5] 仪器口径（沿用两次更正）：`Get-NetTCPConnection -State Listen` 在本机**服务器确在监听时也返回 0** ⇒ 停服用 **TCP connect + `latest.log` 独占打开 + netstat** 三路互证 ✓
+
+§9 交付物身份（当轮现算；引用请重算）
+--------------------------------------------------------------------------------
+1. `src/main/java/com/shadowHunterRolesPlugin/command/RoleCommand.java` = **34814 B / 635 行 / `7260D44400AE10AE27F0372F56A70239F574BCCDA1010BF7D823E0A875AD3A2B`**
+2. `debug-logs/调度器迁移方案.md` = **14747 B / 131 行 / `BECEFE51B6EF5D3AD90F98212816697147DC9BB8BEBF428F60741821C0C26AFE`**
+3. `debug-logs/测试记录/阶段5-起服日志-调度器迁移-矩阵.log` = **6074 B / 56 行 / `88BDEF4C6EF21629E5539B363B2C722FB7A7DA15CA0DF62974A14BB9AD8122B2`**
+4. 本文件 `debug-logs/测试记录/阶段5-调度器迁移-归一化矩阵-停服物证.txt`（身份见交卡 output）
+5. 构建：`BUILD SUCCESSFUL in 14s` · jar **147227 B / `2AE7F9A9…`** · 最新 `.class` @20:11:15.420 · `src 新于 jar = 0`
+6. 仓库外工具（**未写入仓库**）：`%TEMP%\t51c-matrix-bot-out.txt`（§2 逐字来源）；工装 `.scratch\bot\t51c-build.log` ·
+   `t51c-multiset.txt` · `logdelta-t51c*.txt` · 快照 `src-snapshots\t51c-before`
+> 行数口径 = **换行符计数**（`read` 工具与 `Get-Content` 一致）；按 `\r?\n` 切分会多算 1 个尾部空元素。
+================================================================================

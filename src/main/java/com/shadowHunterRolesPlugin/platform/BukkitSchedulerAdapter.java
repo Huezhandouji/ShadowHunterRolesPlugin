@@ -18,13 +18,17 @@ import org.bukkit.plugin.Plugin;
  * （{@code NEXT_RUNS_CANCELLED} → 重复 {@code NEXT_RUNS_CANCELLED_ALREADY}、{@code isCancelled()=true}、
  * {@code getExecutionState()=CANCELLED_RUNNING}、重复 cancel 无异常 = 幂等）。
  *
- * <p><b>唯一差异（已申报）</b>：{@code runAtFixedRate} 拒绝 {@code initialDelayTicks <= 0}
+ * <p><b>与原生 API 的唯一差异（已申报，且已实测"无相位差"）</b>：{@code runAtFixedRate} 拒绝 {@code initialDelayTicks <= 0}
  * （{@code IllegalArgumentException: Initial delay ticks may not be <= 0}），而
  * {@code BukkitScheduler.runTaskTimer(…, 0L, …)} 接受 0。生产侧有 **3 个调用点传 0**
  * （{@code BuffManager} / {@code DefaultSanTEZeroPunishment} / {@code MeiqiheziBloodySlashSkill}）⇒
- * 本类把 {@code initialDelayTicks} **归一为 1 tick**（{@code Math.max(1L, …)}）；首触发相位最多相差 1 tick、
- * 周期不受影响 —— 探针 ③c/③d 段对**同一生产声明值 0/10**做 A/B 实测（原生 Bukkit vs 本适配器），
- * 首次与第三次触发的 tick **已由实测确认逐字相同**。
+ * 本类把 {@code initialDelayTicks} **归一为 1 tick**（{@code Math.max(1L, …)}）。
+ * <p><b>该归一不产生相位差</b>：原生 Bukkit 的 {@code 0L} 语义本就是"**下一个 tick 首次执行**" ⇒
+ * **归一后首个触发 tick 与原生 {@code runTaskTimer(0L, …)} 逐字相同**（已由探针矩阵实测：
+ * **8 组声明值 × 两条路径的首/次触发 tick 全等** —— (0,1)=1/2、(0,2)=1/3、(0,10)=1/11、(0,40)=1/41、
+ * (1,1)=1/2、(1,2)=1/3、(1,6)=1/7、(1,10)=1/11）；周期、延时、线程与取消语义亦逐组逐字相同。
+ * <p>（历史注记：本注释此前写有"归一将带来最多 1 tick 的**首触发相位差**"这类**论证性表述**，
+ * 该说法已由 t51 的归一化矩阵**实测推翻并回收** ✗ —— 保留此注记只为留痕，勿再据此推断。）
  */
 public final class BukkitSchedulerAdapter implements Scheduler {
 

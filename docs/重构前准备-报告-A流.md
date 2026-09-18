@@ -19,7 +19,7 @@
 | ⑤ | 伤害/冷却/层数/能量数值逐字一致 | 通过（126 个数值字面量多重集完全一致，见 §7） |
 | ⑥ | RoleAPI 既有签名未变 | 通过（未触碰 `RoleAPI.java`/`RoleAPIImpl.java`，见 §7） |
 | ⑦ | 未修改 `SHDFGamePlugin` 任何文件 | 通过（该目录 22:00 之后 0 个文件被改动） |
-| ⑧ | 每处改动给出 文件:行号 + 前后对比 + 时序证据 | 通过（§3/§4/§5 + `docs/t2-diff-before-after.txt`） |
+| ⑧ | 每处改动给出 文件:行号 + 前后对比 + 时序证据 | 通过（§3/§4/§5 + `docs/测试记录/t2-diff-before-after.txt`） |
 
 > ⚠️ **冲突区状态**：`MeiqiheziEquipmentsPassive.stop` **仍为空实现**（`:72-74`），B 流补丁尚未并入 —— 按契约由 `t8` 门禁收口，见 §8。
 
@@ -45,7 +45,7 @@ IDENTICAL  RedBleedPassive.java                        cur=B4E0BA208738 snap=B4E
 IDENTICAL  MeiqiheziEquipmentsPassive.java             cur=CD2C86B6D792 snap=CD2C86B6D792
 ```
 
-新增一次性产物（非交付物，仅为证据）：`docs/t2-diff-before-after.txt`、`docs/t2-build.log`、`docs/t2-build-x.txt`、`docs/t2-numeric-before.txt`、`docs/t2-numeric-after.txt`。
+新增一次性产物（非交付物，仅为证据）：`docs/测试记录/t2-diff-before-after.txt`、`docs/测试记录/t2-build.log`、`docs/测试记录/t2-build-x.txt`、`docs/测试记录/t2-numeric-before.txt`、`docs/测试记录/t2-numeric-after.txt`。
 
 ---
 
@@ -65,7 +65,7 @@ IDENTICAL  MeiqiheziEquipmentsPassive.java             cur=CD2C86B6D792 snap=CD2
 
 ## 3. 逐文件改动（文件:行号 + 前后对比）
 
-完整 unified diff（含上下文）见 `docs/t2-diff-before-after.txt`。以下为逐点摘要。
+完整 unified diff（含上下文）见 `docs/测试记录/t2-diff-before-after.txt`。以下为逐点摘要。
 
 ### A-1 `core/RoleComponentAware/LifecycleAware.java`（16 → 21 行，+9/−4）
 
@@ -300,7 +300,7 @@ cd ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"; .\gradlew build
 
 ### ⑤ 数值逐字一致（126 个数值字面量，多重集比对）
 
-对 A 流 7 文件提取代码区（剔除 `//` 注释与 `/* */` 行）全部数值字面量，改动前（`docs/t2-numeric-before.txt`）与改动后（`docs/t2-numeric-after.txt`）比对：
+对 A 流 7 文件提取代码区（剔除 `//` 注释与 `/* */` 行）全部数值字面量，改动前（`docs/测试记录/t2-numeric-before.txt`）与改动后（`docs/测试记录/t2-numeric-after.txt`）比对：
 
 ```
 before_count=126  after_count=126
@@ -363,7 +363,7 @@ after : 0,0.1f,0.33333d,0.3d,0.5,0.5d,0d,0L,1,100,139,15,1f,1L,2,20,20f,3,30,4,4
 |---|---|
 | `src/main/java/.../LifecycleAware.java` 等 7 个源文件 | 代码改动（见 §3） |
 | `docs/重构前准备-报告-A流.md` | 本报告 |
-| `docs/t2-diff-before-after.txt` | 7 个文件的完整 unified diff（before 快照 vs 改动后），231 行 |
-| `docs/t2-build.log` | 规定命令的完整构建日志（含 `copyPluginJar` 失败细节） |
-| `docs/t2-build-x.txt` | `-x copyPluginJar` 的 `BUILD SUCCESSFUL` 日志 |
-| `docs/t2-numeric-before.txt` / `docs/t2-numeric-after.txt` | 数值字面量比对输入/输出 |
+| `docs/测试记录/t2-diff-before-after.txt` | 7 个文件的完整 unified diff（before 快照 vs 改动后），231 行 |
+| `docs/测试记录/t2-build.log` | 规定命令的完整构建日志（含 `copyPluginJar` 失败细节） |
+| `docs/测试记录/t2-build-x.txt` | `-x copyPluginJar` 的 `BUILD SUCCESSFUL` 日志 |
+| `docs/测试记录/t2-numeric-before.txt` / `docs/测试记录/t2-numeric-after.txt` | 数值字面量比对输入/输出 |

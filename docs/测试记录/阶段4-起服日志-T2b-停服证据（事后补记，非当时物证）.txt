@@ -20,7 +20,7 @@
 --------------------------------------------------------------------------------
 [1.1] 日志冻结（20:45:22）：
       command: Copy-Item 前的读取 —— `Get-Content run\logs\latest.log -Encoding UTF8` 拼接后写入
-      result : `docs/阶段4-起服日志-T2b.log` = **6078 B / mtime 2026-09-17 20:45:22 /
+      result : `docs/测试记录/阶段4-起服日志-T2b.log` = **6078 B / mtime 2026-09-17 20:45:22 /
                SHA256 2335DFBC9ED500284F555FF638DBFE685B77A866EEDDD8FE2CAC257B9B701F0E**
                （内容 = 停机前的稳态快照：56 行，末行时间戳 20:42:05）
 
@@ -53,8 +53,8 @@
       （现存 java 共 6 个，StartTime 全部为 18:47:32–18:50:01 = Gradle daemon）
 [2.3] `run\logs\latest.log` = **6077 B / mtime 2026-09-17 20:42:05**
       ⇒ 自停服前起**再未被写入**（若期间有第三方新起服，该文件大小/mtime 必然变化）⇒ 无新起服写入
-[2.4] `docs\阶段4-起服日志-T2b.log` = **6078 B / mtime 20:45:22 / SHA256 2335DFBC…701F0E**（与 §1.1 相同）
-      `docs\阶段4-起服日志-T2b1.log` = 同 SHA256（卡面同名字节的**字节相同副本**；两份均为权威日志的副本）
+[2.4] `docs\测试记录\阶段4-起服日志-T2b.log` = **6078 B / mtime 20:45:22 / SHA256 2335DFBC…701F0E**（与 §1.1 相同）
+      `docs\测试记录\阶段4-起服日志-T2b1.log` = 同 SHA256（卡面同名字节的**字节相同副本**；两份均为权威日志的副本）
 [2.5] `[System.IO.File]::Open('run\logs\latest.log','Open','Read','None')` → **失败（被拒）**
       ⚠️ **不得据此判定"未停服"**：该文件内容与 mtime 自 20:42:05 起未变、且无服务器进程（[2.2]）
       ⇒ 持句柄者是非服务器进程（Gradle daemon / 文件监视器）。队长在 `9a6d1a4` 的提交说明里已把这条
@@ -63,11 +63,11 @@
 --------------------------------------------------------------------------------
 §3. 与 Mode B 证据的对应（本批主证据）
 --------------------------------------------------------------------------------
-[3.1] 三行齐（`run\logs\latest.log` / 冻存于 `docs/阶段4-起服日志-T2b.log`）：
+[3.1] 三行齐（`run\logs\latest.log` / 冻存于 `docs/测试记录/阶段4-起服日志-T2b.log`）：
       [20:42:03] [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
       [20:42:03] [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
       [20:42:03] [Server thread/INFO]: Done (18.395s)! For help, type "help"
-[3.2] log-delta（锚 = `docs\阶段4-起服日志-T2.log`，工具 `.scratch\bot\log-delta.ps1 -Tag t2b`）：
+[3.2] log-delta（锚 = `docs\测试记录\阶段4-起服日志-T2.log`，工具 `.scratch\bot\log-delta.ps1 -Tag t2b`）：
       anchor 13 / current 13 行 WARN|ERROR|SEVERE；**ADDED 0 / REMOVED 0 / C = 0**
       （A) oshi 硬件探测噪声 0、B) 世界态实体噪声 0）
 [3.3] 构建：`BUILD SUCCESSFUL in 16s`；jar **135308 B / 20:40:56 /

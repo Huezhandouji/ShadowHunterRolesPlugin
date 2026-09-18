@@ -4,9 +4,10 @@ t63 · 调试指令**控制台输出**的「取证 + bot 冒烟」轮 —— 交
 —— 执行者：eng-取证（卡 `t63` / attempt `f9e028f1`）· 被验制品 = `0F2D901C…`（**提交态**）
    ① 自绑定（commit + jar + 日志身份 + F1 链）← 本卡要补的**缺口②** · ② 执行链与判据
    ③ 运行级判据（bot 冒烟双路径 + op 门控双窗）· ④ 工装身份与两处自曝 · ⑤ 申报 · ⑥ 红线自检
-—— ⚠ **修订注记（2026-09-18 22:0x，经队长授权；本次只改本行与 §5 的 [5.8]，正文其余部分逐字未改 ✓）**：
-   本件**取代旧版** ✗ —— 旧版 = `13865 B / 138 行 / SHA256 09D43F7A6CE92875F001B93D847F88CBA1DD25683B02986C82D8BD1DCF6C2FF1`
-   （**仅存留痕** = 提交 `643302d` 的历史版本 ✗）⇒ 现行引用请用**本件新身份** ✓。
+—— ⚠ **修订注记（2026-09-18 22:0x，经队长授权 (a1)+(a2)；本次只改本行、§3 的 [3.5] 与 §5 的 [5.8]，正文其余部分逐字未改 ✓）**：
+   本件**取代旧版** ✗ —— 旧版（提交内）= `13865 B / 138 行 / SHA256 09D43F7A6CE92875F001B93D847F88CBA1DD25683B02986C82D8BD1DCF6C2FF1`
+   （= 提交 `643302d` 的历史版本，**仅存留痕** ✗）；本次修订前的一版（本会话内、未提交）= `15381 B / 149 行 / SHA256 A31F741A7DE0E409E58578F75828821FCA51434FE94E1A888A3B9A3CED9CF3C1`（**同仅存留痕** ✗）
+   ⇒ 现行引用请用**本件新身份**（见交付报文）✓。
 ================================================================================
 
 §0 结论摘要（一句话）
@@ -93,6 +94,19 @@ Mode B 三行齐 ✓ · 正序集合差**只看 C = 0** ✓ · **仍在线时先
       **无 `[cooldown] … cooling=` 载荷** ✓
 [3.4] **op 门控（控制台侧，双窗偏移切分）**：op 窗控制台片段 **10462 字符**、非 op 窗 **720 字符**；
       非 op 窗内 `[command-debug]` 计数 = **0** ✓ ⇒ **用户要求的出口不会对非 op 泄漏到日志** ✓
+[3.5] **端口链与 verdict 明细（本轮实测，逐项现读冻结件）** ✓
+      · `portLegEquivalent=true` × **6** ✓（`=false` × **0** · `SKIPPED` × **0** ⇒ **该腿真跑了**，
+        不是"被跳过却记成 false" ✗）；
+      · 逐字：`… | matrixEquivalent=true | portLeg=autoRecoverEnergy_passive,portFirstSecond=1/11 | portLegEquivalent=true | CONCLUSION=CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference …`
+        ⇒ **`portFirstSecond=1/11` 与 `t51` 那轮的历史参照逐字相同** ✓（因本轮 runner **先绑角色/服务再跑探针** ⇒ 该腿不被跳过 ✓）；
+      · 同轮其余维度全绿 ✓：`matrixAllPairsMatch=true` × 6 · `matrixEquivalent` · `sameThread` · `periodEquivalent` ·
+        `delayedEquivalent` · `cancelSemanticsOk` · `clampEquivalent` · `adapterDelayedEquivalent` · `adapterCancelOk` ·
+        `portLegEquivalent` × 6 · `CONCLUSION=CAN …` × 6；
+      · ⚠ **一处反向 `false` 的定性（防后人误读为回归）** ✗：`rawInitialDelayPolicySame=false`
+        —— 原文 = `global: initialDelay0=REJECTED(IllegalArgumentException: Initial delay ticks may not be <= 0) /
+        bukkit: initialDelay0=ACCEPTED` ⇒ 这是**裸 API 的策略差异**，且**已被适配器归一化**
+        （同行 `clampEquivalent=true` + `adapterDelayedEquivalent=true` + `CONCLUSION=CAN … zero visible difference`）
+        ⇒ **设计内差异、非回归** ✓（亦是 `t53/t57` 归一化措辞的**运行时印证** ✓）。
 
 §4 红线自检
 --------------------------------------------------------------------------------

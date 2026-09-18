@@ -3,7 +3,7 @@
 —— 起服/停服物证（**当轮即时记录**，2026-09-18 19:26–19:30）
 ================================================================================
 编制：eng-收尾 · 记录方式：停机后立即实测落盘（非事后补记）
-位置：`debug-logs/测试记录/`（按现行约定：测试记录/冻结证据统一放 `debug-logs/` 下）
+位置：`debug-logs/测试记录/`（用户现行规则：测试记录/冻结证据统一放 `debug-logs/` 下）
 
 §1 起服（Mode B）
 [1.1] 命令：`$env:GRADLE_USER_HOME="<repo>\.gradle-work"; .\gradlew runServer --console=plain`（后台；起服前已广播"我要起服"）
@@ -22,23 +22,68 @@
 [2.3] @19:30:42：`25566` 监听 = **0**；java 共 3 个（Gradle daemon）；**启动于 19:26 之后（本批 Paper）= 0**
 [2.4] `run\logs\latest.log` = 6015 B / mtime 19:26:19（稳态后未再写入）
 
-§3 本批代码身份
-[3.1] 改动面 = **12 个 src 文件**：`core/ports/CooldownPort.java`（`end()` → boolean，语义重写）·
-      `core/CooldownPortImpl.java`（start 重启语义 + end 真实语义）· `core/RoleInstance.java`（删 2 处框架代启动；
-      新增 isCooling/clearCooldownForRestart/endCooldown/scanCooldowns/expiredIds/dispatchCooldownEnd；
-      `triggerUpdate` 每 tick 扫描）· `roleComponent/ActiveComponent.java`（`onCooldownEnd` + `enum CooldownEndReason`）
-      + **8 个组件**（10 处 `return CastResult.SUCCEED;` 前插入显式 `svc().cooldowns().start(getCooldownTicks())`）
+§3 本批代码身份（12 个 src 文件；逐文件 SHA256 见 §5）
+[3.1] `core/ports/CooldownPort.java`（`void end()` → `boolean end()`；javadoc 重写）·
+      `core/CooldownPortImpl.java`（start 重启语义 + end 真实语义）·
+      `core/RoleInstance.java`（删 2 处框架代启动；新增冷却自管理方法组；tick 扫描）·
+      `roleComponent/ActiveComponent.java`（`onCooldownEnd` + `enum CooldownEndReason`）·
+      **8 个组件 / 10 处** `return CastResult.SUCCEED;` 前插入显式 `svc().cooldowns().start(getCooldownTicks())`
 [3.2] 构建：`BUILD SUCCESSFUL in 15s`；jar = **137910 B / 19:25:38 /
       SHA256 0BD2552F0F0356633A9D6939E8F07BE17FE5828F422BC65241897E666E629CC4**；`src 新于 jar = 0`
 [3.3] 双口径：**numeric 379 → 379（diff 0）**；**string 180 → 181（diff 1 行 = `RoleInstance` 内 `"registered"` 多 1 次）**
       ⇒ **(d) 申报 1 条**（冷却回调的异常隔离键，与既有 `update()`/`onSanTEChange` 同键同形；**无新增字面量值**）
+      —— 队长已确认接受（含 numeric diff 0）。
 [3.4] 运行深度声明：**只到「插件启用 + 服务器空闲（Done）」**；**无玩家登录/选角色**，
       冷却自管理的运行期四态（冷却中 end()、重启顶替、到点恢复、回调被调用）**未做运行期覆盖** ⇒ 待 t15/真人冒烟
 
-§4 边界
-- 本文件为**当轮即时记录**（19:30:42 实测）；日志冻结发生在停机**之前**。
+§4 队长两条裁定（**写入物证，防后人"顺手改回"**）
+[4.1] **裁定①：`componentServices` 保留**（不删）。理由：它是**构造期注入的载体**与 4.4 渲染器可能的台账来源；
+      "只写不读"是本项（框架不再代启动）的**预期结果**；删除属**另一项**决策，不塞进本批。
+[4.2] **裁定②：D3 优先于 D2 —— 保留 `runLater(this::updateHotbar, remaining)`**，不按 D2 删。
+      理由：**扫描在 `triggerUpdate` 里有 ≤1 tick 的相位差** ⇒ 若严格照 D2（只留扫描），最后一段秒数可能
+      **多显示一 tick** = **未申报的可见时机差异**；按"不得静默产生可见差异"，本项保留 `runLater`
+      （`start` 的那一次到点刷新 ＋ 扫描的到期刷新**二者幂等** ⇒ **零可见差异**）。
+      **任务累积问题留到 4.4**（刷新源收敛到 `markDirty()` 后自然消除）。
+
+§5 逐文件 SHA256 回滚单元（12 文件；路径省略 `src/main/java/com/shadowHunterRolesPlugin/`）
+```
+core/ports/CooldownPort.java                1034 B /  26 行 / 183AA9D028B3F5E300C7731F6CB64B7307C7BF3ECD3D652BEA0C90214B6BAFEC
+core/CooldownPortImpl.java                  2474 B /  59 行 / 8AA93B588DB323DB47642A3D2B110D5A14901A11B33DF2C8FE741E27546DA7DC
+core/RoleInstance.java                     35628 B / 847 行 / 5B0DB4312792FC34EDA2BE4B8A485E075E3FA077F077C2C7DE922729FC996ACD
+roleComponent/ActiveComponent.java          3350 B /  97 行 / 253F4FC963BA0D368EC18B89231E3CE7D1AF4C7E41CF6CE61CCA43715AC265FB
+roleComponent/meiqiHezi/mainWeapon/MeiqiheziJuejueMainWeapon.java  4596 B / 109 行 / C4A90DBC4CFBB5F91A86DC6943FCD87A596BEBBB3C7D1E2BE877F210185843F9
+roleComponent/meiqiHezi/skill/MeiqiheziBloodySlashSkill.java       3690 B /  97 行 / D3830718A80F7B086D4E887D9A32169049F6BD930DC7B3170F9D2BEB9BFF0951
+roleComponent/meiqiHezi/skill/MeiqiheziCircleSlashSkill.java       4388 B / 108 行 / 5EAD6894921E4F2C5A9F5DF3382719B32C539754192C870C4AEAB4285301743D
+roleComponent/meiqiHezi/skill/MeiqiheziUnconcernSkill.java         2383 B /  58 行 / F71DC3B383D56D0EC40BC706E16A4F33E1FEA368EF070E7A44B6ACD3C3D12C55
+roleComponent/red/RedDeeplySorrowSkill.java                          3941 B /  81 行 / 76EDDD9EA8A2842E4F3B557D85B200185F882C24024BC958CF657F497B990CA3
+roleComponent/red/RedEvilShockSkill.java                             2538 B /  50 行 / 906EB8886E3D7973DF2219A6350AFE3D88491313B2CCFD7967269FF77BF868C2
+roleComponent/red/RedSanctifiedBladeMainWeapon.java                  2893 B /  64 行 / 05B1F935EB73100393EA91107094C04619305B835F74AE81C2B0BE1CA45051C2
+roleComponent/red/RedSolitaryArroganceSkill.java                      5211 B / 111 行 / A369A1AFBB305FE050757D5E7A6D4DA631B47768C59C4F778B1132DA9143F914
+```
+
+§6 `start/end` 语义证据（代码路径 + 现算行号；`git grep` 可复算）
+[6.1] **冷却中 `start` ⇒ 旧段回调 `RESTARTED`**：`CooldownPortImpl.start:43` → `if(owner.clearCooldownForRestart(...)) :44`
+      → `owner.dispatchCooldownEnd(..., RESTARTED) :45` → 再 `startSkillCooldown/startMainWeaponCooldown`。
+      `RoleInstance.clearCooldownForRestart:345` = `if(!isCooling(...)) return false; remove; return true`（**先清条目、再回调**）。
+[6.2] **冷却中 `end()` ⇒ `true` + `ENDED_BY_COMPONENT`**：`CooldownPortImpl.end:56` → `RoleInstance.endCooldown:356`
+      = `if(!isCooling) return false;` → `remove` → `dispatchCooldownEnd(..., ENDED_BY_COMPONENT)` → `updateHotbar()` → `return true`。
+[6.3] **非冷却 `end()` ⇒ `false` 且无副作用**：同上，`isCooling` 为假时**直接 return false**（不 remove、不回调、不刷新）✓。
+[6.4] **自然到期 ⇒ 条目消失 + `EXPIRED`（O-21 关闭）**：`RoleInstance.scanCooldowns:368`（由 `triggerUpdate:765` 每 tick 调用）
+      → `expiredIds(...) :387` 收集到期 id → `remove` → `dispatchCooldownEnd(..., EXPIRED)` → 若有移除则 `updateHotbar()` 一次。
+      组件侧回调 = `ActiveComponent.onCooldownEnd(CooldownEndReason)`（默认空，D4 三分法）。
+[6.5] **零可见差异证据**：`start*Cooldown` 仍排 `runLater(this::updateHotbar, remaining)`（未换 `markDirty`）✓；
+      扫描到期刷新与之**幂等**（两次 `updateHotbar()` 写的是同一份物品）⇒ §4.2 裁定理由；框架侧两处代启动已删
+      （`git grep -n "cooldowns().start" -- src/main/java` 在 `RoleInstance` 只剩**说明注释**，10 处全在组件侧）✓。
+
+§7 起服窗口核查（收到"起服独占冲突"提醒后的现算，**未起服**）
+[7.1] @**19:32:36**：`25566` 监听 = **0**；但 `run\logs\latest.log` **独占读 = False（被占用）**；
+      java 进程 = 7，**其中 4 个启动于 19:26 之后** ⇒ **当前窗口持有者 = `eng-验证`（t15 复跑）**，不是我 ✗。
+[7.2] **本批窗口无重叠**：我的运行 = 19:26:17 起服、**19:30:42 已停服**（§2）；占用者在其后才启动 ⇒ 无并行起服 ✓。
+[7.3] 我**未**再起服（本批已完工，无需窗口）✓。
+
+§8 边界
+- 本文件为**当轮即时记录**（19:30:42 实测）+ 19:32:36 的窗口核查（§7）；日志冻结发生在停机**之前**。
 - 未伪造"控制台停服行"：本批 `job_kill` 路径不产生可归档的 `Stopping server` 行 ⇒ 以 §2.2/§2.3 三条独立实测为准。
 - 红线未动：`api/**`、`ComponentServices`（10 成员）、`SanTEChangeEvent`/`EnergyChangeEvent` 对外发布、`bind(`/迁移标记 = 0。
-- 知悉项：`componentServices` 在 D1 后**只写不读**（保留，4.4 或需用作服务集台账）；D2「start 不再排 runLater」与
-  D3「保留 runLater(updateHotbar)」字面冲突 ⇒ **按 D3 保留**（到期另由扫描保证一次刷新，幂等）。
+- 两份产物位于 `debug-logs/**`（现行 `.gitignore` 全忽略）⇒ 入库需 `git add -f`（由队长执行）。
 ================================================================================

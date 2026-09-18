@@ -13,3 +13,16 @@ ShadowHunterRolesPlugin-1.0.0-verified-20260918-203749-7A21729B.jar
   备注      = 该代含 t53 / t57 / 非Folia口径 三批【纯注释】改动 ⇒ 与更早各代 class 级等价（差异仅 LineNumberTable）
 
 # 无法回溯的历史代次（B/C/D/E 及其中间重建）：当时只留身份读数、未留 jar 副本 ⇒ 其 "class 级等价" 主张【未独立复现】（eng-验证 t56 §7 如实记录）。
+
+[
+2026-09-18 21:01:58
+] 
+ShadowHunterRolesPlugin-1.0.0-verified-20260918-205855-DBE04077.jar
+  bytes    = 
+148298
+  mtime    = 
+2026-09-18 20:58:55.755
+  sha256   = 
+DBE040774A476363FC62F6EBC0F8A1BA43DBB4842622B4DC99852DF699CE8DF1
+  覆盖证据  = 阶段5-起服日志-两说并存措辞.log（Mode B 三行 + 只看 C=0 + 停机前先冻结 + 停服三路互证；F1 链 jar 20:58:55 < log 20:59:50 < 说明 21:01:22）
+  与前代关系 = 前代 7A21729B…(148297) 仅注释改动后再编译 ⇒ 差异应在 LineNumberTable 行号；本代【自带】运行证据（判据 ①）

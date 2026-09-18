@@ -35,8 +35,9 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
     /**
      * 批次②（B②-b-2）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
-     * 能量 = `tryConsume`（旧"先比较再 decreaseEnergy"合一）；`canCastSkill` 不满足 → `NO_COOLDOWN`
-     * （旧路径直接 return、**不启冷却**）；冷却改为 `SUCCEED` 由框架按声明值 **200** 启动；
+     * 判定顺序（2026-09-18 调整）：**先判 `canCastSkill`** —— 不满足 → `REJECTED_DISABLED`（让"被禁用"有框架反馈），
+     * **再**做能量 `tryConsume` —— 不满足 → `NO_COOLDOWN`（与旧路径一致、**不启冷却**）；
+     * 冷却改为 `SUCCEED` 由框架按声明值 **200** 启动；
      * 缓慢用 **5 参重载**（`ambient=true, particles=false` 逐字保真，R-1 方法族）；
      * 前摇任务改由 `svc().timers()` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
      */

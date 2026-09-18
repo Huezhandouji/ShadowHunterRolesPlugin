@@ -16,8 +16,8 @@ t51 同批（用户新裁定）· 阶段 5 前置 —— **调度器迁移：Buk
 --------------------------------------------------------------------------------
 | 文件 | 身份（现算） | 角色 |
 |---|---|---|
-| `platform/BukkitSchedulerAdapter.java` | **3508 B / 70 行 / `3DC66F6013F9CA1BAA9F049D66DD05E82C2C58A9B9949A545CF916D1CAE031C5`** | **回滚单元（1 文件）**：切 `GlobalRegionScheduler` + `initialDelay<=0` 归一 |
-| `command/RoleCommand.java` | **31289 B / 582 行 / `E356303A7D1177E3CCB3B4F13F28ECC1B8F41ED0CD1D636DCA203021A72A8D41`** | 临时探针：新增 ③c/③d **新实现验证**段（可整段删除） |
+| `platform/BukkitSchedulerAdapter.java` | **3508 B / 69 行 / `3DC66F6013F9CA1BAA9F049D66DD05E82C2C58A9B9949A545CF916D1CAE031C5`** | **回滚单元（1 文件）**：切 `GlobalRegionScheduler` + `initialDelay<=0` 归一 |
+| `command/RoleCommand.java` | **31289 B / 581 行 / `E356303A7D1177E3CCB3B4F13F28ECC1B8F41ED0CD1D636DCA203021A72A8D41`** | 临时探针：新增 ③c/③d **新实现验证**段（可整段删除） |
 
 映射（逐条按队长书面指定，接口签名不变）：
 - `run(Runnable)` → `getGlobalRegionScheduler().run(plugin, st -> task.run())`
@@ -208,9 +208,11 @@ t51 同批（用户新裁定）· 阶段 5 前置 —— **调度器迁移：Buk
 §11 交付物身份（当轮现算；引用请重算）
 --------------------------------------------------------------------------------
 1. `src/main/java/com/shadowHunterRolesPlugin/platform/BukkitSchedulerAdapter.java`
-   = **3508 B / 70 行 / 20:01:00 / `3DC66F6013F9CA1BAA9F049D66DD05E82C2C58A9B9949A545CF916D1CAE031C5`**
+   = **3508 B / 69 行 / 20:01:00 / `3DC66F6013F9CA1BAA9F049D66DD05E82C2C58A9B9949A545CF916D1CAE031C5`**
 2. `src/main/java/com/shadowHunterRolesPlugin/command/RoleCommand.java`
-   = **31289 B / 582 行 / 20:01:22 / `E356303A7D1177E3CCB3B4F13F28ECC1B8F41ED0CD1D636DCA203021A72A8D41`**
+   = **31289 B / 581 行 / 20:01:22 / `E356303A7D1177E3CCB3B4F13F28ECC1B8F41ED0CD1D636DCA203021A72A8D41`**
+   > 行数口径：= 文件内换行符计数（`read` 工具与 `Get-Content` 一致）。若用"按 `\r?\n` 切分"的写法会多算 1
+   > （文件尾换行产生一个空元素）—— 本节两处数字**均为前者**（初版曾误记为 70 / 582，已按此口径更正）。
 3. `debug-logs/测试记录/阶段5-起服日志-调度器迁移.log`
    = **6135 B / 20:03:20.718 / `C8912D2C8FAC5919E53CFA7491B1FBC037A91D773B87DA8BACEFB8DB88E68CC6`**
 4. 本文件 `debug-logs/测试记录/阶段5-调度器迁移-停服物证.txt`（身份见交卡 output）

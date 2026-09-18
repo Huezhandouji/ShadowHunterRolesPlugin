@@ -134,6 +134,16 @@ public class RoleInstance {
     public ComponentRegistry componentRegistry() { return componentRegistry; }
 
     /**
+     * **临时调试用**（冷却自管理冒烟入口）：取某组件一对一的服务集，使调试命令能调用**同一个**端口实例
+     * （如 {@code cooldowns().end()} / {@code cooldowns().start(ticks)}）。
+     * 冒烟结束后随调试入口一并删除（见交付报告的删除清单）。
+     */
+    public ComponentServices servicesOf(String componentId){
+        RoleComponent component = componentRegistry.getById(componentId);
+        return component != null ? componentServices.get(component) : null;
+    }
+
+    /**
      * 组件与其**一对一**的服务集（含按本组件 id/kind 构造的冷却端口、按本组件 id 定位资源表的定时器端口）。
      * 收尾批⑤：改按 {@code (id, kind)} 构造 —— 服务集必须先于组件实例存在（构造期注入）。
      */

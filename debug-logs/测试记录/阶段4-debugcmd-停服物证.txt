@@ -1,0 +1,80 @@
+================================================================================
+阶段 4 追补 · 临时调试命令（`/role debug cooldown …`）
+—— 起服/停服物证（**当轮即时记录**，2026-09-18 19:35–19:36）
+   + (d) 逐条申报 + 给用户的四态冒烟清单 + 删除清单
+================================================================================
+
+§1 起服（Mode B）
+[1.1] 命令：`$env:GRADLE_USER_HOME="<repo>\.gradle-work"; .\gradlew runServer --console=plain`（后台；起服前已广播"我要起服"）
+[1.2] 窗口核查（起服前 19:35:22）：`25566` 监听 = 0；java 进程 = 3 且**无 19:26 之后启动者** ⇒ eng-验证 的 t15 复跑已收尾；
+      `latest.log` 独占读仍被拒，但按既定口径（gradle-daemon log-handle）**持句柄者非服务器** ⇒ 判定窗口空闲后起服（无并行）
+[1.3] 三行齐（逐字）：
+      [19:36:00] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+      [19:36:00] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+      [19:36:01] [Server thread/INFO]: Done (17.214s)! For help, type "help"
+[1.4] 停机前冻结：`debug-logs/测试记录/阶段4-起服日志-debugcmd.log` =
+      6078 B / 19:36:10 / SHA256 0147EFC0A6BFB40E4A43A9B6ADDBED432E448787ED606B8A3E6AC327C6F24F20
+[1.5] 正序集合差（`log-delta.ps1`，锚 `debug-logs/测试记录/阶段4-起服日志-T2b.log`，只看 C）：
+      anchor 13 / current 13；**ADDED 0 / REMOVED 0 / C = 0**（A=0、B=0）
+
+§2 停服（当时实测）
+[2.1] `job_kill <runServer 后台作业>` —— **只 job_kill + 等待，未强杀 java**
+[2.2] **停服完成判定 @ 19:36:35**：`[System.IO.File]::Open('run\logs\latest.log','Open','Read','None')` = **成功**
+[2.3] @19:36:35：`25566` 监听 = **0**；java = 3（Gradle daemon）；**19:35 之后启动 = 0**
+[2.4] `run\logs\latest.log` = 6077 B / mtime 19:36:02（稳态后未再写入）；未伪造控制台停服行（job_kill 路径不产生）
+
+§3 代码身份与红线
+[3.1] 改动面 = **2 个 src 文件**（无新增文件）：
+      `command/RoleCommand.java` = **13338 B / 320 行 /
+      `789E78F529E7C07A93E3C966260FD4EEEF3B8D4BDA9E5F312A6934EA9E5D5568`**
+      `core/RoleInstance.java` = **36190 B / 857 行 /
+      `0FDD57D21F6CC1CAE8137CE2EAD38C20E1FA024AEE389FC1FC9B3B4AA57A37A8`**
+[3.2] 构建：`BUILD SUCCESSFUL in 16s`；jar = **139891 B / 19:35:00 /
+      `4FAED39614EA03FCC4A7CC3F486B9DC898A7650D7ADBE946752CB7969FCF9654`**；`src 新于 jar = 0`
+[3.3] 红线（现算，全部 0 行改动）：`src/main/resources/plugin.yml` = **0** · `ShadowHunterRolesPlugin.java` = **0**（**未新增注册路径** ✓）·
+      `api/**` = **0** · `core/ports/CooldownPort.java` + `core/CooldownPortImpl.java` = **0**（**冷却语义一字未改** ✓）·
+      `ComponentServices` 10 成员未动 · 两事件发布未动
+
+§4 (d) 申报（新增字面量，**逐条**；全部集中在 `command/RoleCommand.java`；删除方向 = 0）
+[4.1] **numeric +9 次**：`0`×3（参数下标/槽位 0 语义）、`1`（`args[1]`）、`2`×2（`args[2]`、比较）、`20.0`（tick→秒换算）、`3`（`args[3]`）、`4`（`args.length < 4`）
+[4.2] **string +31 次**（按值）：
+      `"debug"` · `"cooldown"` · `"status"` · `"end"` · `"restart"` · `"\\d+"`（槽位判定的正则）·
+      `"Usage: /role debug cooldown <status|end|restart> <slot|componentId>"`（×2）·
+      `"Wrong arguments. Use /role help to learn how to use."`（case debug 的兜底）·
+      `"You do not have permission to use this command."` · `"You have no role yet!"` ·
+      `"Role instance not found for you."` · `"No component found for: "` ·
+      `"Not an active component (skill/main weapon): "` · `"No services bound for component: "` ·
+      `"[cooldown] "` · `" | cooling="` · `" | remainingTicks="` · `" | remainingSeconds="` · `"%.2f"` ·
+      `" | declaredTicks="` · `"[cooldown] end("` · `") returned="` · `" | wasCooling="` ·
+      `" | ENDED_BY_COMPONENT dispatched (onCooldownEnd)"` · `" | no-op (was not cooling)"` ·
+      `"[cooldown] restart("` · `") wasCooling="` · `" | RESTARTED dispatched (old segment dropped)"` ·
+      `" | no old segment was cooling"` · `" | newRemainingTicks="`
+[4.3] 性质：**全部只服务调试入口**，不进任何生产路径；删掉调试入口后这些字面量随之消失（见 §6 删除清单）。
+
+§5 给用户的**四态冒烟清单**（在 25565 装了 SHDF 的外服或本地测试服执行；**需 op**；先 `/role set <roleId>` 选好角色）
+| # | 命令（示例：猎人主武器在槽位 0） | 期望现象（证明哪一态） |
+|---|---|---|
+| 0 | `/role debug cooldown status 0` | 打印 `cooling=false … remainingTicks=0`（**基线**） |
+| 1 | 先正常施放一次（左键/右键按角色），再 `/role debug cooldown status 0` | `cooling=true`、`remainingTicks≈声明值`、`declaredTicks=声明值`（**冷却启动**） |
+| 2 | 冷却中执行 `/role debug cooldown end 0` | 输出 `returned=true | wasCooling=true | ENDED_BY_COMPONENT dispatched (onCooldownEnd)`；**随后再 `status` ⇒ `cooling=false`**，且**物品立刻变回可放态、可再次施放**（**冷却中 `end()` ✅ + 回调 ✅**） |
+| 3 | 不在冷却时执行 `/role debug cooldown end 0` | 输出 `returned=false | wasCooling=false | no-op (was not cooling)`（**幂等、无副作用 ✅**） |
+| 4 | 先施放使其进入冷却，再 `/role debug cooldown restart 0` | 输出 `wasCooling=true | RESTARTED dispatched (old segment dropped) | newRemainingTicks≈声明值`；**秒数从新值重新倒数**（**重启顶替 ✅**） |
+| 5 | 施放后等到自然到点，再 `/role debug cooldown status 0` | `cooling=false`，且（新增）**冷却表条目已消失** ⇒ 再施放一次仍正常（**自然到期 + O-21 关闭 ✅**） |
+> 说明：`status/end/restart` 的 `<slot|componentId>` 既可给 0..8 的**热键栏槽位**，也可直接给**组件 id**（如 `meiqihezi_mainWeapon_juejue`）。
+> **回调可观察性**：`onCooldownEnd` 的派发结果目前通过 `end/restart` 的**返回值与文案**间接证明（`ENDED_BY_COMPONENT dispatched` / `RESTARTED dispatched`）；
+> 组件侧若未覆写该钩子则无其它可见输出（现有组件均未覆写 ⇒ 预期无额外现象）✓。
+
+§6 **删除清单**（冒烟结束后一次性移除；临时入口，不影响生产语义）
+1. `command/RoleCommand.java`：删 **`case "debug":` 整段（5 行）** + **`handleDebugCooldown(...)` 与 `resolveComponentId(...)` 两个方法及其上方"临时调试入口"注释块**（约 95 行）；
+   以及为它们新增的 **5 个 import**：`core.RoleInstance` / `core.ports.ComponentServices` / `core.ports.CooldownPort` /
+   `roleComponent.ActiveComponent` / `roleComponent.RoleComponent`（**若 `RoleInstance` 仍被其它既有代码用到则保留该 import**）；
+   同时删掉两处 `"Usage: /role debug cooldown …"` 文案（随方法体一并删除）。
+2. `core/RoleInstance.java`：删 **`servicesOf(String componentId)` 方法及其 5 行 javadoc**（约 10 行）。
+3. 删除后判定：`git grep -n "debug cooldown" -- src/main/java` = **0**；`git grep -n "servicesOf" -- src/main/java` = **0**；
+   构建通过 + Mode B 三行（可不再单独取证，按当批纪律执行）。
+> 备注：**没有**改 `plugin.yml`、**没有**新增注册路径、**没有**改冷却语义 —— 所以删除是纯减行操作，回滚面 = 上述 2 文件。
+
+§7 运行深度声明
+只到「插件启用 + 服务器空闲（Done）」；**未登录玩家、未执行任何 `/role debug` 命令**（命令的**运行期四态**由用户按 §5 冒烟覆盖）；
+`C = 0` 只证明启动期无新增告警，**不证明命令行为**。
+================================================================================

@@ -1,5 +1,10 @@
 package com.shadowHunterRolesPlugin.command;
 
+import com.shadowHunterRolesPlugin.core.RoleInstance;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.CooldownPort;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import net.kyori.adventure.text.Component;
@@ -85,6 +90,12 @@ public class RoleCommand implements CommandExecutor {
                         break;
                 }
                 sendHelp(player);
+                return true;
+
+            case "debug":
+                //临时调试入口（冷却自管理冒烟）：/role debug cooldown <status|end|restart> <slot|componentId>
+                if(handleDebugCooldown(player, args)) return true;
+                player.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
                 return true;
 
             case "help":
@@ -208,6 +219,95 @@ public class RoleCommand implements CommandExecutor {
             sender.sendMessage(Component.text("Failed to clear the role."));
         }
         return;
+    }
+
+    // ═════════ 临时调试入口（冷却自管理冒烟用；**冒烟结束可整段删除**）═════════
+    // 删除清单：本段（到本类末尾前的全部 DEBUG 方法）+ 上面 switch 的 case "debug" + 本行上方 5 个 import
+    //           + RoleInstance.servicesOf(...)（同一段注释里也有删除说明）。
+
+    private boolean handleDebugCooldown(Player player, String[] args){
+        //门控：仅 op（对普通玩家零可见行为）
+        if(!player.isOp()){
+            player.sendMessage(Component.text("You do not have permission to use this command."));
+            return true;
+        }
+        if(args.length < 2 || !"cooldown".equals(args[1])) return false;
+        if(args.length < 4){
+            player.sendMessage(Component.text("Usage: /role debug cooldown <status|end|restart> <slot|componentId>"));
+            return true;
+        }
+        if(!roleManager.hasRole(player)){
+            player.sendMessage(Component.text("You have no role yet!"));
+            return true;
+        }
+
+        RoleInstance instance = roleManager.getRoleInstance(player);
+        if(instance == null){
+            player.sendMessage(Component.text("Role instance not found for you."));
+            return true;
+        }
+
+        String action = args[2];
+        String target = args[3];
+        String componentId = resolveComponentId(instance, target);
+        if(componentId == null){
+            player.sendMessage(Component.text("No component found for: " + target));
+            return true;
+        }
+        RoleComponent component = instance.componentRegistry().getById(componentId);
+        if(!(component instanceof ActiveComponent active)){
+            player.sendMessage(Component.text("Not an active component (skill/main weapon): " + componentId));
+            return true;
+        }
+        ComponentServices services = instance.servicesOf(componentId);
+        if(services == null){
+            player.sendMessage(Component.text("No services bound for component: " + componentId));
+            return true;
+        }
+        CooldownPort cooldowns = services.cooldowns();
+        int declared = active.getCooldownTicks();
+
+        switch (action){
+            case "status":{
+                int remaining = cooldowns.remainingTicks();
+                boolean cooling = remaining > 0;
+                player.sendMessage(Component.text("[cooldown] " + componentId
+                        + " | cooling=" + cooling
+                        + " | remainingTicks=" + remaining
+                        + " | remainingSeconds=" + String.format("%.2f", remaining / 20.0)
+                        + " | declaredTicks=" + declared));
+                return true;
+            }
+            case "end":{
+                boolean wasCooling = cooldowns.remainingTicks() > 0;
+                boolean ended = cooldowns.end();
+                player.sendMessage(Component.text("[cooldown] end(" + componentId + ") returned=" + ended
+                        + " | wasCooling=" + wasCooling
+                        + (ended ? " | ENDED_BY_COMPONENT dispatched (onCooldownEnd)" : " | no-op (was not cooling)")));
+                return true;
+            }
+            case "restart":{
+                boolean wasCooling = cooldowns.remainingTicks() > 0;
+                cooldowns.start(declared);
+                int remaining = cooldowns.remainingTicks();
+                player.sendMessage(Component.text("[cooldown] restart(" + componentId + ") wasCooling=" + wasCooling
+                        + (wasCooling ? " | RESTARTED dispatched (old segment dropped)" : " | no old segment was cooling")
+                        + " | newRemainingTicks=" + remaining));
+                return true;
+            }
+            default:
+                player.sendMessage(Component.text("Usage: /role debug cooldown <status|end|restart> <slot|componentId>"));
+                return true;
+        }
+    }
+
+    /** 目标解析：纯数字 = 热键栏槽位（读 {@code Role.getSlotMap()}，不猜）；否则按组件 id（须在注册表内）。 */
+    private String resolveComponentId(RoleInstance instance, String target){
+        if(target.matches("\\d+")){
+            Integer slot = Integer.parseInt(target);
+            return instance.getRole().getSlotMap().get(slot);
+        }
+        return instance.componentRegistry().getById(target) != null ? target : null;
     }
 
     private void sendHelp(Player player){

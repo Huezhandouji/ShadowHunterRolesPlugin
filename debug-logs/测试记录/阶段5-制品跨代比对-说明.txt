@@ -31,6 +31,9 @@ foreach($p in @(@($jA,"$env:TEMP\cmp-A"),@($jB,"$env:TEMP\cmp-B"))){
 | ② 同名 `.class` 的 SHA256 逐字相同 | **94 / 96** ✗ ⇒ **严格"字节码等价"不成立** |
 | ↳ 差异清单（2） | `com\shadowHunterRolesPlugin\platform\BukkitSchedulerAdapter.class` · `...\BukkitSchedulerAdapter$1.class`（**等长 3297 B**，字节不同） |
 | ③ 差异类的语义（补充步） | 两者 **`javap -c -p` 反汇编逐字相同 = True** ✓ ⇒ 差异**只在 `LineNumberTable`** |
+| ③b 差异的**逐行分解**（`javap -v -p`；由 `eng-验证` 独立复核、与本节结论一致） | 26 行差异 = **22 行 `line NN: M`（行号表位移）+ 4 行文件头**（class 路径 + 其自带的 `SHA-256 checksum` 行，各 ×2）⇒ **字节码指令层零差异** ✓ |
+| ③c 为何本次会位移（机制） | 本代那次注释改动是**净增行**（"两说并存"整段）⇒ 代码行号位移 ⇒ `LineNumberTable` 变 ⇒ class 字节变 ✗；而 `t59` 那次是**就地 2→2、净 0 行** ⇒ 不位移 ⇒ 字节不变 ✓ —— **两次结果不同并不矛盾** ✓ |
+| ③d 两条不可混用 ✗ | "**改注释 ⇒ 语义不变**" 用 **`javap -c -p` 反汇编**判；"**逐字节相同**" 只在 **接口** 或 **无行位移** 时成立 ✓ |
 | 容器层差异 | 两份 jar 内**同一条目的时间戳相同**（`1980-02-01 00:00:00`，Gradle 确定性时间戳）⇒ 1 字节差来自 **class 内容**，**不是**容器清单 |
 | 其余 | `Task.class` / `Scheduler.class`（**接口**）与 `RoleCommand.class` 等 **94 个全部逐字相同** ✓ |
 

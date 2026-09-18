@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.command;
 
+import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.core.ports.CooldownPort;
@@ -7,12 +8,15 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 
 public class RoleCommand implements CommandExecutor {
@@ -95,6 +99,8 @@ public class RoleCommand implements CommandExecutor {
             case "debug":
                 //临时调试入口（冷却自管理冒烟）：/role debug cooldown <status|end|restart> <slot|componentId>
                 if(handleDebugCooldown(player, args)) return true;
+                //临时调度探针（schedprobe）：/role debug sched [all] —— 取证后可整段删除（删除清单见 handleDebugSched 上方注释）
+                if(handleDebugSched(player, args)) return true;
                 player.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
                 return true;
 
@@ -308,6 +314,192 @@ public class RoleCommand implements CommandExecutor {
             return instance.getRole().getSlotMap().get(slot);
         }
         return instance.componentRegistry().getById(target) != null ? target : null;
+    }
+
+    // ═════════ 临时调度探针（schedprobe；**取证后可整段删除**）═════════
+    // 入口：`/role debug sched [all]` —— op 门控；不新增注册路径、不在 onEnable 做常驻副作用；
+    // 全部探针任务在第 3 次触发时自取消 ⇒ 单次命令不留常驻任务（状态全部是本方法局部变量）。
+    // 逐条打印原始值：① execute 回调内线程名；② run / runDelayed / runAtFixedRate 的线程名 + 实际触发 tick（与声明值并排）
+    // + initialDelay=0 边界实测（runAtFixedRate vs runTaskTimer，异常原文照打）；
+    // ③ 同周期 Bukkit.getScheduler().runTaskTimer 对照任务的线程名 + 实际触发 tick（声明值逐字相同）+ ③b runTaskLater 延时对照；
+    // ④ ScheduledTask.cancel() 返回值 / isCancelled() / getExecutionState() / 重复 cancel；⑤ 一句话结论（由本次原始值现算，不只给结论）。
+    // 删除清单（逐条；判据 = `git grep -n "sched" -- src/main/java` 归零）：
+    //   ① 本段整体：本注释块 + handleDebugSched(Player, String[])（本类唯一新增方法）；
+    //   ② onCommand 的 case "debug" 内新增的 1 行 `if(handleDebugSched(player, args)) return true;`（含其上方 1 行注释）；
+    //   ③ 本段新增的 4 个 import：com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin、
+    //      io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler、
+    //      io.papermc.paper.threadedregions.scheduler.ScheduledTask、org.bukkit.scheduler.BukkitTask；
+    //   ④ 无新增字段、无新增注册路径、plugin.yml 与 onEnable 零改动。
+    private boolean handleDebugSched(Player player, String[] args){
+        //门控：仅 op（对普通玩家零可见行为；与 handleDebugCooldown 同款、先于参数判定）
+        if(!player.isOp()){
+            player.sendMessage(Component.text("You do not have permission to use this command."));
+            return true;
+        }
+        if(args.length < 2 || !"sched".equals(args[1])) return false;
+        if(args.length >= 3 && !"all".equals(args[2])){
+            player.sendMessage(Component.text("Usage: /role debug sched [all]"));
+            return true;
+        }
+
+        ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
+        if(plugin == null){
+            player.sendMessage(Component.text("[sched] plugin instance unavailable; probe aborted."));
+            return true;
+        }
+
+        //观测位（局部 ⇒ 删除本方法即无残留）：str = 线程名/取消原始值/边界值；tick = 实际触发 tick 相对命令 tick 的差值
+        final String[] str = new String[6];
+        final int[] tick = new int[8];
+        for(int i = 0; i < tick.length; i++) tick[i] = -1;
+        final int[] grrCount = {0};
+        final int[] bukkitCount = {0};
+        final int baseTick = Bukkit.getCurrentTick();
+        final GlobalRegionScheduler grs = Bukkit.getGlobalRegionScheduler();
+        final BukkitTask[] bukkitHolder = new BukkitTask[1];
+
+        player.sendMessage(Component.text("[sched] probe start | commandThread=" + Thread.currentThread().getName()
+                + " | commandTick=" + baseTick + " | primaryThread=" + Bukkit.isPrimaryThread()
+                + " | declared: runDelayed=20t, runAtFixedRate=1/10t, bukkit runTaskTimer=1/10t, boundary=0/10t"));
+
+        //① execute(Plugin, Runnable)：无返回值/无句柄 ⇒ 只测线程与相位
+        grs.execute(plugin, () -> {
+            int now = Bukkit.getCurrentTick();
+            player.sendMessage(Component.text("[sched] ① execute | thread=" + Thread.currentThread().getName()
+                    + " | tick=" + now + " | delta=" + (now - baseTick)
+                    + " | primaryThread=" + Bukkit.isPrimaryThread()));
+        });
+
+        //② run(Plugin, Consumer<ScheduledTask>)：句柄可达性
+        grs.run(plugin, task -> {
+            int now = Bukkit.getCurrentTick();
+            str[0] = Thread.currentThread().getName();
+            player.sendMessage(Component.text("[sched] ② run | thread=" + Thread.currentThread().getName()
+                    + " | tick=" + now + " | delta=" + (now - baseTick)
+                    + " | owningPluginIsUs=" + (task.getOwningPlugin() == plugin)
+                    + " | isRepeatingTask=" + task.isRepeatingTask()
+                    + " | getExecutionState=" + task.getExecutionState()
+                    + " | isCancelled=" + task.isCancelled()));
+        });
+
+        //② runDelayed(..., 20L)
+        grs.runDelayed(plugin, task -> {
+            int now = Bukkit.getCurrentTick();
+            tick[0] = now - baseTick;
+            player.sendMessage(Component.text("[sched] ② runDelayed | declaredDelay=20 | tick=" + now
+                    + " | delta=" + tick[0] + " | thread=" + Thread.currentThread().getName()
+                    + " | isRepeatingTask=" + task.isRepeatingTask()
+                    + " | getExecutionState=" + task.getExecutionState()
+                    + " | isCancelled=" + task.isCancelled()));
+        }, 20L);
+
+        //② 边界实测：runAtFixedRate 的 initialDelay 允许范围（0 = 生产调用点实际传入值；try/catch 就地取异常原文，不抛给命令层）
+        try {
+            ScheduledTask zeroGlobal = grs.runAtFixedRate(plugin, t -> { }, 0L, 10L);
+            zeroGlobal.cancel();
+            str[4] = "initialDelay0=ACCEPTED";
+        }
+        catch (IllegalArgumentException e){
+            str[4] = "initialDelay0=REJECTED(" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")";
+        }
+        try {
+            BukkitTask zeroBukkit = Bukkit.getScheduler().runTaskTimer(plugin, () -> { }, 0L, 10L);
+            zeroBukkit.cancel();
+            str[5] = "initialDelay0=ACCEPTED";
+        }
+        catch (IllegalArgumentException e){
+            str[5] = "initialDelay0=REJECTED(" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")";
+        }
+        player.sendMessage(Component.text("[sched] ② boundary | GlobalRegionScheduler.runAtFixedRate(0,10) -> " + str[4]
+                + " | Bukkit.getScheduler().runTaskTimer(0,10) -> " + str[5]));
+
+        //② runAtFixedRate(..., 1L, 10L)：打印 #1/#2/#3 实际触发 tick；第 3 次自取消并打印 ④ 取消语义
+        grs.runAtFixedRate(plugin, task -> {
+            int now = Bukkit.getCurrentTick();
+            grrCount[0]++;
+            int n = grrCount[0];
+            if(n == 1) tick[1] = now - baseTick;
+            if(n == 2) tick[2] = now - baseTick;
+            if(n == 3) tick[3] = now - baseTick;
+            player.sendMessage(Component.text("[sched] ② runAtFixedRate #" + n
+                    + " | declared initialDelay=1 period=10 | tick=" + now + " | delta=" + (now - baseTick)
+                    + " | thread=" + Thread.currentThread().getName()
+                    + " | isRepeatingTask=" + task.isRepeatingTask()
+                    + " | getExecutionState=" + task.getExecutionState()
+                    + " | isCancelled=" + task.isCancelled()));
+            if(n == 3){
+                ScheduledTask.CancelledState cancel1 = task.cancel();
+                boolean cancelled1 = task.isCancelled();
+                ScheduledTask.ExecutionState state1 = task.getExecutionState();
+                ScheduledTask.CancelledState cancel2 = task.cancel();
+                boolean cancelled2 = task.isCancelled();
+                ScheduledTask.ExecutionState state2 = task.getExecutionState();
+                str[2] = "cancel1=" + cancel1 + ",isCancelled1=" + cancelled1 + ",state1=" + state1
+                        + ",cancel2=" + cancel2 + ",isCancelled2=" + cancelled2 + ",state2=" + state2;
+                player.sendMessage(Component.text("[sched] ④ cancel() #1 -> " + cancel1
+                        + " | isCancelled()=" + cancelled1 + " | getExecutionState()=" + state1));
+                player.sendMessage(Component.text("[sched] ④ cancel() #2 (repeat) -> " + cancel2
+                        + " | isCancelled()=" + cancelled2 + " | getExecutionState()=" + state2
+                        + " | no exception = idempotent"));
+            }
+        }, 1L, 10L);
+
+        //③ 对照：同周期 Bukkit 任务，**声明值与全局侧逐字相同**（delay=1 period=10；BukkitTask 句柄；第 3 次自取消）
+        bukkitHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            int now = Bukkit.getCurrentTick();
+            bukkitCount[0]++;
+            int n = bukkitCount[0];
+            if(n == 1) tick[4] = now - baseTick;
+            if(n == 2) tick[5] = now - baseTick;
+            if(n == 3) tick[6] = now - baseTick;
+            str[1] = Thread.currentThread().getName();
+            player.sendMessage(Component.text("[sched] ③ bukkit runTaskTimer #" + n
+                    + " | declared delay=1 period=10 | tick=" + now + " | delta=" + (now - baseTick)
+                    + " | thread=" + Thread.currentThread().getName()));
+            if(n == 3){
+                boolean before = bukkitHolder[0].isCancelled();
+                bukkitHolder[0].cancel();
+                boolean after = bukkitHolder[0].isCancelled();
+                str[3] = "isCancelledBefore=" + before + ",isCancelledAfter=" + after;
+                player.sendMessage(Component.text("[sched] ④(BukkitTask) cancel() -> void | isCancelled() before="
+                        + before + " | after=" + after + " | no exception = idempotent"));
+            }
+        }, 1L, 10L);
+
+        //③b 延时段对照：runDelayed(20) vs runTaskLater(20)（声明值相同；一次性任务，无残留）
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            int now = Bukkit.getCurrentTick();
+            tick[7] = now - baseTick;
+            player.sendMessage(Component.text("[sched] ③b bukkit runTaskLater | declaredDelay=20 | tick=" + now
+                    + " | delta=" + tick[7] + " | thread=" + Thread.currentThread().getName()));
+        }, 20L);
+
+        //⑤ 结论：60 tick 后（两个周期任务均已自取消）以本次原始值现算"能否直切"
+        grs.runDelayed(plugin, task -> {
+            int globalPeriod = (tick[1] >= 0 && tick[3] >= 0) ? tick[3] - tick[1] : -1;
+            int bukkitPeriod = (tick[4] >= 0 && tick[6] >= 0) ? tick[6] - tick[4] : -1;
+            boolean sameThread = str[0] != null && str[0].equals(str[1]);
+            boolean periodEquivalent = globalPeriod > 0 && globalPeriod == bukkitPeriod;
+            boolean delayedEquivalent = tick[0] >= 0 && tick[0] == tick[7];
+            boolean cancelSemanticsOk = str[2] != null && str[2].contains("isCancelled1=true");
+            boolean zeroDelayPolicySame = str[4] != null && str[5] != null
+                    && str[4].startsWith("initialDelay0=ACCEPTED") == str[5].startsWith("initialDelay0=ACCEPTED");
+            player.sendMessage(Component.text("[sched] ⑤ raw | globalThread=" + str[0]
+                    + " | bukkitThread=" + str[1]
+                    + " | globalDeltas=" + tick[1] + "/" + tick[2] + "/" + tick[3] + " (declared 1/10)"
+                    + " | bukkitDeltas=" + tick[4] + "/" + tick[5] + "/" + tick[6] + " (declared 1/10)"
+                    + " | globalRunDelayedDelta=" + tick[0] + " | bukkitRunTaskLaterDelta=" + tick[7] + " (declared 20)"
+                    + " | globalCancel=" + str[2] + " | bukkitCancel=" + str[3]));
+            player.sendMessage(Component.text("[sched] ⑤ verdict | sameThread=" + sameThread
+                    + " | periodEquivalent=" + periodEquivalent + " (global=" + globalPeriod + " bukkit=" + bukkitPeriod + ", declared 20)"
+                    + " | delayedEquivalent=" + delayedEquivalent
+                    + " | cancelSemanticsOk=" + cancelSemanticsOk
+                    + " | initialDelayPolicySame=" + zeroDelayPolicySame + " (global: " + str[4] + " / bukkit: " + str[5] + ")"
+                    + " | CONCLUSION=" + (sameThread && periodEquivalent && delayedEquivalent && cancelSemanticsOk && zeroDelayPolicySame
+                        ? "CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (same thread + same tick timing + equivalent cancel semantics)"
+                        : "CANNOT swap the adapter as-is: at least one measured item differs (see the raw values above)")));
+        }, 60L);
+        return true;
     }
 
     private void sendHelp(Player player){

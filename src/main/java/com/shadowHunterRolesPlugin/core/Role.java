@@ -87,7 +87,7 @@ public class Role {
      * {@code Builder} 过去的三处**校验用**实例化（"造了再丢"）已在收尾批⑤随 id 上移（注册处声明）而删除，
      * 全仓不再有"为取 id 而临时造一个组件"的代码 —— 判据是「创建路径唯一（本方法）」。
      * 服务集**在构造期**交给组件（见 {@code roleComponent.ComponentFactory}）：组件返回时即已持有它，
-     * 容器随后立刻登记（五条件①④，见 {@code docs/阶段4-交付小结.md} §5.7），注入不可能被遗漏。
+     * 容器随后立刻登记（五条件①④，见 {@code debug-logs/阶段4-交付小结.md} §5.7），注入不可能被遗漏。
      */
     private <T extends RoleComponent> T createComponent(String id, ComponentFactory<T> factory, ComponentServices services){
         return factory != null ? factory.create(id, services) : null;

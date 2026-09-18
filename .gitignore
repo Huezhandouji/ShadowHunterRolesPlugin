@@ -32,10 +32,8 @@ run/
 server/
 plugins/
 logs/
-# 说明：冻结证据日志统一放在 docs/测试记录/（测试记录文件夹，含验证/评审报告与 agent 过程记录）
+# 说明：测试记录 / 冻结日志 / 验证评审报告 / agent 过程记录统一放在 debug-logs/（其忽略规则见下方 debug-logs 段）
 *.log
-# 例外：测试记录文件夹内的日志是受管证据 ⇒ 正常跟踪，新批次直接 git add 即可（无需 -f）
-!docs/测试记录/**/*.log
 eula.txt
 server.properties
 ops.json

@@ -1,7 +1,7 @@
 ================================================================================
 t67 · 冷却三条窄分支（G-1 / G-2 / G-3）—— **取证说明**
 —— 会话 2026-09-18 22:28:23 → 22:29:4x（单次起服 + 一次在线主冻结）· 执行者 `eng-取证`（t67 / attempt 1）
-—— 路径命名为**提议**（卡面 inScope 我这边不可见）⇒ 若队长要求改名，整件可按身份重命名 ✓
+—— 路径已按【卡面 inScope 实名】落位 ✓（实体 = `阶段5-冷却分支补齐-说明.txt`；原提议名已由队长归位，**内容与身份逐字不变** ✓）
    ① 自绑定（制品 + commit + 日志身份 + F1 链）· ② 执行链与判据 · ③ 三条目标逐字命中（**双路径**）
    ④ 工装与双向自证 · ⑤ 约束合规（零 src / 零构建 / 无新代制品）· ⑥ 申报
 ================================================================================
@@ -80,4 +80,29 @@ Mode B 三行齐 ✓ · 正序集合差 **C = 0** ✓ · 主冻结在**仍在线
 [6.2] **本轮制品 = 第 5 代** ✓（`21002ABC…`，**含 `t60` 删 1 行死 import 的改动** ✓）：冷却指令行为与之无关 ✓，但**证据绑定的是这一代** ⇒ 引用请用 §1.1 身份，**不要**用 `build/libs` 去指代更早的代次 ✗（复核方同向提醒 ✓）。
 [6.3] **主冻结直接写入证据路径**（仍在线时）✓ —— 这是 §2.1① 要求的"主冻结"形态 ✓；停机后另存补冻结（delta = 0 ✓，见 §2.7）。
 [6.4] **我未起第二台服、未改任何冻结件、未做 git 写** ✓；本轮写入 = 主冻结 1 件 + 本说明 + 停服物证 + `.scratch` 内工装与 transcript ✓。
+================================================================================
+
+
+§7 负样本（acceptance 4）与构造顺序说明
+--------------------------------------------------------------------------------
+[7.1] **三条非 op 负样本**（`非 op 窗 [command-debug] = 0` ✓）：由**同一插件代的权威轮 `t63`** 保留 ——
+      冻结件 `debug-logs/测试记录/阶段5-起服日志-控制台输出-取证.log`
+      = **39033 B / 223 行 / 21:55:30.018 / SHA256 `972AAE6E90A5B8D11268265956E8FE482B44397FF9F72625BB37D2A55BF7D326`** ✓，其内逐字：
+```
+[21:53:23] probe159935 issued server command: /role debug sched all
+[21:53:27] probe159935 issued server command: /role debug cooldown status 0
+[21:53:29] probe159935 issued server command: /role debug cooldown end 0
+[21:55:06] probe715922 issued server command: /role debug sched all
+[21:55:10] probe715922 issued server command: /role debug cooldown status 0
+[21:55:12] probe715922 issued server command: /role debug cooldown end 0
+```
+      ⇒ 三条命令（`sched all` / `cooldown status 0` / `cooldown end 0`）各由**非 op** 机器人发出，其**非 op 窗切片（720 字符）内 `[command-debug]` = 0** ✓
+      （已由 `t64` 独立复核，见其 §3.2；本卡**承接**该负样本，**未在本轮重新捕获** ✗ —— 如实申报）。
+[7.2] **构造顺序**：卡面 acceptance 3 的写法为"先 `/role set` 启动冷却 → 冷却中 `restart`（G-1）→ 第二次 `end`（G-2）→ 未绑角色 op 会话发 `status`（G-3）"。
+      本轮**实际顺序** = **G-3 最前**（同一个 op 机器人、**在 `/role set` 之前**发 `status/end/restart 1`）→ 再 `/role set meiqihezi` → G-1 → G-2 ✓
+      ⇒ **前置态等价**（G-3 的充分条件 = op **且未绑角色** ✓ 两条都满足 ✓），且**省去第二个 op 会话** ✓；卡面要求的"逐条命令 + 前置态"已在 §3 表中列全 ✓（**顺序差异如实申报** ✗）。
+[7.3] **判据补充（acceptance 5）**：级别字段锚定扫描含 **FATAL** ⇒ `/(ERROR|SEVERE|FATAL)\]:` 在冻结件内 = **0** ✓。
+[7.4] **卡面 Verify 命令结果**（现算）：`git rev-parse HEAD` = `0e85979b76bb348bf0a781973d72a250d56bf3b2` ✓ ·
+      `git grep -n -E 'RESTARTED dispatched|no-op \(was not cooling\)|You have no role yet' -- src/main/java/com/shadowHunterRolesPlugin/command`
+      = **4 命中**（`ClearRoleCommand.java:65` · `DebugCooldownCommand.java:50 / :96 / :104` ✓）· `git status --porcelain -- src` = **0** ✓。
 ================================================================================

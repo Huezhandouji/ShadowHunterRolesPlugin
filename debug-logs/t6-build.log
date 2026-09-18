@@ -1,0 +1,34 @@
+﻿Starting a Gradle Daemon, 2 busy and 3 stopped Daemons could not be reused, use --status for details
+Reusing configuration cache.
+.\gradlew : Caught exception: Couldn't open current thread, error = 5
+At line:1 char:220
++ ... adle-work"; .\gradlew build -x copyPluginJar --console=plain 2>&1 | O ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Caught exceptio...read, error = 5:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Exception in thread "File watcher server" net.rubygrapefruit.platform.NativeException: Couldn't open current thread, er
+ror = 5
+	at org.gradle.fileevents.internal.AbstractNativeFileEventFunctions$NativeFileWatcher.initializeRunLoop0(Native Method)
+	at org.gradle.fileevents.internal.AbstractNativeFileEventFunctions$NativeFileWatcher.initializeRunLoop(AbstractNativeF
+ileEventFunctions.java:25)
+	at org.gradle.fileevents.internal.AbstractFileEventFunctions$AbstractFileWatcher$1.run(AbstractFileEventFunctions.java
+:151)
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :compileKotlin NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :processResources UP-TO-DATE
+> Task :compileJava
+> Task :classes
+> Task :jar
+> Task :assemble
+> Task :compileTestKotlin NO-SOURCE
+> Task :compileTestJava NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :check UP-TO-DATE
+> Task :build
+
+BUILD SUCCESSFUL in 16s
+3 actionable tasks: 2 executed, 1 up-to-date
+Configuration cache entry reused.

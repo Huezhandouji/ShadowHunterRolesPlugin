@@ -62,3 +62,13 @@ sha256 = 0F2D901C6B6FE301E32CDA2B52C7377E940F8C6D058A7E96B6B92D1C3377DF74
 覆盖证据 = 阶段5-起服日志-控制台输出-取证.log（39033 B / 223 行 / 2026-09-18 21:55:30.018 / SHA256 972AAE6E90A5B8D11268265956E8FE482B44397FF9F72625BB37D2A55BF7D326）：Mode B 三行 + 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log，13/13 行全等、ADDED=0）+ 主冻结在仍在线时 + 只 job_kill + 停服三路互证 + 运行级锚（[command-debug]=99 · [sched]=72 · matrixAllPairsMatch==6 · portLegEquivalent==6 · CONCLUSION==6 · ERROR/SEVERE=0）；bot 冒烟 mineflayer 双路径 + op 门控双窗，断言 failed=0
 与前代关系 = 与登记 4 为同一字节制品（同一 jar 文件：不重复复制、不重建）：Gradle 全部任务 UP-TO-DATE（输入/输出哈希匹配）⇒ 该 jar 即提交态 src 的制品；重建只会改其 mtime 并反转登记 4 的 F1 链（协同规范 §3.4）
 备注 = 本登记只追加"提交态"第二轮运行证据；F1 链 = jar 21:41:02 < freezeA 21:49:37.907 < freezeB 21:55:30.018 < 本登记；提交绑定 commit = b42d775aef2f7163ffcc34c39e5af2a93a655bf8（起服时 HEAD；src/main tree = beed92cb9997049d8b086f164b9f386a74eae1ba，与取证时刻 HEAD 889e95c1b47a249150e9f7e3091e82b4bc0d9dee 的 src/main tree 逐字相同）
+
+# --- 登记 6 ---
+登记时刻 = 2026-09-18 22:05:30
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260918-220106-21002ABC.jar
+bytes = 159661
+mtime = 2026-09-18 22:01:06.944
+sha256 = 21002ABCA1291D5B18929961460E565C721790BD8E251EBE7DE744D2AE6BA408
+覆盖证据 = 阶段5-起服日志-清理批.log（6074 B / 56 行 / mtime 2026-09-18 22:03:14.958 / SHA256 3B6788C93B55B15F6C31ADB1B34ACFFAA00BFD296B0E57E98C5A9AD908901980）：Mode B 三行 + 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0、REMOVED=0、A=B=C=0）+ 停机前先在仍在线时主冻结（22:04:34 冻结，与原件共享读逐字节相同）+ 只 job_kill + 停服三路互证 + 锚定级别字段扫描 ERROR/SEVERE=0
+与前代关系 = 本代是首代含【真删代码】的制品（RedDeeplySorrowSkill.java 删 1 行死 import：全 src \bRoleInstance\b 139 → 138）⇒ 与登记 4/5（0F2D901C… / 159652 B）**不存在 class 级等价主张**，自出 Mode B 运行证据；jar 159652 → 159661 B（+9 B：删行使源文件属性/行号表变化）
+备注 = 卡面 inScope 未列本文件与 jar 归档两条路径 ⇒ 按 t39/t50/t59 先例实际执行并在 output 逐条申报；F1 链 = jar mtime 22:01:06.944 < log mtime 22:03:14.958 < 本登记 2026-09-18 22:05:30

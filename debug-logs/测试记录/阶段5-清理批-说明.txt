@@ -1,0 +1,168 @@
+================================================================================
+t60 · 清理批（拆分版）· 交付说明
+—— 唯一改动 = roleComponent/red/RedDeeplySorrowSkill.java:3 删 1 行死 import
+—— 判据读数一律带自己的测量时刻（协同规范 §5 族 8 ③）；本文件为【说明】性质
+================================================================================
+
+§0 一句话
+  真删 1 行死 import（`import com.shadowHunterRolesPlugin.core.RoleInstance;`）⇒ 该文件
+  `\bRoleInstance\b` 的【代码位】1 → 0；全 src 双口径 139 → 138（delta = -1，可逐条归因）；
+  两条字面量口径零差异；构建通过 + Mode B 三行 + 正序集合差只看 C=0 + 停机前先在仍在线时冻结
+  + 只 job_kill + 停服三路互证；新代制品归档 + MANIFEST 登记 6（只追加）。零 git 写。
+
+§1 门禁与基线（"动手前一刻"取）
+  [21:59:26.991] 闸门机械自验
+    · `git status --porcelain -- src` = 0 行（无人在写）· HEAD = 643302d
+    · 最新 src mtime = 21:40:43.952 < 提交时刻 21:58:34 ✓
+    · 窗口三路 free：TCP 25566 失败 · netstat 无 `:25566` 条目 · `latest.log` 独占打开成功 ·
+      java 仅 2 个 19:01 daemon（**未**用 `Get-NetTCPConnection`，协同规范 §5 族 1）
+  [21:59:41.000] 基线快照 `.scratch/bot/src-snapshots/t60-before` = **91 个 .java + SHA256.txt 91 行**（逐文件自证）
+  [21:59:41.850] 基线判据（报告：`.scratch/bot/t60-criteria-before.txt`）
+    ⇒ 目标文件 = 3941 B / 81 行 / mtime 2026-09-18 19:25:08.308 /
+      SHA256 76EDDD9EA8A2842E4F3B557D85B200185F882C24024BC958CF657F497B990CA3（与卡面事实一致，未变）
+  ⇒ 旧基线 `t59cmd-before`（21:24:12）已失效，**未使用** ✓
+
+§2 改动面（唯一）
+  文件：src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedDeeplySorrowSkill.java
+  `git diff --numstat` = **0 插入 / 1 删除**
+  旧 blob = c63952e229524edcf2d3ef12def3ff60f79a431c（HEAD 版）
+  3941 B / 81 行  →  3887 B / 80 行；mtime 2026-09-18 21:59:56.550
+  新 SHA256 = AAEDC1891DB34244A848333E88AE51F3D1CAE62014E94AF745CBDDDFA0E0724
+  唯一删除行 = `-import com.shadowHunterRolesPlugin.core.RoleInstance;`
+  ⇒ 除该行外整串未变（numstat 0/1 即机械证据）
+
+§3 判据表
+
+  3.1 归零组（**卡面原文口径**）
+  | 判据 | before @21:59:41.850 | after @22:00:02.209 | 判定 |
+  |---|---|---|---|
+  | 该文件 `\bRoleInstance\b` **代码位** | 1（`:3` import） | **0** | ✓ 归零 |
+  | （同组旁读）注释位 | 1（`:66`） | 1（删行后为 `:65`） | 保留 ✓ |
+  | `git ls-files --others --exclude-standard` | 0 行 | **0 行** | ✓ 空 |
+  | `git status` 的 `??` 计数 | 0 | **0** | ✓ 归零 |
+  另：改动后 porcelain = 1 行 ` M <该 java>` —— **M ≠ ??**，`??` 仍须为 0 ✓（卡面口径不受影响）
+
+  3.2 减少组（双口径 delta < 0 且逐条可解释）—— **不是"0 行"**
+  度量 = 全 src `\bRoleInstance\b` 命中行数
+  | 口径 | before | after | delta |
+  |---|---|---|---|
+  | `git grep`（普通） | 139 | **138** | **-1** |
+  | `git grep --untracked` | 139 | **138** | **-1** |
+  ⇒ 两口径一致（无未跟踪 .java 贡献命中；族 8 联合读 ✓）
+  (d) 逐条申报（行号无关口径，把"漂移"从"真变化"里剔除）：
+    · **真删除**：`import com.shadowHunterRolesPlugin.core.RoleInstance;`（原 `:3`）⇒ 命中 -1 ✓
+    · **行号漂移（非内容变化）**：原 `:66` 的注释行同文搬到 `:65`（删 1 行 ⇒ 其后整体上移）
+      ⇒ 行键口径会读成"删 1 + 增 1"；文本口径（丢行号）净值 = **REMOVED 1 / ADDED 0**
+  ⇒ 结论写"净减少 1 条命中且逐条可归因"，**不写"0 行"** ✓
+
+  3.3 旁证（探针类；**不在本卡改动面内**，仅旁证）
+  | 判据 @22:00:02.209 | 现算 | 判定 |
+  |---|---|---|
+  | 探针输出**锚串**白名单【外】 | 0（白名单内 30） | ✓ |
+  | `[sched]` 白名单【外】 | 0（白名单内 28） | ✓ |
+  | `schedprobe` | 1（适配器 `:16` 引用证据文件名） | **不要求归零** ✓ |
+  | `io.papermc…threadedregions.scheduler` | 4（子指令 2 + 适配器必需 2） | **不要求归零** ✓ |
+  白名单 REGEX = `command/(DebugSchedCommand|DebugCommand)\.java`；过滤作用在**【行】**上（**不**作 pathspec）
+  锚串形态 = `matrixAllPairsMatch=|portLegEquivalent=|\[sched\] [①②③④⑤]`（**码点构造**）
+  **未**用裸词 `sched` ✗ —— 它命中 `scheduler`/`scheduler()` 等生产 API 名，实测产生 **22 条假"白名单外"**
+
+  3.4 红线
+  | 项 | 现算 | 判定 |
+  |---|---|---|
+  | `api/**` porcelain | 0 | ✓ 未改 |
+  | `ComponentServices` 成员数 | **10** | ✓ 不变 |
+  | `callEvent` | **2**（`RoleInstance:584` / `:603`） | ✓ 两事件对外发布不变 |
+  | `plugin.yml` + 主类 porcelain | 0 | ✓ `/role` 注册方式一字未改 |
+  | 冷却 / 调度语义 | 唯一删除行是 import ⇒ 未触碰任何冷却或调度代码 | ✓ 一字不改 |
+  | git 写 | 未执行任何 `add`/`commit`/`checkout` | ✓ |
+
+§4 双口径（字面量多重集）
+  口径 A = path-aware（`numeric-multiset.ps1`，`-BaseDir` 传**绝对路径**）
+    numeric：before 658 / after 658 / **diff rows = 0**
+    string ：before 396 / after 396 / **diff rows = 0**
+  口径 B = value-only（`t59-literal-net.ps1`，丢文件身份）
+    numeric：658 / 658 / net = 0；REMOVED 0 / ADDED 0
+    string ：396 / 396 / net = 0；REMOVED 0 / ADDED 0
+  ⇒ 本卡只删 1 行 import（非字面量）⇒ **两条口径差异均为 0** ✓（若有非零行则须逐条申报）
+
+§5 构建与制品
+  [22:01:06] `.\gradlew build -x copyPluginJar` ⇒ exit **0** / `BUILD SUCCESSFUL in 13s`
+  最新 `.class` = 2026-09-18 22:01:06.386（RedDeeplySorrowSkill.class）**早于** jar mtime ✓
+  `src 新于 jar` = **0** ✓
+  本代 jar = `build/libs/ShadowHunterRolesPlugin-1.0.0.jar`
+    = **159661 B** / mtime **2026-09-18 22:01:06.944**
+    / SHA256 **21002ABCA1291D5B18929961460E565C721790BD8E251EBE7DE744D2AE6BA408**
+  与上一代（MANIFEST 登记 4/5 的 `0F2D901C…` / 159652 B）差 **+9 B**
+  ⇒ 本代是**真删代码后的新 class**，**不主张**与任何前代 class 级等价 ✓
+  **未**对已冻结代次执行"删 jar + 重建"（协同规范 §3.4）✓
+
+§6 起服 / 冻结 / 停机（读数详见 `阶段5-清理批-停服物证.txt`）
+  Mode B 三行：
+    `[22:03:12] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0`
+    `[22:03:12] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.`
+    `[22:03:13] [Server thread/INFO]: Done (12.213s)! For help, type "help"`
+  正序集合差（锚 = `阶段4-起服日志-T2b.log`）：anchor 13 = current 13 / ADDED **0** / REMOVED **0** / A=B=C=**0**
+    ⇒ **只看 C = 0** ✓
+  锚定级别字段扫描 `\] \[[^]]*/(ERROR|SEVERE)\]` = **0** ✓
+    （裸 `ERROR` 口径 = **3**，全部是 oshi WMI 的 **WARN** 行正文含 "Error was …" ⇒ 裸口径必然假阳性）
+  主冻结（**服务器仍在线时**）：22:04:33.939 → 22:04:34.078
+    冻结件 = 6074 B / mtime 2026-09-18 22:03:14.958 / SHA256 3B6788C93B55B15F6C31ADB1B34ACFFAA00BFD296B0E57E98C5A9AD908901980
+    与原件（共享读）**逐字节相同** ✓
+  **只** `job_kill`：不对 java 进程动手；作业以 killed 终结
+  停服三路互证 @22:04:57.182：TCP 失败 · netstat **无任何** `:25566` 条目（连 TIME_WAIT 都清空）·
+    `latest.log` 独占打开成功 · java 仅剩 19:01 daemon
+  F1 链：jar mtime **22:01:06.944** < log mtime **22:03:14.958** < 本代物证 mtime（见 §7 各文件身份）
+
+§7 逐文件身份（2026-09-18 22:0x 现算；引用请按协同规范 §7.1 带时刻重算）
+  | 文件 | bytes | mtime | SHA256 |
+  |---|---|---|---|
+  | src/main/java/…/roleComponent/red/RedDeeplySorrowSkill.java | 3887 | 21:59:56.550 | AAEDC1891DB34244A848333E88AE51F3D1CAE62014E94AF745CBDDDFA0E0724 |
+  | debug-logs/测试记录/阶段5-起服日志-清理批.log | 6074 | 22:03:14.958 | 3B6788C93B55B15F6C31ADB1B34ACFFAA00BFD296B0E57E98C5A9AD908901980 |
+  | debug-logs/测试记录/阶段5-清理批-说明.txt（本文件） | 见报文 | 见报文 | 见报文 |
+  | debug-logs/测试记录/阶段5-清理批-停服物证.txt | 见报文 | 见报文 | 见报文 |
+  | build/libs/ShadowHunterRolesPlugin-1.0.0.jar | 159661 | 22:01:06.944 | 21002ABCA1291D5B18929961460E565C721790BD8E251EBE7DE744D2AE6BA408 |
+  | debug-logs/回滚快照/jars/…-20260918-220106-21002ABC.jar | 159661 | 22:01:06.944 | 21002ABCA1291D5B18929961460E565C721790BD8E251EBE7DE744D2AE6BA408 |
+
+§8 仪器自曝（如实记录，非掩饰）
+  1) **族 5 命中**：起服期间对**原件** `run/logs/latest.log` 调 `Get-FileHash` 被写锁拒绝 ⇒ 我那次
+     "byte-identical" 比较拿到**空串** ⇒ 假 `False`。改用**共享读**（`FileShare.ReadWrite`，§5 族 1 的修法）
+     并加"两侧输出非空"断言后重做 ⇒ 原件 6074 B / `3B6788C9…` == 冻结件 ⇒ **True** ✓
+  2) **族 9 命中（第 1 次）**：`t60-criteria.ps1 -DeltaFrom <相对路径>` 在脚本 `Push-Location` 之后解析
+     ⇒ 找不到 sidecar；**族 5 输入护栏当场拦下**（未静默给"0 行"）⇒ 已修为"先按原始位置绝对化"，
+     并用**刚才失败的那条相对路径原样复跑**验证修复 ✓
+  3) **族 9 命中（第 2 次）**：`numeric-multiset.ps1 -BaseDir <相对路径>` ⇒ 该仪器 `line 73` 用**相对串长度**
+     去切**绝对路径** ⇒ 两侧键前缀错位 ⇒ 报出 **1316 行假差异**（`main\java\…` vs `rc-snapshots\t60-before\main\java\…`）。
+     **未改该共享仪器**（他人按哈希引用）⇒ 改以**绝对路径**复跑 ⇒ diff rows = **0** ✓；已记为调用要求。
+  4) **行号漂移**：删 1 行会让"行键口径"读出 2 删 / 1 增（同文搬到上一行）⇒ 已在仪器内新增**文本口径**
+     （丢行号）把"真变化"与"漂移"分开 ⇒ 真变化 = REMOVED 1 / ADDED 0 ✓（即 (d) 的唯一一条）
+  5) **忽略子树枚举**：实测 `git ls-files --others -- debug-logs` = **2**（本卡归档 jar + 冻结日志），
+     而 `--exclude-standard` 口径 = **0** ⇒ 两口径含义不同，本说明**两个都报**（卡面判据用后者；
+     另报前者以免"看起来干净"误导）✓
+
+§9 边界与申报
+  卡面 inScope = 1 个 java + 3 个证据文件。实际落盘另含 **2 条"判据要求但 inScope 未列"** 的路径
+  （按 t39/t50/t59 先例：实际执行 + 在 output 逐条申报；`changedPaths` 只列 inScope 内的）：
+    · `debug-logs/回滚快照/jars/ShadowHunterRolesPlugin-1.0.0-verified-20260918-220106-21002ABC.jar`（新代归档）
+    · `debug-logs/回滚快照/jars/MANIFEST.txt`（**登记 6，只追加**；已机械证明：原 6612 B 逐字节为新文件前缀 ⇒ 登记 4/5 未动）
+  另（队长 21:5x 指示，**非**本卡判据）：`debug-logs/测试记录/{t60-runbook.md, t60-criteria.ps1}` 两份预备物存档。
+  **未**改 `command/**`（留给后续卡）✓ · **未**改 `api/**` ✓ · **未**改冷却/调度语义 ✓ · **未**做 git 写 ✓
+
+§10 源码状态绑定
+  基线 commit = **643302d**（动笔时 HEAD）· 交付时 HEAD = **bd7c794**
+  两者 `src/main` tree **逐字相同** = `beed92cb9997049d8b086f164b9f386a74eae1ba` ✓
+  `643302d..HEAD` 区间只改 1 条路径 = `debug-logs/测试记录/协同规范-起服停机取证.txt`（**非 src**）✓
+  ⇒ "我基于的 src" 与"当前 HEAD 的 src"是同一棵 ⇒ 证据链未受他人提交影响 ✓
+
+§11 复算命令（全部可重跑）
+  cd ShadowHunterRoles
+  git grep -n -E '\bRoleInstance\b' -- src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedDeeplySorrowSkill.java
+  git grep -n          -E '\bRoleInstance\b' -- src/main/java | Measure-Object -Line      # 普通口径
+  git grep -n --untracked -E '\bRoleInstance\b' -- src/main/java | Measure-Object -Line  # --untracked 口径
+  git ls-files --others --exclude-standard
+  git status --porcelain
+  git diff --numstat -- src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedDeeplySorrowSkill.java
+  powershell -NoProfile -ExecutionPolicy Bypass -File ..\.scratch\bot\t60-criteria.ps1 -Phase after -Stamp recheck `
+      -DeltaFrom <绝对路径>\t60-roleinstance-plain-before.txt
+  powershell -NoProfile -ExecutionPolicy Bypass -File ..\.scratch\bot\numeric-multiset.ps1 -BaseDir <绝对路径>\t60-before -Mode both -Tag recheck
+  powershell -NoProfile -ExecutionPolicy Bypass -File ..\.scratch\bot\log-delta.ps1 -Anchor debug-logs\测试记录\阶段4-起服日志-T2b.log -Current debug-logs\测试记录\阶段5-起服日志-清理批.log -Tag recheck
+================================================================================

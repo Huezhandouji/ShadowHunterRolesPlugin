@@ -47,6 +47,15 @@ if (-not $Stamp)    { $Stamp    = $Phase }
 $log = New-Object System.Collections.Generic.List[string]
 function W([string]$s) { $log.Add($s); Write-Output $s }
 
+# family 9: Push-Location below changes what a RELATIVE path means. Resolve a
+# relative -DeltaFrom against the ORIGINAL location first. (Measured 2026-09-18:
+# a relative sidecar path resolved inside the repo after Push-Location and the
+# family-5 input guard fired -- which is how it was caught instead of silently
+# reporting a false "0 rows".)
+if ($DeltaFrom -and -not [System.IO.Path]::IsPathRooted($DeltaFrom)) {
+  $DeltaFrom = Join-Path (Get-Location).Path $DeltaFrom
+}
+
 Push-Location $RepoRoot
 
 $targetRel = 'src/main/java/com/shadowHunterRolesPlugin/roleComponent/red/RedDeeplySorrowSkill.java'
@@ -126,11 +135,37 @@ if ($DeltaFrom) {
     $rm = @($before | Where-Object { $plain -notcontains $_ })
     $ad = @($plain  | Where-Object { $before -notcontains $_ })
     W ("[C-DELTA] vs " + $absDelta)
+    W ("      caliber 1 = LINE-KEYED (path:lineno:text)  -- line numbers are moving targets")
     W ("      before=" + $before.Count + "  after=" + $plain.Count + "  DELTA=" + ($plain.Count - $before.Count) + "   (card requires < 0, itemised)")
     W ("      REMOVED = " + $rm.Count)
     foreach ($x in $rm) { W ("        - " + $x) }
     W ("      ADDED   = " + $ad.Count)
     foreach ($x in $ad) { W ("        + " + $x) }
+
+    # caliber 2 = TEXT-ONLY (drop "<path>:<lineno>"): separates a REAL content
+    # change from a pure LINE-NUMBER SHIFT. Measured 2026-09-18: deleting 1 line
+    # made caliber 1 report 2 REMOVED / 1 ADDED, because every later line in the
+    # file shifted up by one -- caliber 2 collapses that noise.
+    function TextOnly([string[]]$arr) { return @($arr | ForEach-Object { ($_ -split ':', 3)[2] }) }
+    $bt = TextOnly $before
+    $at = TextOnly $plain
+    $rmT = New-Object System.Collections.Generic.List[string]
+    $adT = New-Object System.Collections.Generic.List[string]
+    foreach ($k in ($bt | Sort-Object -Unique)) {
+      $n = @($bt | Where-Object { $_ -eq $k }).Count
+      $m = @($at | Where-Object { $_ -eq $k }).Count
+      for ($i = 0; $i -lt ($n - $m); $i++) { $rmT.Add($k) }
+    }
+    foreach ($k in ($at | Sort-Object -Unique)) {
+      $m = @($at | Where-Object { $_ -eq $k }).Count
+      $n = @($bt | Where-Object { $_ -eq $k }).Count
+      for ($i = 0; $i -lt ($m - $n); $i++) { $adT.Add($k) }
+    }
+    W ("      caliber 2 = TEXT-ONLY (line numbers dropped)  -- real content change only")
+    W ("      REMOVED = " + $rmT.Count)
+    foreach ($x in $rmT) { W ("        - " + $x) }
+    W ("      ADDED   = " + $adT.Count)
+    foreach ($x in $adT) { W ("        + " + $x) }
   } else { W ("[C-DELTA] !! sidecar NOT FOUND: " + $DeltaFrom + "  (assert input non-empty - family 5)") }
 }
 

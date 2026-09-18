@@ -43,17 +43,17 @@ public class DebugCooldownCommand implements SubCommand {
         if(!(sender instanceof Player player)) return true;
 
         if(args.length < 2){
-            player.sendMessage(Component.text(getUsage()));
+            send(player, getUsage());
             return true;
         }
         if(!roleManager.hasRole(player)){
-            player.sendMessage(Component.text("You have no role yet!"));
+            send(player, "You have no role yet!");
             return true;
         }
 
         RoleInstance instance = roleManager.getRoleInstance(player);
         if(instance == null){
-            player.sendMessage(Component.text("Role instance not found for you."));
+            send(player, "Role instance not found for you.");
             return true;
         }
 
@@ -61,17 +61,17 @@ public class DebugCooldownCommand implements SubCommand {
         String target = args[1];
         String componentId = resolveComponentId(instance, target);
         if(componentId == null){
-            player.sendMessage(Component.text("No component found for: " + target));
+            send(player, "No component found for: " + target);
             return true;
         }
         RoleComponent component = instance.componentRegistry().getById(componentId);
         if(!(component instanceof ActiveComponent active)){
-            player.sendMessage(Component.text("Not an active component (skill/main weapon): " + componentId));
+            send(player, "Not an active component (skill/main weapon): " + componentId);
             return true;
         }
         ComponentServices services = instance.servicesOf(componentId);
         if(services == null){
-            player.sendMessage(Component.text("No services bound for component: " + componentId));
+            send(player, "No services bound for component: " + componentId);
             return true;
         }
         CooldownPort cooldowns = services.cooldowns();
@@ -81,34 +81,43 @@ public class DebugCooldownCommand implements SubCommand {
             case "status":{
                 int remaining = cooldowns.remainingTicks();
                 boolean cooling = remaining > 0;
-                player.sendMessage(Component.text("[cooldown] " + componentId
+                send(player, "[cooldown] " + componentId
                         + " | cooling=" + cooling
                         + " | remainingTicks=" + remaining
                         + " | remainingSeconds=" + String.format("%.2f", remaining / 20.0)
-                        + " | declaredTicks=" + declared));
+                        + " | declaredTicks=" + declared);
                 return true;
             }
             case "end":{
                 boolean wasCooling = cooldowns.remainingTicks() > 0;
                 boolean ended = cooldowns.end();
-                player.sendMessage(Component.text("[cooldown] end(" + componentId + ") returned=" + ended
+                send(player, "[cooldown] end(" + componentId + ") returned=" + ended
                         + " | wasCooling=" + wasCooling
-                        + (ended ? " | ENDED_BY_COMPONENT dispatched (onCooldownEnd)" : " | no-op (was not cooling)")));
+                        + (ended ? " | ENDED_BY_COMPONENT dispatched (onCooldownEnd)" : " | no-op (was not cooling)"));
                 return true;
             }
             case "restart":{
                 boolean wasCooling = cooldowns.remainingTicks() > 0;
                 cooldowns.start(declared);
                 int remaining = cooldowns.remainingTicks();
-                player.sendMessage(Component.text("[cooldown] restart(" + componentId + ") wasCooling=" + wasCooling
+                send(player, "[cooldown] restart(" + componentId + ") wasCooling=" + wasCooling
                         + (wasCooling ? " | RESTARTED dispatched (old segment dropped)" : " | no old segment was cooling")
-                        + " | newRemainingTicks=" + remaining));
+                        + " | newRemainingTicks=" + remaining);
                 return true;
             }
             default:
-                player.sendMessage(Component.text(getUsage()));
+                send(player, getUsage());
                 return true;
         }
+    }
+
+    /**
+     * 双写：**玩家侧**（Adventure {@code Component}，文本与既有实现逐字相同）+ **服务端日志**（{@link DebugCommand#log}，
+     * 带 {@code [command-debug]} 前缀）—— 用户要求"调试信息**也**输出至服务端控制台"，故是相加而非取代。
+     */
+    private void send(Player player, String text){
+        player.sendMessage(Component.text(text));
+        DebugCommand.log(text);
     }
 
     @Override

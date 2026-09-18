@@ -65,13 +65,13 @@ public class DebugSchedCommand implements SubCommand {
         if(!(sender instanceof Player player)) return true;
 
         if(args.length >= 1 && !"all".equals(args[0])){
-            player.sendMessage(Component.text(getUsage()));
+            sendKey(player, getUsage());
             return true;
         }
 
         ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
         if(plugin == null){
-            player.sendMessage(Component.text("[sched] plugin instance unavailable; probe aborted."));
+            sendKey(player, "[sched] plugin instance unavailable; probe aborted.");
             return true;
         }
 
@@ -85,16 +85,16 @@ public class DebugSchedCommand implements SubCommand {
         final GlobalRegionScheduler grs = Bukkit.getGlobalRegionScheduler();
         final BukkitTask[] bukkitHolder = new BukkitTask[1];
 
-        player.sendMessage(Component.text("[sched] probe start | commandThread=" + Thread.currentThread().getName()
+        sendKey(player, "[sched] probe start | commandThread=" + Thread.currentThread().getName()
                 + " | commandTick=" + baseTick + " | primaryThread=" + Bukkit.isPrimaryThread()
-                + " | declared: runDelayed=20t, runAtFixedRate=1/10t, bukkit runTaskTimer=1/10t, boundary=0/10t"));
+                + " | declared: runDelayed=20t, runAtFixedRate=1/10t, bukkit runTaskTimer=1/10t, boundary=0/10t");
 
         //① execute(Plugin, Runnable)：无返回值/无句柄 ⇒ 只测线程与相位
         grs.execute(plugin, () -> {
             int now = Bukkit.getCurrentTick();
-            player.sendMessage(Component.text("[sched] ① execute | thread=" + Thread.currentThread().getName()
+            sendKey(player, "[sched] ① execute | thread=" + Thread.currentThread().getName()
                     + " | tick=" + now + " | delta=" + (now - baseTick)
-                    + " | primaryThread=" + Bukkit.isPrimaryThread()));
+                    + " | primaryThread=" + Bukkit.isPrimaryThread());
         });
 
         //② run(Plugin, Consumer<ScheduledTask>)：句柄可达性
@@ -137,8 +137,8 @@ public class DebugSchedCommand implements SubCommand {
         catch (IllegalArgumentException e){
             str[5] = "initialDelay0=REJECTED(" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")";
         }
-        player.sendMessage(Component.text("[sched] ② boundary | GlobalRegionScheduler.runAtFixedRate(0,10) -> " + str[4]
-                + " | Bukkit.getScheduler().runTaskTimer(0,10) -> " + str[5]));
+        sendKey(player, "[sched] ② boundary | GlobalRegionScheduler.runAtFixedRate(0,10) -> " + str[4]
+                + " | Bukkit.getScheduler().runTaskTimer(0,10) -> " + str[5]);
 
         //② runAtFixedRate(..., 1L, 10L)：打印 #1/#2/#3 实际触发 tick；第 3 次自取消并打印 ④ 取消语义
         grs.runAtFixedRate(plugin, task -> {
@@ -163,11 +163,11 @@ public class DebugSchedCommand implements SubCommand {
                 ScheduledTask.ExecutionState state2 = task.getExecutionState();
                 str[2] = "cancel1=" + cancel1 + ",isCancelled1=" + cancelled1 + ",state1=" + state1
                         + ",cancel2=" + cancel2 + ",isCancelled2=" + cancelled2 + ",state2=" + state2;
-                player.sendMessage(Component.text("[sched] ④ cancel() #1 -> " + cancel1
-                        + " | isCancelled()=" + cancelled1 + " | getExecutionState()=" + state1));
-                player.sendMessage(Component.text("[sched] ④ cancel() #2 (repeat) -> " + cancel2
+                sendKey(player, "[sched] ④ cancel() #1 -> " + cancel1
+                        + " | isCancelled()=" + cancelled1 + " | getExecutionState()=" + state1);
+                sendKey(player, "[sched] ④ cancel() #2 (repeat) -> " + cancel2
                         + " | isCancelled()=" + cancelled2 + " | getExecutionState()=" + state2
-                        + " | no exception = idempotent"));
+                        + " | no exception = idempotent");
             }
         }, 1L, 10L);
 
@@ -188,8 +188,8 @@ public class DebugSchedCommand implements SubCommand {
                 bukkitHolder[0].cancel();
                 boolean after = bukkitHolder[0].isCancelled();
                 str[3] = "isCancelledBefore=" + before + ",isCancelledAfter=" + after;
-                player.sendMessage(Component.text("[sched] ④(BukkitTask) cancel() -> void | isCancelled() before="
-                        + before + " | after=" + after + " | no exception = idempotent"));
+                sendKey(player, "[sched] ④(BukkitTask) cancel() -> void | isCancelled() before="
+                        + before + " | after=" + after + " | no exception = idempotent");
             }
         }, 1L, 10L);
 
@@ -248,8 +248,8 @@ public class DebugSchedCommand implements SubCommand {
                 adapterHolder[0].cancel();
                 str[6] = "isCancelledBefore=" + before + ",isCancelledAfter=" + after
                         + ",isCancelledAfterSecondCancel=" + adapterHolder[0].isCancelled();
-                player.sendMessage(Component.text("[sched] ③d adapter Task.cancel() -> void | " + str[6]
-                        + " | repeated cancel: no exception = idempotent"));
+                sendKey(player, "[sched] ③d adapter Task.cancel() -> void | " + str[6]
+                        + " | repeated cancel: no exception = idempotent");
             }
         }, 0L, 10L);
 
@@ -289,6 +289,7 @@ public class DebugSchedCommand implements SubCommand {
             }, d, p);
         }
         grs.runDelayed(plugin, task -> {
+            DebugCommand.log("[sched] ④m matrix: per-row tick detail for the 8 declared pairs x 2 paths stays player-side only; the key verdict line follows");
             boolean matrixAllMatch = true;
             for(int i = 0; i < mPairs.length; i++){
                 boolean firstIdentical = mTicks[i][0] == mTicks[i][2] && mTicks[i][0] > 0;
@@ -300,7 +301,7 @@ public class DebugSchedCommand implements SubCommand {
                         + " | firstIdentical=" + firstIdentical + " | secondIdentical=" + secondIdentical));
             }
             str[7] = "matrixAllPairsMatch=" + matrixAllMatch;
-            player.sendMessage(Component.text("[sched] ④m verdict | " + str[7]));
+            sendKey(player, "[sched] ④m verdict | " + str[7]);
         }, 50L);
 
         //④p **端口链实测**（规格 B③"双入口归一"：TimerPortImpl → Scheduler → 适配器 → GlobalRegionScheduler）：
@@ -327,7 +328,7 @@ public class DebugSchedCommand implements SubCommand {
         }
         if(portServices == null){
             str[8] = "portLeg=SKIPPED(no role or no bound services)";
-            player.sendMessage(Component.text("[sched] ④p port leg | " + str[8]));
+            sendKey(player, "[sched] ④p port leg | " + str[8]);
         }
         else{
             final ComponentServices portSvc = portServices;
@@ -343,8 +344,8 @@ public class DebugSchedCommand implements SubCommand {
                 if(k == 2){
                     portHolder[0].cancel();
                     str[8] = str[8] + ",portFirstSecond=" + portTicks[0] + "/" + portTicks[1];
-                    player.sendMessage(Component.text("[sched] ④p port leg | component=" + str[8]
-                            + " | expectedByMatrix(0,10)=1/11 | identical=" + (portTicks[0] == 1 && portTicks[1] == 11)));
+                    sendKey(player, "[sched] ④p port leg | component=" + str[8]
+                            + " | expectedByMatrix(0,10)=1/11 | identical=" + (portTicks[0] == 1 && portTicks[1] == 11));
                 }
             });
         }
@@ -369,7 +370,7 @@ public class DebugSchedCommand implements SubCommand {
             boolean adapterEquivalent = sameThread && periodEquivalent && delayedEquivalent && cancelSemanticsOk
                     && clampEquivalent && adapterDelayedEquivalent && adapterCancelOk && matrixEquivalent
                     && (!portLegCovered || portLegEquivalent);
-            player.sendMessage(Component.text("[sched] ⑤ raw | globalThread=" + str[0]
+            sendKey(player, "[sched] ⑤ raw | globalThread=" + str[0]
                     + " | bukkitThread=" + str[1]
                     + " | globalDeltas=" + tick[1] + "/" + tick[2] + "/" + tick[3] + " (declared 1/10)"
                     + " | bukkitDeltas=" + tick[4] + "/" + tick[5] + "/" + tick[6] + " (declared 1/10)"
@@ -377,8 +378,8 @@ public class DebugSchedCommand implements SubCommand {
                     + " | adapterRunLaterDelta=" + tick[12]
                     + " | A/B(declared 0/10) rawBukkitFirstThird=" + tick[8] + "/" + tick[9]
                     + " adapterFirstThird=" + tick[10] + "/" + tick[11]
-                    + " | globalCancel=" + str[2] + " | bukkitCancel=" + str[3] + " | adapterCancel=" + str[6]));
-            player.sendMessage(Component.text("[sched] ⑤ verdict | sameThread=" + sameThread
+                    + " | globalCancel=" + str[2] + " | bukkitCancel=" + str[3] + " | adapterCancel=" + str[6]);
+            sendKey(player, "[sched] ⑤ verdict | sameThread=" + sameThread
                     + " | periodEquivalent=" + periodEquivalent + " (global=" + globalPeriod + " bukkit=" + bukkitPeriod + ", declared 20)"
                     + " | delayedEquivalent=" + delayedEquivalent
                     + " | cancelSemanticsOk=" + cancelSemanticsOk
@@ -391,9 +392,22 @@ public class DebugSchedCommand implements SubCommand {
                     + " | portLegEquivalent=" + portLegEquivalent
                     + " | CONCLUSION=" + (adapterEquivalent
                         ? "CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (raw APIs differ only on initialDelay<=0; the adapter normalises 0 -> 1 and the A/B on the production declaration 0/10 is tick-identical)"
-                        : "CANNOT swap the adapter as-is: at least one measured item differs (see the raw values above)")));
+                        : "CANNOT swap the adapter as-is: at least one measured item differs (see the raw values above)"));
         }, 60L);
         return true;
+    }
+
+    /**
+     * 关键行双写：**玩家侧**（Adventure {@code Component}，文本与既有实现逐字相同）+ **服务端日志**
+     * （{@link DebugCommand#log}，带 {@code [command-debug]} 前缀）。
+     * <p>
+     * 判定"关键行"的口径：结论/判据行与语义原始值行（probe start · ① execute · ② boundary · ④ cancel 三态 ·
+     * ③d adapter cancel · ④m verdict · ④p port leg · ⑤ raw · ⑤ verdict）；**逐行刷屏明细**
+     * （矩阵逐行 tick、逐次触发 #n、逐 tick 端口链）仍只发玩家侧 —— 日志保持可 grep、不刷屏。
+     */
+    private void sendKey(Player player, String text){
+        player.sendMessage(Component.text(text));
+        DebugCommand.log(text);
     }
 
     @Override

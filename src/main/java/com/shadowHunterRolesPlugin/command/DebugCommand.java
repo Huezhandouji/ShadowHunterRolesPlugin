@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.command;
 
+import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import net.kyori.adventure.text.Component;
 import org.bukkit.command.CommandSender;
@@ -28,6 +29,21 @@ public class DebugCommand implements SubCommand {
 
     /** 门控文案（与原实现逐字相同） */
     private static final String NO_PERMISSION = "You do not have permission to use this command.";
+
+    /** 控制台/日志路径的统一前缀（t61 起；卡面自查命令按此 grep：`git grep -n 'command-debug'`）。 */
+    static final String CONSOLE_PREFIX = "[command-debug]";
+
+    /**
+     * 把与玩家侧**同一份**调试文本写入服务端日志（`logs/latest.log`）—— 用户要求"调试信息**也**输出至服务端控制台"。
+     * <p>
+     * 只**新增日志路径**，不动 chat：玩家侧仍是 Adventure {@code Component}（两者相加，不互相取代）。
+     * 插件实例不可用时**静默跳过**（不抛异常、不改变玩家侧可见行为）。
+     */
+    static void log(String text){
+        ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
+        if(plugin == null) return;
+        plugin.getLogger().info(CONSOLE_PREFIX + " " + text);
+    }
 
     private final Map<String, SubCommand> topics = new TreeMap<>();
 

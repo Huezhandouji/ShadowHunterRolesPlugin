@@ -80,4 +80,18 @@ Compare-Object (Get-Content o.sorted) (Get-Content n.sorted)     # 多重集：�
 - 本件 = **勘误/读法说明，非证据本体**；**未修改任何既有冻结件** ✓、**未做 git 写** ✓（入库需队长 `git add -f`）
 - 适用边界：本件**只纠正引用与读法**，**不改变任何结论** —— t59/t61 的 Mode B 三行、`C = 0`、F1 链、冻结先于停机、双口径 (d)、逐文件 SHA256 全部**不变** ✓
 - 自身身份按入库时现算即可（按队内新纪律不内嵌自身哈希，避免自指失效）
+
+§7 一条申报的闭合（2026-09-18 补记 · 队长授权，仅补在**本件**）
+--------------------------------------------------------------------------------
+t61 说明 **§8.1** 曾如实申报："`cooldown` 的**有角色**路径（`status` / `end` / `restart` 读数分支）本轮**未实跑** ⇒
+其日志路径与无角色分支共用同一个 `send(...)` 双写助手（代码级等价），但**没有运行期证据**"。
+**该缺口已由 `eng-取证` 的权威轮（`t63`）闭合** ✓ —— 队长口径 + `t64`（verdict = pass）裁断确认：
+```
+冻结件 debug-logs/测试记录/阶段5-起服日志-控制台输出-取证.log = 39033 B / 223 行 / 21:55:30
+[cooldown] 合计 21 行 ⇒ status(`| cooling=`) 15 · end(`end(...) returned=`) 3 · restart(`restart(...) wasCooling=`) 3
+  :66/:68  … | cooling=true | remainingTicks=63/33 …            ← 只可能出现在【已绑角色】路径
+  :64      restart(meiqihezi_skill_unconcern) wasCooling=false | no old segment was cooling | newRemainingTicks=100
+  :70      end(meiqihezi_skill_unconcern) returned=true | wasCooling=true | ENDED_BY_COMPONENT dispatched (onCooldownEnd)
+```
+⇒ **不再需要补跑 / 派卡** ✓（避免重复占用窗口）；本行仅作**留痕** —— **本件仍不修改任何既有冻结件** ✓。
 ================================================================================

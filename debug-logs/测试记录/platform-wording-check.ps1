@@ -56,7 +56,11 @@ $patNewWrap = ($cTong + $cYi + $cBao + $cZhuang)
 $script:failed = 0
 
 function Show([string]$label, [string]$pattern, [int]$expected, [string[]]$scope, [string]$reading) {
-    $hits = @(git grep -n -E $pattern -- @scope 2>$null)
+    # --untracked: plain `git grep` IGNORES untracked files, so a retired phrase
+    # sitting in a brand-new (not yet added) file would make this check pass
+    # VACUOUSLY. Verified live 2026-09-18 with a probe file: plain grep = 0 hits,
+    # --untracked = 1 hit. Always search untracked files too.
+    $hits = @(git grep --untracked -n -E $pattern -- @scope 2>$null)
     $verdict = if ($hits.Count -eq $expected) { "OK" } else { "MISMATCH"; $script:failed++ }
     Write-Output ("[{0}] {1}" -f $verdict, $label)
     Write-Output ("      pattern : {0}" -f $pattern)
@@ -71,6 +75,12 @@ Write-Output "============ platform/ javadoc wording self-check ============"
 Write-Output ("script  = " + $script:myPath)
 Write-Output ("HEAD = " + (git rev-parse HEAD))
 Write-Output ("src porcelain lines = " + @(git status --porcelain -- src).Count + "   (0 = COMMITTED, NOT 'not started')")
+$script:untracked = @(git ls-files --others --exclude-standard -- src/main/java)
+Write-Output ("untracked src files = " + $script:untracked.Count + "   (searched too, via git grep --untracked)")
+foreach ($u in $script:untracked) { Write-Output ("    UNTRACKED: " + $u) }
+if (@(git status --porcelain -- src).Count -gt 0) {
+    Write-Output "NOTE: src is dirty - this run describes the WORKING TREE, not HEAD."
+}
 Write-Output ""
 
 # 1

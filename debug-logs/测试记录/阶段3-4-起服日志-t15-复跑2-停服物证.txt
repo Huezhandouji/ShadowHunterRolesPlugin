@@ -1,0 +1,10 @@
+t15 复跑 #2（含 scheduler probe 的 jar）停服物证
+时间戳（+08:00）：2026-09-18 20:00:33.915
+25566 监听：False（条数 0）
+java 进程数：3
+run/logs/latest.log 可独占读：True（size=5634）
+停机方式：仅 job_kill（未强杀 java）
+日志：debug-logs/测试记录/阶段3-4-起服日志-t15-复跑2.log（5634 B / SHA256 7AFCF7D1709C2F2C19427E37D29F2DB68F4862CB6B027CCC2C10FE21EDCFC377）
+状态锚：HEAD=dd0308c000e54ccd49c66ce960a00b4bd3af20ed ; src porcelain=0 行（M command/RoleCommand.java = 临时调度探针 +192 行）
+被验 jar：144269 B / 2026-09-18 19:51:56.118 / SHA256 5CFD2CA4E9C59F80A0BDA1E8ACFE78DF9F019163238C4DFD905EC857952CDC9A ; src 新于 jar = 0
+探针文件：command/RoleCommand.java = 26452 B / SHA256 284F132725DCFE14FCFE37D5544522E3B7D8BEDF39C0C30B172312CC3FAEB850

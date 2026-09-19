@@ -1,0 +1,85 @@
+阶段5 · 4.4 接管批 —— 独立复核轮（t4）停服物证
+================================================================
+性质：本文件是【当轮物证】（当轮产出，不是事后补记）· 产出者 = eng-验证（卡 t4）
+覆盖对象：**一代制品** = build/libs/ShadowHunterRolesPlugin-1.0.0.jar
+          （= 归档件 debug-logs/回滚快照/jars/ShadowHunterRolesPlugin-1.0.0-verified-20260919-125407-6A249993.jar）
+口径：身份一律现算（bytes + SHA256）；行号 = 冻结件 ReadAllLines 口径（[System.IO.File]::ReadAllLines）
+
+§1 起服窗口（起服前，三路互证）
+- 广播：本卡开工前后分别向 eng-实现 / eng-取证 / captain 发出"我要占用 25566"（eng-实现 已回"窗口让给你"、eng-取证 已回"我不占窗口"）
+- 三路互证 @ 2026-09-19 13:08:26.909：
+  ① netstat 按 LISTENING 过滤 :25566 = **0 行**（原始 :25566 行数 = 0）  ← 禁单用 Get-NetTCPConnection
+  ② TcpClient.Connect('127.0.0.1',25566) = **FAIL**（actively refused）
+  ③ run/logs/latest.log 独占打开（FileShare.None）= **OK**
+  java 进程数 = **0**
+- 起服前 latest.log 身份 = 6077 B / mtime 2026-09-19 12:57:13.502 / SHA256 527183B0…（**旧件**：与 t2 轮冻结件 阶段5-起服日志-4.4接管.log 逐字节相同）
+- 假新鲜防线基线：t0（起服前检查时刻）= **2026-09-19 13:08:29.091**
+
+§2 起服与在线取证（本轮 = 独立一轮，不依赖实现者那一轮）
+- runServer job 启动时刻 = **2026-09-19 13:08:37.393**（job id = pwsh-2；同刻打印 jar 身份，见 §5）
+- 服务端 JVM 首个日志行时间戳 = **13:08:50**（晚于 t0 ✓）
+- **Mode B 三行**（冻结件内逐字；行号 = 冻结件 ReadAllLines，共 54 行）：
+    L43 [13:09:03] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+    L44 [13:09:04] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+    L48 [13:09:04] [Server thread/INFO]: Done (14.850s)! For help, type "help"
+- **正序集合差（只看 C = 0）**：仪器 .scratch\bot\log-delta.ps1 -Anchor …阶段4-起服日志-T2b.log -Current …run\logs\latest.log -Tag t44verify
+    anchor WARN/ERROR/SEVERE = 13 行 · current = 13 行 · ADDED = 0 · REMOVED = 0 · A) oshi = 0 · B) world = 0 · **C) OTHER = 0** ✓
+- **级别字段扫描**（冻结件）`\] \[[^]]*/(ERROR|SEVERE)\]` = **0 命中**；
+  裸 `ERROR|SEVERE` = 3 命中，**全为 oshi WMI 的 WARN 正文**（"Error was -2147217405 …"）⇒ 必须锚定级别字段（裸串会造假阳性）
+- **制品载入自绑定（哈希级）**：run/plugins/.paper-remapped/extra-plugins/index.json（本文件只读、未改）内
+    "6A249993ECDE32C9AAB4E651191C5277C198F97DB5C35A603FC68893C67FF734" : "ShadowHunterRolesPlugin-1.0.0-1789793818094.jar"
+  ⇒ Paper 的 remap 索引按【源插件 jar 的 SHA256】登记 ⇒ 本轮被 remap/载入的插件 = 本代制品（SHA256 逐字相同）。
+  附注（如实）：本轮日志**未**打印 `[PluginRemapper] Remapping plugin …` 行 ⇒ 为 remap **缓存命中复用**（索引文件 mtime 13:09:04.387 属本轮；缓存内制品 161137 B / mtime 12:56:58.757）。
+- **在线冻结** @ 2026-09-19 13:11:59.139（服务器仍在运行、**尚未停机**；用共享读流复制，非 Get-FileHash/ReadAllText——服务端运行期独占该文件）：
+    源   run/logs/latest.log = 5698 B / mtime 2026-09-19 13:09:05.863
+    冻结 debug-logs/测试记录/阶段5-起服日志-4.4复核.log = 5698 B / mtime 2026-09-19 13:11:59.139 /
+         SHA256 8268E32C953E4BD3BB361C7008A670139E98139510FC7BEBDEADFCB6F86A3273
+    逐字节相同 = True（源文件以共享读流取字节现算 SHA256 = 同值）
+- **mtime 语义声明（口径，不是缺陷）**：冻结件 mtime = **冻结时刻**（新建文件）；源 mtime = **服务端最后一次写日志时刻**（13:09:05.863）。
+  两者**都晚于** jar mtime（12:54:07.286）⇒ F1 链在两种口径下都成立（与 t2 轮观察一致：复制件 mtime ≠ 源 mtime，而 SHA256 相同）。
+
+§3 ★ 假新鲜三条件（队长强制判据，逐条给证）
+ ① 本次 runServer 的 job 启动时刻 = **2026-09-19 13:08:37.393**
+ ② 冻结内容的时间起点（服务端首个日志行）= **13:08:50** > ① ✓；源文件 mtime = 13:09:05.863 > ① ✓
+ ③ 冻结件 SHA256 = 8268E32C… **≠** 阶段5-起服日志-冷却分支补齐.log（8930 B / 73EEF15D…）✓
+    且 **≠** 阶段5-起服日志-4.4接管.log（6077 B / 527183B0…）✓
+ ⇒ 三条同时成立 ⇒ 本轮日志**不是**旧件复用。
+ 自曝过程：13:08:43 与 13:08:47 两次轮询读到的仍是旧件（mtime 12:57:13.502），**旧件正文里同样含 `Done (`** ⇒ 若不加"只接受 mtime 晚于 t0"的时间闸门，会把它当成"本轮已起服"。加闸门后 13:08:51 才见到新件。
+
+§4 停机（纪律：只 job_kill）
+- 方式：**只 job_kill job pwsh-2** —— 未强杀 java、未 kill 进程、未发 stop/end 命令 ⇒ 无 graceful 停服行（与既有各轮同形态）
+- 停机后三路复证 @ **2026-09-19 13:12:53.872**：
+  ① netstat LISTENING :25566 = **0 行**（原始 :25566 行数 = 0）
+  ② TcpClient.Connect = **FAIL**（actively refused）
+  ③ latest.log 独占打开（FileShare.None）= **OK**
+  java 进程数 = **0**（停机前 = 4：pid 32864 / 43176（13:08:37 起）、pid 3996（13:08:38 起）属 gradle 侧；**服务端 JVM = pid 7428（13:08:48.917 起，CPU 85.5s）**；停机后 4 个全部退出）
+- 停机后 latest.log 身份 = 5698 B / mtime 13:09:05.863 / SHA256 8268E32C… = 与在线冻结件**逐字节相同** ⇒ 冻结覆盖整轮（停机未再写入）
+
+§5 制品三时点（铁律：不得重建被验证代次的 jar）
+- 开工前（13:04:57.704）：159512 B / 2026-09-19 12:54:07.286 / 6A249993ECDE32C9AAB4E651191C5277C198F97DB5C35A603FC68893C67FF734
+- runServer 启动前同刻打印（13:08:37）：**逐字一致**
+- 结卡前现算：**逐字一致**
+- **未重建的证据**：runServer 的 Gradle 输出含 `> Task :jar UP-TO-DATE`（另 `:compileJava UP-TO-DATE`、`:processResources UP-TO-DATE`）
+   ⇒ jar 未被重打（若 `:jar` 被执行则 mtime 前移 ⇒ 本代证据链作废）
+- 归档件 …-verified-20260919-125407-6A249993.jar = 同 bytes / 同 mtime / 同 SHA256（与 build/libs **逐字节相同**）；该归档件**已在 HEAD 内**（`git ls-tree HEAD -- debug-logs/回滚快照/jars` 可见 6 个 jar + MANIFEST）
+- 本轮未执行：`clean` / 删 build/libs / 强制 rebuild / `build`。仅执行一次 `compileJava`（`BUILD SUCCESSFUL in 14s`，退出码 0；jar 与 build/classes 最新 .class 的 mtime 均未变）
+
+§6 提交态绑定
+- 本卡开工时 HEAD = **b06225298ddf7e1a4cf384550ee04f9bfcc55d49**（t2 的 6 个 src + MANIFEST 由队长入库）
+- 过程中 HEAD 前移一次 = **11bb7926125cf7a6e7515ab9dea2ed3866cc9a99**（队长补入库本代归档件；**未触碰 src**）
+- 被验证树 = `src/main` tree = **a6a33c9b85a82ea25b15f8417e9dc880c588ecdb**（b062252 与 11bb792 同值；`git diff b062252 HEAD -- src/main` = 0 行）
+- `git status --porcelain`（全仓）= **0 行**（开工时与在线取证时均为 0）⇒ 本轮是**提交态取证**，不是"开发构建轮"
+
+§7 F1 链（要求 jar < log < 物证 < 报告）
+- jar mtime = 2026-09-19 12:54:07.286（build/libs；与归档件同 mtime）
+- log = 本卡冻结件 阶段5-起服日志-4.4复核.log：mtime = 2026-09-19 13:11:59.139（源写盘 13:09:05.863）
+- 物证 = 本文件：mtime = 本文件写盘时刻（**晚于 log**；其 bytes/行数/SHA256 由复核报告现算登记）
+- 报告 = 阶段5-4.4接管-独立复核报告.md（最后写盘 ⇒ 链尾）
+- 机器校验 ORDER 的命令与输出见复核报告（四件 mtime 一次比较）；ORDER 只判**时间先后**，逐件身份见 §2/§5/§6 与报告。
+
+§8 未覆盖项（如实申报）
+ 1. 本轮**无玩家/机器人上线** ⇒ **无外观级证据**（四态 × 两 kind 的材质/名字颜色/后缀/lore/PDC 在本卡内只有**静态级**对照）；外观级由 t5（C-15）承担。
+ 2. 未挂 `setItem` 计数探针 ⇒ "空闲 tick 零 setItem / 冷却中每 tick flush"只有**结构性**论证（与 t1 §11 一致，量化归 t17/t18）。
+ 3. 停机为 `job_kill`（无 graceful stop 行）⇒ 无法从日志判"世界保存 / 插件 onDisable"；与既有各轮同形态，**不申报为已覆盖**。
+ 4. 本轮日志未打印 `[PluginRemapper] Remapping` 行 ⇒ 制品载入的自绑定改用 remap 索引的 **SHA256 映射**（§2），不引用"日志自述路径"。
+ 5. `BuffManager#addBuff` 的可见时机（R-1 保护的那条差异）**运行级未取证**（需构造"上 STUN 但不起冷却"用例）⇒ 仍挂账。

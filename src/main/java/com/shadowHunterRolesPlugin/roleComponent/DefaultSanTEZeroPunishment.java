@@ -30,22 +30,27 @@ import java.time.Duration;
  * <ol>
  *   <li>**进入即标记**：归零判定通过后立即 {@code inSanTEPunishment = true}，**先于**起任务
  *       （消除"起任务与标记之间"的重入窗口）；</li>
- *   <li>**惩罚期间持续钉 SanTE = 0**：任务体**每跳**执行 {@code svc().sante().set(0)}
- *       （40 tick 一跳 ⇒ 钉点为触发后第 1 / 41 / 81 tick；两钉点之间其它组件的写入（如流血 `+4`）
- *       会在下一跳被重新钉回 0）；</li>
+ *   <li>**惩罚期间持续钉 SanTE = 0（逐 tick）**：{@link #update()} 里以 {@code inSanTEPunishment} 守卫，
+ *       **每一 tick** 执行 {@code svc().sante().set(0)}
+ *       （阶段 6 · t27 对齐用户裁定 **Q1 = A**：此前是"任务体每 40 刻钉一次"，整个惩罚只钉 3 次、
+ *       两钉点之间可被其它组件抬高（如流血 `+4`）⇒ 现改为逐 tick，**惩罚期间每一 tick 都是 0**）；</li>
  *   <li>**忽略重入**：{@code onSanTEChange} 顶部守卫 {@code if (inSanTEPunishment) return;}
  *       ⇒ 惩罚进行中**不取消、不重启、不刷新 {@code count}、不重放标题/粒子、不重复上 STUN**；</li>
- *   <li>**结束回满**：第三次跳（{@code count == 3}）清标记并把 SanTE 恢复至 {@code max}（逐字保留迁移前行为）。</li>
+ *   <li>**结束回满（推迟到 STUN 结束）**：在**施加 STUN 的那一跳**（{@code count == 1}）预约
+ *       {@code svc().timers().runLater(100L, …)} ⇒ **STUN 100 刻到期那一刻**清标记并把 SanTE 恢复至 {@code max}
+ *       （阶段 6 · t27 对齐用户裁定 **Q2 = A**：此前在第 3 跳 ≈4.05 s 就回满、而 STUN 到 5 s 才结束
+ *       ⇒ 存在约 1 秒「已回满但仍在眩晕」的窗口 ⇒ 现已消除；回满在**同一处一次性**完成）。</li>
  * </ol>
- * <p><b>⚠️ 旧注释已被实测证伪并更正（本批）</b>：容器侧 `RoleInstance.dispatchSanTEChange` 的
+ * <p><b>⚠️ 旧注释已被实测证伪并更正（t26）</b>：容器侧 `RoleInstance.dispatchSanTEChange` 的
  * {@code if(pre == now) return;} **只能**挡住「**已经是 0 还继续扣**」；而「**先回血再扣**」
  * （`pre = 4 → now = 0`）是**真变化** ⇒ **照样派发**。因此原注释所称
  * 「SanTE 已为 0 时再扣不再重复派发 ⇒ 惩罚不再被重复触发/延长（O-6 的重复任务路径由本批闭合）」
  * **与实测不符**：旧实现在该相位下会**取消并重启**惩罚（刷新 `count`、重上 STUN 100 刻、重放标题与粒子、再来三跳真伤）。
- * 真正闭合"重复触发/延长"的是本批的 **(1) 标记 + (3) 重入守卫**，**不是**容器侧的 `pre == now`。
- * <p><b>⚠️ 中止路径必须复位标记（静默失效防护）</b>：{@code stop()}、玩家离线/死亡分支、任务取消/空转分支
- * 都必须把 {@code inSanTEPunishment} 复位 —— 否则标记卡在 {@code true} ⇒ **后续归零永不触发惩罚**
- * （绿灯不报的静默失效）。
+ * 真正闭合"重复触发/延长"的是 t26 的 **(1) 标记 + (3) 重入守卫**，**不是**容器侧的 `pre == now`。
+ * <p><b>⚠️ 中止路径必须复位标记（静默失效防护；t26 建立 · t27 保持完整）</b>：{@code stop()}、玩家离线/死亡分支、
+ * 任务取消/空转分支、以及**回满任务本身的正常结束**都必须把 {@code inSanTEPunishment} 复位 ——
+ * 否则标记卡在 {@code true} ⇒ **逐 tick 钉 0 会一直生效、且后续归零永不触发惩罚**（绿灯不报的静默失效）。
+ * 五条路径逐条标注为源码里的 {@code (5-①…⑤)}。
  */
 public class DefaultSanTEZeroPunishment extends PassiveSkill {
     public DefaultSanTEZeroPunishment(String id, ComponentServices services) {
@@ -59,9 +64,28 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
     //O-6：任务句柄（阶段 2 换成平台 Task，null = 没有任务在跑）
     private Task punishmentTask;
+    //回满任务句柄（Q2 = A：STUN 100 刻结束时一次性回满；与上面同属本组件资源表）
+    private Task punishmentRestoreTask;
 
-    //B⑨：惩罚状态搬进组件私有字段（原 RoleInstance.isInSanTEPunishment 已删）
+    //B⑨：惩罚状态搬进组件私有字段（原 RoleInstance.isSanTEPunishment 已删）
     private boolean inSanTEPunishment = false;
+
+    /**
+     * 逐 tick 钩子（容器按注册表顺序每 tick 广播一次）—— **(2) 惩罚期间逐 tick 钉 SanTE = 0**（用户裁定 Q1 = A）。
+     * <p>与容器侧「真变化才派发」的关系（**无重入循环、无任务泄漏**）：
+     * <ul>
+     *   <li>已是 0 时 {@code set(0)} ⇒ 容器侧 `if(pre == now) return;` ⇒ **不派发**；</li>
+     *   <li>若本 tick 更早的组件把 SanTE 抬高（例：`RedBleedPassive` 的 `+4`），本行就是**真变化** ⇒ 派发一次 `(pre>0 → 0)`；
+     *       该次派发回到本组件时被 {@link #onSanTEChange(int, int)} 顶部的重入守卫挡下 ⇒ **不取消、不重启、不刷新 count**；</li>
+     *   <li>钉 0 与惩罚任务彼此独立：本方法**不创建/不取消任何任务** ⇒ 不产生任务泄漏。</li>
+     * </ul>
+     */
+    @Override
+    public void update() {
+        if (inSanTEPunishment) {
+            svc().sante().set(0);
+        }
+    }
 
     @Override
     public void onSanTEChange(int pre, int now) {
@@ -108,16 +132,24 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                         }
                         count += 1;
 
-                        //(2) 惩罚期间持续钉 0（本跳）。钉 0 **不产生派发**：容器侧 `if(pre == now) return;`
-                        //   对"已经是 0 再置 0"直接返回 ⇒ 不会经 onSanTEChange 重入本组件（无重入循环）。
-                        //   若两钉点之间被其它组件抬高（如流血 +4），本行的 set(0) 才是"真变化"，
-                        //   会派发一次 (pre>0 → 0) —— 那一次仍被 (3) 守卫挡下，不会重启惩罚。
-                        svc().sante().set(0);
+                        //(2) 钉 0 已移出任务体：改为 {@link #update()} 里**逐 tick** 执行（用户裁定 Q1 = A）
+                        //    ⇒ 惩罚期间"每一 tick 都是 0"，不再有两钉点之间被抬高的窗口。
 
                         Location loc = player.getLocation();
 
                         if (count == 1) {
                             svc().buffs().add(BuffType.STUN, 100);
+
+                            //(4) 回满推迟到 STUN 结束（用户裁定 Q2 = A）：STUN 在本跳施加、持续 100 刻
+                            //    ⇒ 自本跳起 100 刻后（= STUN 到期那一刻）清标记并一次性回满。
+                            //    ⇒ 惩罚期间 SanTE 全程真正为 0（逐 tick 钉 + 结束后才回满），消除"已回满但仍眩晕"的窗口。
+                            punishmentRestoreTask = svc().timers().runLater(100L, () -> {
+                                //(5-⑤ 正常结束) 若标记已被中止路径复位 ⇒ 不再回满（防越权恢复）
+                                if (!inSanTEPunishment) return;
+                                //先清标记：否则同一 tick 的逐 tick 钉 0 会把刚回满的值立刻抹回 0
+                                inSanTEPunishment = false;
+                                svc().sante().set(svc().sante().max());
+                            });
                             player.playSound(loc, Sound.ITEM_TOTEM_USE, 1f, 1f);
 
                             Location particleLoc = loc.clone().add(0, 1, 0);
@@ -160,21 +192,20 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                             particleLoc.getWorld().spawnParticle(Particle.SCULK_SOUL, particleLoc, 30, 0.5d, 0.5d, 0.5d);
                         }
                         svc().damage().trueDamage(player, null, totalDamageAmount * 0.33333d);
-
-                        if (count == 3) {
-                            //(4) 结束回满：清标记 + 恢复至 max（逐字保留迁移前行为；原实现此处是**重复两次**置 false，已去重）
-                            inSanTEPunishment = false;
-                            svc().sante().set(svc().sante().max());
-                        }
+                        //(4) 回满**不再**发生在第 3 跳：已推迟到 STUN 结束（见 count == 1 处的回满任务，Q2 = A）
                     }
                 });
     }
 
-    //取消仍在运行的惩罚任务并复位句柄（O-6）
+    //取消仍在运行的惩罚任务/回满任务并复位句柄（O-6；两把句柄都属本组件资源表）
     private void cancelPunishmentTask(){
         if(punishmentTask != null){
             punishmentTask.cancel();
             punishmentTask = null;
+        }
+        if(punishmentRestoreTask != null){
+            punishmentRestoreTask.cancel();
+            punishmentRestoreTask = null;
         }
     }
 

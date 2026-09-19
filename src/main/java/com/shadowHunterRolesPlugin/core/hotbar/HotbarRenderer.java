@@ -65,7 +65,9 @@ public final class HotbarRenderer {
 
     /**
      * 帧末 flush 的**写物品段**（全仓唯一渲染写点）：遍历角色槽位表，按 {@link #stateOf} 的四段顺序重绘。
-     * <p>只对**已注册**的组件生效（未知 id 跳过）——与旧实现的查表顺序一致（主武器优先）。
+     * <p>只对**已注册**的组件生效（未知 id 跳过）。**kind 一律取注册处的权威值**
+     * （{@code Role#componentKindOf(String)}）——组件自述 kind 不参与任何行为分支。
+     * <p>第三分支（{@code PASSIVE}）：被动**不占热键栏、不参与渲染**；即使被塞进槽位表也在此显式跳过。
      */
     public void render() {
         Player player = owner.getPlayer();
@@ -76,19 +78,23 @@ public final class HotbarRenderer {
         if (slotMap == null || slotMap.isEmpty()) return;
 
         for (Map.Entry<Integer, String> entry : slotMap.entrySet()) {
-            HotbarItem item = owner.hotbarItemOf(entry.getValue());
+            String id = entry.getValue();
+            ItemKind kind = owner.getRole().componentKindOf(id);
+            if (kind == null || kind == ItemKind.PASSIVE) continue;
+            HotbarItem item = owner.hotbarItemOf(id);
             if (item == null) continue;
-            inv.setItem(entry.getKey(), buildIcon(item));
+            inv.setItem(entry.getKey(), buildIcon(item, kind));
         }
     }
 
     /**
      * 按四段状态构建单个热键栏物品（材质 / 名称 / 后缀 / lore / PDC 与旧基类实现逐字一致）。
+     * <p>{@code kind} = **注册处的权威 kind**（形参传入，不从组件自述读）。
      * <p>技能与主武器的差异是**冻结差异**：技能冷却名带 `" x.xs"` 秒数，主武器冷却名**不带**任何追加段；
      * 主武器 `energyCost ≡ 0`（且能量被 clamp 到 ≥ 0）⇒ 永不进入 {@link IconState#ENERGY_LACK}。
      */
-    public ItemStack buildIcon(HotbarItem item) {
-        boolean skill = item.getKind() == ItemKind.SKILL;
+    public ItemStack buildIcon(HotbarItem item, ItemKind kind) {
+        boolean skill = kind == ItemKind.SKILL;
         boolean ready = skill ? owner.isSkillReady(item.getId()) : owner.isMainWeaponReady(item.getId());
         boolean canCast = skill ? owner.getBuffManager().canCastSkill() : owner.getBuffManager().canUseMainWeapon();
         IconState state = stateOf(ready, canCast, owner.getCurrentEnergy(), item.getEnergyCost());

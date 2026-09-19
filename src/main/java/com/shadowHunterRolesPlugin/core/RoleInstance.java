@@ -7,6 +7,7 @@ import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
 import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
+import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -220,32 +221,28 @@ public class RoleInstance {
         return true;
     }
 
+    /**
+     * 组件初始化（阶段 6 · 统一装配）：**只遍历 {@code role.getComponents()} 一次** ——
+     * 遍历顺序 = `Builder.add*` 的调用顺序 = **纯注册序**（旧的三段遍历
+     * 「技能 → 被动 → 主武器」已删除，见交付说明的派发序申报）。
+     * <p>权威 kind 由注册处随条目给出，并交给 {@link #createServices(String, ItemKind)}
+     * （冷却端口在组件被构造**之前**就绑定了 kind）。
+     */
     private void initComponents(){
-        for(String skillId : role.getSkillIds()){
-            ComponentServices services = createServices(skillId, ItemKind.SKILL);
-            Skill skill = role.createSkill(skillId, services);
-            if(skill != null){
-                skillMap.put(skillId, skill);
-                registerCreated(skill, services);
-            }
-        }
+        for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
+            String componentId = entry.getKey();
+            ItemKind kind = entry.getValue().getKind();
 
-        for(String passiveId : role.getPassiveSkillIds()){
-            ComponentServices services = createServices(passiveId, ItemKind.SKILL);
-            PassiveSkill passive = role.createPassive(passiveId, services);
-            if(passive != null){
-                passiveMap.put(passiveId, passive);
-                registerCreated(passive, services);
-            }
-        }
+            ComponentServices services = createServices(componentId, kind);
+            RoleComponent component = role.createComponent(componentId, services);
+            if(component == null) continue;
 
-        for(String weaponId : role.getMainWeaponIds()){
-            ComponentServices services = createServices(weaponId, ItemKind.MAIN_WEAPON);
-            MainWeapon mainWeapon = role.createMainWeapon(weaponId, services);
-            if(mainWeapon != null){
-                mainWeaponMap.put(weaponId, mainWeapon);
-                registerCreated(mainWeapon, services);
-            }
+            //旧窄类型视图（供既有公共访问器使用）：按**具体类型**归位，不按 kind 猜测
+            if(component instanceof Skill skill) skillMap.put(componentId, skill);
+            if(component instanceof MainWeapon weapon) mainWeaponMap.put(componentId, weapon);
+            if(component instanceof PassiveSkill passive) passiveMap.put(componentId, passive);
+
+            registerCreated(component, services);
         }
     }
 
@@ -459,13 +456,17 @@ public class RoleInstance {
     //本容器只提供查表与状态输入，旧的"更新物品栏 / 更新元数据"方法（连同其两条调用路径）已随本批删除。
 
     /**
-     * 统一渲染器的查表入口：按槽位表里的 id 取可渲染组件。
-     * 顺序与旧实现一致（**主武器优先**），未注册 id 返回 {@code null}（渲染器跳过该槽位）。
+     * 统一渲染器的查表入口：按槽位表里的 id 取可渲染组件（未注册 id ⇒ {@code null}，渲染器跳过该槽位）。
+     * <p>**适配点（阶段 6）**：优先取 {@link HotbarPresentable#asHotbarItem()} 的规格视图 ——
+     * 这样「只 `extends RoleComponent` + 实现 `HotbarPresentable`」的新式组件同样可被渲染；
+     * 旧式实现（自身即 `HotbarItem`）原样返回。
+     * <p>行为分支（技能/主武器）由**注册 kind** 决定，不在此处区分。
      */
     public HotbarItem hotbarItemOf(String id){
-        if(mainWeaponMap.containsKey(id)) return mainWeaponMap.get(id);
-        if(skillMap.containsKey(id)) return skillMap.get(id);
-        return null;
+        RoleComponent component = componentRegistry.getById(id);
+        if(component == null) return null;
+        if(component instanceof HotbarPresentable presentable) return presentable.asHotbarItem();
+        return component instanceof HotbarItem item ? item : null;
     }
 
     //清除主武器，技能占用的快捷栏

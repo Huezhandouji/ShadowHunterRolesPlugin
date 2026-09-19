@@ -82,3 +82,13 @@ sha256 = 6A249993ECDE32C9AAB4E651191C5277C198F97DB5C35A603FC68893C67FF734
 覆盖证据 = 阶段5-起服日志-4.4接管.log（6077 B / mtime 2026-09-19 13:00:33.240 / SHA256 527183B0F242D591130E90E83E066BBFEAD6274EBB2E109B9A17EB1413263A8A）：Mode B 三行（12:57:11 Enabling ShadowHunterRolesPlugin v1.0.0 / 12:57:11 ShadowHunter Character System enabled. / 12:57:12 Done (15.686s)!）+ 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0、REMOVED=0、A=B=C=0）+ 停机前先在仍在线时冻结（13:00:25 与 13:00:33 两次冻结逐字节相同）+ 只 job_kill（未强杀 java）+ 停服三路互证（netstat LISTENING=0 / TCP connect 拒绝 / latest.log 独占打开成功）+ 锚定级别字段扫描 \] \[[^]]*/(ERROR|SEVERE)\] = 0（裸 ERROR/SEVERE=3 均为 oshi WARN 正文）
 与前代关系 = 本代是首代含【渲染路径结构性改动】的制品（HotbarRenderer 由骨架改为唯一渲染者 + 五触点置脏 + triggerUpdate 帧末 flush + 删 T⑦ 四条旧渲染方法与 legacy 刷新方法）⇒ 与前代 21002ABC…(159661 B) **不存在 class 级等价主张**，自出 Mode B 运行证据；jar 159661 → 159512 B（-149 B）
 备注 = F1 链 = jar mtime 12:54:07.286 < log mtime 13:00:33.240 < 本登记；起服时 runServer 自述 remap 的制品即 'build\libs\ShadowHunterRolesPlugin-1.0.0.jar'（与本登记同一文件，归档件与其逐字节相同）；提交绑定 = 起服时工作树 src（点名 commit 42dde5e5… 为改动前基线，本批改动未提交、由队长提交）
+ 
+# --- 登记 8 ---
+登记时刻 = 2026-09-19 19:24:38
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260919-192214-FCB926AC.jar
+bytes = 164982
+mtime = 2026-09-19 19:22:14.941
+sha256 = FCB926ACEEA08BC0C0D9044BA1B109E082A170CB866A68EB84036B4C3F876D77
+覆盖证据 = 阶段6-起服日志-统一组件装配.log（6075 B / mtime 2026-09-19 19:24:08.738 / SHA256 2F45CF5EA263FDB361F70510D97AC3FA1B4103890D1F66812178DF41303172CE）：Mode B 三行（19:23:52 Enabling ShadowHunterRolesPlugin v1.0.0 / 19:23:52 ShadowHunter Character System enabled. / 19:23:52 Done (9.717s)!）+ 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0、REMOVED=0、A=B=C=0）+ 开机窗/运行窗分列读数（开机窗 50 行、运行窗 6 行；两窗级别字段 ERROR/SEVERE 均 = 0）+ 插件归因异常独立扫描 = 0 + 停机前先在仍在线时冻结 + 只 job_kill（未强杀 java）+ 停服三路互证
+与前代关系 = 本代是首代含【统一组件装配】的制品（addComponent 双载 + 权威 kind 在注册处 + HotbarSpec/能力接口 + 三基类降级 + 被动 kind 清理 + **派发序改纯注册序**）⇒ 与 6A249993（阶段 5 · 4.4 那代，159512 B）**不存在 class 级等价主张**，自出 Mode B 运行证据；jar 159512 → 164982 B
+备注 = F1 链 = jar mtime 19:22:14.941 < log mtime 19:24:08.738 < 本登记；工作树状态 = 取证时刻 git status --porcelain -- src 非空（**开发构建轮**，见说明件「提交态申报」节）；未重建 6A249993 那一代（其归档件读数逐字未变）

@@ -28,11 +28,14 @@ final class CooldownPortImpl implements CooldownPort {
 
     @Override
     public boolean isReady() {
+        //PASSIVE（阶段 6）：显式无声语义 —— 被动没有冷却，恒就绪（不落进技能表/主武器表）
+        if (kind == ItemKind.PASSIVE) return true;
         return kind == ItemKind.SKILL ? owner.isSkillReady(componentId) : owner.isMainWeaponReady(componentId);
     }
 
     @Override
     public int remainingTicks() {
+        if (kind == ItemKind.PASSIVE) return 0;
         return kind == ItemKind.SKILL
                 ? owner.getRemainingSkillCooldownTicks(componentId)
                 : owner.getRemainingMainWeaponCooldownTicks(componentId);
@@ -41,6 +44,8 @@ final class CooldownPortImpl implements CooldownPort {
     /** S2：以本次调用时刻重算到期（覆盖旧值）；旧段未到期 ⇒ 先清条目并回调 {@code RESTARTED}。 */
     @Override
     public void start(int ticks) {
+        //PASSIVE（阶段 6）：不写任何表、不派发、不置脏（被动没有冷却；若将来需要，须先立项给它一张表）
+        if (kind == ItemKind.PASSIVE) return;
         if (owner.clearCooldownForRestart(componentId, kind)) {
             owner.dispatchCooldownEnd(componentId, ActiveComponent.CooldownEndReason.RESTARTED);
         }
@@ -56,6 +61,7 @@ final class CooldownPortImpl implements CooldownPort {
     /** S3：仅在冷却中生效（清条目 + 回调 + 刷新 + true）；否则 false 且无副作用。 */
     @Override
     public boolean end() {
+        if (kind == ItemKind.PASSIVE) return false;
         return owner.endCooldown(componentId, kind);
     }
 }

@@ -1,0 +1,103 @@
+阶段 6 · 派发面能力化两刀 —— 停服物证（t22）
+================================================================================
+口径声明
+  1) 本件是【当轮物证】：三路互证分「起服前」与「停机后」各测一次；冻结动作发生在**服务器仍在线时**。
+  2) 身份一律【现算】：bytes = 文件长度；SHA256 = Get-FileHash -Algorithm SHA256；mtime = yyyy-MM-dd HH:mm:ss.fff。
+  3) ★ **工作树状态申报（台账 §3 铁律 8）**：取证时刻 `git status --porcelain -- src` = **4 行**（3 改 + 1 未跟踪新件
+     `core/hotbar/CooldownAware.java`）⇒ 本轮 = **开发构建轮**（非"提交态"）。制品↔源码绑定 = 「点名提交 `3becba8` 的 src 树 + 本批工作树改动」；
+     本批改动**未提交**（提交权在队长）。另：未跟踪新件使 `git grep` 默认**看不见** `CooldownAware.java`
+     ⇒ 本件与说明件凡涉及它的检索一律带 `--untracked --no-exclude-standard`（或直读文件）。
+
+一、★ 防「假新鲜」三条件（队长 t22 追加的硬判据；缺一则该轮 Mode B / C=0 无效）
+--------------------------------------------------------------------------------
+  条件① **本次 runServer 作业的启动时刻**（我记录的三段边界，逐条现算/可复核）：
+      · 起服前最后一次三路互证完成 = **2026-09-19 20:06:47.687**（广播与启动紧随其后）
+      · **日志轮转时刻 = [20:07:06]**（冻结件首行 `[20:07:06] [ServerMain/INFO]: [bootstrap] Running Java 21 …`）
+      · 起服前我把当时那份 latest.log 原样留存为 `.scratch/bot/pret22-latest-copy.log`
+        = 10460 B / SHA256 **6041B041C686F78146AF65824D82D537B20E7F6E5D99A3CD85C81D4E0133AE5D**（= t21 那轮的内容）
+  条件② **latest.log 的 mtime 晚于启动时刻**：
+      · 停机后 latest.log = 6075 B / mtime **2026-09-19 20:07:17.547**
+      · 冻结件 mtime = **2026-09-19 20:07:28.593**（仍在在线时冻结）
+      · ⇒ 20:06:47.687 < 20:07:06（轮转/首行） < 20:07:17.547 ≤ 20:07:28.593 ✔
+      · 附注：`latest.log` 的**CreationTime 是陈旧的 2026-07-31**（Paper 就地把该文件截断重写，不重建 inode）
+        ⇒ **不得**用 CreationTime 判轮次，只能用 mtime + SHA + 轮转件（本轮即由下列轮转证据钉死）。
+  条件③ **SHA256 ≠ 清单里每一个旧冻结件**（逐件**现算**后比较，不是比对记忆值）：
+      本轮冻结件 `阶段6-起服日志-派发能力化.log` = SHA256 **46B1E0458622586705A27D68D3F1063907FCADD6054E4FC5E0FAB209B2F2B0CB**
+      | 旧冻结件 | 现算 SHA256 前 8 位 | ≠ 本轮 |
+      |---|---|---|
+      | 阶段6-起服日志-C11派发序运行级.log（t21） | 6041B041 | ✔ 不等 |
+      | 阶段6-起服日志-统一组件装配-外观取证.log（t19） | 8318A683 | ✔ 不等 |
+      | 阶段5-起服日志-4.4复核.log（t4） | 8268E32C | ✔ 不等 |
+      | 阶段5-起服日志-4.4接管.log（t2） | 527183B0 | ✔ 不等 |
+      | 阶段5-起服日志-冷却分支补齐.log（t67） | 73EEF15D | ✔ 不等 |
+      | 阶段6-起服日志-统一组件装配.log（t18，额外） | 2F45CF5E | ✔ 不等 |
+      ⇒ 六件**全部不等**；且与本轮开跑前的 `pret22-latest-copy.log`（6041B041…）也**不等** ✔
+  ★ **轮转侧证（最强的一条）**：`run/logs/` 现有最新轮转件 **`2026-09-19-6.log.gz`**（mtime 2026-09-19 20:07:06，2845 B），
+      解压后 SHA256 = **6041B041C686F781…**（逐字等于 t21 那轮的内容 / 等于我留存的起服前副本）
+      ⇒ **证明本轮确实把上一轮的 latest.log 挤走并新建了本轮日志**（不是"未起服就冻结同一份旧件"）。
+
+二、起服前：窗口三路互证（2026-09-19 20:06:47.687）
+--------------------------------------------------------------------------------
+  ① netstat 按 LISTENING 过滤 :25566 ⇒ hits = **0**  ② TcpClient.Connect ⇒ FAIL（actively refused）  ③ latest.log 独占打开 ⇒ **OK**
+  旁证：java = 0；`run/plugins/` 无 t21 探针 jar（t21 已按约移出）
+
+三、起服与在线期
+--------------------------------------------------------------------------------
+  作业：pwsh-13（`cd ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"; .\gradlew runServer --console=plain`）
+  插件清单（本件内逐字）：`[20:07:08] [PluginInitializerManager] Bukkit plugins (1):` + ` - ShadowHunterRolesPlugin (1.0.0)`
+      ⇒ 只有本插件（t21 的探针未残留）；制品来源由 runServer 输出自述（remap `build\libs\ShadowHunterRolesPlugin-1.0.0.jar`）
+  Mode B 三行（冻结件内逐字）：
+      [20:07:15] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+      [20:07:15] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+      [20:07:16] [Server thread/INFO]: Done (9.636s)! For help, type "help"
+
+四、仍在线时冻结日志（20:07:28.588；共享读流，非停机后补写）
+--------------------------------------------------------------------------------
+  冻结件 = debug-logs/测试记录/阶段6-起服日志-派发能力化.log
+      bytes = 6075 / mtime = 2026-09-19 20:07:28.593 / lines = 56（ReadAllLines 口径）
+      sha256 = 46B1E0458622586705A27D68D3F1063907FCADD6054E4FC5E0FAB209B2F2B0CB
+  停机后 run/logs/latest.log 与冻结件**逐字节相同**（同 bytes / 同 SHA256）⇒ 在线冻结覆盖整轮。
+
+五、停机动作（只 job_kill；未强杀 java）
+--------------------------------------------------------------------------------
+  `job_kill pwsh-13`；未对 java 做任何 kill/Stop-Process；探测循环首次满足「java=0 且 LISTENING=0」= **20:07:43.344**。
+
+六、停机后：三路复证
+--------------------------------------------------------------------------------
+  ① netstat LISTENING :25566 ⇒ **0**  ② TcpClient.Connect ⇒ FAIL（refused）  ③ latest.log 独占打开 ⇒ **OK**  旁证：java = **0** ⇒ 25566 已释放。
+
+七、当轮运行级判据（证据 = 冻结件）
+--------------------------------------------------------------------------------
+  ① Mode B 三行齐 —— 见第三节（逐字）。
+  ② 正序集合差（`.scratch/bot/log-delta.ps1 -Anchor …阶段4-起服日志-T2b.log -Current …run/logs/latest.log -Tag t22`）：
+        anchor WARN/ERROR/SEVERE = 13 ; current = 13 ; ADDED = 0 ; REMOVED = 0 ; A=B=C=0 ⇒ **只看 C=0** ✔（落盘 .scratch/bot/logdelta-t22.txt）
+        口径附注：本次调用我把脚本输出接了 `Select-Object -First 20`，原生进程被截断 ⇒ 外层报了 `exit code 1`；
+        脚本自身已打印 `written -> …`（= 正常跑完）⇒ 该非零退出是**生产者侧管道截断的伪值**（台账族 7），**不是** log-delta 失败。
+  ③ 级别字段扫描（禁用裸 ERROR）**开机窗/运行窗分列**：开机窗（首行..`Done (`）= 50 行 ⇒ ERROR/SEVERE = **0**（WARN=7：3 oshi + 4 offline-mode）；
+        运行窗（`Done (` 之后）= 6 行 ⇒ ERROR/SEVERE = **0**（WARN=6：Paper 横幅）；全件级别字段 = **0**，裸 `ERROR|SEVERE` = 3（oshi 正文）。
+  ④ **插件归因异常独立扫描（形态先双向自证）**：
+        形态 A = 行含 `ShadowHunterRolesPlugin` **且**级别字段 ∈ {WARN,ERROR,SEVERE}；形态 B = 行含 `com.shadowHunterRolesPlugin`（栈帧）。
+        **正样本**（`阶段5-起服日志-4.4外观取证.log`）：formA = **1**（`[13:21:26] …/WARN]: [ShadowHunterRolesPlugin] Global task … generated an exception`）、formB = **4**（栈帧）
+        **负样本**（`阶段6-起服日志-统一组件装配.log`，t18）：formA = **0**、formB = **0**
+        **本轮**：formA = **0**、formB = **0** ⇒ 无插件归因异常 ✔（形态在已知正样本上命中、在已知负样本与本轮同为 0 ⇒ 有区分力）
+
+八、F1 链（机器校验 ORDER）
+--------------------------------------------------------------------------------
+  链：jar mtime < 起服日志 mtime < 停服物证 mtime < 说明件 mtime
+      jar = 2026-09-19 20:05:37.216 ；log = 2026-09-19 20:07:28.593 ；物证 = 本文件 ；说明 = 阶段6-派发能力化-说明.txt
+  ⇒ 说明件末节给出 `ORDER = OK` 的机器校验命令与输出。
+
+九、制品（与红线）
+--------------------------------------------------------------------------------
+  build/libs/ShadowHunterRolesPlugin-1.0.0.jar = **165404 B / 2026-09-19 20:05:37.216 /
+      SHA256 06750CFE187EE7E50E76993F5628D258A1E7FC20A5D225905CA830806D8711E2**（作业输出：`:compileJava`/`:jar` 已执行）
+  归档件 = `debug-logs/回滚快照/jars/ShadowHunterRolesPlugin-1.0.0-verified-20260919-200537-06750CFE.jar`（与 build/libs 逐字节相同）+ MANIFEST「登记 9」
+  ★ **未重建 `FCB926AC` 那一代**：其归档件现算 = 164982 B / 2026-09-19 19:22:14.941 / `FCB926AC…`（逐字未变）。
+
+十、边界与未覆盖（如实）
+--------------------------------------------------------------------------------
+  1) 本轮的 Mode B / C=0 / 两窗扫描**不能**证明"非继承组件真的被派发"—— 那需要把非继承组件**注册进一个角色**，
+     而 `RoleAPI` 不开放组件注册（见说明件 A8 的诚实档位与最小闭合方式）。严禁把它读成运行级已验证。
+  2) 本轮无玩家/机器人上线 ⇒ 外观面与行为面均无新运行级读数；本卡与外观面**无交集**（说明件 A6 的论证 + 渲染三文件 0 改动）。
+  3) 停机方式 = job_kill（未强杀 java）⇒ 日志无优雅关服行，不影响上述判据。
+  4) 本轮 = **开发构建轮**（见口径声明第 3 条）。

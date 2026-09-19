@@ -92,3 +92,13 @@ sha256 = FCB926ACEEA08BC0C0D9044BA1B109E082A170CB866A68EB84036B4C3F876D77
 覆盖证据 = 阶段6-起服日志-统一组件装配.log（6075 B / mtime 2026-09-19 19:24:08.738 / SHA256 2F45CF5EA263FDB361F70510D97AC3FA1B4103890D1F66812178DF41303172CE）：Mode B 三行（19:23:52 Enabling ShadowHunterRolesPlugin v1.0.0 / 19:23:52 ShadowHunter Character System enabled. / 19:23:52 Done (9.717s)!）+ 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0、REMOVED=0、A=B=C=0）+ 开机窗/运行窗分列读数（开机窗 50 行、运行窗 6 行；两窗级别字段 ERROR/SEVERE 均 = 0）+ 插件归因异常独立扫描 = 0 + 停机前先在仍在线时冻结 + 只 job_kill（未强杀 java）+ 停服三路互证
 与前代关系 = 本代是首代含【统一组件装配】的制品（addComponent 双载 + 权威 kind 在注册处 + HotbarSpec/能力接口 + 三基类降级 + 被动 kind 清理 + **派发序改纯注册序**）⇒ 与 6A249993（阶段 5 · 4.4 那代，159512 B）**不存在 class 级等价主张**，自出 Mode B 运行证据；jar 159512 → 164982 B
 备注 = F1 链 = jar mtime 19:22:14.941 < log mtime 19:24:08.738 < 本登记；工作树状态 = 取证时刻 git status --porcelain -- src 非空（**开发构建轮**，见说明件「提交态申报」节）；未重建 6A249993 那一代（其归档件读数逐字未变）
+ 
+# --- 登记 9 ---
+登记时刻 = 2026-09-19 20:08:21
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260919-200537-06750CFE.jar
+bytes = 165404
+mtime = 2026-09-19 20:05:37.216
+sha256 = 06750CFE187EE7E50E76993F5628D258A1E7FC20A5D225905CA830806D8711E2
+覆盖证据 = 阶段6-起服日志-派发能力化.log（6075 B / mtime 2026-09-19 20:07:28.593 / SHA256 46B1E0458622586705A27D68D3F1063907FCADD6054E4FC5E0FAB209B2F2B0CB）：Mode B 三行（20:07:15 Enabling / 20:07:15 enabled. / 20:07:16 Done (9.636s)!）+ 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0、REMOVED=0、A=B=C=0）+ 开机窗/运行窗分列（50 行/6 行，两窗级别字段 ERROR/SEVERE 均 0）+ 插件归因异常扫描 0/0（形态先在已知正样本 阶段5-起服日志-4.4外观取证.log 86–95 行验证 formA=1/formB=4）+ 防假新鲜三条件（作业启动边界 20:06:47.687 < 轮转 20:07:06 < mtime 20:07:28.593；SHA 与清单六件全不等；被挤走的旧件 2026-09-19-6.log.gz 解压 = 6041B041… = 起服前内容）+ 停机前先在仍在线时冻结 + 只 job_kill（未强杀 java）+ 停服三路互证
+与前代关系 = 本代是首代含【派发面能力化两刀】的制品（handleCast 判据 ActiveComponent→HotbarActionable；新增能力接口 CooldownAware 承接 onCooldownEnd+CooldownEndReason，dispatchCooldownEnd 判据改为 CooldownAware）⇒ 与 FCB926AC（t18 那代，164982 B）**不存在 class 级等价主张**，自出 Mode B 运行证据；jar 164982 → 165404 B
+备注 = F1 链 = jar mtime 20:05:37.216 < log mtime 20:07:28.593 < 本登记；工作树状态 = 取证时刻 porcelain -- src 非空（**开发构建轮**：CooldownAware.java 为未跟踪新件，见说明件「提交态申报」节）；未重建 FCB926AC 代（其归档件读数逐字未变）

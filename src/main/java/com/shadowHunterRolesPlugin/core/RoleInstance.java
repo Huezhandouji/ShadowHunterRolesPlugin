@@ -6,6 +6,8 @@ import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
 import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
+import com.shadowHunterRolesPlugin.core.dispatch.HotbarActionable;
+import com.shadowHunterRolesPlugin.core.hotbar.CooldownAware;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
@@ -16,7 +18,6 @@ import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.platform.Task;
-import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -195,7 +196,8 @@ public class RoleInstance {
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
-        if(!(component instanceof ActiveComponent active)) return false;
+        //阶段 6 · 派发面能力化：判据由「继承关系」改为「能力接口」——本处只用到 onCast（HotbarActionable 的唯一方法）
+        if(!(component instanceof HotbarActionable active)) return false;
 
         //冷却自管理（D1）：框架**不再**代启动冷却 —— 组件在施放成功处自行 svc().cooldowns().start(getCooldownTicks())；
         //声明值仍是唯一真值来源（4.7/O-13），启动点与启动值都与旧框架代启动逐字一致 ⇒ 可观察行为不变。
@@ -370,7 +372,7 @@ public class RoleInstance {
     boolean endCooldown(String componentId, ItemKind kind){
         if(!isCooling(componentId, kind)) return false;
         cooldownTable(kind).remove(componentId);
-        dispatchCooldownEnd(componentId, ActiveComponent.CooldownEndReason.ENDED_BY_COMPONENT);
+        dispatchCooldownEnd(componentId, CooldownAware.CooldownEndReason.ENDED_BY_COMPONENT);
         markHotbarDirty.run();
         return true;
     }
@@ -383,12 +385,12 @@ public class RoleInstance {
         boolean removed = false;
         for(String skillId : expiredIds(skillCooldowns)){
             skillCooldowns.remove(skillId);
-            dispatchCooldownEnd(skillId, ActiveComponent.CooldownEndReason.EXPIRED);
+            dispatchCooldownEnd(skillId, CooldownAware.CooldownEndReason.EXPIRED);
             removed = true;
         }
         for(String weaponId : expiredIds(mainWeaponCooldowns)){
             mainWeaponCooldowns.remove(weaponId);
-            dispatchCooldownEnd(weaponId, ActiveComponent.CooldownEndReason.EXPIRED);
+            dispatchCooldownEnd(weaponId, CooldownAware.CooldownEndReason.EXPIRED);
             removed = true;
         }
         if(removed){
@@ -411,11 +413,13 @@ public class RoleInstance {
     /**
      * 冷却结束回调的唯一派发点（D4）：**先移除条目、再回调** ⇒ 回调内再 {@code end()} 只会得到 {@code false}（不递归重入）；
      * 异常隔离沿用 {@link #runComponentUpdate}（与 update()/onSanTEChange 同键）。
+     * <p>阶段 6 · 派发面能力化：判据由 {@code ActiveComponent} 改为能力接口 {@link CooldownAware}
+     * （{@code ActiveComponent implements CooldownAware} ⇒ 既有组件的接受集逐字不变）。
      */
-    void dispatchCooldownEnd(String componentId, ActiveComponent.CooldownEndReason reason){
+    void dispatchCooldownEnd(String componentId, CooldownAware.CooldownEndReason reason){
         RoleComponent component = componentRegistry.getById(componentId);
-        if(component instanceof ActiveComponent active){
-            runComponentUpdate("registered", active.getId(), () -> active.onCooldownEnd(reason));
+        if(component instanceof CooldownAware aware){
+            runComponentUpdate("registered", component.getId(), () -> aware.onCooldownEnd(reason));
         }
     }
 

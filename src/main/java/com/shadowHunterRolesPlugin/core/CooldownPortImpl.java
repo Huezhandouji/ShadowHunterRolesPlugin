@@ -1,8 +1,8 @@
 package com.shadowHunterRolesPlugin.core;
 
+import com.shadowHunterRolesPlugin.core.hotbar.CooldownAware;
 import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
 import com.shadowHunterRolesPlugin.core.ports.CooldownPort;
-import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 
 /**
  * {@link CooldownPort} 的独立适配器：**构造期已绑定本组件 id 与 kind**（组件不再传 id）。
@@ -47,7 +47,7 @@ final class CooldownPortImpl implements CooldownPort {
         //PASSIVE（阶段 6）：不写任何表、不派发、不置脏（被动没有冷却；若将来需要，须先立项给它一张表）
         if (kind == ItemKind.PASSIVE) return;
         if (owner.clearCooldownForRestart(componentId, kind)) {
-            owner.dispatchCooldownEnd(componentId, ActiveComponent.CooldownEndReason.RESTARTED);
+            owner.dispatchCooldownEnd(componentId, CooldownAware.CooldownEndReason.RESTARTED);
         }
         if (kind == ItemKind.SKILL) {
             owner.startSkillCooldown(componentId, ticks);

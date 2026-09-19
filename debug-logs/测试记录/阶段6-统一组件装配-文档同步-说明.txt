@@ -1,0 +1,514 @@
+阶段6 · 统一组件装配 —— 活文档同步 · 说明（t20）
+================================================================
+交付物：docs/插件文档/ 的 5 份活文档同步到统一组件装配口径 + 本说明件
+本件位置：debug-logs/测试记录/阶段6-统一组件装配-文档同步-说明.txt
+（debug-logs/** 被 .gitignore 忽略 ⇒ 入库由队长 `git add -f`；本件不进 changedPaths 之外的位置）
+
+────────────────────────────────────────────────────────────────
+第 0 节 · 一句话
+────────────────────────────────────────────────────────────────
+把活文档从旧口径（三个窄类型入口 addSkill / addMainWeapon / addPassive、靠继承三个基类获得能力、
+"技能 → 被动 → 主武器"三段派发序）同步到统一组件装配口径：
+
+  1. `Role.Builder.addComponent` 的两个重载（带槽位 / 不带槽位）是推荐入口，三个旧方法已标
+     `@Deprecated`、仍可用、与新入口走**同一条内部路径**；
+  2. `HotbarSpec`（表现规格）+ 能力接口（`HotbarPresentable` / `CooldownBearing` / `EnergyCosting`，
+     以及既有的 `HotbarItem` / `HotbarActionable` / `CombatHook`）+ `HotbarPresentable` 的
+     **一个实现点 `spec()`**；
+  3. **不必继承**三个基类（三者降级为可选的便利实现、未删除），并给出"不属于这三支"的组件组合例；
+  4. **权威 kind 在注册处**（`Role.componentKindOf(String)`），理由 = 服务集先于组件构造；
+  5. **派发序 = 纯注册序**（不再是三段序）；
+  6. 把**已获用户批准**的那条玩法差异落到玩家可见处：`SanTE = 9` 且与「黯然销魂」同 tick 双写时，
+     归零惩罚由【触发】变为【不触发】，tick 末 SanTE 由 4 变 3。
+
+零 git 写；零 src 改动；未改任何既有证据与冻结件。
+
+────────────────────────────────────────────────────────────────
+第 1 节 · 身份（现算；含口径声明）
+────────────────────────────────────────────────────────────────
+【提交态】
+  · 本卡开工时 HEAD = 54b555795194c752d2ea0d66bd75fbbf197c7751
+    （开工前 `git status --porcelain` = 0 行；= 统一组件装配落地的那一代）
+  · 结卡时 HEAD = 213e2d2c3bd09f7a0535b23feda16b088144624e
+    —— 本批期间**队长另提交了 4 份取证件**（`debug-logs/测试记录/阶段6-统一组件装配-外观取证*` 与
+    `阶段6-起服日志-统一组件装配-外观取证.log`，+942 行，提交时刻 2026-09-19 19:46:35）。
+    两代的 `src/main` tree **逐字相同**（388399fdeb40f3414a3df633b65dfad5a07e7557）⇒ 这次 HEAD 位移
+    与本批文档改动无关，也不影响本批任何判据读数（本批的扫描集是 `docs/插件文档/`，且判据复跑于位移之后）。
+  · 本批未执行任何 git 写命令（无 add / commit / checkout / restore / stash / reset / switch）
+    ⇒ 改动**全部停在磁盘工作树**，由队长决定提交。
+
+【改动产物的身份】口径 = 落盘后的工作树字节数（CRLF 保留）+ SHA256（`Get-FileHash -Algorithm SHA256`）；
+行数仅作描述，口径 = `[System.IO.File]::ReadAllLines(…, UTF8)`（**不是** `Measure-Object -Line`：
+后者只数非空行）。下列读数与"改动面定稿后"的工作树同刻现算。
+
+  1) docs/插件文档/角色与技能.md
+     25350 B · 2026-09-19 19:40:26.025 · 336 行
+     SHA256 347CB76BB8B0D3F3827FC503C99F6EEBD5F2F2179168D43F1646FFDBB1103026
+  2) docs/插件文档/架构与组件模型.md
+     25753 B · 2026-09-19 19:41:57.361 · 296 行
+     SHA256 6BCC3DAA802FA2BD774A8F710A82D21C495FFF5715F3554CCACE707693A64201
+  3) docs/插件文档/开发指南-新增角色或组件.md
+     31975 B · 2026-09-19 19:41:57.371 · 473 行
+     SHA256 EE54AD02CE8CD159B11CBFDB86A68B64AD486C1D42DB2108C20AD59DE02D702D
+  4) docs/插件文档/初学者指南/01-插件简述.md
+     5492 B · 2026-09-19 19:41:11.164 · 98 行
+     SHA256 6FE97C018BD2E3BA25D2A3A258DB2B4A89127621CD093A7C9FFF2EA2670B81BD
+  5) docs/插件文档/初学者指南/04-如何创建一个自己的角色.md
+     19761 B · 2026-09-19 19:40:54.071 · 380 行
+     SHA256 6DAA6BC806C7AD9F75C40C260CC846E551B4D16F0CFABB68B3099100C7A9DB2C
+
+  （本说明件自身的身份：件内**不自指**（写完才有最终值）；需要时由复核方按上面的口径现算 bytes + SHA256。）
+
+【未改动的 inScope 文件（同刻现算，供复核"改动面最小"）】
+  · docs/插件文档/README.md                      19194 B · 244 行 · SHA256 930DEB8C804FD880535A043AEB0D826B76BA8000879E70A106B3091C476B242E
+  · docs/插件文档/初学者指南/README.md             3452 B · 56 行 · SHA256 8A34DA769F6CEC319B9B04A3C1A4801A6A73AA2C8EC26EA7BBCD2371C057130A
+  · docs/插件文档/初学者指南/02-面向对象基础.md       6382 B · 142 行 · SHA256 3A43F1109B4531A623CD9C4A33678CD38CB4D4FD9EE916B4A0FBA08255D8C2E4
+  · docs/插件文档/初学者指南/03-读懂第一段代码.md     15380 B · 258 行 · SHA256 C728212C1D4241DA77C7556888D77B732EC1F1B23FA618A1B1A6BACF5937B920
+
+────────────────────────────────────────────────────────────────
+第 2 节 · 改动面（numstat 逐文件 + 未改文件逐条判定）   【A1 / A11】
+────────────────────────────────────────────────────────────────
+命令（仓库根执行）：
+  git -C ShadowHunterRoles diff --numstat -- docs
+
+原始输出（5 行，git 的路径按 core.quotepath 转义为八进制，内容逐字照抄）：
+  2	0	"docs/\346\217\222\344\273\266\346\226\207\346\241\243/\345\210\235\345\255\246\350\200\205\346\214\207\345\215\227/01-\346\217\222\344\273\266\347\256\200\350\277\260.md"
+  23	11	"docs/\346\217\222\344\273\266\346\226\207\346\241\243/\345\210\235\345\255\246\350\200\205\346\214\207\345\215\227/04-\345\246\202\344\275\225\345\210\233\345\273\272\344\270\200\344\270\252\350\207\252\345\267\261\347\232\204\350\247\222\350\211\262.md"
+  105	15	"docs/\346\217\222\344\273\266\346\226\207\346\241\243/\345\274\200\345\217\221\346\214\207\345\215\227-\346\226\260\345\242\236\350\247\222\350\211\262\346\210\226\347\273\204\344\273\266.md"
+  48	13	"docs/\346\217\222\344\273\266\346\226\207\346\241\243/\346\236\266\346\236\204\344\270\216\347\273\204\344\273\266\346\250\241\345\236\213.md"
+  14	1	"docs/\346\217\222\344\273\266\346\226\207\346\241\243/\350\247\222\350\211\262\344\270\216\346\212\200\350\203\275.md"
+
+合计：5 个文件 · +192 / −40。
+
+逐文件说明（改了什么 / 为什么属于本次组件模型变更）：
+  · 开发指南-新增角色或组件.md（+105 / −15）—— 主承载件。
+    ＊ 开篇"三条最要紧的事"→"四条"，补第 4 条 = 统一装配入口 + 组件不必继承；
+    ＊ 「新增一个技能」补一条要点：基类是可选的（`extends RoleComponent` 才是框架要求）；
+    ＊ 「新增一个被动」/「新增一个主武器」各补一句"便利基类、可不继承"；
+    ＊ **新增整节「组件不必继承三个基类（能力按需组合）」**：能力接口表（6 个）+ 不继承基类的组合例
+      （可编译的 `MyHybridComponent` 全文）+ 登记片段 + 两条分工（权威 kind 在注册处 / 管道入口收窄）；
+    ＊ 「新增一个角色」的骨架改用 `addComponent` 两个重载，并补"两个重载"表与 `ItemKind` 的 import 行；
+    ＊ **新增子节「三个旧装配方法（仍在，但已标建议改用新入口）」**：@Deprecated / 仍可用 /
+      同一条内部路径 / 三行等价对照表 / RoleLoader 仍在使用旧写法 / 窄类型工厂形参；
+    ＊ 硬规则表"装配顺序 = 注册顺序（同类型内部）"→"派发顺序 = 注册顺序（不再三段序）"；
+    ＊ 「组件构造器会被执行多次吗」的登记内容改成 `(id, 工厂, 权威 kind, 槽位?)` + `Role.createComponent`；
+    ＊ 「组件与角色的注册」改写成按注册序取出 → `Role.createComponent` → `ComponentFactory.create`；
+    ＊ 禁忌清单加第 10 条（新代码不要再用三个旧别名）。
+  · 架构与组件模型.md（+48 / −13）—— 结构性承载件。
+    ＊ 总览图：组件层标注"可选便利基类"、补"装配入口 addComponent（两个重载）"一行；
+    ＊ 层职责表：能力接口行扩到 6 个接口 + 新增"表现规格 HotbarSpec"行；
+    ＊ 「三个薄基类」→「三个可选的便利基类」并写明"不必继承 + 工厂形参已放宽"；
+    ＊ **新增「能力接口与一个实现点」**：`HotbarPresentable` 接口片段 + 7 个 default + 组合例 + 管道收窄；
+    ＊ **新增「权威 kind 在注册处」**：`ItemKind` 三值 + 行为分支读注册 kind + 理由链（服务集先于组件构造）+ 被动两处差异；
+    ＊ 「启停机制」补"广播顺序 = 注册序"；
+    ＊ 「一个角色实例的装配顺序」把"技能 → 被动 → 主武器"改成"按注册序逐个创建"；
+    ＊ 「渲染契约」把 `HotbarItem` 那条换成 `HotbarPresentable` + `spec()` + `asHotbarItem()` + 注册 kind；
+    ＊ 扩展点表"加技能 / 被动 / 主武器"行改写成"extends RoleComponent + 按需实现能力接口 + addComponent 登记"；
+    ＊ 硬规则第 3 条补"不带槽位的重载表示不占热键栏"；**追加第 13 条**"装配只有一个入口"（不动 1–12 的编号）。
+  · 角色与技能.md（+14 / −1）—— 玩家可见处。
+    ＊ 被动表的表头口径改成"先后顺序由注册顺序决定"，并补两行**完整注册顺序**（含技能与主武器）；
+    ＊ 「SanTE 归零惩罚」补两条：触发值看"每笔写入之后的即时值"、以及 `SanTE = 9` 的具体例子（见第 9 节）；
+    ＊ 「通用机制」末尾新增子节「组件在同一刻的顺序」（注册顺序 + 不再三段序 + 为什么玩家要关心）。
+  · 初学者指南/04-如何创建一个自己的角色.md（+23 / −11）—— 教程主体。
+    ＊ 第 2 步的清单片段 `.addSkill(...)` → `.addComponent(..., ItemKind.SKILL)`，并补"三个旧写法仍能用"；
+    ＊ `ItemKind` 的当场解释（一张只有三格的名字表；不说"枚举"这类词）+ import 区补 `ItemKind`；
+    ＊ 第 6 步两个调用改成 `addComponent` 的重载形态，并补一句"框架真正要求的只有 extends RoleComponent"；
+    ＊ 规则表：槽位那条改成 `addComponent` 语境；`ensureIdNotRegistered(String type, String id)`
+      → `ensureIdNotRegistered(ItemKind kind, String id)`（**修掉一处与源码不符的签名**）；
+    ＊ 报错表补"撞车的是被动或主武器时开头的词会换成 Passive / MainWeapon"。
+  · 初学者指南/01-插件简述.md（+2 / −0）—— 只加一段小注：三句旧写法仍能用、新写法合并成一句
+    `.addComponent(...)`、具体见 `04` 第 2 步。（01 里的代码片段是 `RoleLoader` 的**逐字现状**，未改动。）
+
+**未改动的 inScope 文件，逐条判定"无必要改动"**：
+  · docs/插件文档/README.md（0 行）：逐段复核后判定不改 —— 它面向服主与玩家，全文没有出现
+    `addSkill` / `addMainWeapon` / `addPassive` / `extends Skill` / 派发序 / 归零惩罚触发条件；
+    其「组件类型」表（技能 / 被动 / 主武器）描述的是**玩家可见形态**，本次变更不触及；
+    命令、权限、热键栏四态、已知问题各节均与本批无关。
+  · 初学者指南/README.md（0 行）：只是阅读顺序与"本文档组不写什么"的入口页，无代码、无组件模型描述。
+  · 初学者指南/02-面向对象基础.md（0 行）：六个词的例子全部仍然成立（`RoleComponent` / `new ItemStack`
+    / `getId()` / `id` 字段 / `extends Skill` 的实例 / `VitalsPort`），`extends Skill` 仍是有效便利实现。
+  · 初学者指南/03-读懂第一段代码.md（0 行）：它逐行引用的 `MeiqiheziUnconcernSkill` 与 `RoleInstance`
+    节选在本次变更中**逐字未改**（`Skill` 类仍在、构造函数签名不变），所以引文与讲解不需要动。
+
+────────────────────────────────────────────────────────────────
+第 3 节 · 判据一：痕迹双向自证   【A7】
+────────────────────────────────────────────────────────────────
+【模式来源与落盘】本次**复用**已在磁盘上的模式文件（不是本卡创建，避免在 inScope 之外写入新文件；
+它们位于被忽略的 `.scratch/t8/`，不进版本库、不进 changedPaths）。逐件身份（bytes + SHA256）：
+
+  .scratch/t8/p-A1.txt       55 B   FB8E7DE668671521566C11F566980314B12C7D98F9D2B9D367A32C43D8EB3F37
+  .scratch/t8/p-A2a.txt      17 B   5FF7C308C2BE707B59196281D910522EE99360D8B8F7E6DAA1DA084C3E008754
+  .scratch/t8/p-A2b.txt      13 B   5B5ED5BEEB7F5521BEB9F630CB3E5C63F121A60EEB0985DB4C3AFF9886921853
+  .scratch/t8/p-A3.txt      141 B   21BD473E9959E9FDAAAB3CD4E076E87EF602A73BD222183D15D4B2AD9F995F0F
+  .scratch/t8/p-A4.txt      130 B   5417CA572EB46C822F3B00AE6014ADA5FE385777314A3A5FC31AA5D8B7352AE7
+  .scratch/t8/p-A5.txt      105 B   1B4EABD6FF0DC4A48B29EDE1C747EB739A500F89BEB923FF899C07EA0C5606E0
+  .scratch/t8/p-A6.txt       68 B   9D5E55CD518BFB08BF60AFD3A35D3802E95E146F56EA87CE263D196E005B649E
+  .scratch/t8/p-verify.txt  352 B   5971C7D8AAB341E661C0F30AE0E8D500FDAF65E65CDFBC012E9A9B4589B6C183
+  .scratch/t8/p-forbidden.txt 217 B DCE5DEF079EDAD020E2B198F64BE2D8352638F3ABF7EE736EB1938A50AA4A4D6
+
+  模式集内容（口径：正则、逐行一条，`git grep -E -f` ⇒ 默认大小写敏感、**行级**计数、含代码与注释、
+  作用域 = 命令行给出的路径）：
+    p-A1 = 卡号与批次号：`\bt[0-9]{1,2}\b` · `B[①②③④⑤⑥⑦⑧⑨]` · `T-[0-9]`
+    p-A2a = 阶段号：`阶段\s?[0-9]`
+    p-A2b = 段号形态：`[0-9]\.[0-9]`（**人工判读型**，见第 4 节）
+    p-A3 = 协作语 18 词：队长/队员/本卡/立卡/结卡/改派/交接/独立验证/独立复核/评审/复核/台账/回滚/申报/口径/判据/回归/硬约束
+    p-A4 = 过程文件名 9 项：debug-logs/最终重构指南/组件系统设计/迁移清单/交付小结/协同规范/任务卡编写指南/实施指南/取证
+    p-A5 = 元口径与过程记号 12 项：写作口径/身份一律现算/现算/不要照抄/移动靶/未覆盖/计划 ?≠/✓/✗/⚠/⭐/eng-
+    p-A6 = 面向流程的章节 5 项：复算命令/自检清单/判据集/验收条目/边界行为清单
+    p-verify = 合并模式（A1 的 3 条 + A3 的 15 条 + A4 的 7 项 + A5 的 6 项 + `eng-`）
+
+【新侧（工作树 / docs/插件文档）】命令逐条：
+  git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-A1.txt     -- "docs/插件文档"   ⇒ 0
+  git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-A2a.txt    -- "docs/插件文档"   ⇒ 0
+  git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-A3.txt     -- "docs/插件文档"   ⇒ 0
+  git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-A4.txt     -- "docs/插件文档"   ⇒ 0
+  git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-A5.txt     -- "docs/插件文档"   ⇒ 0
+  git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-A6.txt     -- "docs/插件文档"   ⇒ 0
+  git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-verify.txt -- "docs/插件文档"   ⇒ 0
+  （A2b 单独处理：15 行，逐行判读见第 4 节）
+
+【旧侧（改写前的提交 0c6930d）—— 判据有区分力的证据】
+  旧侧样本 = **0c6930d5845b0255f4157f5abb505a96eb156c5f**（"停机交接"那一代）。
+  为什么必须是它：**不得**用"产物入库的那次提交"当旧侧样本 —— 那一刻的目录内容已经是改写后的无痕迹版本
+  ⇒ 恒 0 行 ⇒ **没有判别力**（本会话队长自曝过同一类错：把指南入库的提交当旧侧，见交接台账）。
+  0c6930d 的 `docs/插件文档` 共 5 个文件（含现已迁出的 `日志与证据归档规范.md`）；逐模式读数：
+
+  p-A1 = 60 · p-A2a = 95 · p-A3 = 63 · p-A4 = 147 · p-A5 = 52 · p-A6 = 10 · p-verify = 208 · p-A2b = 175
+  （单文件样本 `docs/插件文档/架构与组件模型.md`：A1 = 27 · A2a = 30 · A3 = 31 · A4 = 27 · A5 = 19 ·
+    A6 = 4 · p-verify = 58 · A2b = 44）
+
+  ⇒ 两侧计数同写：**新侧 0 / 旧侧非 0（8 个模式全非 0）** ⇒ 判据在已知含命中的样本上咬得住，
+    且新侧 0 不是"模式没落盘 / 工具不可调用 / 作用域写空"造成的假绿（见第 5 节的三条探活同族纪律）。
+  ⇒ 与交接台账里 8 组的旧→新计数**逐字一致**：60→0 · 95→0 · 175→（15 行版本号语境）· 63→0 ·
+    147→0 · 52→0 · 10→0 · 208→0。
+
+【命令形态的两点说明】
+  ① 作用域里的 CJK 路径**可以**直接作为 git pathspec 用（本批实测有效：上面的单文件读数与目录读数
+     互相印证）；为避免"参数侧 CJK 转码"这一类疑虑，目录级读数另用 ASCII 路径复核过一次：
+     `git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-verify.txt -- docs`（= docs 下只有
+     `插件文档` 一棵子树）⇒ 新侧 0 行、旧侧 208 行，与 CJK 路径读数一致。
+  ② `git grep` 的可见性：它**不搜未跟踪件**。本批只改**已跟踪**的 5 份文档（工作树内容即被搜内容），
+     而本说明件位于被忽略的 `debug-logs/**` ⇒ 天然不在扫描集内（本件正文含大量模式字面量，
+     若被误扫会假阳）。改动后 `git status --porcelain` 只有 5 条 ` M`（见第 14 节）。
+
+────────────────────────────────────────────────────────────────
+第 4 节 · 判据二：A2b 的 15 行逐条判读
+────────────────────────────────────────────────────────────────
+命令：git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-A2b.txt -- "docs/插件文档"
+读数：**15 行**（旧侧 175 行 ⇒ 该模式确实有区分力，不是恒 0 模式）。
+逐行判读（命中行号照抄，内容片段人工归因）：
+  README.md:42  `api-version: '1.21.11'`                     → 服务端版本号
+  README.md:44  `paper-api:1.21.11-R0.1-SNAPSHOT`            → 依赖版本号
+  README.md:45  `gradle-9.6.1-bin` + run-paper 3.0.2 + Kotlin 2.4.0 → 构建工具版本号
+  README.md:49  `ShadowHunterRolesPlugin-1.0.0.jar`          → 工程版本号
+  README.md:53  `version = "1.0.0"`                          → 工程版本号
+  README.md:70  `…-1.0.0.jar`                                → 产物名
+  README.md:79  `Paper 1.21.11`                              → 服务端版本号
+  README.md:85  `Paper 1.21.11` + `Java 21`                  → 版本号
+  README.md:86  `…-1.0.0.jar`                                → 产物名
+  初学者指南/03:190  `…-1.0.0.jar`                            → 产物名
+  初学者指南/03:199  `Minecraft 1.21.11`                      → 版本号
+  初学者指南/04:262  `…-1.0.0.jar`                            → 产物名
+  初学者指南/04:272  `Minecraft 1.21.11`                      → 版本号
+  开发指南:22  `Paper 1.21.11`                                → 版本号
+  开发指南:25  `…-1.0.0.jar`                                  → 产物名
+判定：15/15 行都是**版本号 / 产物名语境**，没有一行是"阶段号 · 批号 · 卡号"这类痕迹；
+本批新增 / 改写的段落未带来任何新的 A2b 命中（改动前后同为 15 行，仅 04 与开发指南的行号因上面增行而位移）。
+⇒ 该模式**不列入"痕迹 0 命中"的主判据**（它是人工判读型），但两侧计数与逐行判读在此留档，
+   供后续沿用者**重算行数**（不得改写期望值来回避）。
+
+────────────────────────────────────────────────────────────────
+第 5 节 · 判据三：初学者指南 20 词禁用表   【A8】
+────────────────────────────────────────────────────────────────
+命令：git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-forbidden.txt -- "docs/插件文档/初学者指南"
+读数：**0 行**（作用域 = 初学者指南目录的 5 份文档；口径 = 行级、含代码块、大小写敏感）。
+20 词表（与 p-forbidden.txt 逐字一致）：泛型 · record · 枚举 · 注册表 · 依赖注入 · 生命周期钩子 ·
+脏标记 · 协程 · 线程池 · 调度器 · PDC · 属性修饰符 · 端口 · 适配器 · 反射 · 工厂模式 · 多态 ·
+抽象类 · 设计模式 · 注解。
+
+【仪器自证（三件齐：模式 + 定域 + 口径；并在已知含命中样本上报数）】
+  ① 已知含命中样本 = `08fe741`（初学者指南**首次落地**的那一代；当时还是单文件
+     `docs/插件文档/初学者指南.md`，未做术语审查）
+     命令：git -C ShadowHunterRoles grep -nE -f .scratch/t8/p-forbidden.txt 08fe741 -- "docs/插件文档/初学者指南.md"
+     读数：**4 行**，逐行：
+       :22  `- 类、对象、继承、接口、注解；`            → 命中"注解"
+       :217 `- 登记门铃的函数，头上有一个注解 @EventHandler；` → 命中"注解"
+       :297 `@Override 是一个**注解**，…`               → 命中"注解"
+       :367 `- **端口是 25566**…`                        → 命中"端口"
+     ⇒ 同一份文档谱系上，模式能咬到 4 行 ⇒ 不是恒 0 的假绿。
+  ② 另一样本（旧手册整目录）：`0c6930d` 的 `docs/插件文档` ⇒ **65 行**（端口 / 适配器 / 注册表 等），
+     进一步证明这 20 个词在本仓库文本里真的会出现。
+  ③ 同族探活（防止"工具缺失 ⇒ 空比较假 True"）：`git --version` 与 `git rev-parse HEAD` 均 exit 0，
+     且紧邻的合并模式在同一命令形态下给出旧侧 208 行 / 新侧 0 行 ⇒ 命令本身非空跑。
+
+【术语克制三条件（本批新增词逐个过）】见第 12 节的登记清单。
+
+────────────────────────────────────────────────────────────────
+第 6 节 · 判据四：不引用过程文档   【A10】
+────────────────────────────────────────────────────────────────
+命令：git -C ShadowHunterRoles grep -n "debug-logs" -- "docs/插件文档"
+读数：**0 行**（口径：裸词 `debug-logs`，行级，作用域 = 整个 `docs/插件文档`）。
+本批新增文字里出现的"来源"一律是**仓库内源码路径 + 符号**（如 `core/Role.java` 的 `Role.Builder`、
+`core/hotbar/HotbarSpec`），没有任何一条指向过程目录。
+
+────────────────────────────────────────────────────────────────
+第 7 节 · 判据五：新模型已进入活文档
+────────────────────────────────────────────────────────────────
+命令：git -C ShadowHunterRoles grep -rn "addComponent\|HotbarSpec" -- "docs/插件文档"
+读数：**44 行 / 5 个文件**（口径：两个锚串的并集、行级、含代码块）：
+  · 开发指南-新增角色或组件.md   22 行
+  · 架构与组件模型.md            12 行
+  · 初学者指南/04               8 行
+  · 初学者指南/01               1 行
+  · 角色与技能.md               1 行
+（改动前同一命令 = **0 行** ⇒ 这条判据有区分力：旧版活文档里这两个名字一次都没出现。）
+
+────────────────────────────────────────────────────────────────
+第 8 节 · 逐条验收的落地位置   【A2 / A3 / A4 / A5】
+────────────────────────────────────────────────────────────────
+【A2 统一入口 + 旧别名（开发指南）】
+  · 两个重载的表与调用示例：开发指南「新增一个角色 › 抄一份最小模板」下方的新表（四参 / 三参）；
+  · 旧方法状态：开发指南「三个旧装配方法（仍在，但已标建议改用新入口）」——
+    写明"都还在、还能用""已标 `@Deprecated`""只调用同一条内部路径 `Role.Builder.addComponentInternal`"，
+    并给三行等价对照表（旧写法 ↔ 统一入口 ↔ 权威 kind ↔ 槽位）；
+  · 交叉引用：架构与组件模型 硬规则第 13 条同写。
+【A3（架构与组件模型）】
+  · `HotbarSpec`：总览层表新增"表现规格"行 + 「能力接口与一个实现点」；
+  · 能力接口：层表"能力接口"行扩到 6 个（`HotbarPresentable` / `HotbarItem` / `CooldownBearing` /
+    `EnergyCosting` / `HotbarActionable` / `CombatHook`）+ 接口片段 + 7 个 default 的说明；
+  · "一个实现点 `spec()`"：`HotbarPresentable` 接口片段 + 逐条说明 + 「渲染契约」里再写一次；
+  · 权威 kind 在注册处：新增同名子节（含理由链：`RoleInstance.createServices(String, ItemKind)` →
+    `CooldownPortImpl` 构造期绑 kind → `ComponentFactory.create(String, ComponentServices)` 只给 id 与服务集）。
+  说明：该文档没有编号章节；上面这些改动落在它的「总览 / 组件模型与生命周期 / 渲染契约 / 扩展点与硬性规则」
+  四个位置，覆盖了任一种"§2/§3/§4"数法下会指到的小节。
+【A4 不必继承 + 组合例】
+  · 明写：架构「三个可选的便利基类」首句 + 「能力接口与一个实现点」末两条 + 开发指南新增整节首句；
+  · 组合例：开发指南「不继承基类的组合」给出 `MyHybridComponent`
+    （`extends RoleComponent implements HotbarActionable, CombatHook`，含两个钩子体）**全文**；
+  · 该例**实测编译通过**（见第 11 节：javac exit 0，与仓库外探针 `A6Hybrid` 同型）。
+【A5 派发序 = 注册序】
+  · 架构「启停机制」新增黑体句"广播顺序 = 注册序 …不再按技能 → 被动 → 主武器分组"；
+  · 架构「一个角色实例的装配顺序」把三段序改写为按注册序逐个创建；
+  · 开发指南 硬规则表"派发顺序 = 注册顺序"；
+  · 角色与技能「组件在同一刻的顺序」（玩家可见处）+ 被动表表头 + 两行完整注册顺序。
+
+────────────────────────────────────────────────────────────────
+第 9 节 · A6：已获批准的玩法差异怎么写进玩家可见文档
+────────────────────────────────────────────────────────────────
+【grep 命令与命中行】
+  git -C ShadowHunterRoles grep -n "归零" -- docs
+  ⇒ 9 行命中，其中与本差异直接相关的 3 行（改动后行号）：
+    docs/插件文档/角色与技能.md:222  `### SanTE 归零惩罚 default_san_te_zero_punishment（两个角色都挂）`
+    docs/插件文档/角色与技能.md:226  `- **"降到 ≤ 0"看的是每一笔写入之后的即时值**：同一刻若有多个组件在改 SanTE，…`
+    docs/插件文档/角色与技能.md:227  `- **一个具体例子**：red 在 SanTE = 9 时，若「黯然销魂」的每秒 −10 与「流血」被动的每次结算 +4 落在同一刻…`
+  另有 2 行是**新增**的交叉引用/顺序说明：
+    docs/插件文档/角色与技能.md:315  「组件在同一刻的顺序」首条（注册顺序的定义）
+    docs/插件文档/角色与技能.md:317  "同一刻里两个组件都在改同一个数值时，谁先谁后会影响结果"
+  （改动前该 grep 命中 6 行，且**没有任何一行**说明"同刻双写谁先谁后"这件事。）
+
+【写法选择】按卡面允许的两条路里选了"**按新派发序更新**"，并把差异在玩家可见处**双向量化**写出，
+  不写"以前 / 现在"这类版本对比句（活文档只描述当前行为）。写进文档的判定：
+  · 触发判据 = "每一笔写入之后的即时值"（源码依据：`DefaultSanTEZeroPunishment.onSanTEChange(int pre, int now)`
+    在 `now > 0` 时直接返回 ⇒ `now <= 0` 才触发）；
+  · 具体数值链（新序）：`red` 的注册顺序里 `red_bleed_passive`（第 1 条）先于「黯然销魂」（第 5 条）
+    ⇒ 9 + 4 = 13 → 13 − 10 = 3 ⇒ **不触发**惩罚、该刻末 SanTE = **3**；
+  · 反向链（同刻先 −10）：9 − 10 夹到 0 ⇒ **触发**整套惩罚 → 再 +4 ⇒ 该刻末 4；
+  · 数值来源（逐条可核）：`RedBleedPassive.BLEED_SANTE_RECOVER = 4`（每次结算回 4）·
+    `RedDeeplySorrowSkill` 的 `svc().sante().decrease(10)`（每 20 刻扣 10）· 注册顺序见
+    `registry/RoleLoader` 的 `redBuilder()`（`addPassive(ID_RED_BLEED…)` 是第一条）。
+【判定】A6 成立：玩家可见处（角色与技能.md）已按新派发序描述触发条件，并给出"触发 / 不触发"两条链的
+  确切数值；已获用户批准的那条变化（触发 → 不触发、tick 末 4 → 3）在文档里表现为"现在会走哪条路"。
+
+────────────────────────────────────────────────────────────────
+第 10 节 · API 抽查：文档新写的类名 / 方法名 / 常量   【A9】
+────────────────────────────────────────────────────────────────
+口径：每个符号给「文件 + 符号」，并用 `git grep -F`（固定串、大小写敏感）命中；**抽查 25 组 / 0 条查无实据**。
+（以下命令的工作目录 = 仓库根；`$R = src/main/java/com/shadowHunterRolesPlugin`）
+
+  ① `Role.Builder.addComponent(String, ComponentFactory<? extends RoleComponent>, int, ItemKind)`
+     git grep -n -F "public Builder addComponent(" -- "$R/core/Role.java"            ⇒ 2 行（:239 四参 / :247 三参）
+  ② `addSkill` / `addPassive` / `addMainWeapon` + `@Deprecated`
+     git grep -n -F -e "@Deprecated" -e "public Builder addSkill(" -e "public Builder addPassive(" -e "public Builder addMainWeapon(" -- "$R/core/Role.java"
+                                                                                   ⇒ 6 行（:257/:258 · :268/:269 · :278/:279）
+  ③ `Role.Builder.addComponentInternal`
+     git grep -c -F "addComponentInternal" -- "$R/core/Role.java"                  ⇒ 7 行
+  ④ `Role.createComponent(String, ComponentServices)`（唯一创建点）
+     git grep -n -F "public RoleComponent createComponent(" -- "$R/core/Role.java"  ⇒ 1 行（:118）
+     唯一性：git grep -n -F -e "getFactory().create(" -e "factory.create(" -- src/main/java ⇒ 调用点只有 :121
+  ⑤ `Role.getComponents()`（有序组件表）
+     git grep -n -F "public Map<String, ComponentEntry> getComponents()" -- "$R/core/Role.java" ⇒ 1 行（:381）
+  ⑥ `Role.componentKindOf(String)`
+     git grep -n -F "componentKindOf" -- "$R"                                       ⇒ 6 行（定义 :386 + 4 处注释 + 渲染器调用 :82）
+  ⑦ `Role.Builder.ensureIdNotRegistered(ItemKind, String)`（04 修正的签名）
+     git grep -n -F "private void ensureIdNotRegistered(ItemKind kind, String id)" -- "$R/core/Role.java" ⇒ 1 行（:322）
+  ⑧ `Role.Builder.validateSlot(int)`
+     git grep -n -F "private void validateSlot(int slot)" -- "$R/core/Role.java"     ⇒ 1 行（:338）
+  ⑨ `RoleInstance.createServices(String, ItemKind)`
+     git grep -n -F "private ComponentServices createServices(" -- "$R/core/RoleInstance.java" ⇒ 1 行（:159）
+  ⑩ `RoleInstance.initComponents()`
+     git grep -n -F "private void initComponents()" -- "$R/core/RoleInstance.java"    ⇒ 1 行（:231）
+  ⑪ `CooldownPortImpl(RoleInstance, String, ItemKind)`
+     git grep -n -F "CooldownPortImpl(RoleInstance owner, String componentId, ItemKind kind)" -- "$R/core/CooldownPortImpl.java" ⇒ 1 行（:23）
+  ⑫ `ComponentFactory.create(String, ComponentServices)`
+     git grep -n -F "T create(String id, ComponentServices services)" -- "$R/roleComponent/ComponentFactory.java" ⇒ 1 行（:24）
+  ⑬ `HotbarSpec.of(...)`
+     git grep -n -F "public static HotbarSpec of(" -- "$R/core/hotbar/HotbarSpec.java" ⇒ 1 行（:41）
+  ⑭ `HotbarPresentable.spec()`（唯一实现点）
+     git grep -n -F "HotbarSpec spec();" -- "$R"                                    ⇒ 1 行（:26）
+  ⑮ `HotbarPresentable.asHotbarItem()`
+     git grep -n -F "default HotbarItem asHotbarItem()" -- "$R/core/hotbar/HotbarPresentable.java" ⇒ 1 行（:57）
+  ⑯ `CooldownBearing.getCooldownTicks()`
+     git grep -n -F "int getCooldownTicks();" -- "$R/core/hotbar/CooldownBearing.java" ⇒ 1 行（:13）
+  ⑰ `EnergyCosting.getEnergyCost()`
+     git grep -n -F "int getEnergyCost();" -- "$R/core/hotbar/EnergyCosting.java"     ⇒ 1 行（:12）
+  ⑱ `HotbarActionable.onCast(CastSignal)`
+     git grep -n -F "CastResult onCast(CastSignal signal);" -- "$R/core/dispatch/HotbarActionable.java" ⇒ 1 行（:6）
+  ⑲ `CombatHook.onAttack(AttackSignal)`
+     git grep -n -F "CastResult onAttack(AttackSignal signal);" -- "$R/core/dispatch/CombatHook.java"   ⇒ 1 行（:6）
+  ⑳ `RoleInstance.hotbarItemOf(String)`
+     git grep -n -F "public HotbarItem hotbarItemOf(String id){" -- "$R/core/RoleInstance.java" ⇒ 1 行（:465）
+  ㉑ `ItemKind.SKILL` / `MAIN_WEAPON` / `PASSIVE`
+     git grep -n -F -e "SKILL," -e "MAIN_WEAPON," -e "PASSIVE" -- "$R/core/hotbar/ItemKind.java" ⇒ 3 行（:9/:10/:11）
+  ㉒ `ActiveComponent implements HotbarItem, HotbarActionable, HotbarPresentable`
+     git grep -n -F "implements HotbarItem, HotbarActionable, HotbarPresentable" -- "$R/roleComponent/ActiveComponent.java" ⇒ 1 行（:27）
+  ㉓ 管道收窄两条（文档里明写的行为事实）
+     git grep -n -F -e "instanceof ActiveComponent active" -e "instanceof CombatHook hook" -- "$R/core/RoleInstance.java"
+                                                                                   ⇒ :198（handleCast）· :216（handleAttack）
+  ㉔ 三条装配期报错文案（04 报错表）
+     git grep -n -F -e "Slot must be between 0 and 8" -e "already registered: " -e "failed assembly validation and was NOT registered" -- "$R"
+                                                                                   ⇒ Role.java:340 · Role.java:324 · RoleLoader.java:104
+  ㉕ 两行"完整注册顺序"的锚（角色与技能.md）
+     git grep -n -F -e "addPassive(ID_RED_BLEED" -e "addMainWeapon(ID_RED_SANCTIFIED_BLADE" -e "addSkill(ID_RED_DEEPLY_SORROW" -- "$R/registry/RoleLoader.java"
+                                                                                   ⇒ :154 · :155 · :158
+  ⇒ 25/25 命中，**0 条查无实据**；本批新写的符号没有一个是凭空造出来的。
+
+────────────────────────────────────────────────────────────────
+第 11 节 · 文档片段可编译性探针（正样本 + 负对照）
+────────────────────────────────────────────────────────────────
+目的：把《开发指南》与《初学者指南 04》里**逐字抄下来的代码片段**真的过一遍 javac —— 因为文档片段
+不会被仓库构建覆盖（它们不在 `src/` 里），这是"照抄能编译"的唯一直接证据。
+探针位置（**仓库外**，工作区 `.scratch\t20-docsync\`；不进版本库、不进 changedPaths，与 t18 的
+仓库外 A6 探针同惯例）。
+
+【探针文件（逐件身份，bytes + SHA256）】
+  .scratch/t20-docsync/src/com/shadowHunterRolesPlugin/roleComponent/myRole/MyHybridComponent.java
+      1329 B · BC9E4E5C0E0330A70753954C1B391ACEA104127450E53A3DB032CC85D1A76A3F（= 开发指南新增节里那段，逐字）
+  .scratch/t20-docsync/src/com/shadowHunterRolesPlugin/roleComponent/myRole/MyFirstSkill.java
+      1285 B · B63AC24D193F9ADD4140EFD2D760A875BB9CD9BA8BB4CF407C538E3919EF90EA（= 04 第 1 步的完整文件，逐字）
+  .scratch/t20-docsync/src/com/shadowHunterRolesPlugin/roleComponent/myRole/MyMainWeapon.java
+      1008 B · 31FAF58071B80E9649A0EDE18B0A52E2B0AA4865A4596E6C58232D9FB935636D（= 开发指南主武器骨架的形状）
+  .scratch/t20-docsync/src/com/shadowHunterRolesPlugin/roleComponent/myRole/MyPassive.java
+       554 B · 5227937255776961B5A70040A3D15656E9E4308BA034CF43AF3CF78E89575BD0（= 开发指南被动骨架的形状）
+  .scratch/t20-docsync/src/docsync/DocSyncProbe.java
+      1298 B · BDE2FF1E5F9317F10D9AF83477BE0941B0887C18D18E20DDB7864FACC1E0BF0A
+      （把两类文档给出的登记写法各写一遍：`addComponent` 的**三参**与**四参**各用两次）
+  .scratch/t20-docsync/negative/NegativeControl.java
+       724 B · EC63FF0AFF9E6B319DDF1F098934F8F6C75CCC9CCD32029AEA8185235CAF73DE（负对照）
+
+【classpath（本机现值）】
+  ShadowHunterRoles/build/classes/java/main
+  + io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT（Gradle 缓存里的 …\20961a0e…\paper-api-1.21.11-R0.1-SNAPSHOT.jar）
+  + 39 个依赖 jar（Gradle 缓存里 net.kyori / org.jetbrains.annotations / com.google.guava / gson / snakeyaml /
+    commons / bungeecord-chat / joml / fastutil / slf4j / log4j 各目录下**非 sources/javadoc** 的 jar）
+  编译器：`C:\Program Files\Java\jdk-21\bin\javac.exe`
+
+【正样本（应通过）】
+  命令：javac.exe -encoding UTF-8 -cp <上述 classpath> -d .scratch\t20-docsync\out <5 个 .java>
+  结果：**exit = 0**，产物 5 个 class：
+    com/shadowHunterRolesPlugin/roleComponent/myRole/MyFirstSkill.class
+    com/shadowHunterRolesPlugin/roleComponent/myRole/MyHybridComponent.class
+    com/shadowHunterRolesPlugin/roleComponent/myRole/MyMainWeapon.class
+    com/shadowHunterRolesPlugin/roleComponent/myRole/MyPassive.class
+    docsync/DocSyncProbe.class
+  ⇒ 文档里"不继承基类的组合""04 的完整技能文件""主武器 / 被动骨架形状""addComponent 两个重载的登记写法"
+    四处都真的能编译。
+
+【负对照（应失败；证明上一行不是真空通过）】
+  探针内容：把 `MyHybridComponent`（非 `Skill` 支）交给**旧窄类型入口** `addSkill(...)`。
+  命令：javac.exe -encoding UTF-8 -cp <上述 classpath + 正样本 out> -d .scratch\t20-docsync\out-neg NegativeControl.java
+  结果：**exit = 1**；stderr 原始输出（控制台码页把 CJK 弄花了，ASCII 定位信息可读）：
+    javac.exe : C:\Users\ROG\Desktop\…\.scratch\t20-docsync\negative\NegativeControl.java:18: 错误: 不兼容的类型: 推断类型…
+                .addSkill("probe_hybrid_via_old_entry", MyHybridComponent::new, 1)
+                                                        ^
+    1 个错误
+  产物目录 `out-neg` **未生成**（Test-Path = False）。
+  ⇒ 双向自证成立：正样本 exit 0 / 负对照 exit 1，且负对照给出的正是"工厂形参不兼容"⇒ 印证开发指南里
+    "三个旧入口的工厂形参是窄类型、不属于这三支的组件过去没有登记位置"这句话。
+
+【一条口径提醒】上面这次负对照重跑时我曾误加 `-J-Dstdout.encoding=UTF-8` 之类的 JVM 透传参数，javac
+  拒收该参数并给出 exit = 2；那是**我的命令写错**，与负对照结论无关 —— 结论以"无 `-J` 参数、exit = 1"的那次为准，
+  两次的差别已在上面如实写明。
+
+────────────────────────────────────────────────────────────────
+第 12 节 · 术语清单（初学者指南）   【A8 条件③】
+────────────────────────────────────────────────────────────────
+口径：初学者指南的读者前置假设 = 只会「变量 / 列表 / 函数」（外加 02 那六个词：类 · 对象 · 方法 ·
+字段 · 继承 · 接口）。超出者必须同时满足三条件：① 是本次目标所必需；② 首次出现处用一句话、拿读者
+已知的东西解释；③ 登记进本清单。
+
+本批在初学者指南里新引入 / 新加解释的词（逐条）：
+  1. `ItemKind`（04 第 2 步）
+     ① 必需：`addComponent` 的第四个实参只能是它的三个值之一，不写就无法照抄教程；
+     ② 解释（一句话，用"名字表"打比方）："一张只有三格的名字表 —— `SKILL`（技能）、`MAIN_WEAPON`（主武器）、
+        `PASSIVE`（被动）。写的时候连点带名字抄成 `ItemKind.SKILL` 这样"；
+     ③ 已登记（本条）。**未**使用"枚举"这个词（禁用表命中项）。
+  2. `ItemKind.SKILL` / `ItemKind.MAIN_WEAPON` / `ItemKind.PASSIVE`（04 第 2 步、第 6 步）
+     同一条解释覆盖三个值；三处出现都在解释之后或同段。
+  3. `addComponent`（04 第 2 步、01 的小注）
+     它是**函数名**，属于读者已知的"函数"范畴；首次出现处给了参数逐格读法（表里那一行）+ 一句
+     "与旧写法效果一模一样"。
+  4. `RoleComponent`（04 第 1 步的括注、第 6 步的括注）
+     ② 解释：在 02 里已作为"类"的第一个真实例子出现（`public abstract class RoleComponent`），
+        本批的用法是"框架真正要求的只有 `extends RoleComponent`" + "它是比 `Skill` 更底层的模板"；
+     ③ 已登记。全篇**没有**引入 `HotbarSpec` / `能力接口` / `spec()` / `default` / `@Deprecated` 等词 ——
+        它们对"做出一个能跑的最小角色"不是必需的（这三条留给 `../开发指南-新增角色或组件.md`）。
+  5. 旧写法三名 `addSkill` / `addMainWeapon` / `addPassive`（01 小注、04 第 2 步括注）
+     只在"这三句也还能用、效果一样"的语境里出现，是**读者会在仓库里真的看到**的名字 ⇒ 必需；未展开解释、
+     因为不需要照抄它们。
+  其余原有词（`svc()` / `onCast` / `tick` / `extends` …）沿用既有登记，本批未新增用法。
+
+────────────────────────────────────────────────────────────────
+第 13 节 · 未覆盖项如实申报   【A12】
+────────────────────────────────────────────────────────────────
+1. **运行级验证：未做**。本批只改文档，没有起服、没有进游戏、没有玩家/机器人；第 9 节里 SanTE 的两条
+   数值链（9→13→3 不触发 / 9→0→4 触发）是**静态推演**（源码常量 + 注册顺序），不是运行级复现。
+   最小闭合方式：接在 t18 未覆盖项 C-11 上的取证卡 —— 构造 `red` 的同 tick 双写并观测 SanTE 序列、
+   是否出现 STUN 100 刻 + 真伤 + 标题、`deeplySorrow.running`。（同一条在 t18 的说明里也仍挂着。）
+2. **文档 Markdown 渲染未在真实渲染器里看过**（表格 / 代码围栏风格沿用既有写法；未做渲染截图或 lint）。
+   最小闭合方式：下游复核时用任意 Markdown 预览核对表格列数，或跑一次 md lint。
+3. **"改动面最小"是人工判读**：第 2 节给了 numstat 与逐段清单，但"哪一段算与本次相关"没有机器判据。
+   最小闭合方式：由复核方按第 2 节的段落清单逐条判"是否应改"。
+4. **术语必要性（第 12 节）同为人工判读**：20 词表只覆盖"显然不该出现"的词；本批新增的
+   `ItemKind` / `RoleComponent` / `addComponent` 是否"目标必需"由我判读，没有第二方复核。
+5. **未扫第三方插件对本插件文档的引用**：本批只动 `docs/插件文档/`，未检查仓库外是否有文档/issue 链接
+   到被改的段落锚点。
+6. **`p-A2b` 的 15 行是人工判读型**：我只逐行判"是版本号语境"，没有做机器判据；沿用者须**重算行数**。
+7. **未做**：`git grep --untracked --no-exclude-standard` 形态的第三路复核（本批改动全部落在**已跟踪**文件上，
+   未跟踪件只有本说明件与仓库外的探针目录；这两者都不属于"文档零痕迹"的扫描集，理由见第 3 节末）。
+
+────────────────────────────────────────────────────────────────
+第 14 节 · 边界   【A13 / A1】
+────────────────────────────────────────────────────────────────
+· **零 git 写**：本批未执行任何 git 写（无 add / commit / checkout / restore / stash / reset / switch）。
+  证据：`git -C ShadowHunterRoles rev-parse HEAD` 在**开工时** = 54b555795194c752d2ea0d66bd75fbbf197c7751、
+  在**结卡时** = 213e2d2c3bd09f7a0535b23feda16b088144624e；后者 = 队长在本批期间提交的 4 份取证件
+  （`src/main` tree 与前者逐字相同）⇒ **本卡的改动一行都没进任何提交**，全部停留在工作树。
+  若复核方要重放本卡读数：请在**工作树**上复跑（不要 checkout 到某代再看），因为改动尚未提交。
+· **零 src 改动**：`git -C ShadowHunterRoles status --porcelain -- src` ⇒ **0 行**。
+· **改动的路径全部 ⊆ 卡面 inScope**：
+    docs/插件文档/角色与技能.md
+    docs/插件文档/架构与组件模型.md
+    docs/插件文档/开发指南-新增角色或组件.md
+    docs/插件文档/初学者指南/01-插件简述.md
+    docs/插件文档/初学者指南/04-如何创建一个自己的角色.md
+  （另：本说明件 = debug-logs/测试记录/阶段6-统一组件装配-文档同步-说明.txt，也在 inScope 内；
+   被忽略 ⇒ 需要队长 `git add -f`。）
+  工作树 `git status --porcelain` 的完整读数 = 上述 5 条 ` M`（+ 1 条被忽略的本说明件，porcelain 默认不显示）。
+· **改动的仓库外产物**（不在 changedPaths、不进版本库，只作探针）：`.scratch\t20-docsync\` 下的
+  5 个探针源码 + 1 个负对照 + 编译产物。与 t18 的仓库外探针同惯例。
+· **未改任何既有证据与冻结件**：`debug-logs/测试记录/` 与 `debug-logs/回滚快照/` 下的既有文件一字未改
+  （本批只**读**了 `阶段6-统一组件装配-说明.txt` 等作为事实来源，并在读时用 ReadAllLines/read 工具，
+  未用 `Get-Content`）。
+· **未申请提权**：全程零提权申请；未遇到沙箱拒绝。
+
+（完）

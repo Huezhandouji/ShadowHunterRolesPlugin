@@ -1,0 +1,134 @@
+阶段 6 · 归零惩罚两处语义对齐 —— 交付说明（卡 t27）
+================================================================================================================
+边界声明（开篇）
+  1) 三件证据 = 本件 + 阶段6-起服日志-归零惩罚语义对齐.log + 阶段6-归零惩罚语义对齐-停服物证.txt；jar 归档与 MANIFEST 追加属本卡 inScope。
+  2) **零 git 写**；**改动面 = 1 个源文件**；未改 `RoleAPI`、未改渲染路径、未改 `t26` 的三件证据、未改 `docs/`、未改任何其它组件。
+  3) 行号 = 结卡时**当前树**现值；点名提交：开工基线 = `a18cd9628c3b03819ebbe634572166c303fe94d4`。
+  4) ★ 卡面 verify #6 的路径笔误（`runtime\logs` ⇒ 实为 `run\logs`）已双跑落盘，见 A7 与物证第七节②。
+
+第 0 节 · 一句话结论
+  按用户对两处规格歧义的裁定完成对齐：**Q1 = A**（钉 0 由「40 刻任务跳一次」改为 **逐 tick**）、**Q2 = A**（回满由第 3 跳 ≈4.05 s 推迟到 **STUN 100 刻结束** ⇒ 消除约 1 秒「已回满但仍在眩晕」窗口）；
+  **其余语义逐字不变**（忽略重入 · 进入即标记 · STUN 100 · 真伤数值与节奏 · 粒子/标题/音效），**五条中止路径复位保持完整**。
+  构建通过、Mode B 三行齐、集合差 `C=0`（且带判别力）、两窗级别字段 0、插件归因异常 0/0（形态双向自证）、防假新鲜三条 + 轮转侧证齐、停服三路互证齐；新代已归档并登记（登记 11）。
+  **运行级仍只覆盖"既有组件零回归"档**；惩罚循环端到端**如实退档**（A9）。
+
+第 1 节 · 基线（第一动作 = 取基线，编辑之前）
+  `… t59-baseline-and-scoped-criteria.ps1 -Name t27-punishment-align-before` ⇒ HEAD = `a18cd962…`；快照 + SHA256.txt；时点 2026-09-19 20:52:46.611。
+  API 先核实（铁律 ①）：`TimerPort.runLater(long delayTicks, Runnable task)`（`core/ports/TimerPort.java:25`）+ `TimerPortImpl.runLater` 会 `track(handle)` 登记进本组件资源表（`core/TimerPortImpl.java` 现读）⇒ 回满任务的取消/泄漏由框架兜底。
+
+第 2 节 · 改动内容（t27 只做两处对齐）
+  ① **A1（Q1 = A）**：删除 40 刻任务体内的 `svc().sante().set(0)`；新增 `update()` 覆写（现 `:83-88`）：
+      ```java
+      @Override
+      public void update() {
+          if (inSanTEPunishment) {
+              svc().sante().set(0);
+          }
+      }
+      ```
+      `update()` 由容器**每 tick** 广播一次（`RoleInstance.triggerUpdate` 的组件广播）⇒ 惩罚期间**每一 tick** SanTE 都是 0。
+  ② **A2（Q2 = A）**：回满从 `count == 3` 移出，改为在**施加 STUN 的那一跳**（`count == 1`）预约（现 `:144-152`）：
+      ```java
+      punishmentRestoreTask = svc().timers().runLater(100L, () -> {
+          if (!inSanTEPunishment) return;              // (5-⑤ 正常结束，防御性)
+          inSanTEPunishment = false;                   // 先清标记：否则同一 tick 的逐 tick 钉 0 会把回满值抹回 0
+          svc().sante().set(svc().sante().max());      // 一次性回满
+      });
+      ```
+      STUN 在 `count == 1`（触发后第 1 tick）施加、持续 100 刻 ⇒ 本任务在 **(T+1)+100 = T+101 = STUN 到期那一刻**执行 ⇒ **惩罚期间 SanTE 全程为 0，结束后一次性回满** ⇒ 约 1 秒矛盾窗口消除。
+  ③ 任务句柄由 1 把变 2 把（`punishmentTask` + `punishmentRestoreTask`），`cancelPunishmentTask()` 两把都取消并复位（现 `:203-213`）。
+
+第 3 节 · 逐条（A1…A11）
+  A1【钉 0 改为逐 tick】⇒ **pass**：`update()` = `:84-88`，钉 0 代码调用 = **`:86 svc().sante().set(0);`**，守卫 = `:85 if (inSanTEPunishment)`。
+      判据（卡面 verify #2/#3 原文输出见 commandsRun）：`git grep -nE 'sante\(\)\.set\(0\)|void update\(\)|inSanTEPunishment'` ⇒ 逐行命中；`git grep -n -B2 -A6 'void update'` ⇒ 逐字显示 `update()` 三行体。
+      **口径**：`sante().set(0)` 全文件 **2 处命中** = 代码 `:86`（唯一代码调用，在 `update()` 内）+ javadoc `:34`（文档描述）；**40 刻任务体内已无 `set(0)`**（原 `:115` 一处已删）。
+  A2【回满推迟到 5 秒】⇒ **pass**：实现方式见第 2 节②；判据：`git grep -nE 'runLater\(100L|sante\(\)\.set\(svc\(\)\.sante\(\)\.max'` ⇒ 代码 `:146`（预约）+ `:151`（回满）+ javadoc `:40`。
+      **时序推导（可复算）**：`runRepeating(0L, 40L, …)` 首跳 = 触发后第 1 tick（0 由适配层归一为 ≥1）；STUN 在首跳施加、`BuffType.STUN, 100` ⇒ 到期 = 首跳 + 100 tick = **T+101**；回满任务在首跳以 `runLater(100L)` 预约 ⇒ **同在 T+101 执行** ⇒ 惩罚期间（T…T+101）SanTE 恒 0，回满在 T+101 一次性发生 ⇒ **不存在"已回满但仍在眩晕"窗口**（改前：回满在 T+81，窗口 = T+81…T+101 ≈ 1 s）。
+  A3【中止路径复位不得丢失】⇒ **pass（逐路径，编号与源码注释一致）**：全文件 `inSanTEPunishment = false` = **5 处**（+1 处字段初值 `:71`）：
+      | # | 路径 | 行 | 性质 |
+      |---|---|---|---|
+      | (5-①) | `stop()`（清角色/下线/框架 `triggerLifecycleStop`） | `:220` | 语义必需 |
+      | (5-②) | 任务体 `!player.isOnline() \|\| player.isDead()` | `:122` | 语义必需 |
+      | (5-③) | 任务体 `punishmentTask == null \|\| isCancelled()` | `:116` | 防御性 |
+      | (5-④) | 任务体 `count >= 3` 空转 | `:130` | 防御性 |
+      | (5-⑤) | **回满任务的正常结束**（本次由 `count==3` **迁移**至此） | `:150` | 语义必需（正常收尾） |
+      判据：`git grep -n -E 'inSanTEPunishment = false|\(5-'` ⇒ 逐行命中（注释里 `(5-①…⑤)` 五条齐全）。
+      **为什么必须有**：标记卡在 `true` ⇒ `update()` 的逐 tick 钉 0 **持续生效**（SanTE 永远被钉回 0）**且** `onSanTEChange` 顶部守卫永久早退 ⇒ **后续归零永不触发惩罚**；全程**零错零警告**（编译过、Mode B 三行、`C=0` 全不报）⇒ 静默失效。
+  A4【不得引入重入循环】⇒ **pass（关系逐条写明）**：
+      · 已是 0 时 `set(0)` ⇒ `RoleInstance.setCurrentSanTE` 写同值后 `dispatchSanTEChange(pre=0, now=0)` ⇒ 容器侧 `if(pre == now) return;` ⇒ **不派发**；
+      · 若本 tick 更早的组件把 SanTE 抬高（`RedBleedPassive` 的 `+4`）⇒ 本 tick 的钉 0 是**真变化** ⇒ 派发一次 `(pre>0 → 0)` ⇒ 回到本组件时被 `onSanTEChange` 顶部守卫 `if(inSanTEPunishment) return;`（`:93`）挡下 ⇒ **不取消、不重启、不刷新 count**；
+      · **钉 0 与惩罚任务彼此独立**：`update()` **不创建/不取消任何任务** ⇒ **无任务泄漏**；两把任务句柄只在「进入惩罚」与「stop()」两处被取消/替换（`cancelPunishmentTask()` 是唯一入口）。
+      · 结构旁证（可复算，静态级）：red 角色的注册序里 `default_san_te_zero_punishment` 位于流血/黯然销魂**之后** ⇒ 同一 tick 内被抬高的值会在**本 tick 内**被钉回 0（无需等下一 tick）。
+  A5【不得改变其余语义】⇒ **pass（逐条对照现值）**：`if(inSanTEPunishment) return;` = `:93`（忽略重入）· `inSanTEPunishment = true;` 先于起任务 = `:102` < `:104`（进入即标记）· `svc().buffs().add(BuffType.STUN, 100)` = `:141`（逐字，含 100）·
+      真伤数值 = `:110`（`MAX_HEALTH × 0.3d` 或 20）与 `:194`（`totalDamageAmount * 0.33333d`，逐字）· 节奏 = `runRepeating(0L, 40L, …)`（`:104`，三跳不变；`count==3` 那跳照旧做音效/粒子/真伤 —— 仅**回满**被移出）·
+      表现层 = `ITEM_TOTEM_USE`（`:153`）· `TOTEM_OF_UNDYING`（`:156`）· `SCULK_SOUL`（`:157`/`:192`）· `ENTITY_WITHER_HURT`（`:190`）· `showTitle`（`:185`）· 标题时长 `Duration.ofMillis(5000L)`（`:169`/`:179`）—— 全部逐字未动。
+  A6 构建 + 制品 ⇒ **pass**：`BUILD SUCCESSFUL in 10s`；`.class` mtime 刷新；jar = 165428 → **165857 B / 2026-09-19 20:53:53.918**；`src 新于 jar = 0`；
+      归档 `…-verified-20260919-205353-B8C3259E.jar`（与 build/libs 逐字节相同）+ MANIFEST「登记 11」；**未重建 `305BA1AD`**（现算 165428 B / 20:42:26.390 逐字未变）与 `06750CFE`（165404 B / 20:05:37.216 逐字未变）。
+  A7 运行级 ⇒ **pass（含一处卡面笔误的双跑申报）**：Mode B 三行（20:54:41/20:54:41/20:54:42 `Done (8.953s)!`）· **开机窗/运行窗分列** ⇒ ERROR/SEVERE 均 **0**（50 行/6 行）·
+      **插件归因异常**（形态锚 `^\s+at `）**0/0**，且先在正样本上自证命中（t5 件 formA=**1**/formB=**4**）+ 负样本（t26 件 0/0）· 当轮物证：仍在线冻结 → 只 `job_kill` → 停服三路复证。
+      ★ **`C=0` 口径事先选定**：本轮**不挂机器人** ⇒ t25 那类"机器人掉线触发的 Netty 回退投递 WARN"不会出现 ⇒ 期望 `C=0`；实测一致（说明件与物证第七节⑤同步写明）。
+      ★ **卡面 verify #6 路径笔误（`runtime\logs\latest.log`，实际不存在）** —— 两跑对照（四元组，落盘 `.scratch/bot/logdelta-t27-verbatim.txt` 与 `…-t27.txt`）：
+          **甲（卡面原样）**：`anchor=13 · current=0 · ADDED=0 · REMOVED=0 · C=0` ⇒ **真空通过**（工具在 `Compare-Object` 抛 `ParameterArgumentValidationErrorNullNotAllowed`，但 `$ErrorActionPreference='Continue'` ⇒ 仍写出报告）；
+          **乙（修正路径）**：`anchor=13 · current=13 · ADDED=0 · REMOVED=0 · A=B=C=0` ⇒ **具备判别力的 C=0** ✔。
+      ⇒ **有效轮的判据写死三条同时成立：`ADDED=0` 且 `REMOVED=0` 且 `current 侧行数=13`**（采纳 eng-验证 的强化建议；只写 `C=0` 会被真空轮蒙过）。
+  A8【防假新鲜三条 + 轮转侧证】⇒ **pass**（逐条落盘于物证第一节）：
+      ① 启动边界 **20:54:16.435**（起服前三路互证）→ 轮转/首行 **20:54:33**；
+      ② latest.log mtime **20:54:43.953**、冻结件 mtime **20:54:57.330**（均晚于启动边界）；
+      ③ 本轮 SHA **`25C200B0…`** 与清单六件（`3F04913F` t26 / `B06549A1` t25 / `46B1E045` t22 / `8318A683` t19 / `8268E32C` t4 / `527183B0` t2）**逐件现算全不等**；
+      ★ **轮转侧证**：`run/logs/2026-09-19-9.log.gz`（mtime 20:54:33）解压 = **6075 B / `3F04913F…`** **逐字等于起服前那份**（= t26 冻结件）⇒ 旧件确实被挤走。
+  A9【运行级如实退档】⇒ **pass（退档声明）**：惩罚表现层 = `TOTEM_OF_UNDYING` + `SCULK_SOUL`（`:156`/`:157`/`:192`，`World#spawnParticle` 半径发送；惩罚点就在玩家自身 ⇒ 施放者必收），
+      与 `DUST` 同属 mineflayer 无法解析的包（eng-验证 t25 实测：`mineflayer/lib/particle.js:21` 读 `undefined.type` ⇒ 管线断裂 ⇒ keepalive 超时）⇒
+      **本卡证据最高档位 = 静态级（A1–A5、A8 全部可复算）+ 构建级 + 运行级仅覆盖"既有组件零回归"**；**未**、也**不得**写成"惩罚循环已在运行级验证"。
+      **最小闭合方式**（两条）：① 修客户端粒子解析（钉/补 mineflayer，或换非 mineflayer 的 Java headless 客户端）；② 走服务端侧通道（派生 `.scratch/t25-probe/` 的 `SanTEChangeEvent` 监听 + `setPlayerSanTE` 驱动），前提仍是"被观测玩家在线且客户端别掉线"。
+  A10 证据文件名与 inScope 逐字一致 + F1 链 ⇒ **pass**：三件名逐字核对一致；`jar 20:53:53.918 < log 20:54:57.330 < 物证 < 说明` ⇒ **ORDER = OK**（机器校验命令与输出见本件末节）。
+  A11 边界 ⇒ **pass**：未覆盖项见第 4 节；零 git 写；changedPaths ⊆ inScope（见第 5 节）。
+
+第 4 节 · 未覆盖项如实申报
+  1. **惩罚循环端到端未覆盖**（A9）：受客户端 particle 缺陷阻塞，含两条最小闭合方式。
+  2. **Q1/Q2 的"运行期时序"只有静态级依据**：`update()` 每 tick 广播 + `runLater(100L)` 的时序推导均为**静态**事实；本轮无玩家/机器人 ⇒ 未观测到"每 tick 为 0"与"约 5 s 后回满"的实测序列。
+  3. **回满任务的边界**：若玩家在 T+101 之前离线/死亡，损坏路径（`:122`）会先复位标记并取消任务 ⇒ 回满**不发生**（这是有意设计：越权恢复不应发生）；若玩家在 T+101 时恰好离线但实例未清，回满仍会写入（`setCurrentSanTE` 对离线玩家无副作用）。**未在运行级验证**上述两分支。
+  4. 未做逐 tick 采样、未挂机器人、未装任何探针。
+  5. 未评估"逐 tick 钉 0"对**性能**的影响（每 tick 一次 `set(0)`；仅惩罚期间、且已为 0 时不产生派发）—— 属可申报的量级声明，未做计时实测。
+
+第 5 节 · 零 git 写 / changedPaths / 范围外写入
+  · **零 git 写**：未执行 add/commit/checkout/restore/stash/reset；本批改动**未提交**。
+  · changedPaths（仓库相对 POSIX；逐条 ⊆ inScope）：
+      `src/main/java/com/shadowHunterRolesPlugin/roleComponent/DefaultSanTEZeroPunishment.java`
+      `debug-logs/回滚快照/jars/ShadowHunterRolesPlugin-1.0.0-verified-20260919-205353-B8C3259E.jar`
+      `debug-logs/回滚快照/jars/MANIFEST.txt`（追加登记 11）
+      `debug-logs/测试记录/阶段6-归零惩罚语义对齐-说明.txt`
+      `debug-logs/测试记录/阶段6-起服日志-归零惩罚语义对齐.log`
+      `debug-logs/测试记录/阶段6-归零惩罚语义对齐-停服物证.txt`
+  · 范围外（工作区级、非仓库）写入：`.scratch\bot\src-snapshots\t27-punishment-align-before\`（基线快照 + SHA256.txt）、`.scratch\bot\t27-build-1.log`、
+    `.scratch\bot\logdelta-t27.txt` 与 `.scratch\bot\logdelta-t27-verbatim.txt`（**双跑对照，后者即"真空通过"反例**）、
+    `.scratch\bot\pret27-latest-copy.log`（起服前 latest.log 副本 = t26 那轮内容，防假新鲜对照用）⇒ 均属判据要求；未改任何共享仪器脚本。
+  · `t26` 的三件证据（`阶段6-归零惩罚语义修复-*.txt` / `阶段6-起服日志-归零惩罚语义修复.log`）**未触碰**（属卡面 outOfScope，已核对未改）。
+
+第 6 节 · 提交态申报（台账 §3 铁律 8）
+  取证时刻 `git status --porcelain -- src` = **1 行（未提交）** ⇒ 本轮 = **开发构建轮**（非"提交态"）；
+  制品↔源码绑定 = 「点名提交 `a18cd962…` 的 src 树 + 本批工作树改动」；若队长随后提交，请按"提交后 tree ↔ 工作树逐文件比对"认领（提交不动 `build/`，不破 F1 链）。
+
+页末声明（口径）
+  A. 卡面 verify 的 gradlew 条写作裸 `.\gradlew …`；实际执行形态 = 同一条 pwsh 前置 `$env:GRADLE_USER_HOME="$PWD\.gradle-work"`（一次申报）。
+  B. 构建判定 = `BUILD SUCCESSFUL` + `build/classes` 最新 `.class` mtime 已刷新（本机 gradlew 会向 stderr 打 `Couldn't open current thread, error = 5` ⇒ 不看退出码）。
+  C. 卡面 verify #6 的 `runtime\logs\latest.log` 路径**不存在**；本件按「原样跑 + 修正跑」双跑并给出四元组对照，有效轮判据 = `ADDED=0 且 REMOVED=0 且 current=13`。
+
+第 7 节 · F1 链 ORDER 机器校验（命令 + 输出，逐字；本节为最后一次追加）
+  命令：$j=(Get-Item build\libs\ShadowHunterRolesPlugin-1.0.0.jar).LastWriteTime; $l=(Get-Item …阶段6-起服日志-归零惩罚语义对齐.log).LastWriteTime; $e=(Get-Item …阶段6-归零惩罚语义对齐-停服物证.txt).LastWriteTime; $n=(Get-Item …阶段6-归零惩罚语义对齐-说明.txt).LastWriteTime; ($j -lt $l) -and ($l -lt $e) -and ($e -lt $n)
+  jar    mtime = 2026-09-19 20:53:53.918  (build/libs，与归档件同 mtime)
+  log    mtime = 2026-09-19 20:54:57.330  (阶段6-起服日志-归零惩罚语义对齐.log，仍在线时冻结；SHA 25C200B0…)
+  物证   mtime = 2026-09-19 20:55:59.410
+  说明   mtime = 2026-09-19 20:56:21.398  (本件；追加本节后 mtime 顺延，仍为链尾)
+  ORDER = OK
+  点名提交（不用「HEAD 的 tree」）：开工基线 a18cd9628c3b03819ebbe634572166c303fe94d4；本批改动未提交（开发构建轮）。
+
+第 8 节 · 提交态等价核对（赛后；追加不改原句）
+  赛后 HEAD = **dd28bf5017f36794e264c09e1b4736ab29d917d4**（checkpoint: the punishment holds the value down on every tick and refills only once the stun has run out；
+  该提交 stat = 1 file changed, 53 insertions(+), 22 deletions(-)，文件 = `src/main/java/com/shadowHunterRolesPlugin/roleComponent/DefaultSanTEZeroPunishment.java`）。
+  现算三项（命令 + 输出）：
+    · `git status --porcelain -- src` = **0 行**；`git diff HEAD -- src` 输出 = **空** ⇒ 工作树内容与该提交**逐字相同**；
+    · `src 新于 jar = 0`（该文件 mtime 20:53:37.503 < jar mtime 20:53:53.918）⇒ jar `B8C3259E…` 反映的就是该提交的源码；
+    · 取证时点工作树为未提交（本批开工基线 = `a18cd96`；eng-验证 并行读数 = porcelain 1 行）⇒ 本轮的严格档位仍是「开发构建轮」，
+      **但**上述比对成立 ⇒ 可按【**提交态等价**】认领（**不得**读作"取证当时已是提交态"）。
+  判等口径提醒：工作树（CRLF）与 `git show HEAD:<path>`（LF 归一）的字节 SHA256 不同属预期 ⇒ 判等一律用 `git diff HEAD -- <path>` 是否为空。
+

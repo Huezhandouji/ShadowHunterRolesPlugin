@@ -22,9 +22,20 @@ Modifier is already applied on this attribute!
 
 插件施加的**永久属性修饰符会跨会话留在 `playerdata`**：在 09-13、08-03 两个旧 `playerdata` 文件里现算到 `shadowhunterrolesplugin:role_health_modifier`。⇒ 属性修饰符的持久性**不是**假设，是可核事实。
 
-## §3 判读（**未受控复现**，属假设而非结论）
+## §3 判读：原假设已被**证伪**（勿再引用旧说法）
 
-残留的 `buff_movement_speed_modifier` 在玩家载入时被读回 ⇒ **首次** STUN 施加时与既有键相撞 ⇒ `addModifier` 抛异常。
+**原假设（初版本件所记）**：残留的 `buff_movement_speed_modifier` 在玩家载入时被读回 ⇒ **首次** STUN 与既有键相撞 ⇒ `addModifier` 抛。
+
+**证伪证据**（`eng-实现` 只读核验，队长采纳）：`playerdata` 是 **gzip 压缩的 NBT** ⇒ 必须**解压后**再检索。按正确口径实测（正对照 `DataVersion` = **16/16 True**、负对照 `NO_SUCH_KEY_XYZ` = False ⇒ 判据有区分力）：
+
+- `role_health_modifier` = 命中 **3** 件（含 `.dat_old`）⇒ 原假设引的那两件属实；
+- **`buff_movement_speed_modifier` = 16/16 文件全 0**，含 t5 两轮 bot 自己的 playerdata（那两件连 `shadowhunterrolesplugin` 串都没有）。
+
+⇒ 「残留 buff 修饰符被载入 ⇒ 首次 STUN 撞键」这一通道**未获任何现存 playerdata 支持**。
+
+**替代假设（仍未受控复现，仅作复现设计参考）**：`activeBuffs` 是**每 BuffManager / 每 RoleInstance** 的表，而修饰符是**每玩家属性**上的状态；`DefaultSanTEZeroPunishment` 的 O-6 只取消**本组件实例**的旧任务 ⇒ 若 STUN 生效期间玩家换了新 `RoleInstance`（新表为空），新实例的 `addBuff(STUN)` 会命中「属性上已有该 key」而抛。该假设与「第 1 轮抛、第 2 轮不抛」的状态相关性相容。
+
+**结论**：机制**仍未确定** —— 必须**先受控复现**才能修（见 §6）。**不要把任何一条当已证实**。
 
 **代码级不对称**（这是本条最可动作的观察）：
 
@@ -55,15 +66,23 @@ Modifier is already applied on this attribute!
 3. **载入期清账**：在角色装配/清理路径上把本插件历史遗留的修饰符一并回收（避免永久残留）；
 4. **重新取证**：改 src ⇒ 新代制品 ⇒ 必须走完整取证流程（重建 → 起服 → 主冻结 → 停机 → 归档），**不得**作为"顺手修"夹带进任何批次。
 
-## §7 ⚠️ 对本工程既有扫描口径的补充（**建议纳入后续所有批次**）
-
-既有 Mode B 判据是「按**级别字段**扫描 `ERROR|SEVERE` = 0」。本条证明该口径**存在盲区**：
+## §7 ⚠️ 对本工程既有扫描口径的补充（**建议纳入后续所有批次**）既有 Mode B 判据是「按**级别字段**扫描 `ERROR|SEVERE` = 0」。本条证明该口径**存在盲区**：
 
 > **WARN 级、但带插件栈帧（`com.shadowHunterRolesPlugin.*`）的异常，会被完全漏掉。**
 
 ⇒ 建议给后续卡追加一项独立扫描：**「插件归因异常」** = 在冻结件中检索 WARN 级行及其后续栈帧里出现的插件包名，命中即逐条判读（是预期 WARN 还是缺陷）。它与既有 ERROR/SEVERE 扫描**并存**，不互相替代。
 
 **同族提醒**：这与本工程既有两条纪律同源 —— 「**裸 ERROR 会命中 oshi WARN 正文**」（假阳性方向）与本条（**只看级别会漏掉 WARN**，假阴性方向）。两个方向都来自"用级别当唯一判据"。
+
+---
+
+## §8 附带产出的仪器纪律（**纳入后续所有批次**）
+
+**判 `.dat`（`playerdata` / NBT）内容，必须先解压 + 带正/负对照。**
+
+实例：`eng-实现` 首次扫描用**原始字节 ASCII 搜**，两个 key 全 False —— 那是 **gzip 压缩下的假 0**（"路径落到文件 ≠ 看到目标"，与仪器族 5 同族），当场用正对照拆掉并改口径重跑。
+
+⇒ 凡结论形如「某 key 在 `playerdata` 中不存在」，必须同时给出：**解压口径 + 正对照（必定存在的串）+ 负对照（必定不存在的串）+ 两侧计数**。缺任一项，该结论不成立。
 
 ---
 

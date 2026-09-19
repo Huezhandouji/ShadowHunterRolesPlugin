@@ -6,6 +6,7 @@ import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
 import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
+import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -25,7 +26,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
@@ -78,7 +78,13 @@ public class RoleInstance {
 
     //阶段 4：组件注册表（组件集合 + 每组件资源表 + getComponent 查找）与统一渲染器（骨架）
     private final ComponentRegistry componentRegistry = new ComponentRegistry();
-    private final HotbarRenderer hotbarRenderer = new HotbarRenderer();
+    private final HotbarRenderer hotbarRenderer = new HotbarRenderer(this);
+    /**
+     * **唯一的方法引用持有者**（阶段 5 判据 C-03）：供三条"程序化刷新"路径共用 ——
+     * 冷却到点（启动时预约）、每 tick 到期扫描、显式结束冷却（S3）。
+     * 它们都**不**额外产生裸直呼点（阶段 5 判据 C-02 的计数守恒：5 处直呼 + 1 处方法引用）。
+     */
+    private final Runnable markHotbarDirty = hotbarRenderer::markDirty;
     private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
 
     //T-2 ①③：迁移标记已删 —— 所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）。
@@ -121,7 +127,9 @@ public class RoleInstance {
                 1L
         );
 
-        updateHotbar();
+        //阶段 5 · 4.4：构造期**同步首刷一次**（与迁移前的可见时机逐字一致 = 选角色瞬间热键栏即就绪、零延迟）；
+        //首个 tick 因置脏初值为 true 还会再写一次同内容（不可见、且此后空闲 tick 不再写）。
+        hotbarRenderer.render();
     }
 
     //平台上下文：阶段 2 的组件取用入口（阶段 4 起逐批收窄为 ComponentServices 端口白名单）
@@ -258,9 +266,8 @@ public class RoleInstance {
         int endTick = Bukkit.getCurrentTick() + ticks;
         skillCooldowns.put(skillId, endTick);
 
-        updateHotbar();
-        //冷却结束后刷新物品
-        platform.scheduler().runLater(this::updateHotbar, getRemainingSkillCooldownTicks(skillId));
+        //冷却到点置脏（方法引用形态，避免新增直呼点）：到点那一 tick 的帧末 flush 完成图标恢复。
+        platform.scheduler().runLater(markHotbarDirty, getRemainingSkillCooldownTicks(skillId));
 
     }
 
@@ -292,7 +299,7 @@ public class RoleInstance {
         if(skill == null){
             caster.sendMessage(Component.text("unknown skill!"));
         }
-        //T-2c：T-1 的未迁移回退已删（组件侧一律走新管道）；可见刷新由 handleCast 的 markDirty() + updateHotbar 每 tick 保证。
+        //T-2c：T-1 的未迁移回退已删（组件侧一律走新管道）；可见刷新由 handleCast 的置脏 + 帧末 flush 保证。
         return false;
     }
 
@@ -325,9 +332,9 @@ public class RoleInstance {
     public void startMainWeaponCooldown(String weaponId, int ticks){
         int endTick = Bukkit.getCurrentTick() + ticks;
         mainWeaponCooldowns.put(weaponId, endTick);
-        updateHotbar();
 
-        platform.scheduler().runLater(this::updateHotbar, getRemainingMainWeaponCooldownTicks(weaponId));
+        //冷却到点置脏（同技能侧；主武器无秒数文本 ⇒ 冷却中不需要每 tick 刷新）
+        platform.scheduler().runLater(markHotbarDirty, getRemainingMainWeaponCooldownTicks(weaponId));
     }
 
     public int getRemainingMainWeaponCooldownTicks(String weaponId){
@@ -367,7 +374,7 @@ public class RoleInstance {
         if(!isCooling(componentId, kind)) return false;
         cooldownTable(kind).remove(componentId);
         dispatchCooldownEnd(componentId, ActiveComponent.CooldownEndReason.ENDED_BY_COMPONENT);
-        updateHotbar();
+        markHotbarDirty.run();
         return true;
     }
 
@@ -388,8 +395,8 @@ public class RoleInstance {
             removed = true;
         }
         if(removed){
-            //D3 第一步：可见刷新仍走 updateHotbar（runLater(updateHotbar) 机制保留）；换 markDirty 留到 4.4。
-            updateHotbar();
+            //到期移除后置脏（方法引用形态）：同 tick 的帧末 flush 即完成图标恢复（冷却结束不再有可见延迟）
+            markHotbarDirty.run();
         }
     }
 
@@ -448,69 +455,17 @@ public class RoleInstance {
 
 
 
-    //更新技能物品栏，设置物品或者替换物品
+    //热键栏渲染：阶段 5 · 4.4 起**唯一渲染者 = HotbarRenderer**（写物品只发生在 core/hotbar 内）；
+    //本容器只提供查表与状态输入，旧的"更新物品栏 / 更新元数据"方法（连同其两条调用路径）已随本批删除。
 
-
-    public void updateHotbar(){
-        Player p = player;
-        Inventory inv = p.getInventory();
-
-        //获取角色武器技能栏位配置
-        Map<Integer, String> slotMap = role.getSlotMap();
-        if(slotMap == null || slotMap.isEmpty()) return;
-
-        //填充武器技能
-        for(Map.Entry<Integer, String> entry : slotMap.entrySet()){
-            int slot = entry.getKey();
-            String id = entry.getValue();
-
-            //如果是武器
-            if(mainWeaponMap.containsKey(id)){
-                MainWeapon weapon = mainWeaponMap.get(id);
-                inv.setItem(slot, weapon.createIconItem(this));
-                continue;
-            }
-
-            //如果是技能
-            if(skillMap.containsKey(id)){
-                Skill skill = skillMap.get(id);
-                inv.setItem(slot, skill.createIconItem(this));
-            }
-        }
-    }
-
-    //更新元数据，主要是冷却
-    public void updateSkillItemMeta(String skillId){
-        Skill skill = skillMap.getOrDefault(skillId, null);
-        if(skill == null) return;
-
-        Map<Integer, String> slotMap = role.getSlotMap();
-        if(!slotMap.containsValue(skillId)) return;
-
-        int slot = 0;
-        for(int key : slotMap.keySet()){
-            if(slotMap.getOrDefault(key, null).equals(skillId)){
-                slot = key;
-                break;
-            }
-        }
-
-        Inventory inv = player.getInventory();
-        ItemStack item = inv.getItem(slot);
-        if(item == null) return;
-
-        ItemMeta meta = item.getItemMeta();
-
-        meta.displayName(skill.getDisplayName(this));
-
-        //元数据设回物品
-        item.setItemMeta(meta);
-    }
-
-    public void updateAllSkillItemMeta(){
-        for(String skillId : role.getSkillIds()){
-            updateSkillItemMeta(skillId);
-        }
+    /**
+     * 统一渲染器的查表入口：按槽位表里的 id 取可渲染组件。
+     * 顺序与旧实现一致（**主武器优先**），未注册 id 返回 {@code null}（渲染器跳过该槽位）。
+     */
+    public HotbarItem hotbarItemOf(String id){
+        if(mainWeaponMap.containsKey(id)) return mainWeaponMap.get(id);
+        if(skillMap.containsKey(id)) return skillMap.get(id);
+        return null;
     }
 
     //清除主武器，技能占用的快捷栏
@@ -578,7 +533,8 @@ public class RoleInstance {
         int preEnergy = currentEnergy;
 
         this.currentEnergy = Math.clamp(amount, 0, role.getMaxEnergy());
-        updateHotbar();
+        //触点④（能量单一入口）：**无条件**置脏（不做"跨阈值才置脏"的优化 —— 那属阶段 5 性能项）
+        hotbarRenderer.markDirty();
 
         EnergyChangeEvent event = new EnergyChangeEvent(player, this, preEnergy, currentEnergy, role.getMaxEnergy());
         Bukkit.getPluginManager().callEvent(event);
@@ -771,17 +727,28 @@ public class RoleInstance {
             runComponentUpdate("registered", component.getId(), component::update);
         }
 
-        //阶段 4 追补（冷却自管理 · D2）：到期条目 ⇒ 移除 + 回调 + 一次刷新（关闭 O-21）
+        //阶段 4 追补（冷却自管理 · D2）：到期条目 ⇒ 移除 + 回调（关闭 O-21）；可见刷新改由同 tick 的帧末 flush 承担
         scanCooldowns();
 
-        if(shouldUpdateHotbar()){
-            updateHotbar();
+        //阶段 5 · 4.4 帧末 flush（落点 = tick 末尾，紧接组件更新与到期扫描之后）：
+        //① 判脏 → ② 写物品（唯一写点 = HotbarRenderer.render）→ ③ 清脏（此顺序不可交换）
+        //入口条件并入 B-2：**有技能冷却中** ⇒ 每 tick 至少刷一次（否则技能名里的 " x.xs" 不再逐 tick 递减 = 可见行为变化）。
+        if(hotbarRenderer.isDirty() || hasCoolingSkill()){
+            hotbarRenderer.render();
+            hotbarRenderer.clearDirty();
         }
 
-        if(shouldUpdateItemMeta()){
-            updateAllSkillItemMeta();
-        }
+    }
 
+    /**
+     * B-2 谓词：是否存在**冷却中**（条目存在且未到期）的技能。
+     * 只数技能 —— 主武器冷却名没有秒数文本，外观恒定 ⇒ 不需要每 tick 刷新（与迁移前一致）。
+     */
+    private boolean hasCoolingSkill(){
+        for(String skillId : skillCooldowns.keySet()){
+            if(!isSkillReady(skillId)) return true;
+        }
+        return false;
     }
 
     //单个组件抛异常时不能中断这一tick其他组件的更新；同一个组件的异常只上报一次，恢复正常后再提示一次
@@ -803,25 +770,8 @@ public class RoleInstance {
         }
     }
 
-    //检测是否应该更新物品
-    private boolean shouldUpdateHotbar(){
-        for(String skillId : skillCooldowns.keySet()){
-            if(isSkillReady(skillId)) return true;
-        }
-        for(String weaponId : mainWeaponCooldowns.keySet()){
-            if(isMainWeaponReady(weaponId)) return true;
-        }
-        return false;
-    }
-
-    private boolean shouldUpdateItemMeta(){
-        for(String skillId : skillCooldowns.keySet()){
-            if(!isSkillReady(skillId)){
-                return true;
-            }
-        }
-        return false;
-    }
+    //阶段 5 · 4.4：旧的两条每 tick 轮询判定（"检测是否应该更新物品"）已删 ——
+    //其中一条是恒假死路径，另一条的语义（B-2）并入 triggerUpdate 末尾的帧末 flush 入口条件。
 
     //清除这个实例时使用，重置玩家状态
     public void clear(){

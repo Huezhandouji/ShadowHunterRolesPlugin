@@ -49,6 +49,8 @@ final class CooldownPortImpl implements CooldownPort {
         } else {
             owner.startMainWeaponCooldown(componentId, ticks);
         }
+        //触点②（冷却启动）：端口适配器内置脏 —— 一个落点覆盖技能与主武器两 kind（阶段 5 判据 C-01/C-02）。
+        owner.hotbarRenderer().markDirty();
     }
 
     /** S3：仅在冷却中生效（清条目 + 回调 + 刷新 + true）；否则 false 且无副作用。 */

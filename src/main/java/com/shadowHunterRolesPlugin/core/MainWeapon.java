@@ -3,8 +3,6 @@ package com.shadowHunterRolesPlugin.core;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -18,8 +16,6 @@ import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
 import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
-import java.util.ArrayList;
-import java.util.List;
 
 
 public abstract class MainWeapon extends ActiveComponent implements CombatHook {
@@ -42,81 +38,12 @@ public abstract class MainWeapon extends ActiveComponent implements CombatHook {
         return CastResult.SUCCEED;
     }
 
-    //创建物品
-    public ItemStack createIconItem(RoleInstance instance) {
-        if(instance == null) return null;
-        boolean isReady = instance.isMainWeaponReady(getId());
-        boolean canCast = instance.getBuffManager().canUseMainWeapon();
-        Material material;
-
-        if (!isReady) {
-            material = Material.STRUCTURE_VOID;
-        } else if (!canCast) {
-            material = Material.BARRIER;
-        } else {
-            material = getIcon();
-        }
-
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-
-        List<Component> lore = new ArrayList<>();
-
-        if(!isReady){
-            meta.displayName(getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
-            lore.add(Component.text("MainWeapon is on cooldown."));
-        }
-        else if(!canCast){
-            meta.displayName(getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
-                    .color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
-            lore.add(Component.text("MainWeapon has been disabled."));
-        }else {
-            meta.displayName(getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
-            lore.add(Component.text("MainWeapon is ready."));
-        }
-
-        lore.add(Component.text("===================="));
-        lore.add(getDescription());
-
-        meta.lore(lore);
-
-        meta.getPersistentDataContainer().set(Utils.MAIN_WEAPON_KEY, PersistentDataType.STRING, getId());
-
-        item.setItemMeta(meta);
-
-        return item;
-
-
-    }
-
-    //获取物品displayName
-    public Component getDisplayName(RoleInstance instance){
-        if(instance == null){
-            return Component.text("RoleInstance is Null!");
-        }
-
-        boolean isReady = instance.isMainWeaponReady(getId());
-        boolean canCast = instance.getBuffManager().canUseMainWeapon();
-
-        if(!isReady){
-            return getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)
-                    .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD);
-        }
-        else if(!canCast){
-            return getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD).append(Component.text(" DISABLED"))
-                    .color(NamedTextColor.RED).decorate(TextDecoration.BOLD);
-        }else {
-            return getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD);
-        }
-
-    }
-
-
-
+    //物品构建已上移到统一渲染器（core/hotbar/HotbarRenderer）：本类不再持有任何渲染入口（阶段 5 · T⑦ 收口）。
+    //注意：**主武器冷却名不带秒数**是与技能侧的冻结差异，接管后仍由渲染器的主武器分支保持。
 
     public static class Utils{
 
-        private static final NamespacedKey MAIN_WEAPON_KEY = KeyFactory.Registry.of(
+        public static final NamespacedKey MAIN_WEAPON_KEY = KeyFactory.Registry.of(
                 "main_weapon_id"
         );
 

@@ -1,0 +1,237 @@
+================================================================================
+阶段5 · debug-logs 根目录整理（t11）—— 说明、判据自检与未覆盖申报
+—— 交付：36 个散件按类移入 3 个子目录 + `README-旧路径到新路径映射.md`（36 行）
+—— 硬约束：**只移动、不改内容** —— 逐件 bytes + SHA256 移动前后逐字相同（36/36）
+—— 执行：eng-文档（attempt c388781a）· 2026-09-19 · **零 git 写**（无 add / commit / mv）
+================================================================================
+
+§0 一句话
+--------------------------------------------------------------------------------
+`debug-logs/` 根目录的 **36 个散件**已按类移入 `调试日志/`（17）· `交付小结/`（9）· `设计文档/`（10）；
+根目录只剩 `README.md` + `README-文档索引.md` + 新增的**映射表**（共 3 件）。
+既有报告/冻结证据件里的**旧路径一律不改写**（它们是『当时路径』）⇒ 旧路径引用由映射表解析。
+
+§1 判据（逐条：期望 / 实测 / 判据命令）
+--------------------------------------------------------------------------------
+[A1] 到位：36 件全部出现在指定新路径
+  实测：**36 / 36** ✓（逐件 `Test-Path` 现算；三组计数 = 17 / 9 / 10）
+
+[A2] 清空：36 个旧路径全部不存在
+  实测：**旧路径残留 = 0 / 36** ✓
+
+[A3] 身份保持：新路径 bytes + SHA256 == 移动前记录值
+  实测：**36 / 36 一致、0 不一致** ✓（移动脚本内**逐件移动后立即复算**；§2 给逐件清单，§3 给命令与原始输出）
+  更强一层：另做了"全量对拍"——把 36 件与移动前基线逐件比对 bytes + SHA256，全等 ✓
+
+[A4] 完整性：`debug-logs/` 顶层文件数
+  实测：移动前 **38** → 移动后 **2**（`README.md` + `README-文档索引.md`）；**加上本卡新增映射表 = 3** ✓
+  两侧计数都打印（见 §3.3）
+
+[A5] 映射表：含 36 行（旧路径｜新路径｜bytes｜SHA256），逐行可核
+  实测：`README-旧路径到新路径映射.md` 的 `| ` 行 = **36** ✓；**36 行逐行与现场现算对拍一致**（§3.5 抽查 6 行 + 全量 36/36）
+
+[A6] 未触碰：`git status --porcelain -- debug-logs/测试记录 debug-logs/回滚快照`
+  实测：**只出现本卡在 `测试记录` 下新增的 1 个说明件**（= 本件）；`回滚快照` 0 行 ✓（见 §3.6）
+
+[A7] README 原位：`debug-logs/README.md` 仍在原位
+  实测：`Test-Path` = **True**（1998 B）；`git check-ignore` 对它**无输出、exit 1 = 未被忽略**（`.gitignore:85` 的 `!debug-logs/README.md` 例外生效）✓（见 §3.7）
+  反证：把它移走会落回 `debug-logs/**` 的忽略规则 ⇒ 会被吞掉 ⇒ **必须留原位**。
+
+[A8] 活文档引用更新
+  实测：`README-文档索引.md` = 新路径前缀命中 **23**、**旧式（无前缀）残留 0**；`README.md` = 0 / 0（它本来就不引用这 36 件的路径）✓
+  负对照：`git grep -c -e 'debug-logs/最终重构指南.md' -e 'debug-logs/阶段5-交付小结.md' -e 'docs/插件文档/日志与证据归档规范.md'` ⇒ **0 命中（exit 1）**
+  **冻结报告与既有证据件里的旧路径一律未动** —— 横扫口径与计数见 §3.4（命中 236 次，其中**只有两活文档内的 22 次**被本卡改写，其余 214 次按『当时路径』保留）
+
+[A9] 零 git 写：全仓 `git status --porcelain` 只反映本卡的移动与新增
+  实测：**38 行** = 36 行 `' D'`（旧路径被移动）+ 2 行 `' M'`（两个 README 被改写）；
+  **没有任何 add / commit / mv**；新路径 36 件 + 映射表 + 本件均处于 `.gitignore:84` 覆盖下 ⇒ 不显示（需 `--ignored` 才可见）✓（见 §3.6）
+
+[A10] 本件含四要素
+  实测：§1 判据 · §3 命令与原始输出 · §4 身份现算时刻与统计范围 · §5 未覆盖项 ✓
+
+[A11] 未覆盖项如实申报
+  实测：见 §5（卡面强制的三条已在 §5.1 / §5.2 / §5.3）✓
+
+§2 移动清单（36 件：旧路径 → 新路径，附 bytes + SHA256 = **移动后现算**，与移动前基线同值）
+--------------------------------------------------------------------------------
+-- 调试日志/（17 件）--
+debug-logs/baseline-runserver-2026-09-13-1519.log -> debug-logs/调试日志/baseline-runserver-2026-09-13-1519.log | 13325 | FC5903DCE08FAC3BE27DDC2ED77275F9B383138726850A1D3CDC0E16C6CA72EA
+debug-logs/baseline-runserver-B0a-2026-09-17-0040.log -> debug-logs/调试日志/baseline-runserver-B0a-2026-09-17-0040.log | 6138 | CDF90A2C850B02501907964C2908051B120F7B2EB471FE47B54B841D29E32DAB
+debug-logs/baseline-runserver-B0b1-2026-09-17-0046.log -> debug-logs/调试日志/baseline-runserver-B0b1-2026-09-17-0046.log | 6140 | 97A40B330780F70E8F46EB01AC87144BB8A383AA53526A57D020C436D1FD182D
+debug-logs/baseline-runserver-B0b2-2026-09-17-0055.log -> debug-logs/调试日志/baseline-runserver-B0b2-2026-09-17-0055.log | 6077 | 67F35AF44C01C9605A884734AB4C4D945EA748BF3952E7C4C7CFB282B4B313D3
+debug-logs/baseline-runserver-B0b3-2026-09-17-1732.log -> debug-logs/调试日志/baseline-runserver-B0b3-2026-09-17-1732.log | 6077 | 2A006417C806C9EFECEA03953606B4D724678B019F782E9E2A80B7889B4AB24F
+debug-logs/baseline-runserver-t14-2026-09-17-0027.log -> debug-logs/调试日志/baseline-runserver-t14-2026-09-17-0027.log | 6077 | E4CC1C1E0C97965632297EE3426D9F358CEC407293AC639145ED42365549F524
+debug-logs/baseline-runserver-t2-2026-09-16-2201.log -> debug-logs/调试日志/baseline-runserver-t2-2026-09-16-2201.log | 6199 | 2A4BD077852D213901506205E15AC64C2F5D6A27C965D59F922D31FEE5ADB524
+debug-logs/baseline-runserver-t5-2026-09-16-2222.log -> debug-logs/调试日志/baseline-runserver-t5-2026-09-16-2222.log | 6076 | A3EB7CB65081824039D0EB592CF98A4B6F22E648B946491D5C74B65E484CF63C
+debug-logs/baseline-runserver-t9-2026-09-16-2359.log -> debug-logs/调试日志/baseline-runserver-t9-2026-09-16-2359.log | 6137 | B3667A1C4BFE98764A8A33440526E2300ECC32BEC428C56AD2E12018F537ED7E
+debug-logs/t13-build.log -> debug-logs/调试日志/t13-build.log | 1585 | DA09DCA52961DD263034C5410B18ACA43ECD1DBBBD249B006663EF8AEECA0391
+debug-logs/t13-runserver2.log -> debug-logs/调试日志/t13-runserver2.log | 6615 | 3E53B0D85623E08745E499238A6F4D0B15390AB78ED6E3A48C0752499B42A1E0
+debug-logs/t13-runserver-gradle.log -> debug-logs/调试日志/t13-runserver-gradle.log | 6613 | 170C58AF1F377B370DF51036AE9AD74DAD98FE422EE12C5935AB87C33C72CB5D
+debug-logs/t6-build.log -> debug-logs/调试日志/t6-build.log | 1585 | AC6B2B21897E84A4DF80A9B67FA15CC4DA1CE4FBA529251BE90869D76A1D31A8
+debug-logs/t6-runserver-gradle.log -> debug-logs/调试日志/t6-runserver-gradle.log | 9602 | DEEE34DB2F73F603CCBEFF54668B34836DF61646B0BBAFA10EC327A448C8D4CE
+debug-logs/t6-runserver-postchange-20260916-225507.log -> debug-logs/调试日志/t6-runserver-postchange-20260916-225507.log | 9786 | 0D0C5F3B3FE39B8798697CF50710E08E8DA297DD96BE246518B51D778CA976A2
+debug-logs/t7-runserver-20260916-231457.log -> debug-logs/调试日志/t7-runserver-20260916-231457.log | 7467 | 88A7B7D5707CCB34FD85003CB5B48CB3E9292044AF89B3624860CE2CB7D0B515
+debug-logs/阶段3-起服日志-t13ModeB.log -> debug-logs/调试日志/阶段3-起服日志-t13ModeB.log | 6079 | 9FB3FE40139A98C3A81676865051F01929310BEFACDB457DAE50D0AA1CB912DC
+-- 交付小结/（9 件）--
+debug-logs/阶段0-交付小结.md -> debug-logs/交付小结/阶段0-交付小结.md | 33255 | E448E4C5470688BE74860C3CD96AF4B5DE511EFF86E9D4F7427F5575DA73CC76
+debug-logs/阶段0-前置-基线冻结记录.md -> debug-logs/交付小结/阶段0-前置-基线冻结记录.md | 17491 | 4750422EBBFECDB66A6F43A2860C3C56CE14EC4C78DB568A117817FBCE7A27CD
+debug-logs/阶段1-交付小结.md -> debug-logs/交付小结/阶段1-交付小结.md | 38111 | 36A2246A517C4066BE244FEAEEE9EA263A64BFC9D2F2430A4570EAAFCE1539C7
+debug-logs/阶段1-收口记录.md -> debug-logs/交付小结/阶段1-收口记录.md | 18029 | F216D5A9D0E02492BBD3ED0B465843E7F7E808AB71CE681AB9EA591A5ECE6DE4
+debug-logs/阶段1.8-交付小结.md -> debug-logs/交付小结/阶段1.8-交付小结.md | 20678 | 6B5C4CA85229609BFE296B714C186DC89452975EA355A75B71E22CD7DF416F04
+debug-logs/阶段2-交付小结.md -> debug-logs/交付小结/阶段2-交付小结.md | 32752 | A9A95930F4FE72B141341B4736946EEE190DCD0964DC461112E27875115EBFB2
+debug-logs/阶段3-交付小结.md -> debug-logs/交付小结/阶段3-交付小结.md | 20827 | 781EABCE669C511C2DD34C23FDF9ED9F13A54F1857FC17CCBE03A615A3818585
+debug-logs/阶段4-交付小结.md -> debug-logs/交付小结/阶段4-交付小结.md | 98197 | 4A6B67DF566CDEA5E02B44CC27B33F7EAD275DD63B72B2CFCAC5154B08EB7336
+debug-logs/阶段5-交付小结.md -> debug-logs/交付小结/阶段5-交付小结.md | 17710 | 7AA96164079A2D9A0F78EDA679125970A02604AD7E27CACC7F971D22A06D8D18
+-- 设计文档/（10 件）--
+debug-logs/最终重构指南.md -> debug-logs/设计文档/最终重构指南.md | 180261 | 3C98651AC4B7362A3AB25241904153BE90DE193F3C210294936B495D6F752F8F
+debug-logs/组件系统设计-Unity风格.md -> debug-logs/设计文档/组件系统设计-Unity风格.md | 68925 | 43E676060DBE8895160525BA73940F517712CC67273861A7ECFF6CA1259EDEE1
+debug-logs/架构重构意见.md -> debug-logs/设计文档/架构重构意见.md | 59276 | F8553FC9C658FB46F92BA18C62C5A794FC7E114A12D6FEB21A90FA03A72ACD11
+debug-logs/重构前准备-需求与验收.md -> debug-logs/设计文档/重构前准备-需求与验收.md | 18907 | 0C9FF15F6FA4654050F35C0500DD13AC062C7B32C88DE3C4DD0D49BFD75253A3
+debug-logs/重构前准备-报告-A流.md -> debug-logs/设计文档/重构前准备-报告-A流.md | 22685 | 508EDABFD59B0A777CEB43FA77F13B15957BEC1A289AAA13CFA449D447773ED0
+debug-logs/调度器迁移方案.md -> debug-logs/设计文档/调度器迁移方案.md | 14747 | BECEFE51B6EF5D3AD90F98212816697147DC9BB8BEBF428F60741821C0C26AFE
+debug-logs/冷却自管理架构规划.md -> debug-logs/设计文档/冷却自管理架构规划.md | 12465 | 6C943AFBDC79A08B0A1EA7FBFFBF1B51A2D0D27C05DC1A26B62BC5FB0583DC4A
+debug-logs/阶段4-4.4渲染器接管预案.md -> debug-logs/设计文档/阶段4-4.4渲染器接管预案.md | 22332 | 6360BC341EF12EBFEA2C0B55C5497B0C503DE632D5CD1FABC10C64295E2295EA
+debug-logs/阶段4-T块⑦前置清单.md -> debug-logs/设计文档/阶段4-T块⑦前置清单.md | 5713 | 4AC4B23BE47E28BBE6C41DBF3D44D025836B9FF44D2C0E4F953F379D0BF35D7B
+debug-logs/阶段4-迁移清单.md -> debug-logs/设计文档/阶段4-迁移清单.md | 131326 | 46894E46136A7103AA9FC5368485D53D65122E839BA1A06BD39A07F4B87E058C
+（同表另见 `debug-logs/README-旧路径到新路径映射.md`，那是对外的主表；本清单是它的副本口径。）
+
+§3 命令与原始输出
+--------------------------------------------------------------------------------
+§3.1 移动脚本（逐件移动后立即复算 bytes + SHA256）
+```
+清单件数 = 36 （调试日志 17 / 交付小结 9 / 设计文档 10）
+移动并核对通过 = 36 / 36 ；不符 = 0
+旧路径残留 = 0 / 36
+```
+§3.2 移动后三组计数
+```
+调试日志 = 17 件 ；交付小结 = 9 件 ；设计文档 = 10 件
+```
+§3.3 顶层文件（A4 两侧计数）
+```
+移动前：顶层文件数 = 38
+移动后：顶层文件数 = 2   ← README.md（1998 B）· README-文档索引.md
+加上本卡新增映射表 = 3   ← + README-旧路径到新路径映射.md（8596 B）
+```
+§3.4 引用扫描（A8 判定口径；本表落盘**之前**扫描）
+```
+扫描集 = 218 件（debug-logs/** + docs/** + 仓库根 *.md；扩展名 md|txt|log|js|ps1|json|yml|kts）
+被引用的不同文件数 = 35 ；命中总次数 = 236
+  其中「两个活 README」内 = 22   ← 本卡改写的就是这 22 处
+  其中「其它既有文档 / 冻结证据件」内 = 214   ← 按『当时路径』**一字未改**
+```
+§3.5 映射表与逐行可核（A5）
+```
+映射表 = 8596 B / 55 行 / `| ` 行 = 36 ；SHA256 30FC401711664BAC107657F5F797E73CD0D0BBABD08F50301DBAC1FC653CF0F7
+逐行对拍：36/36 与现场现算一致（抽查 6 行示例）
+  debug-logs/baseline-runserver-2026-09-13-1519.log  -> 调试日志/…  13325 B  FC5903DC…  一致
+  debug-logs/t6-runserver-postchange-20260916-225507.log -> 调试日志/…  9786 B  0D0C5F3B…  一致
+  debug-logs/阶段5-交付小结.md                        -> 交付小结/…  17710 B  7AA96164…  一致
+  debug-logs/阶段4-迁移清单.md                        -> 设计文档/… 131326 B  46894E46…  一致
+  debug-logs/调度器迁移方案.md                        -> 设计文档/…  14747 B  BECEFE51…  一致
+  debug-logs/阶段3-起服日志-t13ModeB.log              -> 调试日志/…   6079 B  9FB3FE40…  一致
+```
+§3.6 作用域与全仓 `git status`（A6 / A9）
+```
+git status --porcelain -- debug-logs/测试记录 debug-logs/回滚快照
+  → 只 1 行：?? / M 本件（阶段5-文档目录整理-说明.txt；被忽略目录下，见下）
+git status --porcelain（全仓） = 38 行
+  36 行 ' D' = 被移动的旧路径
+   2 行 ' M' = debug-logs/README.md、debug-logs/README-文档索引.md
+  新路径 36 件 + 映射表 + 本件：均落在 .gitignore:84（debug-logs/**）下 ⇒ 常规 porcelain 不显示（需 --ignored）
+  没有任何 add / commit / mv（零 git 写）
+```
+§3.7 `README.md` 原位与忽略规则（A7）
+```
+Test-Path 'debug-logs\README.md'                    = True（1998 B）
+git check-ignore -v -- debug-logs/README.md         → 无输出、exit 1 = **未被忽略**（`.gitignore:85 !debug-logs/README.md` 例外生效）
+反向对照：同命令对 debug-logs/README-文档索引.md 与 debug-logs/README-旧路径到新路径映射.md ⇒ 命中 .gitignore:84（被忽略；两件已入库/由队长入库）
+```
+§3.8 A8 复检（两个活 README 内的旧式引用残留）
+```
+README-文档索引.md: 新路径前缀命中 = 23 ；旧式（无前缀）残留 = 0
+README.md:         新路径前缀命中 = 0  ；旧式残留 = 0（它本来就不引用这 36 件的路径）
+负对照：git grep -c -e 'debug-logs/最终重构指南.md' -e 'debug-logs/阶段5-交付小结.md' -e 'docs/插件文档/日志与证据归档规范.md' -- 两 README ⇒ 0 命中（exit 1）
+```
+
+§4 身份现算时刻与统计范围
+--------------------------------------------------------------------------------
+- **身份现算时刻**：2026-09-19 14:26:19.722（映射表落盘）/ 14:26:49.849（索引最后一次改写）；
+  逐件 bytes + SHA256 在**移动时**逐件现算，并在**映射表生成时**再次现算（两次同值）。
+- **统计范围**：`debug-logs/` **顶层 + 三个新子目录**；`测试记录/`（142 件）与 `回滚快照/`（313 件）**排除**。
+- **行数口径**：`[System.IO.File]::ReadAllLines(..., UTF8)`；文件数 = `Get-ChildItem -File`。
+- **三项结卡身份（现算；引用前重算）**：
+  `debug-logs/README-旧路径到新路径映射.md` = **8596 B / 55 行 / 30FC401711664BAC107657F5F797E73CD0D0BBABD08F50301DBAC1FC653CF0F7**
+  `debug-logs/README-文档索引.md`          = **12148 B / 131 行 / 2C26855B197AF920A3C9DFA4E17B8C49C57E5BCD8A8A7886F68DABA68DDDB1BB**
+  `debug-logs/README.md`                  = **1998 B / 24 行 / C7AE85FF0A9C4A1C9512D71A91D5AE13F958E161441989BF78DEB107D2049ECE**
+- **本件自身不内嵌哈希**（避免自指失效）：引用请现算。
+
+§5 未覆盖项如实申报
+--------------------------------------------------------------------------------
+§5.1 **『何处引用了这些文件』的判定口径与扫描范围（卡面强制项 ①）**
+  - 口径 = **文件名全串字面匹配**（`regex::Escape` 后的 `Matches` 计数），**不是**路径级匹配 ⇒
+    只写"目录 + 片段"（如只写 `设计文档/…`）或**改了名**的引用**会漏**；
+  - 范围 = `debug-logs/**` + `docs/**` + 仓库根 `*.md`，扩展名 md|txt|log|js|ps1|json|yml|kts ⇒ **218 件**；
+    **不含** `src/**`、`build/**`、`run/**`、`.scratch/**`（仓库外）⇒ 那些位置的引用未纳入统计；
+  - 扫描发生在本表**落盘之前** ⇒ 映射表自身、本说明件、以及 `测试记录/README-测试记录台账.md` 的**新增行**均不在集内
+    （t9 台账里对这 36 件的引用**未被计入**，也**未被改写**）。
+§5.2 **映射表不覆盖 `测试记录/` 与 `回滚快照/`（卡面强制项 ②）** —— 二者**未移动**（本卡零改动），
+  故它们的路径不出现也不需要出现在映射表内；`测试记录/` 的**文件级台账**另见 `测试记录/README-测试记录台账.md`。
+§5.3 **旧路径在冻结件内仍然存在，属『当时路径』（卡面强制项 ③）** —— 本卡只改写了两个**活文档**；
+  其余 **214 处**旧路径引用（分布在 35 个既有文件里）**一字未改** ⇒ 见到旧路径请**查映射表**解析，
+  **不得**据此判定"文件丢失"。
+§5.4 **`git` 索引未落** —— 本卡零 git 写 ⇒ 36 件新路径 + 映射表 + 本件**均未入库**；由**队长**用 `git add -f` 落索引
+  （移入被忽略目录属队长职责面）。在落索引前 `git status` 会显示 36 条 ` D`（旧路径），这是**预期形态**、**不是删除**。
+§5.5 **未覆盖的动作**：`docs/` 下若还有指向旧路径的引用（`docs/**` 在扫描范围内，命中计入 §3.4 的 214 处），
+  本卡**按纪律不改** ⇒ 只由映射表解析。`debug-logs/回滚快照/`（313 件）内的引用同理。
+§5.6 **分类口径来自卡面** ⇒ 未做任何"换类"判断；`调试日志/` 内的 17 件是**可重复生成的调试日志**（不入库、不作结论依据），
+  若后人认为某件应升级为**冻结证据**，须按 `测试记录/日志与证据归档规范.md` 走"移入 `测试记录/` + 入库"流程（**本卡不做**）。
+
+§6 边界自证
+--------------------------------------------------------------------------------
+- **只移动、不改内容**：36 件逐件 bytes + SHA256 前后同值 ✓；`测试记录/`（142 件）与 `回滚快照/`（313 件）**零改动** ✓。
+- **零 git 写**：未执行 `add` / `commit` / `mv` / `checkout` / `restore` / `stash` / `reset` ✓。
+- **两活文档只改"路径引用"**：`README-文档索引.md` 的 §4.2/§4.3 改新路径、新增 §4.6（新目录与映射表）；
+  `README.md` 的二分法表与布局节改新路径、并回收"冻结证据在 `docs/*.log`"这条**已作废的旧位置句**（现为 `debug-logs/测试记录/*.log`）。
+- **开工 / 结卡 commit**：开工 `2f91fe8c0e2c7219ebec987f8df2322a435c6949`；结卡 `2f91fe8c0e2c7219ebec987f8df2322a435c6949`（**卡内 HEAD 未移动**；引代**点名 commit**，未使用"当前 HEAD 所指的那棵树"这类相对说法）。
+
+§7 结卡复核（最后一次写入之后的原始输出；全部只读）
+--------------------------------------------------------------------------------
+```
+[V1] git -C ShadowHunterRoles rev-parse HEAD
+  2f91fe8c0e2c7219ebec987f8df2322a435c6949     ← 开工 = 结卡，卡内 HEAD 未移动
+
+[V2] (Get-ChildItem -LiteralPath 'debug-logs' -File).Count   = 3
+  README.md                        1998 B
+  README-旧路径到新路径映射.md      8596 B      ← 本卡新增
+  README-文档索引.md               12148 B     ← 本卡改写（只改路径引用 + 新增 §4.6）
+
+[V3] 三组计数
+  调试日志 = 17 件 ；交付小结 = 9 件 ；设计文档 = 10 件
+
+[V4] 递归清单（排除 测试记录|回滚快照）两侧计数
+  条目数 = 39（= 3 顶层 + 17 + 9 + 10）⇒ 与期望相等 ✓
+  39 条逐条身份与移动前基线同值（bytes + SHA256 前 16 位，全文见 §2 / 映射表）：
+    README.md C7AE85FF0A9C4A1C · README-旧路径到新路径映射.md 30FC401711664BAC · README-文档索引.md 2C26855B197AF920
+    调试日志/ 17 件：FC5903DCE08FAC3B · CDF90A2C850B0250 · 97A40B330780F70E · 67F35AF44C01C960 · 2A006417C806C9EF · E4CC1C1E0C979656 · 2A4BD077852D2139 · A3EB7CB650818240 · B3667A1C4BFE9876 · DA09DCA52961DD26 · 3E53B0D85623E087 · 170C58AF1F377B37 · AC6B2B21897E84A4 · DEEE34DB2F73F603 · 0D0C5F3B3FE39B87 · 88A7B7D5707CCB34 · 9FB3FE40139A98C3
+    交付小结/ 9 件：E448E4C5470688BE · 4750422EBBFECDB6 · 36A2246A517C4066 · F216D5A9D0E02492 · 6B5C4CA85229609B · A9A95930F4FE72B1 · 781EABCE669C511C · 4A6B67DF566CDEA5 · 7AA96164079A2D9A
+    设计文档/ 10 件：3C98651AC4B7362A · 43E676060DBE8895 · F8553FC9C658FB46 · 0C9FF15F6FA46540 · 508EDABFD59B0A77 · BECEFE51B6EF5D3A · 6C943AFBDC79A08B · 6360BC341EF12EBF · 4AC4B23BE47E28BB · 46894E46136A7103
+
+[V5] git -C ShadowHunterRoles status --porcelain -- debug-logs/测试记录 debug-logs/回滚快照
+  → 无输出（exit 0）                      ← 回滚快照 0 行；测试记录 也没有"可见"改动
+  git status --porcelain --ignored -- 同作用域
+  → !! "debug-logs/测试记录/阶段5-文档目录整理-说明.txt"   ← 本卡在 测试记录 下新增的那 **1** 件（被忽略故常规口径不显示）
+  ⇒ 口径：**本作用域的常规 porcelain 为空**，本卡新增件通过 `--ignored` 两侧证；`回滚快照/` 依旧 0 行（未触碰）✓
+
+[V6] git -C ShadowHunterRoles status --porcelain（全仓）   = 38 行
+  36 行 ' D' = 被移动的旧路径（**预期形态，不是删除**：文件在新路径下）
+   2 行 ' M' = debug-logs/README.md · debug-logs/README-文档索引.md
+  ⇒ **没有任何 add / commit / mv**（零 git 写）✓；新路径 36 件 + 映射表 + 本件均在 .gitignore:84 下 ⇒ 常规口径不显示
+
+[附] 其它计数
+  测试记录/ = 143 件（142 存量 + 本件） ；回滚快照/ = 313 件 ；git status --porcelain -- src = 0 行
+  本件（写入 §7 之前）身份 = 18805 B / 197 行 / mtime 2026-09-19 14:27:25.143 /
+                              SHA256 64B1AEAE04651BB7DEDCE1E603798E50F0150DCD33A52C940790DC2E168C3948
+  ⇒ **§7 追加后本件字节数/哈希已变**，引用请现算（本件不内嵌自身哈希）。
+```
+================================================================================

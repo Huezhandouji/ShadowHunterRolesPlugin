@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.core;
 
 
+import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
@@ -35,9 +36,16 @@ public class Role {
     private final int maxEnergy;
     private final int maxSanTE;
 
-    private final Map<String, ComponentFactory<Skill>> skillFactories;
-    private final Map<String, ComponentFactory<PassiveSkill>> passiveFactories;
-    private final Map<String, ComponentFactory<MainWeapon>> mainWeaponFactories;
+    /**
+     * **唯一有序组件表**（阶段 6）：`LinkedHashMap` ⇒ **声明顺序 = 装配调用顺序**，
+     * 它就是生命周期/事件广播的**派发序载体**（纯注册序；不再是"技能 → 被动 → 主武器"三段序）。
+     * <p>每个条目的 {@link ComponentEntry#getKind()} 是**权威 kind**（行为分支的唯一来源）。
+     */
+    private final Map<String, ComponentEntry> components;
+    /** 三个按 kind 过滤的**有序** id 视图（组内保持声明序；旧的公共访问器语义不变）。 */
+    private final Set<String> skillIds;
+    private final Set<String> passiveIds;
+    private final Set<String> mainWeaponIds;
     //武器和技能所在的栏位
     private final Map<Integer, String> slotMap;
 
@@ -57,44 +65,91 @@ public class Role {
         this.maxSanTE = builder.maxSanTE;
         this.faction = builder.faction;
 
-        this.skillFactories = Collections.unmodifiableMap(builder.skillFactories);
-        this.passiveFactories = Collections.unmodifiableMap(builder.passiveFactories);
-        this.mainWeaponFactories = Collections.unmodifiableMap(builder.mainWeaponFactories);
+        this.components = Collections.unmodifiableMap(new LinkedHashMap<>(builder.components));
+        this.skillIds = Collections.unmodifiableSet(filterIds(this.components, ItemKind.SKILL));
+        this.passiveIds = Collections.unmodifiableSet(filterIds(this.components, ItemKind.PASSIVE));
+        this.mainWeaponIds = Collections.unmodifiableSet(filterIds(this.components, ItemKind.MAIN_WEAPON));
         this.slotMap = Collections.unmodifiableMap(builder.slotMap);
 
         this.icon = builder.icon;
 
     }
 
+    /** 按 kind 过滤出**保持声明序**的 id 视图（`LinkedHashSet`）。 */
+    private static Set<String> filterIds(Map<String, ComponentEntry> components, ItemKind kind){
+        Set<String> ids = new LinkedHashSet<>();
+        for(Map.Entry<String, ComponentEntry> entry : components.entrySet()){
+            if(entry.getValue().getKind() == kind){
+                ids.add(entry.getKey());
+            }
+        }
+        return ids;
+    }
+
     public RoleInstance createInstance(Player player, RolesContext context){
         return new RoleInstance(player, this, context);
     }
 
+    /** 旧窄类型入口（保留兼容）：kind 不符时返回 {@code null}（与"该类型未装配"同义）。 */
     public Skill createSkill(String skillId, ComponentServices services){
-        return createComponent(skillId, skillFactories.get(skillId), services);
+        RoleComponent component = createComponent(skillId, services);
+        return component instanceof Skill skill ? skill : null;
     }
 
+    /** 旧窄类型入口（保留兼容）：见 {@link #createSkill(String, ComponentServices)}。 */
     public PassiveSkill createPassive(String passiveId, ComponentServices services){
-        return createComponent(passiveId, passiveFactories.get(passiveId), services);
+        RoleComponent component = createComponent(passiveId, services);
+        return component instanceof PassiveSkill passive ? passive : null;
     }
 
+    /** 旧窄类型入口（保留兼容）：见 {@link #createSkill(String, ComponentServices)}。 */
     public MainWeapon createMainWeapon(String weaponId, ComponentServices services){
-        return createComponent(weaponId, mainWeaponFactories.get(weaponId), services);
+        RoleComponent component = createComponent(weaponId, services);
+        return component instanceof MainWeapon weapon ? weapon : null;
     }
 
     /**
-     * **唯一组件创建点**（阶段 4 的 4.1）：全仓**创建路径**只有这里调用 {@code ComponentFactory.create}；
-     * {@code Builder} 过去的三处**校验用**实例化（"造了再丢"）已在收尾批⑤随 id 上移（注册处声明）而删除，
-     * 全仓不再有"为取 id 而临时造一个组件"的代码 —— 判据是「创建路径唯一（本方法）」。
-     * 服务集**在构造期**交给组件（见 {@code roleComponent.ComponentFactory}）：组件返回时即已持有它，
-     * 容器随后立刻登记（五条件①④，见 {@code docs/阶段4-交付小结.md} §5.7），注入不可能被遗漏。
+     * **唯一组件创建点**（阶段 6 起对全部 kind 生效）：全仓**创建路径**只有这里调用
+     * {@link ComponentFactory#create(String, ComponentServices)}；装配表按 id 查条目的工厂。
+     * <p>服务集**在构造期**交给组件：组件返回时即已持有它，容器随后立刻登记。
+     * 权威 kind **不**经本方法传递给组件（组件无从得知，见 `RoleInstance.createServices(id, kind)`），
+     * 它由 {@link #componentKindOf(String)} 供框架侧行为分支读取。
      */
-    private <T extends RoleComponent> T createComponent(String id, ComponentFactory<T> factory, ComponentServices services){
-        return factory != null ? factory.create(id, services) : null;
+    public RoleComponent createComponent(String id, ComponentServices services){
+        ComponentEntry entry = components.get(id);
+        if(entry == null) return null;
+        return entry.getFactory().create(id, services);
     }
 
     public Material getIcon(){
         return icon;
+    }
+
+    /**
+     * 装配条目：`(工厂, 权威 kind, 槽位?)`。
+     * <p>槽位 = {@code -1} 表示**不占热键栏**（不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它）。
+     */
+    public static final class ComponentEntry{
+
+        private final ComponentFactory<? extends RoleComponent> factory;
+        private final ItemKind kind;
+        private final int slot;
+
+        ComponentEntry(ComponentFactory<? extends RoleComponent> factory, ItemKind kind, int slot){
+            this.factory = factory;
+            this.kind = kind;
+            this.slot = slot;
+        }
+
+        public ComponentFactory<? extends RoleComponent> getFactory() { return factory; }
+
+        /** **权威 kind**（行为分支的唯一来源）。 */
+        public ItemKind getKind() { return kind; }
+
+        /** 槽位；{@code -1} = 无槽位（不占热键栏）。 */
+        public int getSlot() { return slot; }
+
+        public boolean hasSlot() { return slot >= 0; }
     }
 
     public static class Builder{
@@ -109,9 +164,8 @@ public class Role {
         private int maxSanTE = 100;
         private Faction faction = Faction.UNKNOWN;
 
-        private final Map<String, ComponentFactory<Skill>> skillFactories = new LinkedHashMap<>();
-        private final Map<String, ComponentFactory<PassiveSkill>> passiveFactories = new LinkedHashMap<>();
-        private final Map<String, ComponentFactory<MainWeapon>> mainWeaponFactories = new LinkedHashMap<>();
+        /** 唯一有序组件表（声明序 = 装配调用序）—— 阶段 6 的派发序载体。 */
+        private final Map<String, ComponentEntry> components = new LinkedHashMap<>();
         private final Map<Integer, String> slotMap = new HashMap<>();
 
         private Material icon;
@@ -177,57 +231,83 @@ public class Role {
         }
 
         /**
-         * 装配一条技能：**id 由调用方（注册处）声明** —— 不再"造一个临时实例取 id"。
-         * 收尾批⑤：装配条目 = {@code (id, ComponentFactory)}；容器在**构造期**把服务集交给组件。
+         * **统一装配入口（占热键栏）**：权威 kind 由注册处给出（技能 / 主武器 / 被动都走这里）。
+         * <p>工厂形参放宽到 {@code ComponentFactory<? extends RoleComponent>} ⇒ 组件**不必**继承
+         * `Skill` / `MainWeapon` / `PassiveSkill`，只需 `extends RoleComponent` 并按需实现能力接口。
+         * <p>槽位写入与 id 去重都发生在**唯一内部路径** {@code addComponentInternal} 内。
          */
+        public Builder addComponent(String id, ComponentFactory<? extends RoleComponent> factory, int slot, ItemKind kind){
+            return addComponentInternal(id, factory, kind, slot);
+        }
+
+        /**
+         * **统一装配入口（不占热键栏）**：无槽位 ⇒ 不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它。
+         * <p>其余语义与四参重载完全一致（同一条内部路径）。
+         */
+        public Builder addComponent(String id, ComponentFactory<? extends RoleComponent> factory, ItemKind kind){
+            return addComponentInternal(id, factory, kind, -1);
+        }
+
+        /**
+         * 装配一条技能（**弃用别名**）：语义等价于统一入口的四参重载（权威 kind = `SKILL`）。
+         *
+         * @deprecated 改用统一入口的四参重载 `addComponent` —— 两者走**同一条内部路径**
+         *             （本方法只负责补上权威 kind，不另开实现）。
+         */
+        @Deprecated
         public Builder addSkill(String skillId, ComponentFactory<Skill> factory, int slot){
+            return addComponentInternal(skillId, factory, ItemKind.SKILL, slot);
+        }
+
+        /**
+         * 装配一条被动（**弃用别名**）：语义等价于统一入口的无槽位重载（权威 kind = `PASSIVE`；
+         * 无槽位 ⇒ 不占热键栏）。
+         *
+         * @deprecated 改用统一入口的无槽位重载 `addComponent` —— 同一条内部路径。
+         */
+        @Deprecated
+        public Builder addPassive(String passiveId, ComponentFactory<PassiveSkill> factory){
+            return addComponentInternal(passiveId, factory, ItemKind.PASSIVE, -1);
+        }
+
+        /**
+         * 装配一条主武器（**弃用别名**）：语义等价于统一入口的四参重载（权威 kind = `MAIN_WEAPON`）。
+         *
+         * @deprecated 改用统一入口的四参重载 `addComponent` —— 同一条内部路径。
+         */
+        @Deprecated
+        public Builder addMainWeapon(String mainWeaponId, ComponentFactory<MainWeapon> factory, int slot){
+            return addComponentInternal(mainWeaponId, factory, ItemKind.MAIN_WEAPON, slot);
+        }
+
+        /**
+         * **唯一内部装配路径**（阶段 6）：两个新重载与三个弃用别名都只调用这里 ⇒ 校验、id 去重、
+         * 槽位写入、入表各只有一处实现。
+         *
+         * @param slot 槽位；{@code < 0} = 无槽位（不占热键栏，不写 `slotMap`）
+         */
+        private Builder addComponentInternal(String id, ComponentFactory<? extends RoleComponent> factory,
+                                             ItemKind kind, int slot){
             // 与迁移前临时实例取 id 的 fail-fast 等价：null 工厂在**装配期**立刻 NPE，而不是拖到实例创建
             Objects.requireNonNull(factory);
 
-            if(skillId == null || skillId.trim().isEmpty()){
-                throw new IllegalArgumentException("Skill ID cannot be null or empty.");
+            if(id == null || id.trim().isEmpty()){
+                throw new IllegalArgumentException("Component ID cannot be null or empty.");
             }
-            ensureIdNotRegistered("Skill", skillId);
-
-            validateSlot(slot);
-
-            skillFactories.put(skillId, factory);
-            slotMap.put(slot, skillId);
-
-            return this;
-        }
-
-        /**
-         * 装配一条被动：**id 由注册处声明**（无槽位）；装配条目 = {@code (id, ComponentFactory)}。
-         */
-        public Builder addPassive(String passiveId, ComponentFactory<PassiveSkill> factory){
-            Objects.requireNonNull(factory);
-
-            if (passiveId == null || passiveId.trim().isEmpty()) {
-                throw new IllegalArgumentException("Passive skill ID cannot be null or empty");
+            if(kind == null){
+                throw new IllegalArgumentException("Component kind cannot be null.");
             }
-            ensureIdNotRegistered("Passive", passiveId);
+            ensureIdNotRegistered(kind, id);
 
-            passiveFactories.put(passiveId, factory);
-
-            return this;
-        }
-
-        /**
-         * 装配一条主武器：**id 由注册处声明**；装配条目 = {@code (id, ComponentFactory)}。
-         */
-        public Builder addMainWeapon(String mainWeaponId, ComponentFactory<MainWeapon> factory, int slot){
-            Objects.requireNonNull(factory);
-
-            if(mainWeaponId == null || mainWeaponId.trim().isEmpty()){
-                throw new IllegalArgumentException("MainWeapon ID cannot be null or empty.");
+            boolean hasSlot = slot >= 0;
+            if(hasSlot){
+                validateSlot(slot);
             }
-            ensureIdNotRegistered("MainWeapon", mainWeaponId);
 
-            validateSlot(slot);
-
-            mainWeaponFactories.put(mainWeaponId, factory);
-            slotMap.put(slot, mainWeaponId);
+            components.put(id, new ComponentEntry(factory, kind, hasSlot ? slot : -1));
+            if(hasSlot){
+                slotMap.put(slot, id);
+            }
 
             return this;
         }
@@ -239,10 +319,19 @@ public class Role {
         }
 
         //O-10：id 去重必须是跨类型的 —— 技能/被动/主武器共用同一个 id 命名空间，任一重复都抛异常
-        private void ensureIdNotRegistered(String type, String id){
-            if (skillFactories.containsKey(id) || passiveFactories.containsKey(id) || mainWeaponFactories.containsKey(id)) {
-                throw new IllegalArgumentException(type + " already registered: " + id);
+        private void ensureIdNotRegistered(ItemKind kind, String id){
+            if (components.containsKey(id)) {
+                throw new IllegalArgumentException(kindLabel(kind) + " already registered: " + id);
             }
+        }
+
+        /** 旧错误文案里的类型词（保持可读性；异常类型与触发条件不变）。 */
+        private static String kindLabel(ItemKind kind){
+            return switch (kind) {
+                case SKILL -> "Skill";
+                case PASSIVE -> "Passive";
+                case MAIN_WEAPON -> "MainWeapon";
+            };
         }
 
         //O-12：槽位冲突 fail-fast（§10 裁决 1）—— 抛异常、该角色不注册，不再"告警 + 覆盖"
@@ -276,13 +365,27 @@ public class Role {
     public int getMaxEnergy() { return maxEnergy; }
     public int getMaxSanTE() { return maxSanTE; }
     public Set<String> getSkillIds(){
-        return skillFactories.keySet();
+        return skillIds;
     }
     public Set<String> getPassiveSkillIds() {
-        return passiveFactories.keySet();
+        return passiveIds;
     }
     public Set<String> getMainWeaponIds(){
-        return mainWeaponFactories.keySet();
+        return mainWeaponIds;
+    }
+
+    /**
+     * **唯一有序组件表**（阶段 6）：遍历顺序 = 装配调用顺序 ⇒ 生命周期/事件广播的派发序。
+     * 容器的组件初始化只遍历本表**一次**（纯注册序）。
+     */
+    public Map<String, ComponentEntry> getComponents(){
+        return components;
+    }
+
+    /** 按 id 取**权威 kind**（框架侧行为分支的唯一来源）：未注册 ⇒ {@code null}。 */
+    public ItemKind componentKindOf(String id){
+        ComponentEntry entry = components.get(id);
+        return entry != null ? entry.getKind() : null;
     }
 
     public Faction getFaction() { return faction; }

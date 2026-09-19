@@ -1,0 +1,104 @@
+阶段 6 · SanTE 归零惩罚语义修复 —— 停服物证（t26）
+================================================================================
+口径声明
+  1) 本件是【当轮物证】：三路互证分「起服前」与「停机后」各测一次；冻结动作发生在**服务器仍在线时**（非停机后补写）。
+  2) 身份一律【现算】：bytes = 文件长度；SHA256 = Get-FileHash -Algorithm SHA256；mtime = yyyy-MM-dd HH:mm:ss.fff。
+  3) ★ **提交态认领（台账 §3 铁律 8；本卡**赛后**成立）**：
+      · 本批开工基线快照时点 HEAD = `7277fc2`（2026-09-19 20:41:29.746）；改动面 = **1 个源文件**。
+      · **取证时点**（20:43:48–20:44:16）工作树 `porcelain -- src` = **1 行（未提交）** ⇒ 那一刻严格说属"开发构建轮"。
+      · **赛后**队长提交为 **`7e616fbe6e63d882dd9d67d461903dc1e3836490`**（`DefaultSanTEZeroPunishment.java`，+49/−10）；此刻现算
+        `porcelain -- src` = **0 行**、`git diff HEAD -- src` = **空** ⇒ **工作树内容与该提交逐字相同** ⇒ 本轮按【**提交态等价**】认领，
+        **不得**读作"取证当时已是提交态"。
+      · 制品↔提交绑定：`src 新于 jar = 0`（该文件 mtime 20:42:10.500 < jar 20:42:26.390）⇒ jar `305BA1AD…` 反映的就是 `7e616fb` 的源码。
+      · 口径注：工作树文件（CRLF）与 `git show HEAD:<path>`（LF 归一）**字节 SHA256 不同**属预期，判等一律用 `git diff HEAD -- <path>` 为空（已实测）。
+
+一、★ 防「假新鲜」三条件（同时满足）
+--------------------------------------------------------------------------------
+  条件① **本次 runServer 作业的启动边界**（三条时间锚，逐条可复核）：
+      · 起服前最后一次三路互证完成 = **2026-09-19 20:43:27.679**
+      · **日志轮转 / 本轮首行 = [20:43:48]**（冻结件首行 `[20:43:48] [ServerMain/INFO]: [bootstrap] Running Java 21 …`）
+      · 起服前我把当时那份 latest.log 原样留存为 `.scratch\bot\pret26-latest-copy.log`
+        = **15302 B** / SHA256 **B06549A1A4F850F179FCB9439E6CDEC6CB4496B9C35EC69D29FE9B4EF605532A**（= **t25 那轮**的冻结件内容；源 mtime 20:23:39.949，见 eng-验证 复算）
+  条件② **latest.log 的 mtime 晚于启动边界**：停机后 latest.log mtime = **20:43:59.638**、冻结件 mtime = **20:44:16.608**
+      ⇒ 20:43:27.679 < 20:43:48（轮转/首行） < 20:43:59.638 ≤ 20:44:16.608 ✔
+      （附注：`latest.log` 的 CreationTime 是陈旧值 —— Paper 就地把该文件截断重写、不重建 inode ⇒ 判轮次只能用 mtime + SHA + 轮转件。）
+  条件③ **SHA256 ≠ 清单里每一个旧冻结件**（逐件**现算**后比较）：
+      本轮冻结件 `阶段6-起服日志-归零惩罚语义修复.log` = **3F04913F38684B9073E8C800939E41A8558BC34530318047014F83A57857B8D0**
+      | 旧冻结件 | 现算前 8 位 | ≠ 本轮 |
+      |---|---|---|
+      | 阶段6-起服日志-C11派发序运行级.log（t21） | 6041B041 | ✔ |
+      | 阶段6-起服日志-派发能力化.log（t22） | 46B1E045 | ✔ |
+      | 阶段6-起服日志-C11派发序运行级-复跑.log（t25） | B06549A1 | ✔ |
+      | 阶段6-起服日志-统一组件装配-外观取证.log（t19） | 8318A683 | ✔ |
+      | 阶段5-起服日志-4.4复核.log（t4） | 8268E32C | ✔ |
+      | 阶段5-起服日志-4.4接管.log（t2） | 527183B0 | ✔ |
+  ★ **轮转侧证（最强一条）**：`run/logs/2026-09-19-8.log.gz`（3510 B / mtime **20:43:48**）解压后 = **15302 B / B06549A1…**
+      ⇒ **逐字等于起服前那份**（t25 的 latest.log）⇒ 证明本轮确实把上一轮的 latest.log 挤走并新建了本轮日志（不是"未起服冻结同一份旧件"）。
+
+二、起服前：窗口三路互证（2026-09-19 20:43:27.679）
+--------------------------------------------------------------------------------
+  ① netstat 按 LISTENING 过滤 :25566 ⇒ **0**  ② TcpClient.Connect ⇒ FAIL（actively refused）  ③ latest.log 独占打开 ⇒ **OK**  旁证：java = 0
+  （eng-验证 同一时刻并行复算一致；其提醒"java=3 属 Gradle daemon、不得当占用判据"已采纳。）
+
+三、起服与在线期
+--------------------------------------------------------------------------------
+  作业：pwsh-17（`cd ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"; .\gradlew runServer --console=plain`）
+  插件清单（本件内逐字）：`[20:43:50] [PluginInitializerManager] Bukkit plugins (1):` + ` - ShadowHunterRolesPlugin (1.0.0)` ⇒ **只有本插件**（无探针残留）
+  Mode B 三行（冻结件内逐字）：
+      [20:43:57] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+      [20:43:58] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+      [20:43:58] [Server thread/INFO]: [ShadowHunterRolesPlugin] Done (9.904s)! For help, type "help"
+
+四、仍在线时冻结日志（20:44:16.602；共享读流，非停机后补写）
+--------------------------------------------------------------------------------
+  冻结件 = debug-logs/测试记录/阶段6-起服日志-归零惩罚语义修复.log
+      bytes = 6075 / mtime = 2026-09-19 20:44:16.608 / lines = 56（ReadAllLines 口径）
+      sha256 = 3F04913F38684B9073E8C800939E41A8558BC34530318047014F83A57857B8D0
+  停机后 run/logs/latest.log 与冻结件**逐字节相同**（同 bytes / 同 SHA256）⇒ 在线冻结覆盖整轮。
+
+五、停机动作（只 job_kill；未强杀 java）
+--------------------------------------------------------------------------------
+  `job_kill pwsh-17`；未对 java 做任何 kill/Stop-Process；探测循环首次满足「java=0 且 LISTENING=0」= **20:44:31.051**。
+
+六、停机后：三路复证
+--------------------------------------------------------------------------------
+  ① netstat LISTENING :25566 ⇒ **0**  ② TcpClient.Connect ⇒ FAIL（refused）  ③ latest.log 独占打开 ⇒ **OK**  旁证：java = **0** ⇒ 25566 已释放。
+
+七、当轮运行级判据（证据 = 冻结件）
+--------------------------------------------------------------------------------
+  ① Mode B 三行齐 —— 见第三节。
+  ② 正序集合差（`.scratch/bot/log-delta.ps1 -Anchor …阶段4-起服日志-T2b.log -Current …run/logs/latest.log -Tag t26`）：
+        anchor WARN/ERROR/SEVERE = 13 ; current = 13 ; ADDED = 0 ; REMOVED = 0 ; A=B=C=0 ⇒ **只看 C=0** ✔（落盘 .scratch/bot/logdelta-t26.txt）
+        ★ **C=0 的期望是本轮"事先选定"的**（采纳 eng-验证/队长 的口径）：**本轮不挂机器人** ⇒ 不出现 t25 那类"机器人掉线触发的 Netty 回退投递 WARN" ⇒ 期望 C=0；实测与分析一致。
+  ③ 级别字段扫描 **开机窗 / 运行窗分列**：开机窗（首行..`Done (`）= 50 行 ⇒ ERROR/SEVERE **0**（WARN 7：3 oshi + 4 offline-mode）；
+        运行窗（`Done (` 之后）= 6 行 ⇒ ERROR/SEVERE **0**（WARN 6：Paper 横幅）；全件级别字段 = **0**，裸 `ERROR|SEVERE` = 3（oshi 正文）。
+  ④ **插件归因异常独立扫描（形态锚 `^\s+at`）**：
+        形态 A = 行含 `ShadowHunterRolesPlugin` **且**级别字段 ∈ {WARN,ERROR,SEVERE}；形态 B = 行匹配 **`^\s+at .*com\.shadowHunterRolesPlugin`**（栈帧）
+        正样本（`阶段5-起服日志-4.4外观取证.log`）：formA = **1**、formB = **4**（逐行见下）
+            `at ShadowHunterRolesPlugin-1.0.0-…jar//com.shadowHunterRolesPlugin.manager.BuffManager.addBuff(BuffManager.java:53)`
+            `…core.BuffPortImpl.add(BuffPortImpl.java:29)` · `…roleComponent.DefaultSanTEZeroPunishment$1.run(DefaultSanTEZeroPunishment.java:84)` · `…platform.BukkitSchedulerAdapter.lambda$runRepeating$2(BukkitSchedulerAdapter.java:61)`
+        负样本（`阶段6-起服日志-派发能力化.log`，t22）：formA = 0、formB = 0
+        **本轮**：formA = **0**、formB = **0** ⇒ 无插件归因异常 ✔（形态双向自证）
+
+八、F1 链（机器校验 ORDER）
+--------------------------------------------------------------------------------
+  链：jar mtime < 起服日志 mtime < 停服物证 mtime < 说明件 mtime
+      jar = 2026-09-19 20:42:26.390 ；log = 2026-09-19 20:44:16.608 ；物证 = 本文件 ；说明 = 阶段6-归零惩罚语义修复-说明.txt
+  ⇒ 说明件末节给出 `ORDER = OK` 的机器校验命令与输出。
+
+九、制品（与红线）
+--------------------------------------------------------------------------------
+  build/libs/ShadowHunterRolesPlugin-1.0.0.jar = **165428 B / 2026-09-19 20:42:26.390 /
+      SHA256 305BA1AD205CC82ADECE795DA24854C11EFAAC60573395AD701981D712EDE119**（作业输出 `:compileJava`/`:jar` 已执行）
+  归档件 = `debug-logs/回滚快照/jars/ShadowHunterRolesPlugin-1.0.0-verified-20260919-204226-305BA1AD.jar`（与 build/libs 逐字节相同）+ MANIFEST「登记 10」
+  ★ **未重建 `06750CFE` 那一代**：其归档件现算 = 165404 B / 2026-09-19 20:05:37.216 / `06750CFE…`（逐字未变）。
+
+十、边界与未覆盖（如实）
+--------------------------------------------------------------------------------
+  1) ★ **惩罚循环（归零 → 钉 0 → 回满）的端到端运行级观测本轮未做，且受同一客户端缺陷阻塞**：惩罚表现层是
+     `TOTEM_OF_UNDYING` + `SCULK_SOUL`（`DefaultSanTEZeroPunishment:124/:125/:160`，`World#spawnParticle` 半径发送，而惩罚点就在玩家自身）
+     ⇒ 与 `DUST` 同属 mineflayer 无法解析的包（eng-验证 t25 实测：`mineflayer/lib/particle.js:21` 读 `undefined.type` ⇒ 管线断裂 ⇒ keepalive 超时）
+     ⇒ **本卡不承诺惩罚循环的运行级结论**（详见说明件 A12 的退档声明与最小闭合方式）。
+  2) 本轮**无玩家/机器人上线** ⇒ 无行为面/外观面的新运行级读数；本卡改动**只在"归零被触发之后"的路径上生效**，其触发需要玩家把 SanTE 打到 0。
+  3) 停机方式 = job_kill（未强杀 java）⇒ 日志无优雅关服行，不影响上述判据。
+  4) 提交态按【提交态等价】认领（口径声明第 3 条），取证时点工作树非空已如实写明。

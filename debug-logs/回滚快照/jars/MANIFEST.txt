@@ -1,0 +1,124 @@
+# 已验证制品存档（2026-09-18 起；按 eng-验证 的建议设立）
+# 目的：让 "class 级等价 / javap -c -p 反汇编逐字相同" 这类主张可被【独立复现】—— 制品本身必须可回溯，而非只留身份读数。
+# 规则：凡有【运行期证据】覆盖的制品，把该 jar 复制到此目录并在下方登记；命名含构建时刻 + SHA256 前 8 位。
+# 格式（2026-09-18 规范化，队长追认）：每条登记**一行一个 `key = value`**；禁止 `key =` 与值分两行 ✗（同行解析会把上一条的值配给本条）。
+
+# --- 登记 1 ---
+登记时刻 = 2026-09-18 20:42:06
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260918-203749-7A21729B.jar
+bytes = 148297
+mtime = 2026-09-18 20:37:49.919
+sha256 = 7A21729B035B0C38BABAA22B03EC675A0FFDE1AC4A321B07A6C91C1384506017
+覆盖证据 = 阶段5-起服日志-非Folia口径.log（Mode B 三行 + 只看 C=0 + 停服三路互证）
+备注 = 该代含 t53 / t57 / 非Folia口径 三批【纯注释】改动 ⇒ 与更早各代 class 级等价（差异仅 LineNumberTable）
+
+# 无法回溯的历史代次（B/C/D/E 及其中间重建）：当时只留身份读数、未留 jar 副本 ⇒ 其 "class 级等价" 主张【未独立复现】（eng-验证 t56 §7 如实记录）。
+
+# --- 登记 2 ---
+登记时刻 = 2026-09-18 21:01:58
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260918-205855-DBE04077.jar
+bytes = 148298
+mtime = 2026-09-18 20:58:55.755
+sha256 = DBE040774A476363FC62F6EBC0F8A1BA43DBB4842622B4DC99852DF699CE8DF1
+覆盖证据 = 阶段5-起服日志-两说并存措辞.log（Mode B 三行 + 只看 C=0 + 停机前先冻结 + 停服三路互证；F1 链 jar 20:58:55 < log 20:59:50 < 说明 21:01:22）
+与前代关系 = 前代 7A21729B…(148297) 仅注释改动后再编译 ⇒ 差异应在 LineNumberTable 行号；本代【自带】运行证据（判据 ①）
+
+# --- 跨代 class 级比对（eng-平台 / 2026-09-18 21:1x）---
+比对命令 = 解压两份 jar -> 1) 比 .class 文件集合；2) 比同名 .class 的 SHA256；3) 对差异类做 javap -c -p 反汇编对拍（零重建，全部基于本目录两份留档制品）
+判据①文件集合相同 = True（96 vs 96，无单侧文件）
+判据②同名 SHA256 逐字相同 = 94 / 96 ⇒ 【严格逐字相同不成立 ✗】
+判据②不同的两个 = platform/BukkitSchedulerAdapter.class 与 platform/BukkitSchedulerAdapter$1.class（等长 3297 B、字节不同）
+判据②补充反汇编 = 对这两个类做 javap -c -p ⇒ 【逐字相同 = True】⇒ 差异只在 LineNumberTable（行号随注释增行位移）
+容器层 = 两份 jar 内同一条目的时间戳相同（1980-02-01 00:00:00，Gradle 确定性时间戳）⇒ 那 1 字节差来自 class 内容，不是容器
+结论与处置 = 严格"字节码等价"不成立 ⇒ 必须自出一轮 Mode B ⇒ 已于 2026-09-18 20:58–21:01 完成（见登记 2 的覆盖证据）
+语义等价的作用 = 反汇编逐字相同 ⇒ 与既有各代的语义等价关系可作**辅助**证据，但**不作为认领依据** ✗
+
+# --- 登记 3 ---
+登记时刻 = 2026-09-18 21:35:00
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260918-212616-53CBEB65.jar
+bytes = 158875
+mtime = 2026-09-18 21:26:16.053
+sha256 = 53CBEB650FEAAEC828FB57F169DA01A14985A18872311AA02891FC6717730246
+覆盖证据 = 阶段5-起服日志-指令整合.log（Mode B 三行 + 正序集合差只看 C=0 + 停机前先在仍在线时冻结 + 只 job_kill 后停服三路互证 + 额外 14 条游戏内指令矩阵；F1 链 jar 21:26:16 < log 21:32:07 < 说明）
+与前代关系 = 本代是首代含【指令体系结构变动】的制品（command/** 1 改 8 新：SubCommand 体系 + 两类调试指令迁成子指令类），与前代 DBE04077…(148298) 及其它各代**不存在 class 级等价主张** ⇒ 已自出 Mode B 运行证据
+备注 = 探针输出文本逐字保留（26 条 [sched] 字面量多重集全等），但探针**行号**已变 ⇒ 既有证据请按 DebugSchedCommand + 键名引用
+
+# --- 登记 4 ---
+登记时刻 = 2026-09-18 21:45:00
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260918-214102-0F2D901C.jar
+bytes = 159652
+mtime = 2026-09-18 21:41:02.153
+sha256 = 0F2D901C6B6FE301E32CDA2B52C7377E940F8C6D058A7E96B6B92D1C3377DF74
+覆盖证据 = 阶段5-起服日志-控制台输出.log（Mode B 三行 + 正序集合差只看 C=0 + 停机前先在仍在线时冻结 + 只 job_kill 后停服三路互证 + **15 行 [command-debug] 控制台输出**（含 ④m verdict / ⑤ raw / ⑤ verdict / CONCLUSION=）+ 4 条 issued server command；F1 链 jar 21:41:02 < log 21:43:14 < 说明）
+与前代关系 = 前代 53CBEB65…(158875, t59 指令体系) 的**同一批指令代码 + 仅新增日志出口**：探针与冷却的**玩家侧输出文本逐字未变**（26 条 [sched] 字面量多重集仍全等）⇒ 与 t59 代语义等价；本代自带运行证据
+备注 = 本代只新增 3 条字符串字面量（"[command-debug]" · 分隔符 " " · ④m 矩阵说明句），**数值字面量 diff = 0**（658 → 658）；改动面 = command/** 3 个 Debug* 文件
+
+# --- 登记 5 ---
+登记时刻 = 2026-09-18 21:57:00
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260918-214102-0F2D901C.jar
+bytes = 159652
+mtime = 2026-09-18 21:41:02.153
+sha256 = 0F2D901C6B6FE301E32CDA2B52C7377E940F8C6D058A7E96B6B92D1C3377DF74
+覆盖证据 = 阶段5-起服日志-控制台输出-取证.log（39033 B / 223 行 / 2026-09-18 21:55:30.018 / SHA256 972AAE6E90A5B8D11268265956E8FE482B44397FF9F72625BB37D2A55BF7D326）：Mode B 三行 + 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log，13/13 行全等、ADDED=0）+ 主冻结在仍在线时 + 只 job_kill + 停服三路互证 + 运行级锚（[command-debug]=99 · [sched]=72 · matrixAllPairsMatch==6 · portLegEquivalent==6 · CONCLUSION==6 · ERROR/SEVERE=0）；bot 冒烟 mineflayer 双路径 + op 门控双窗，断言 failed=0
+与前代关系 = 与登记 4 为同一字节制品（同一 jar 文件：不重复复制、不重建）：Gradle 全部任务 UP-TO-DATE（输入/输出哈希匹配）⇒ 该 jar 即提交态 src 的制品；重建只会改其 mtime 并反转登记 4 的 F1 链（协同规范 §3.4）
+备注 = 本登记只追加"提交态"第二轮运行证据；F1 链 = jar 21:41:02 < freezeA 21:49:37.907 < freezeB 21:55:30.018 < 本登记；提交绑定 commit = b42d775aef2f7163ffcc34c39e5af2a93a655bf8（起服时 HEAD；src/main tree = beed92cb9997049d8b086f164b9f386a74eae1ba，与取证时刻 HEAD 889e95c1b47a249150e9f7e3091e82b4bc0d9dee 的 src/main tree 逐字相同）
+
+# --- 登记 6 ---
+登记时刻 = 2026-09-18 22:05:30
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260918-220106-21002ABC.jar
+bytes = 159661
+mtime = 2026-09-18 22:01:06.944
+sha256 = 21002ABCA1291D5B18929961460E565C721790BD8E251EBE7DE744D2AE6BA408
+覆盖证据 = 阶段5-起服日志-清理批.log（6074 B / 56 行 / mtime 2026-09-18 22:03:14.958 / SHA256 3B6788C93B55B15F6C31ADB1B34ACFFAA00BFD296B0E57E98C5A9AD908901980）：Mode B 三行 + 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0、REMOVED=0、A=B=C=0）+ 停机前先在仍在线时主冻结（22:04:34 冻结，与原件共享读逐字节相同）+ 只 job_kill + 停服三路互证 + 锚定级别字段扫描 ERROR/SEVERE=0
+与前代关系 = 本代是首代含【真删代码】的制品（RedDeeplySorrowSkill.java 删 1 行死 import：全 src \bRoleInstance\b 139 → 138）⇒ 与登记 4/5（0F2D901C… / 159652 B）**不存在 class 级等价主张**，自出 Mode B 运行证据；jar 159652 → 159661 B（+9 B：删行使源文件属性/行号表变化）
+备注 = 卡面 inScope 未列本文件与 jar 归档两条路径 ⇒ 按 t39/t50/t59 先例实际执行并在 output 逐条申报；F1 链 = jar mtime 22:01:06.944 < log mtime 22:03:14.958 < 本登记 2026-09-18 22:05:30
+ 
+# --- 登记 7 ---
+登记时刻 = 2026-09-19 13:01:13
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260919-125407-6A249993.jar
+bytes = 159512
+mtime = 2026-09-19 12:54:07.286
+sha256 = 6A249993ECDE32C9AAB4E651191C5277C198F97DB5C35A603FC68893C67FF734
+覆盖证据 = 阶段5-起服日志-4.4接管.log（6077 B / mtime 2026-09-19 13:00:33.240 / SHA256 527183B0F242D591130E90E83E066BBFEAD6274EBB2E109B9A17EB1413263A8A）：Mode B 三行（12:57:11 Enabling ShadowHunterRolesPlugin v1.0.0 / 12:57:11 ShadowHunter Character System enabled. / 12:57:12 Done (15.686s)!）+ 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0、REMOVED=0、A=B=C=0）+ 停机前先在仍在线时冻结（13:00:25 与 13:00:33 两次冻结逐字节相同）+ 只 job_kill（未强杀 java）+ 停服三路互证（netstat LISTENING=0 / TCP connect 拒绝 / latest.log 独占打开成功）+ 锚定级别字段扫描 \] \[[^]]*/(ERROR|SEVERE)\] = 0（裸 ERROR/SEVERE=3 均为 oshi WARN 正文）
+与前代关系 = 本代是首代含【渲染路径结构性改动】的制品（HotbarRenderer 由骨架改为唯一渲染者 + 五触点置脏 + triggerUpdate 帧末 flush + 删 T⑦ 四条旧渲染方法与 legacy 刷新方法）⇒ 与前代 21002ABC…(159661 B) **不存在 class 级等价主张**，自出 Mode B 运行证据；jar 159661 → 159512 B（-149 B）
+备注 = F1 链 = jar mtime 12:54:07.286 < log mtime 13:00:33.240 < 本登记；起服时 runServer 自述 remap 的制品即 'build\libs\ShadowHunterRolesPlugin-1.0.0.jar'（与本登记同一文件，归档件与其逐字节相同）；提交绑定 = 起服时工作树 src（点名 commit 42dde5e5… 为改动前基线，本批改动未提交、由队长提交）
+ 
+# --- 登记 8 ---
+登记时刻 = 2026-09-19 19:24:38
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260919-192214-FCB926AC.jar
+bytes = 164982
+mtime = 2026-09-19 19:22:14.941
+sha256 = FCB926ACEEA08BC0C0D9044BA1B109E082A170CB866A68EB84036B4C3F876D77
+覆盖证据 = 阶段6-起服日志-统一组件装配.log（6075 B / mtime 2026-09-19 19:24:08.738 / SHA256 2F45CF5EA263FDB361F70510D97AC3FA1B4103890D1F66812178DF41303172CE）：Mode B 三行（19:23:52 Enabling ShadowHunterRolesPlugin v1.0.0 / 19:23:52 ShadowHunter Character System enabled. / 19:23:52 Done (9.717s)!）+ 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0、REMOVED=0、A=B=C=0）+ 开机窗/运行窗分列读数（开机窗 50 行、运行窗 6 行；两窗级别字段 ERROR/SEVERE 均 = 0）+ 插件归因异常独立扫描 = 0 + 停机前先在仍在线时冻结 + 只 job_kill（未强杀 java）+ 停服三路互证
+与前代关系 = 本代是首代含【统一组件装配】的制品（addComponent 双载 + 权威 kind 在注册处 + HotbarSpec/能力接口 + 三基类降级 + 被动 kind 清理 + **派发序改纯注册序**）⇒ 与 6A249993（阶段 5 · 4.4 那代，159512 B）**不存在 class 级等价主张**，自出 Mode B 运行证据；jar 159512 → 164982 B
+备注 = F1 链 = jar mtime 19:22:14.941 < log mtime 19:24:08.738 < 本登记；工作树状态 = 取证时刻 git status --porcelain -- src 非空（**开发构建轮**，见说明件「提交态申报」节）；未重建 6A249993 那一代（其归档件读数逐字未变）
+ 
+# --- 登记 9 ---
+登记时刻 = 2026-09-19 20:08:21
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260919-200537-06750CFE.jar
+bytes = 165404
+mtime = 2026-09-19 20:05:37.216
+sha256 = 06750CFE187EE7E50E76993F5628D258A1E7FC20A5D225905CA830806D8711E2
+覆盖证据 = 阶段6-起服日志-派发能力化.log（6075 B / mtime 2026-09-19 20:07:28.593 / SHA256 46B1E0458622586705A27D68D3F1063907FCADD6054E4FC5E0FAB209B2F2B0CB）：Mode B 三行（20:07:15 Enabling / 20:07:15 enabled. / 20:07:16 Done (9.636s)!）+ 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0、REMOVED=0、A=B=C=0）+ 开机窗/运行窗分列（50 行/6 行，两窗级别字段 ERROR/SEVERE 均 0）+ 插件归因异常扫描 0/0（形态先在已知正样本 阶段5-起服日志-4.4外观取证.log 86–95 行验证 formA=1/formB=4）+ 防假新鲜三条件（作业启动边界 20:06:47.687 < 轮转 20:07:06 < mtime 20:07:28.593；SHA 与清单六件全不等；被挤走的旧件 2026-09-19-6.log.gz 解压 = 6041B041… = 起服前内容）+ 停机前先在仍在线时冻结 + 只 job_kill（未强杀 java）+ 停服三路互证
+与前代关系 = 本代是首代含【派发面能力化两刀】的制品（handleCast 判据 ActiveComponent→HotbarActionable；新增能力接口 CooldownAware 承接 onCooldownEnd+CooldownEndReason，dispatchCooldownEnd 判据改为 CooldownAware）⇒ 与 FCB926AC（t18 那代，164982 B）**不存在 class 级等价主张**，自出 Mode B 运行证据；jar 164982 → 165404 B
+备注 = F1 链 = jar mtime 20:05:37.216 < log mtime 20:07:28.593 < 本登记；工作树状态 = 取证时刻 porcelain -- src 非空（**开发构建轮**：CooldownAware.java 为未跟踪新件，见说明件「提交态申报」节）；未重建 FCB926AC 代（其归档件读数逐字未变）
+ 
+# --- 登记 10 ---
+登记时刻 = 2026-09-19 20:45:05
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260919-204226-305BA1AD.jar
+bytes = 165428
+mtime = 2026-09-19 20:42:26.390
+sha256 = 305BA1AD205CC82ADECE795DA24854C11EFAAC60573395AD701981D712EDE119
+覆盖证据 = 阶段6-起服日志-归零惩罚语义修复.log（6075 B / mtime 2026-09-19 20:44:16.608 / SHA256 3F04913F38684B9073E8C800939E41A8558BC34530318047014F83A57857B8D0）：Mode B 三行（20:43:57 Enabling / 20:43:58 enabled. / 20:43:58 Done (9.904s)!）+ 正序集合差只看 C=0（锚 阶段4-起服日志-T2b.log：anchor/current 各 13 行、ADDED=0/REMOVED=0、A=B=C=0）+ 开机窗/运行窗分列（50/6 行，两窗级别字段 ERROR/SEVERE 均 0）+ 插件归因异常扫描 0/0（形态锚 ^\s+at 且先在已知正样本 阶段5-起服日志-4.4外观取证.log 86–95 行验证 formA=1/formB=4）+ 防假新鲜三条（启动边界 20:43:27 < 轮转/首行 20:43:48 < 冻结 20:44:16.608；SHA 与旧件清单六件逐件现算全不等；轮转件 2026-09-19-8.log.gz 解压 = B06549A1… = 起服前内容）+ 停机前先在仍在线时冻结 + 只 job_kill（未强杀 java）+ 停服三路互证
+与前代关系 = 本代是首代含【SanTE 归零惩罚语义修复】的制品（进入即标记 / 每跳钉 0 / 忽略重入 / 结束后回满 / 五条中止路径复位标记 / 去重复赋值 / 更正类头已被证伪的注释）⇒ 与 06750CFE（t22 那代，165404 B）不存在 class 级等价主张，自出 Mode B 运行证据；jar 165404 → 165428 B
+备注 = F1 链 = jar mtime 20:42:26.390 < log mtime 20:44:16.608 < 本登记；提交绑定 = 队长提交 7e616fbe6e63d882dd9d67d461903dc1e3836490（src/main/java/.../DefaultSanTEZeroPunishment.java，+49/−10），且 src 新于 jar = 0 ⇒ 本 jar 反映的就是该提交的源码；取证时点工作树尚未提交、赛后逐文件比对 git diff HEAD -- src = 空 ⇒ 按提交态等价认领；未重建 06750CFE 代（其归档件读数逐字未变）
+ 
+# --- 登记 11 ---
+登记时刻 = 2026-09-19 20:55:44
+文件 = ShadowHunterRolesPlugin-1.0.0-verified-20260919-205353-B8C3259E.jar
+bytes = 165857
+mtime = 2026-09-19 20:53:53.918
+sha256 = B8C3259EF6FFF900FC805B78E346609019332C72C773B158B71F2BD9B5DF0236
+覆盖证据 = 阶段6-起服日志-归零惩罚语义对齐.log（6075 B / mtime 2026-09-19 20:54:57.330 / SHA256 25C200B012D3A718B5EA71A85B74C5E941270C897FACD009E6CD8B0F1195993B）：Mode B 三行（20:54:41 Enabling / 20:54:41 enabled. / 20:54:42 Done (8.953s)!）+ 正序集合差只看 C=0 且**带判别力判据**（有效轮 = ADDED=0 且 REMOVED=0 且 current 行数=13；本轮的修正路径跑 = anchor 13 / current 13 / ADDED 0 / REMOVED 0；卡面原样路径跑 = current 0 且 ADDED=0/REMOVED=0 ⇒ **真空通过**，已作为反例落盘 .scratch/bot/logdelta-t27-verbatim.txt）+ 开机窗/运行窗分列（50/6 行，两窗级别字段 ERROR/SEVERE 均 0）+ 插件归因异常扫描 0/0（形态锚 ^\s+at 且先在已知正样本 阶段5-起服日志-4.4外观取证.log 86–95 行验证 formA=1/formB=4）+ 防假新鲜三条 + **轮转侧证**（2026-09-19-9.log.gz 解压 = 6075 B / 3F04913F… = 起服前那份）+ 停机前先在仍在线时冻结 + 只 job_kill（未强杀 java）+ 停服三路互证
+与前代关系 = 本代是首代含【Q1=逐 tick 钉 0 + Q2=回满推迟到 STUN 结束】的制品 ⇒ 与 305BA1AD（t26 那代，165428 B）不存在 class 级等价主张，自出 Mode B 运行证据；jar 165428 → 165857 B
+备注 = F1 链 = jar mtime 20:53:53.918 < log mtime 20:54:57.330 < 本登记；工作树状态 = 取证时刻 porcelain -- src = 1 行（**开发构建轮**，见说明件「提交态申报」节）；未重建 305BA1AD 与 06750CFE（两件归档件读数逐字未变）

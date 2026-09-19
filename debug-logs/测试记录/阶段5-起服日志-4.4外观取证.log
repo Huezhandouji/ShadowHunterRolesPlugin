@@ -1,0 +1,140 @@
+[13:19:56] [ServerMain/INFO]: [bootstrap] Running Java 21 (Java HotSpot(TM) 64-Bit Server VM 21.0.8+12-LTS-250; Oracle Corporation null) on Windows 11 10.0 (amd64)
+[13:19:56] [ServerMain/INFO]: [bootstrap] Loading Paper 1.21.11-132-ver/1.21.11@c5eb079 (2026-05-11T11:43:09Z) for Minecraft 1.21.11
+[13:19:57] [ServerMain/WARN]: [oshi.util.platform.windows.WmiQueryHandler] COM exception querying Win32_Processor, which might not be on your system. Will not attempt to query it again. Error was -2147217405: (HRESULT: 80041003)
+[13:19:57] [ServerMain/WARN]: [oshi.util.platform.windows.WmiQueryHandler] COM exception querying Win32_Processor, which might not be on your system. Will not attempt to query it again. Error was -2147217405: (HRESULT: 80041003)
+[13:19:57] [ServerMain/WARN]: [oshi.util.platform.windows.WmiQueryHandler] COM exception querying Win32_PhysicalMemory, which might not be on your system. Will not attempt to query it again. Error was -2147217405: (HRESULT: 80041003)
+[13:19:57] [ServerMain/INFO]: [PluginInitializerManager] Initializing plugins...
+[13:19:58] [ServerMain/INFO]: [PluginInitializerManager] Initialized 1 plugin
+[13:19:58] [ServerMain/INFO]: [PluginInitializerManager] Bukkit plugins (1):
+ - ShadowHunterRolesPlugin (1.0.0)
+[13:20:05] [ServerMain/INFO]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, profilesHost=https://api.mojang.com, name=PROD]
+[13:20:07] [ServerMain/INFO]: Loaded 1470 recipes
+[13:20:07] [ServerMain/INFO]: Loaded 1584 advancements
+[13:20:07] [ServerMain/INFO]: [ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry] Initialising converters for DataConverter...
+[13:20:07] [ServerMain/INFO]: [ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry] Finished initialising converters for DataConverter in 457.2ms
+[13:20:08] [Server thread/INFO]: Starting minecraft server version 1.21.11
+[13:20:08] [Server thread/INFO]: Loading properties
+[13:20:08] [Server thread/INFO]: This server is running Paper version 1.21.11-132-ver/1.21.11@c5eb079 (2026-05-11T11:43:09Z) (Implementing API version 1.21.11-R0.1-SNAPSHOT)
+[13:20:08] [Server thread/INFO]: [spark] This server bundles the spark profiler. For more information please visit https://docs.papermc.io/paper/profiling
+[13:20:08] [Server thread/INFO]: Server Ping Player Sample Count: 12
+[13:20:08] [Server thread/INFO]: Using 4 threads for Netty based IO
+[13:20:08] [Server thread/INFO]: [MoonriseCommon] Paper is using 8 worker threads, 1 I/O threads
+[13:20:08] [Server thread/INFO]: Default game type: CREATIVE
+[13:20:08] [Server thread/INFO]: Generating keypair
+[13:20:08] [Server thread/INFO]: Starting Minecraft server on *:25566
+[13:20:09] [Server thread/INFO]: Paper: Using Java compression from Velocity.
+[13:20:09] [Server thread/INFO]: Paper: Using Java cipher from Velocity.
+[13:20:09] [Server thread/INFO]: [SpigotLibraryLoader] [ShadowHunterRolesPlugin] Loading 0 libraries... please wait
+[13:20:09] [Server thread/INFO]: [ShadowHunterRolesPlugin] Loading server plugin ShadowHunterRolesPlugin v1.0.0
+[13:20:09] [Server thread/INFO]: Server permissions file permissions.yml is empty, ignoring it
+[13:20:09] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!
+[13:20:09] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.
+[13:20:09] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.
+[13:20:09] [Server thread/WARN]: To change this, set "online-mode" to "true" in the server.properties file.
+[13:20:09] [Server thread/INFO]: Preparing level "world"
+[13:20:09] [Server thread/INFO]: Loading 0 persistent chunks for world 'minecraft:overworld'...
+[13:20:09] [Server thread/INFO]: Preparing spawn area: 100%
+[13:20:09] [Server thread/INFO]: Prepared spawn area in 7 ms
+[13:20:09] [Server thread/INFO]: Loading 0 persistent chunks for world 'minecraft:the_nether'...
+[13:20:09] [Server thread/INFO]: Prepared spawn area in 13 ms
+[13:20:09] [Server thread/INFO]: Loading 0 persistent chunks for world 'minecraft:the_end'...
+[13:20:09] [Server thread/INFO]: Prepared spawn area in 14 ms
+[13:20:09] [Server thread/INFO]: Done preparing level "world" (0.647s)
+[13:20:09] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+[13:20:10] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+[13:20:10] [Server thread/INFO]: [spark] Starting background profiler...
+[13:20:10] [Server thread/INFO]: [spark] The async-profiler engine is not supported for your os/arch (windows11/amd64), so the built-in Java engine will be used instead.
+[13:20:10] [Server thread/INFO]: Running delayed init tasks
+[13:20:10] [Server thread/INFO]: Done (14.043s)! For help, type "help"
+[13:20:11] [Paper Async Task Handler Thread - 1/WARN]: *************************************************************************************
+[13:20:11] [Paper Async Task Handler Thread - 1/WARN]: You are running the latest build for your Minecraft version (1.21.11)
+[13:20:11] [Paper Async Task Handler Thread - 1/WARN]: However, you are 4 release(s) behind the latest stable release (26.2)!
+[13:20:11] [Paper Async Task Handler Thread - 1/WARN]: It is recommended that you update as soon as possible
+[13:20:11] [Paper Async Task Handler Thread - 1/WARN]: https://papermc.io/downloads/paper
+[13:20:11] [Paper Async Task Handler Thread - 1/WARN]: *************************************************************************************
+[13:20:27] [User Authenticator #0/INFO]: UUID of player HueZhandouji is 40671423-5a96-3097-9199-6fac21782134
+[13:20:29] [Server thread/INFO]: HueZhandouji joined the game
+[13:20:29] [Server thread/INFO]: HueZhandouji[/127.0.0.1:59652] logged in with entity id 84 at ([world]-688.207652405396, 72.0, 141.6322291472271)
+[13:20:31] [Server thread/INFO]: HueZhandouji issued server command: /role set meiqihezi
+[13:20:34] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 1
+[13:20:34] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(meiqihezi_skill_unconcern) wasCooling=false | no old segment was cooling | newRemainingTicks=100
+[13:20:35] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 0
+[13:20:35] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(meiqihezi_mainWeapon_juejue) wasCooling=false | no old segment was cooling | newRemainingTicks=20
+[13:20:36] [Server thread/INFO]: HueZhandouji issued server command: /role energy set 0
+[13:20:37] [Server thread/INFO]: HueZhandouji issued server command: /role energy get
+[13:20:38] [Server thread/INFO]: HueZhandouji issued server command: /give HueZhandouji minecraft:blaze_powder 1
+[13:20:38] [Server thread/INFO]: [HueZhandouji: Gave 1 [Blaze Powder] to HueZhandouji]
+[13:20:40] [Server thread/INFO]: HueZhandouji issued server command: /role energy set 100
+[13:20:41] [Server thread/INFO]: HueZhandouji issued server command: /role clear
+[13:20:43] [Server thread/INFO]: HueZhandouji issued server command: /role set red
+[13:20:46] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 1
+[13:20:46] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(red_solitaryArrogance_skill) wasCooling=false | no old segment was cooling | newRemainingTicks=200
+[13:20:47] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 0
+[13:20:47] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(red_mainWeapon_sanctifiedBlade) wasCooling=false | no old segment was cooling | newRemainingTicks=100
+[13:20:47] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown end 0
+[13:20:47] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] end(red_mainWeapon_sanctifiedBlade) returned=true | wasCooling=true | ENDED_BY_COMPONENT dispatched (onCooldownEnd)
+[13:20:48] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown end 1
+[13:20:48] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] end(red_solitaryArrogance_skill) returned=true | wasCooling=true | ENDED_BY_COMPONENT dispatched (onCooldownEnd)
+[13:20:49] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 3
+[13:20:49] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(red_deeplySorrow_skill) wasCooling=false | no old segment was cooling | newRemainingTicks=600
+[13:21:09] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown end 3
+[13:21:09] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] end(red_deeplySorrow_skill) returned=true | wasCooling=true | ENDED_BY_COMPONENT dispatched (onCooldownEnd)
+[13:21:10] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown status 3
+[13:21:10] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] red_deeplySorrow_skill | cooling=false | remainingTicks=0 | remainingSeconds=0.00 | declaredTicks=600
+[13:21:13] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown status 3
+[13:21:13] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] red_deeplySorrow_skill | cooling=true | remainingTicks=592 | remainingSeconds=29.60 | declaredTicks=600
+[13:21:26] [Server thread/WARN]: [ShadowHunterRolesPlugin] Global task for ShadowHunterRolesPlugin v1.0.0 generated an exception
+java.lang.IllegalArgumentException: Modifier is already applied on this attribute!
+	at net.minecraft.world.entity.ai.attributes.AttributeInstance.addModifier(AttributeInstance.java:75) ~[paper-1.21.11.jar:1.21.11-132-c5eb079]
+	at net.minecraft.world.entity.ai.attributes.AttributeInstance.addPermanentModifier(AttributeInstance.java:101) ~[paper-1.21.11.jar:1.21.11-132-c5eb079]
+	at org.bukkit.craftbukkit.attribute.CraftAttributeInstance.addModifier(CraftAttributeInstance.java:75) ~[paper-1.21.11.jar:1.21.11-132-c5eb079]
+	at ShadowHunterRolesPlugin-1.0.0-1789793818094.jar//com.shadowHunterRolesPlugin.manager.BuffManager.addBuff(BuffManager.java:53) ~[?:?]
+	at ShadowHunterRolesPlugin-1.0.0-1789793818094.jar//com.shadowHunterRolesPlugin.core.BuffPortImpl.add(BuffPortImpl.java:29) ~[?:?]
+	at ShadowHunterRolesPlugin-1.0.0-1789793818094.jar//com.shadowHunterRolesPlugin.roleComponent.DefaultSanTEZeroPunishment$1.run(DefaultSanTEZeroPunishment.java:84) ~[?:?]
+	at ShadowHunterRolesPlugin-1.0.0-1789793818094.jar//com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter.lambda$runRepeating$2(BukkitSchedulerAdapter.java:61) ~[?:?]
+	at io.papermc.paper.threadedregions.scheduler.FoliaGlobalRegionScheduler$GlobalScheduledTask.run(FoliaGlobalRegionScheduler.java:178) ~[paper-1.21.11.jar:?]
+	at io.papermc.paper.threadedregions.scheduler.FoliaGlobalRegionScheduler.tick(FoliaGlobalRegionScheduler.java:36) ~[paper-1.21.11.jar:?]
+	at net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1758) ~[paper-1.21.11.jar:1.21.11-132-c5eb079]
+	at net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:1611) ~[paper-1.21.11.jar:1.21.11-132-c5eb079]
+	at net.minecraft.server.dedicated.DedicatedServer.tickServer(DedicatedServer.java:427) ~[paper-1.21.11.jar:1.21.11-132-c5eb079]
+	at net.minecraft.server.MinecraftServer.processPacketsAndTick(MinecraftServer.java:1667) ~[paper-1.21.11.jar:1.21.11-132-c5eb079]
+	at net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:1335) ~[paper-1.21.11.jar:1.21.11-132-c5eb079]
+	at net.minecraft.server.MinecraftServer.lambda$spin$2(MinecraftServer.java:388) ~[paper-1.21.11.jar:1.21.11-132-c5eb079]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[?:?]
+[13:21:26] [Server thread/INFO]: HueZhandouji issued server command: /role clear
+[13:21:29] [Server thread/INFO]: HueZhandouji lost connection: Disconnected
+[13:21:29] [Server thread/INFO]: HueZhandouji left the game
+[13:22:58] [User Authenticator #1/INFO]: UUID of player HueZhandouji is 40671423-5a96-3097-9199-6fac21782134
+[13:22:59] [Server thread/INFO]: HueZhandouji joined the game
+[13:22:59] [Server thread/INFO]: HueZhandouji[/127.0.0.1:55218] logged in with entity id 295 at ([world]-688.207652405396, 72.0, 141.6322291472271)
+[13:23:01] [Server thread/INFO]: HueZhandouji issued server command: /role set meiqihezi
+[13:23:04] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 1
+[13:23:04] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(meiqihezi_skill_unconcern) wasCooling=false | no old segment was cooling | newRemainingTicks=100
+[13:23:05] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 0
+[13:23:05] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(meiqihezi_mainWeapon_juejue) wasCooling=false | no old segment was cooling | newRemainingTicks=20
+[13:23:06] [Server thread/INFO]: HueZhandouji issued server command: /role energy set 0
+[13:23:07] [Server thread/INFO]: HueZhandouji issued server command: /role energy get
+[13:23:08] [Server thread/INFO]: HueZhandouji issued server command: /give HueZhandouji minecraft:blaze_powder 1
+[13:23:08] [Server thread/INFO]: [HueZhandouji: Gave 1 [Blaze Powder] to HueZhandouji]
+[13:23:10] [Server thread/INFO]: HueZhandouji issued server command: /role energy set 100
+[13:23:11] [Server thread/INFO]: HueZhandouji issued server command: /role clear
+[13:23:13] [Server thread/INFO]: HueZhandouji issued server command: /role set red
+[13:23:16] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 1
+[13:23:16] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(red_solitaryArrogance_skill) wasCooling=false | no old segment was cooling | newRemainingTicks=200
+[13:23:16] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 0
+[13:23:16] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(red_mainWeapon_sanctifiedBlade) wasCooling=false | no old segment was cooling | newRemainingTicks=100
+[13:23:17] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown end 0
+[13:23:17] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] end(red_mainWeapon_sanctifiedBlade) returned=true | wasCooling=true | ENDED_BY_COMPONENT dispatched (onCooldownEnd)
+[13:23:18] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown end 1
+[13:23:18] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] end(red_solitaryArrogance_skill) returned=true | wasCooling=true | ENDED_BY_COMPONENT dispatched (onCooldownEnd)
+[13:23:19] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown restart 3
+[13:23:19] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] restart(red_deeplySorrow_skill) wasCooling=false | no old segment was cooling | newRemainingTicks=600
+[13:23:39] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown end 3
+[13:23:39] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] end(red_deeplySorrow_skill) returned=true | wasCooling=true | ENDED_BY_COMPONENT dispatched (onCooldownEnd)
+[13:23:40] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown status 3
+[13:23:40] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] red_deeplySorrow_skill | cooling=false | remainingTicks=0 | remainingSeconds=0.00 | declaredTicks=600
+[13:23:43] [Server thread/INFO]: HueZhandouji issued server command: /role debug cooldown status 3
+[13:23:43] [Server thread/INFO]: [ShadowHunterRolesPlugin] [command-debug] [cooldown] red_deeplySorrow_skill | cooling=true | remainingTicks=592 | remainingSeconds=29.60 | declaredTicks=600
+[13:23:56] [Server thread/INFO]: HueZhandouji issued server command: /role clear
+[13:23:59] [Server thread/INFO]: HueZhandouji lost connection: Disconnected
+[13:23:59] [Server thread/INFO]: HueZhandouji left the game

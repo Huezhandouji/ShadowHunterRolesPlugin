@@ -1,0 +1,223 @@
+================================================================================
+t51 同批（用户新裁定）· 阶段 5 前置 —— **调度器迁移：BukkitSchedulerAdapter → GlobalRegionScheduler**
+—— 起服/停服物证（当轮即时记录 2026-09-18 20:01–20:06）
+   · 探针原始输出（op bot 实跑，含"新实现 vs 原生 Bukkit"的 A/B）
+   · 零可见差异逐条对照 · 52 历史锚点扫描 · 双口径 (d) · 回滚单元 · 运行深度声明
+================================================================================
+
+§0 结论摘要（一句话）
+--------------------------------------------------------------------------------
+**适配器已切换成功且零可见差异成立**：`platform/BukkitSchedulerAdapter` 现以 `GlobalRegionScheduler` 为唯一实现，
+`Scheduler`/`Task` 接口与全部调用方**零改动**；实测**回调线程、周期、延时、取消语义**与原生 `BukkitScheduler` 逐字相同，
+且对**生产声明值 0/10**（3 个调用点实际传的值）做了 A/B —— 原生 Bukkit 与**本适配器**首次/第三次触发均为 **1/21**（逐字相同）。
+唯一原始 API 差异（`runAtFixedRate` 拒绝 `initialDelay<=0`）由适配器 `Math.max(1L, …)` 吸收，且该归一**经实测证明是等价的**（不是"近似"）。
+
+§1 本批改动面（2 个 src 文件；**`platform/**` 路径偏离由队长书面追认**）
+--------------------------------------------------------------------------------
+| 文件 | 身份（现算） | 角色 |
+|---|---|---|
+| `platform/BukkitSchedulerAdapter.java` | **3508 B / 69 行 / `3DC66F6013F9CA1BAA9F049D66DD05E82C2C58A9B9949A545CF916D1CAE031C5`** | **回滚单元（1 文件）**：切 `GlobalRegionScheduler` + `initialDelay<=0` 归一 |
+| `command/RoleCommand.java` | **31289 B / 581 行 / `E356303A7D1177E3CCB3B4F13F28ECC1B8F41ED0CD1D636DCA203021A72A8D41`** | 临时探针：新增 ③c/③d **新实现验证**段（可整段删除） |
+
+映射（逐条按队长书面指定，接口签名不变）：
+- `run(Runnable)` → `getGlobalRegionScheduler().run(plugin, st -> task.run())`
+- `runLater(Runnable, delay)` → `runDelayed(plugin, st -> task.run(), delay)`
+- `runRepeating(Runnable, initial, period)` → `runAtFixedRate(plugin, st -> task.run(), Math.max(1L, initial), period)`
+- `wrap(...)`：`Task.cancel()` → `ScheduledTask.cancel()`（**吞掉 `CancelledState` 返回值**）；`Task.isCancelled()` → `st.isCancelled()`
+- **类名未改** ✓（改类名会动调用方）；**只更新了本文件 javadoc** ✓
+- **未**用 `execute(Plugin, Runnable)` 替代 `run(...)` ✓（会丢句柄、任务无法回收）；**未**改 `Scheduler`/`Task` 接口 ✓
+- 文件级证据：本文件的双口径字面量净变化 = **仅 `1L`（`Math.max` 的归一常量），删除方向 0** ✓
+
+§2 零可见差异：`Scheduler` 3 方法 + 取消语义逐条对照（全部来自 §4 原始值）
+--------------------------------------------------------------------------------
+| # | 维度 | 原生 Bukkit（对照） | 新适配器（GlobalRegionScheduler） | 判定 |
+|---|---|---|---|---|
+| 1 | `run` 线程/相位 | **无原生 Bukkit 一次性对照腿**（见下注） | ③d `adapter.run()` thread=`Server thread` | 线程一致 ✓ / 相位**未做 A/B**（申报） |
+| 2 | `runLater(20)` 实际触发 | ③b `runTaskLater` delta=**20** | ③d `adapter.runLater(20)` delta=**20** | **一致 ✓** |
+| 3 | `runRepeating(0,10)` 首次 | ③c raw `runTaskTimer(0,10)` #1 delta=**1** | ③d `adapter.runRepeating(0,10)` #1 delta=**1** | **一致 ✓（A/B 同声明值）** |
+| 4 | `runRepeating(0,10)` 第三次 | ③c #3 delta=**21** | ③d #3 delta=**21** | **一致 ✓** |
+| 5 | 周期（#1→#3） | **20** tick | **20** tick | **一致 ✓** |
+| 6 | `cancel()` 返回 | `void`（`isCancelled` false→true） | `void`（吞掉 `NEXT_RUNS_CANCELLED`） | **一致 ✓（形态不同、语义等价）** |
+| 7 | 重复 `cancel()` | 无异常 | 无异常 | **一致 ✓（幂等）** |
+| 8 | 原始 API 的 `initialDelay<=0` | **接受** | **拒绝**（`IllegalArgumentException`） | ✗ 原始差异 —— **已由适配器归一，且 3/4 行证明等价** ✓ |
+
+> **第 1 行的申报（不掩饰）**：本轮探针**没有**为"一次性 `run`"设原生 Bukkit `runTask` 对照腿（③/③c 都是周期任务），
+> 故 `adapter.run()` 的**相位**只有"在线程与相位上与 GRS 原始 `run` 腿相同"这一层证据，**不构成 A/B**。
+> 影响面评估（现算）：`Scheduler.run(...)` 的**唯一**转发点是 `core/TimerPortImpl.java:35`，而
+> `git grep -n "timers().run(" -- src/main/java` **= 0** ⇒ **`run()` 目前没有任何生产调用点**（组件只用 `runLater` / `runRepeating`）。
+> 若后续要闭环该腿，只需在探针里加 6 行（原生 `runTask` vs `adapter.run()` 的同声明 A/B）——**属可选加强项，未做**。
+
+§3 起服（Mode B）与日志反证
+--------------------------------------------------------------------------------
+[3.1] 起服前**已广播**（20:01，已发 captain + eng-验证）；窗口核查：`25566` 已释放（无 LISTENING）、java=3（均 19:01 daemon）。
+[3.2] 构建：`BUILD SUCCESSFUL in 11s`；jar = **146010 B / 2026-09-18 20:01:38.935 /
+      `163F1D8CBD837E304E40D8706EFC887126250BAD20E1A24102BFE3FDCDD0C405`**；
+      最新 `.class` = `ShadowHunterRolesPlugin.class @20:01:38.599`；**`src 新于 jar = 0`** ✓
+      （`Task :compileJava` / `Task :jar` 均实际执行 = 非 up-to-date 空跑）
+[3.3] Mode B 三行齐（逐字，`debug-logs/测试记录/阶段5-起服日志-调度器迁移.log`）：
+      `:46` `[20:03:18] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0`
+      `:47` `[20:03:18] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.`
+      `:51` `[20:03:19] [Server thread/INFO]: Done (13.133s)! For help, type "help"`
+      SHDF 依赖行（`Succeed to find the dependency`）= **0 命中** ✓（Mode B 口径）
+[3.4] 冻结日志 = **6135 B / 20:03:20.718 / `C8912D2C8FAC5919E53CFA7491B1FBC037A91D773B87DA8BACEFB8DB88E68CC6`**
+      （冻结后复核 `live == frozen`；停服后再次复核仍未变 ⇒ 冻结物未被事后写入）。
+[3.5] 正序集合差（工具 `.scratch\bot\log-delta.ps1`，锚 `阶段4-起服日志-T2b.log`，direction 已打印，**只看 C**）：
+      anchor 13 / current 13 行级别行；**ADDED 0 / REMOVED 0 / A) oshi 0 / B) 世界状态 0 / C) OTHER 0** ✓
+      对**整轮运行结束后的实时日志**（含 §4/§5 两次 bot 会话）复跑：**同样 C = 0** ✓
+[3.6] **52 份历史日志锚点扫描**（`debug-logs/测试记录/*.log` + `debug-logs/baseline-runserver-*.log`，
+      排除本次新日志）：**50 份可比锚点 C = 0（min/max = 0/0）**；另有 **2 份非服务器日志**（`t2-build.log`、`t2-阶段0-build.log`：
+      级别行为 0 行）**不参与比较并在此声明**（不是"跳过失败"，而是其内容里根本没有级别行）。
+      唯一非零集合差出现在最老的基线 `baseline-runserver-2026-09-13-1519.log`（added 3 / removed 9）——**其 C 亦为 0**（差异全在 A/B 噪声类）。
+
+§4 探针原始输出（**新实现验证**，op bot 实跑，逐字粘贴 29 行）
+--------------------------------------------------------------------------------
+执行者：mineflayer bot `HueZhandouji`（`run/ops.json` level 4；offline UUID `40671423-5a96-3097-9199-6fac21782134` 与 ops.json 逐字匹配）。
+服务端旁证：`[20:04:14] [Server thread/INFO]: HueZhandouji issued server command: /role debug sched`
+--------------------------------------------------------------------------------
+[12:04:11.687] BOT login
+[12:04:11.699] CHAT HueZhandouji joined the game
+[12:04:11.880] BOT spawn as HueZhandouji
+[12:04:14.387] BOT >> /role debug sched
+[12:04:14.398] CHAT [sched] probe start | commandThread=Server thread | commandTick=1095 | primaryThread=true | declared: runDelayed=20t, runAtFixedRate=1/10t, bukkit runTaskTimer=1/10t, boundary=0/10t
+[12:04:14.401] CHAT [sched] ② boundary | GlobalRegionScheduler.runAtFixedRate(0,10) -> initialDelay0=REJECTED(IllegalArgumentException: Initial delay ticks may not be <= 0) | Bukkit.getScheduler().runTaskTimer(0,10) -> initialDelay0=ACCEPTED
+[12:04:14.429] CHAT [sched] ③c raw bukkit runTaskTimer #1 | declared delay=0 period=10 | tick=1096 | delta=1 | thread=Server thread
+[12:04:14.429] CHAT [sched] ③ bukkit runTaskTimer #1 | declared delay=1 period=10 | tick=1096 | delta=1 | thread=Server thread
+[12:04:14.430] CHAT [sched] ① execute | thread=Server thread | tick=1096 | delta=1 | primaryThread=true
+[12:04:14.430] CHAT [sched] ② run | thread=Server thread | tick=1096 | delta=1 | owningPluginIsUs=true | isRepeatingTask=false | getExecutionState=RUNNING | isCancelled=false
+[12:04:14.430] CHAT [sched] ② runAtFixedRate #1 | declared initialDelay=1 period=10 | tick=1096 | delta=1 | thread=Server thread | isRepeatingTask=true | getExecutionState=RUNNING | isCancelled=false
+[12:04:14.430] CHAT [sched] ③d adapter.run() | thread=Server thread | tick=1096 | delta=1
+[12:04:14.430] CHAT [sched] ③d adapter.runRepeating #1 | declared initialDelay=0 period=10 (adapter normalises 0 -> 1) | tick=1096 | delta=1 | thread=Server thread
+[12:04:14.917] CHAT [sched] ③ bukkit runTaskTimer #2 | declared delay=1 period=10 | tick=1106 | delta=11 | thread=Server thread
+[12:04:14.917] CHAT [sched] ③c raw bukkit runTaskTimer #2 | declared delay=0 period=10 | tick=1106 | delta=11 | thread=Server thread
+[12:04:14.917] CHAT [sched] ② runAtFixedRate #2 | declared initialDelay=1 period=10 | tick=1106 | delta=11 | thread=Server thread | isRepeatingTask=true | getExecutionState=RUNNING | isCancelled=false
+[12:04:14.917] CHAT [sched] ③d adapter.runRepeating #2 | declared initialDelay=0 period=10 (adapter normalises 0 -> 1) | tick=1106 | delta=11 | thread=Server thread
+[12:04:15.365] CHAT [sched] ③b bukkit runTaskLater | declaredDelay=20 | tick=1115 | delta=20 | thread=Server thread
+[12:04:15.365] CHAT [sched] ② runDelayed | declaredDelay=20 | tick=1115 | delta=20 | thread=Server thread | isRepeatingTask=false | getExecutionState=RUNNING | isCancelled=false
+[12:04:15.365] CHAT [sched] ③d adapter.runLater(20) | declaredDelay=20 | tick=1115 | delta=20 | thread=Server thread
+[12:04:15.417] CHAT [sched] ③ bukkit runTaskTimer #3 | declared delay=1 period=10 | tick=1116 | delta=21 | thread=Server thread
+[12:04:15.417] CHAT [sched] ④(BukkitTask) cancel() -> void | isCancelled() before=false | after=true | no exception = idempotent
+[12:04:15.417] CHAT [sched] ③c raw bukkit runTaskTimer #3 | declared delay=0 period=10 | tick=1116 | delta=21 | thread=Server thread
+[12:04:15.417] CHAT [sched] ② runAtFixedRate #3 | declared initialDelay=1 period=10 | tick=1116 | delta=21 | thread=Server thread | isRepeatingTask=true | getExecutionState=RUNNING | isCancelled=false
+[12:04:15.417] CHAT [sched] ④ cancel() #1 -> NEXT_RUNS_CANCELLED | isCancelled()=true | getExecutionState()=CANCELLED_RUNNING
+[12:04:15.417] CHAT [sched] ④ cancel() #2 (repeat) -> NEXT_RUNS_CANCELLED_ALREADY | isCancelled()=true | getExecutionState()=CANCELLED_RUNNING | no exception = idempotent
+[12:04:15.417] CHAT [sched] ③d adapter.runRepeating #3 | declared initialDelay=0 period=10 (adapter normalises 0 -> 1) | tick=1116 | delta=21 | thread=Server thread
+[12:04:15.417] CHAT [sched] ③d adapter Task.cancel() -> void | isCancelledBefore=false,isCancelledAfter=true,isCancelledAfterSecondCancel=true | repeated cancel: no exception = idempotent
+[12:04:17.372] CHAT [sched] ⑤ raw | globalThread=Server thread | bukkitThread=Server thread | globalDeltas=1/11/21 (declared 1/10) | bukkitDeltas=1/11/21 (declared 1/10) | globalRunDelayedDelta=20 | bukkitRunTaskLaterDelta=20 (declared 20) | adapterRunLaterDelta=20 | A/B(declared 0/10) rawBukkitFirstThird=1/21 adapterFirstThird=1/21 | globalCancel=cancel1=NEXT_RUNS_CANCELLED,isCancelled1=true,state1=CANCELLED_RUNNING,cancel2=NEXT_RUNS_CANCELLED_ALREADY,isCancelled2=true,state2=CANCELLED_RUNNING | bukkitCancel=isCancelledBefore=false,isCancelledAfter=true | adapterCancel=isCancelledBefore=false,isCancelledAfter=true,isCancelledAfterSecondCancel=true
+[12:04:17.372] CHAT [sched] ⑤ verdict | sameThread=true | periodEquivalent=true (global=20 bukkit=20, declared 20) | delayedEquivalent=true | cancelSemanticsOk=true | rawInitialDelayPolicySame=false (global: initialDelay0=REJECTED(IllegalArgumentException: Initial delay ticks may not be <= 0) / bukkit: initialDelay0=ACCEPTED) | clampEquivalent=true | adapterDelayedEquivalent=true | adapterCancelOk=true | CONCLUSION=CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (raw APIs differ only on initialDelay<=0; the adapter normalises 0 -> 1 and the A/B on the production declaration 0/10 is tick-identical)
+[12:04:21.708] BOT >> quit
+[12:04:21.709] BOT end: sched probe done
+--------------------------------------------------------------------------------
+[4.1] 探针残留反证：③d 的 `Task.cancel()` 在 `12:04:15.417`，bot 于 `12:04:21.708` 才退出 —— **6.3 秒内无任何新 `[sched]` 行**
+      ⇒ 全部周期探针任务（含适配器任务）确实已自取消，**无残留任务** ✓
+[4.2] 与 build B（切适配器**前**）的对照：build B 的 ⑤ verdict 是 `CONCLUSION=CANNOT swap the adapter as-is`
+      （因 `rawInitialDelayPolicySame=false` 且当时**没有**适配器腿）；本批把该差异**在适配器里吸收**并新增 ③c/③d A/B 腿
+      ⇒ verdict 变为 `CAN swap … zero visible difference`。**这不是把结论"改绿"，而是新增了可复核的 A/B 实测腿**（原始值见上）。
+
+§5 生产路径实跑（探针之外的加强项，超出卡面声明深度，如实申报）
+--------------------------------------------------------------------------------
+除探针外，本会话还跑了**真实角色生命周期**（同样经**新适配器**）：
+--------------------------------------------------------------------------------
+[12:05:05.535] BOT login
+[12:05:05.544] CHAT HueZhandouji joined the game
+[12:05:05.553] BOT spawn as HueZhandouji
+[12:05:08.055] >> /role set meiqihezi
+[12:05:08.090] CHAT Your role has been set: meiqihezi
+[12:05:08.109] CHAT HueZhandouji has made the advancement [Suit Up]
+[12:05:12.054] >> /role energy get
+[12:05:12.056] CHAT The current energy level of [HueZhandouji] is: 100
+[12:05:15.559] >> /role clear
+[12:05:15.581] CHAT Your role has been cleared.
+[12:05:18.557] >> /role energy get (after clear)
+[12:05:18.558] CHAT HueZhandouji has no role!
+[12:05:20.757] >> quit
+[12:05:20.759] BOT end: role lifecycle done
+--------------------------------------------------------------------------------
+覆盖到的**生产调度路径**（全部经新适配器）：
+- `RoleInstance` 的 **1-tick ticker**（`platform.scheduler().runRepeating(this::triggerUpdate, 1L, 1L)`）在角色创建时启动，
+  连续运行约 **4 秒 ≈ 80 tick**（20:05:08 → 20:05:15）**无任何异常**；
+- 组件 `start()`（装备被动发放护甲 ⇒ 出现 `[Suit Up]` 成就）✓；
+- `/role clear` ⇒ `RoleInstance.clear()` → `cancelAllAndClear()` → **适配器 `Task.cancel()`** ⇒ 角色清除后 ticker 停止：
+  清除后 `/role energy get` 正常返回 `has no role!`，且**此后 5 秒无 SEVERE/ERROR**（§3.5 全轮 C=0）⇒ **回收路径可用** ✓
+仍未覆盖：3 个 `0L` 调用点的**业务触发条件**（buff 生效、SanTE 归零惩罚、BloodySlash 致伤循环）未在游戏内构造
+（需要玩家受击/技能命中）；其**调度入参等价性**已由 §2 第 3/4 行的同声明值 A/B 覆盖，**业务触发留待 t18/用户冒烟**。
+
+§6 停服（当时实测；**只 `job_kill` + 等待**，未强杀 java）
+--------------------------------------------------------------------------------
+[6.1] `job_kill pwsh-14`（runServer 后台作业）—— 只杀作业，未对 java 进程动手。
+[6.2] 停服判定 @ **20:05:48.330**（三路互证）：
+      · `TcpClient.Connect('127.0.0.1', 25566)` = **FAILED（port closed）** ✓
+      · `[System.IO.File]::Open('run\logs\latest.log','Open','Read','None')` = **SUCCEEDED（无持有者）** ✓
+      · `netstat -ano` 中 `25566` **无 LISTENING**（仅 2 条 `TIME_WAIT`：bot 两次连接残影） ✓
+      · `Get-Process java` = **3**，全部 19:01:13/19:01:35/19:01:40 启动的 Gradle daemon（无 20:01 之后启动者） ✓
+      · 冻结日志复算 = 6135 B / 20:03:20.718 / `C8912D2C…`（与 §3.4 逐字相同）✓
+
+§7 红线核对（全部现算）
+--------------------------------------------------------------------------------
+[7.1] `git status --porcelain -- src` = **仅 2 行**（`platform/BukkitSchedulerAdapter.java` + `command/RoleCommand.java`）
+      ⇒ `Scheduler.java` / `Task.java` / `api/**` / `resources/**` / 主类 / 全部 listener 与组件**逐条 0 改动** ✓
+      （**接口未动 ⇒ 调用方零改动**：`git grep -n "scheduler()" -- src/main/java` 的 **9 处**调用点全部逐字不变）
+[7.2] `Scheduler`/`Task` 接口签名逐字未改（3 方法 + 2 方法）；**未**新增注册路径、**未**改 `plugin.yml`、`onEnable` 未动 ✓
+[7.3] `ComponentServices` 10 成员 / 两事件对外发布：不在改动面内 ✓
+[7.4] 探针仍是临时件（可整段删除，删除清单见 `RoleCommand.java` 注释块 `:322` 起）；**本次未删**（下一张卡若要清理，
+      判据见 t51 物证 §9：`handleDebugSched` / `[sched]` / `schedprobe` / `io.papermc…threadedregions.scheduler` 删除后归零）。
+
+§8 双口径（数值 + 字符串多重集；base = **本批开工前自取快照** `t51b-before`）
+--------------------------------------------------------------------------------
+工具：`.scratch\bot\numeric-multiset.ps1 -BaseDir <t51b-before> -Tag t51b-final -Mode both`
+[8.1] **numeric**：before **488** → after **547**，diff rows **59**，**全部新增、删除方向 0** ✓
+[8.2] **string**：before **312** → after **342**，diff rows **34** = 新增 **32** + **删除 2**（下方逐条申报）
+[8.3] **(d) 逐条申报**
+  · numeric +59（全部在 `command/RoleCommand.java` 的探针段）：`0`×22 · `0L`×2 · `1`×4 · `1L`×1 · `10`×3 · `10L`×2 ·
+    `11`×3 · `12`×5 · `13`×1 · `20L`×1 · `3`×2 · `6`×5 · `7`×1 · `8`×3 · `9`×4
+    （含义：新增观测位下标 `str[6]`/`tick[8..12]`、数组长度 `new int[13]`、③c/③d 的声明值 0/10 与自取消阈值 3）
+  · **生产文件**（`platform/BukkitSchedulerAdapter.java`）字面量净变化 = **仅 `1L`×1 新增、删除 0** ✓
+    （即 `Math.max(1L, initialDelayTicks)`；其余为标识符/javadoc，不产生字面量）
+  · string +32 / −2（**全部在探针段；两条"删除"是同义改写，已在基线快照中逐条确认存在 ⇒ 改写而非丢失**）：
+    − `" | initialDelayPolicySame="` → + `" | rawInitialDelayPolicySame="`（改名以点明是"**原始 API** 的策略差异"）
+    − `"CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (same thread + same tick timing + equivalent cancel semantics)"`
+      → + 新版结论文案（点明"原始 API 仅在 `initialDelay<=0` 上不同；适配器把 0 归一为 1，且 A/B 逐字相同"）
+    + 新增：`"[sched] ③c raw bukkit runTaskTimer #"` · `" | declared delay=0 period=10 | tick="` ·
+      `"[sched] ③d adapter.run() | thread="` · `"[sched] ③d adapter.runLater(20) | declaredDelay=20 | tick="` ·
+      `"[sched] ③d adapter.runRepeating #"` · `" | declared initialDelay=0 period=10 (adapter normalises 0 -> 1) | tick="` ·
+      `"[sched] ③d adapter Task.cancel() -> void | "` · `"isCancelledBefore="` · `",isCancelledAfter="` ·
+      `",isCancelledAfterSecondCancel="` · `" | repeated cancel: no exception = idempotent"` ·
+      `" | A/B(declared 0/10) rawBukkitFirstThird="` · `" adapterFirstThird="` · `" | adapterRunLaterDelta="` ·
+      `" | adapterCancel="` · `" | clampEquivalent="` · `" | adapterDelayedEquivalent="` · `" | adapterCancelOk="` ·
+      `" | rawInitialDelayPolicySame="` · `"isCancelledAfter=true"` · `"isCancelledAfterSecondCancel=true"` ·
+      `"/"`×2 · `" | delta="`×4 · `" | thread="`×3 · `" | tick="`×1
+  · 性质：**除 `1L` 外全部只服务临时探针**，删探针即消失（`1L` 属生产适配器，随回滚单元一并回退）。
+
+§9 回滚单元与逐文件 SHA256
+--------------------------------------------------------------------------------
+**回滚单元 = 1 文件**（本批的生产改动）：`git checkout -- src/main/java/com/shadowHunterRolesPlugin/platform/BukkitSchedulerAdapter.java`
+= 回到 `64af170` 的原 `BukkitTask` 实现（44 行 / 逐字节一致）。
+（探针段的回滚见 t51 物证 §9：按删除清单整段删除，属临时件。）
+
+§10 运行深度声明（如实）
+--------------------------------------------------------------------------------
+[10.1] 服务端侧达到「插件启用 + 服务器空闲（`Done`）」= Mode B 深度 ✓（§3）。
+[10.2] **超出卡面的加深（如实申报）**：本会话有**两次 bot 登录**（op `HueZhandouji`）：一次跑探针（§4），
+       一次跑**真实角色生命周期**（§5：`set → ticker 运行 → clear`），后者实际驱动了**新适配器的生产调度路径**。
+       该加深不改变 Mode B 口径（冻结发生在 bot 登录之前；且全轮级别行集合差仍 `C = 0`）。
+[10.3] **仍未覆盖**：① 3 个 `0L` 调用点的**业务触发**（需玩家受击/技能命中）未构造 —— 但其**入参等价性**已由 §2 第 3/4 行同声明值 A/B 覆盖；
+       ② 真实"装了 SHDF 的 25565 外服"四行合格线未执行（本工程 `runServer` 原理上不产生第 3 行）⇒ 不得把三行当四行；
+       ③ Folia 真机未验证（本次只做 `GlobalRegionScheduler`，按方案 §6 只做 Global）。
+[10.4] 仪器口径提醒（沿用 t51 结论）：本机 `Get-NetTCPConnection -State Listen` 在服务器确实监听时也返回 0
+       ⇒ 停服判定用 **TCP connect + `latest.log` 独占打开 + netstat** 三路互证（§6.2）。
+
+§11 交付物身份（当轮现算；引用请重算）
+--------------------------------------------------------------------------------
+1. `src/main/java/com/shadowHunterRolesPlugin/platform/BukkitSchedulerAdapter.java`
+   = **3508 B / 69 行 / 20:01:00 / `3DC66F6013F9CA1BAA9F049D66DD05E82C2C58A9B9949A545CF916D1CAE031C5`**
+2. `src/main/java/com/shadowHunterRolesPlugin/command/RoleCommand.java`
+   = **31289 B / 581 行 / 20:01:22 / `E356303A7D1177E3CCB3B4F13F28ECC1B8F41ED0CD1D636DCA203021A72A8D41`**
+   > 行数口径：= 文件内换行符计数（`read` 工具与 `Get-Content` 一致）。若用"按 `\r?\n` 切分"的写法会多算 1
+   > （文件尾换行产生一个空元素）—— 本节两处数字**均为前者**（初版曾误记为 70 / 582，已按此口径更正）。
+3. `debug-logs/测试记录/阶段5-起服日志-调度器迁移.log`
+   = **6135 B / 20:03:20.718 / `C8912D2C8FAC5919E53CFA7491B1FBC037A91D773B87DA8BACEFB8DB88E68CC6`**
+4. 本文件 `debug-logs/测试记录/阶段5-调度器迁移-停服物证.txt`（身份见交卡 output）
+5. 仓库外工具（**未写入仓库**）：`%TEMP%\t51b-role-lifecycle-runner.js` · `%TEMP%\t51b-sched-bot-out.txt`（§4 逐字来源）·
+   `%TEMP%\t51b-role-lifecycle-out.txt`（§5 逐字来源）；工装 `.scratch\bot\t51b-build.log` · `t51b-multiset.txt` ·
+   `logdelta-t51b*.txt` · 快照 `src-snapshots\t51b-before\`
+6. 构建：`BUILD SUCCESSFUL in 11s` · jar **146010 B / 20:01:38.935 / `163F1D8C…`** · 最新 `.class` @20:01:38.599 · `src 新于 jar = 0`
+================================================================================

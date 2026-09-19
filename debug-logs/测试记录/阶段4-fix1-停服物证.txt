@@ -1,0 +1,85 @@
+================================================================================
+阶段 4 追补 · fix1（I-15 容器直派 + I-14 重入护栏 + F6 死路径收口）
+—— 起服/停服物证（**当轮即时记录**；
+   两份运行：run A = 注释补充前的 jar，run B = **最终产物 jar**）
+================================================================================
+
+编制：eng-收尾          记录方式：**每次停机后立即在本轮会话内实测并落盘**（非事后补记）
+文件位置：`debug-logs/测试记录/`（按 `.gitignore` 约定：测试记录文件夹内的日志/证据正常跟踪，无需 `git add -f`）
+
+--------------------------------------------------------------------------------
+§0. 两次运行与两份日志的角色（**引用时以此为准**）
+--------------------------------------------------------------------------------
+| 运行 | 何时 | 对应 jar 身份 | 日志（冻结件） | 角色 |
+|---|---|---|---|---|
+| **run A** | 19:18–19:20 | 135249 B / 19:17:04 / `94F7C59A33AF51ADC1F0CA06FCCE17F98197546FB414649C682DAA517103E66D` | `debug-logs/测试记录/阶段4-起服日志-fix1.log` = 6075 B / 19:20:00 / `4298E23CF5D5E96A73201517FFCFC181407E7A4B458957BACF77A67CE23E4AA3` | 逻辑批（I-15/I-14/F6）的运行证据 |
+| **run B**（**权威**） | 19:21–19:22 | **135243 B / 19:21:45 / `9591E67737A2CFD5B327B109A90F7E95E697FE1D17D6CB40CFB2EAB0BBD5266C`** | `debug-logs/测试记录/阶段4-起服日志-fix1b.log` = **6078 B / 19:22:36 / `03F28ECA5C4794FBA5F9BB2691E29363D3B72F5DFBE9B05D6BAED26835B84882`** | **最终产物**（含"为什么不与 `currentSanTE` 比较"的注释补充）的运行证据 |
+
+- **为什么有两次**：注释补充后源码变化 ⇒ 重建 ⇒ jar 身份变化（javac 丢弃注释、**字节码语义不变**；差异来自 jar 条目时间戳/压缩）。
+  按"仪器纪律：改动后重跑自检"，**以 run B 为权威**；run A 保留为本批逻辑批的对照证据。
+- 两次运行的**三行齐、集合差、停服判定全部一致**（各自见 §1/§2 对应小节）。
+
+--------------------------------------------------------------------------------
+§1. 起服（Mode B）—— 两次运行
+--------------------------------------------------------------------------------
+[1.A-1] 起服命令：`$env:GRADLE_USER_HOME="<repo>\.gradle-work"; .\gradlew runServer --console=plain`
+        （后台作业；**起服前均已广播"我要起服"**）
+[1.A-2] run A 三行齐（逐字）：
+        [19:19:32] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+        [19:19:32] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+        [19:19:33] [Server thread/INFO]: Done (18.078s)! For help, type "help"
+[1.A-3] run A 冻结日志 = 见 §0 表（19:20:00 冻结，**停机前**）
+[1.A-4] run A 集合差（`log-delta.ps1`，锚 `debug-logs/测试记录/阶段4-起服日志-T2b.log`，只看 C）：
+        anchor 13 / current 13；**ADDED 0 / REMOVED 0 / C = 0**
+[1.B-1] run B 三行齐（逐字）：
+        [19:22:29] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+        [19:22:29] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+        [19:22:29] [Server thread/INFO]: Done (18.061s)! For help, type "help"
+[1.B-2] run B 冻结日志 = 见 §0 表（19:22:36 冻结，**停机前**）
+[1.B-3] run B 集合差（同锚、同工具，`-Tag fix1b`）：
+        anchor 13 / current 13；**ADDED 0 / REMOVED 0 / C = 0**
+
+--------------------------------------------------------------------------------
+§2. 停服（**当时实测**，非事后）—— 两次运行
+--------------------------------------------------------------------------------
+[2.A-1] run A：`job_kill <作业>` —— **只 job_kill + 等待，未强杀 java**
+[2.A-2] **run A 停服完成判定 @ 19:20:14**：`[System.IO.File]::Open('run\logs\latest.log','Open','Read','None')`
+        = **打开成功（True）** ⇒ 持有者（Paper）已收尾
+[2.A-3] run A @19:20:14：`25566` 监听 = **0**；java 共 3 个（19:01:13/19:01:35/19:01:40 = Gradle daemon）；
+        **启动于 19:18 之后的 java 进程 = 0**
+[2.B-1] run B：`job_kill <作业>` —— 同上，未强杀 java
+[2.B-2] **run B 停服完成判定 @ 19:22:50**：`latest.log` 以 `FileShare.None` **独占打开成功（True）**
+[2.B-3] run B @19:22:50：`25566` 监听 = **0**；java 共 3 个（同上 Gradle daemon）；
+        **启动于 19:22 之后的 java 进程 = 0**；`latest.log` = 6077 B / mtime 19:22:31（自稳态起未被写入）
+
+--------------------------------------------------------------------------------
+§3. 本批代码身份（供物证配套引用）
+--------------------------------------------------------------------------------
+[3.1] 改动面 = **3 个 src 文件**（工作树现算，未做 git 写）：
+      `core/RoleInstance.java` = **31797 B / 772 行 /
+      `CBE62F1C38547397E0120FABFE0478567134DD1CE4EF2D950E31111C1E727E5D`**
+      （含 §3.2 的注释补充；此前为 30726 B / 764 行）
+      `listener/RoleEventListener.java` = 803 B / 17 行 /
+      `B3072B841F951D986A5823651B7DA9983A6FB0F532DA959CD78E07AFFDED85F4`
+      `roleComponent/DefaultSanTEZeroPunishment.java` = 6823 B / 152 行 /
+      `C57678F8423C78962E73AAA09C012C632FE06104C2EA7739410803D71C0D5E5F`（仅 javadoc 引用改名 1 行）
+[3.2] **注释补充（队长裁定第 2 条，仅注释、逻辑未动）**：`dispatchSanTEChange` 的 javadoc 增加
+      "`notified` 机制（**为什么不能拿 `currentSanTE` 比**）"条目（初值 = 本次 `newSanTE`、每补发一次更新为
+      `target`、循环退出条件 = 哨兵 `Integer.MIN_VALUE`），并在 `int notified = newSanTE;` 上方加两行内联注释，
+      明写"**不要**改成与 `currentSanTE` 比较：`setCurrentSanTE` 先写字段后派发 ⇒ 重入时比较恒假 ⇒ 补偿退化为死代码"。
+[3.3] 构建（run B 之后重建）：`BUILD SUCCESSFUL in 12s`（`-x copyPluginJar`）；
+      jar = **135243 B / 19:21:45 / `9591E67737A2CFD5B327B109A90F7E95E697FE1D17D6CB40CFB2EAB0BBD5266C`**；
+      `RoleInstance.class` @19:21:44；**`src 新于 jar = 0`**
+[3.4] 双口径（`.scratch\bot\numeric-multiset.ps1 -Mode both`，比较开工前快照 ↔ 现 src，`-Tag fix1-final`）：
+      **numeric 379 → 379（diff 0）**、**string 180 → 180（diff 0）** ⇒ **零字面量变化、(d) 申报 0 条**
+[3.5] 运行深度声明：**只到「插件启用 + 服务器空闲（Done）」**；
+      **无玩家登录、无选角色、未实测 SanTE 派发路径**（本批为容器侧派发改造，其运行期行为需玩家/组件触发覆盖）
+
+--------------------------------------------------------------------------------
+§4. 边界
+--------------------------------------------------------------------------------
+- 本文件为**当轮即时记录**（run A @19:20:14、run B @19:22:50 两次实测）；两次日志冻结均发生在各自停机**之前**。
+- 未伪造任何"控制台停服行"：本批 `job_kill` 路径不产生可归档的 `Stopping server` 行 ⇒ 停服判定以 §2.* 的
+  「日志独占读成功 + 端口 0 + 无本批 java 进程」三条独立实测为准。
+- 本批**未改 `event/**`、`api/**`、`ComponentServices`（10 成员）、`ShadowHunterRolesPlugin.java`（注册行）**。
+================================================================================

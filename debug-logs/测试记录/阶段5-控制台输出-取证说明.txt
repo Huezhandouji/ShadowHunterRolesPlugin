@@ -1,0 +1,163 @@
+================================================================================
+t63 · 调试指令**控制台输出**的「取证 + bot 冒烟」轮 —— 交付说明
+—— 会话 2026-09-18 21:48:55 → 21:55:4x（单次起服 + 两处冻结）· 文档撰写 21:5x
+—— 执行者：eng-取证（卡 `t63` / attempt `f9e028f1`）· 被验制品 = `0F2D901C…`（**提交态**）
+   ① 自绑定（commit + jar + 日志身份 + F1 链）← 本卡要补的**缺口②** · ② 执行链与判据
+   ③ 运行级判据（bot 冒烟双路径 + op 门控双窗）· ④ 工装身份与两处自曝 · ⑤ 申报 · ⑥ 红线自检
+—— ⚠ **修订注记（2026-09-18 22:0x，经队长授权 (a1)+(a2)；本次只改本行、§3 的 [3.5] 与 §5 的 [5.8]，正文其余部分逐字未改 ✓）**：
+   本件**取代旧版** ✗ —— 旧版（提交内）= `13865 B / 138 行 / SHA256 09D43F7A6CE92875F001B93D847F88CBA1DD25683B02986C82D8BD1DCF6C2FF1`
+   （= 提交 `643302d` 的历史版本，**仅存留痕** ✗）；本次修订前的一版（本会话内、未提交）= `15381 B / 149 行 / SHA256 A31F741A7DE0E409E58578F75828821FCA51434FE94E1A888A3B9A3CED9CF3C1`（**同仅存留痕** ✗）
+   ⇒ 现行引用请用**本件新身份**（见交付报文）✓。
+================================================================================
+
+§0 结论摘要（一句话）
+--------------------------------------------------------------------------------
+`t61` 新加的**控制台出口**（`[command-debug]`）已在**提交态制品**上取得完整运行证据：
+Mode B 三行齐 ✓ · 正序集合差**只看 C = 0** ✓ · **仍在线时先冻结**、随后才 `job_kill`、停服三路互证 ✓ ·
+制品归档 + `MANIFEST.txt` 追加**登记 5** ✓ · **bot 冒烟**（mineflayer）同时捕获 **chat 与 [command-debug] 两条路径** ✓、
+**op 门控在 Tab 补全与命令输出两侧成立** ✓（含"非 op 窗口 `[command-debug]` = 0"）· 断言 **failed = 0** ✓ ·
+**本文件自绑定** commit + jar SHA256 + 日志身份 + F1 链 ⇒ `t59` 那轮的缺口②在本轮**已补齐** ✓。
+
+§1 ⭐ 自绑定（缺口②的修复：物证不靠 mtime"暗示"，而写明身份）
+--------------------------------------------------------------------------------
+[1.1] **commit**（起服那一刻的 HEAD，现算）：
+      `git rev-parse HEAD` = **b42d775aef2f7163ffcc34c39e5af2a93a655bf8**
+      提交主题 = "checkpoint: debug commands write the same text to chat and to the server console under a
+      command-debug prefix, with the runtime evidence taken in the same round, while the player-visible text
+      stays unchanged"
+      `src/main` tree = **beed92cb9997049d8b086f164b9f386a74eae1ba**
+[1.2] **jar**（本轮被验制品，工作树与归档件**逐字节相同**）：
+      `ShadowHunterRolesPlugin-1.0.0-verified-20260918-214102-0F2D901C.jar`
+      bytes = **159652** · mtime = **2026-09-18 21:41:02.153**
+      SHA256 = **0F2D901C6B6FE301E32CDA2B52C7377E940F8C6D058A7E96B6B92D1C3377DF74**
+[1.3] **日志身份**（本轮主冻结，卡面证据件）：
+      `阶段5-起服日志-控制台输出-取证.log` = **39033 B / 223 行 / 2026-09-18 21:55:30.018**
+      SHA256 = **972AAE6E90A5B8D11268265956E8FE482B44397FF9F72625BB37D2A55BF7D326**
+[1.4] **F1 链（制品 → 日志 → 物证）**：
+      jar `21:41:02.153` **<** freezeA `21:49:37.907` **<** freezeB `21:55:30.018` **<** 本说明（21:5x） ✓
+      ⇒ 证据**晚于**其制品，且物证内**写明**该 jar 身份（不靠 mtime 推断）✓
+[1.5] **提交一致性（机械证明）**：取证时刻 HEAD 已推进为 `889e95c1b47a249150e9f7e3091e82b4bc0d9dee`
+      （该提交只改 `debug-logs/测试记录/协同规范-起服停机取证.txt`，按我被指出的"忽略子树判据真空"问题加固规范）
+      ⇒ `git diff --name-only b42d775 889e95c -- src` = **0 个文件**，且两提交的 `src/main` tree **逐字相同**
+      ⇒ 制品对应的源码在两次提交间**未变** ✓（故本证据对两个 commit 同时成立）。
+
+§2 执行链（闸门式；每步的读数都在此）
+--------------------------------------------------------------------------------
+[2.1] **起服前三路核查**（§1.2，21:48:0x）：`netstat 25566` 行 = 0（`LISTENING` = 0）· `TcpClient.Connect` = 失败 ·
+      java 进程仅 daemon 量级 ⇒ 窗口空闲 ✓。上一占用者（`t61` 开发轮）**主冻结件已落盘**（21:43:14）且
+      **停服物证已写**（21:45:02）⇒ 其窗口已自行收口，本轮起服覆盖 `latest.log` **不破坏其证据** ✓。
+[2.2] **新基线**（编辑停止那一刻取）：`t59-baseline-and-scoped-criteria.ps1 -Name t61-final-before`
+      HEAD = `b42d775` · 快照 = **91 个 .java** + `SHA256.txt`（**12713 B / 91 行**）
+      · `untracked src` = **0** · `src porcelain lines` = **0** · 最新 src mtime = `21:40:43.952`（早于提交）
+      · 白名单形态判据：探针输出锚**白名单外 = 0** ✓（授权文件内 32 / 28 条，属设计内）
+[2.3] **构建口径（不重建，理由见 §5.2）**：`gradlew build -x copyPluginJar` = **BUILD SUCCESSFUL**，
+      且`compileJava / classes / jar / build` **全部 UP-TO-DATE** ⇒ 工作树制品 = 提交态源码的制品 ✓。
+[2.4] **取证会话**（单次）：`gradlew runServer`（后台作业）→ `Done (14.701s)`
+      → **freeze A**（仍在线；Mode B 权威件）→ **bot 冒烟**（同一会话）
+      → **freeze B**（仍在线；卡面证据件，含冒烟产生的全部锚行）→ 只 `job_kill` → 停服三路互证 → 正序集合差 C = 0
+      （顺序与身份详见 **`阶段5-控制台输出-停服物证.txt`** §1–§4）
+[2.5] **双冻结设计的理由**：卡面同时要求 ①"仍在线时先冻结"与 ②"bot 触发后能在**冻结日志**里 grep 到锚行"
+      ⇒ 单会话两处冻结：freeze A 作 Mode B 权威件，freeze B 为**超集**（含冒烟锚行）并入卡面路径 ⇒ 两条同时满足 ✓。
+[2.6] **Mode B 三行齐**（freeze B 内现算）：
+      `Enabling ShadowHunterRolesPlugin v1.0.0` · `ShadowHunter Character System enabled.` · `Done (14.701s)! …` ✓
+[2.7] **级别字段锚定的 ERROR/SEVERE 扫描** = **0** ✓
+      （**不用裸词 `ERROR`** ✗：`oshi … COM exception … Error was -2147217405` 那 3 条 oshi WARN 正文会假阳性 ——
+      规范 §5 族 10 的实测来源即此。）
+[2.8] **正序集合差**：`log-delta.ps1 -Anchor 阶段4-起服日志-T2b.log -Current <freeze B>`
+      ⇒ anchor 13 / current 13 / ADDED = 0 / REMOVED = 0 / **C) OTHER = 0** ✓（判据非真空：锚件有 13 行严重行）
+[2.9] **归档**：本轮被验制品 = **已归档的 `0F2D901C…`**（与工作树 `build/libs` 逐字节相同：bytes 159652 /
+      mtime 21:41:02.153 / SHA256 一致）⇒ **无需重复复制**（同一字节制品不重复归档）
+      · `MANIFEST.txt` 追加 **「登记 5」**（**一行一值**，未改「登记 4」✓）
+      · MANIFEST 现算 = **6612 B / 64 行 / SHA256 `F32EA1CF2E5949452B96D83C40F5CEC8D0748802B0F4062F02BC57D14BDBFE46`**
+
+§3 运行级判据（bot 冒烟：chat 与 [command-debug] 两条路径 + op 门控两侧）
+--------------------------------------------------------------------------------
+工装 = `t63-smoke-runner.js`（**22587 B / SHA256 `AD8434122018B8597923821C43F7A2147A383939004768A7B5C8E00AA7AE0F8E`**，
+`--selftest` = **ok 9 / bad 0 / exit 0**）；三轮实测的最终轮 **exit = 0 · failed = 0** ✓。
+
+[3.1] **op bot（`HueZhandouji`，`run/ops.json` level 4）**
+      · Tab 补全（`tabComplete(text, true, false)`，结果已按**真实返回形状**归一化）：
+        `/role ` → `[clear, debug, energy, help, set]` · `/role debug ` → **`[cooldown, sched]`**
+        `/role debug cooldown ` → `[end, restart, status]` · `/role debug sched ` → `[all]`
+      · 冷却四态（`status` / `end` / `restart` + 用法/默认支）：`[cooldown] … | cooling=` / `returned=` /
+        `RESTARTED dispatched` / `ENDED_BY_COMPONENT dispatched` / `newRemainingTicks=` 逐字入 chat **且**入控制台
+        （解析出目标组件 id = **`meiqihezi_skill_unconcern`**、槽位 = **1**）
+      · 调度探针 `/role debug sched all`：chat 侧与**冻结日志**侧同时含
+        `[sched]` · `matrixAllPairsMatch=` · `portLegEquivalent=` · `CONCLUSION=` ✓
+[3.2] **op 门控（Tab 补全侧）**
+      · 正对照（证明仪器可用，避免"空结果假通过"）：**op** `/role ` 含 `debug` ✓ 且 `/role debug ` 非空 ✓
+      · 非 op：`/role debug ` 与 `/role debug cooldown ` 均**未提供任何调试话题** ✓
+        （实测形态 = **服务端对"空补全列表"不回包** ⇒ 客户端 5 s 超时；同 bot 的 `/role ` **有回包且含 `debug`** ✓
+         ⇒ 差分成立：**门控只作用在 debug 话题层**，与 `DebugCommand.onTabComplete` 的 `!isOp → List.of()` 一致）
+[3.3] **op 门控（命令输出侧）**：非 op 发 `/role debug sched all`、`/role debug cooldown status|end 0`
+      ⇒ chat 只得到 `You do not have permission to use this command.` ✓（逐字），**无任何 `[sched]` 输出** ✓、
+      **无 `[cooldown] … cooling=` 载荷** ✓
+[3.4] **op 门控（控制台侧，双窗偏移切分）**：op 窗控制台片段 **10462 字符**、非 op 窗 **720 字符**；
+      非 op 窗内 `[command-debug]` 计数 = **0** ✓ ⇒ **用户要求的出口不会对非 op 泄漏到日志** ✓
+[3.5] **端口链与 verdict 明细（本轮实测，逐项现读冻结件）** ✓
+      · `portLegEquivalent=true` × **6** ✓（`=false` × **0** · `SKIPPED` × **0** ⇒ **该腿真跑了**，
+        不是"被跳过却记成 false" ✗）；
+      · 逐字：`… | matrixEquivalent=true | portLeg=autoRecoverEnergy_passive,portFirstSecond=1/11 | portLegEquivalent=true | CONCLUSION=CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference …`
+        ⇒ **`portFirstSecond=1/11` 与 `t51` 那轮的历史参照逐字相同** ✓（因本轮 runner **先绑角色/服务再跑探针** ⇒ 该腿不被跳过 ✓）；
+      · 同轮其余维度全绿 ✓：`matrixAllPairsMatch=true` × 6 · `matrixEquivalent` · `sameThread` · `periodEquivalent` ·
+        `delayedEquivalent` · `cancelSemanticsOk` · `clampEquivalent` · `adapterDelayedEquivalent` · `adapterCancelOk` ·
+        `portLegEquivalent` × 6 · `CONCLUSION=CAN …` × 6；
+      · ⚠ **一处反向 `false` 的定性（防后人误读为回归）** ✗：`rawInitialDelayPolicySame=false`
+        —— 原文 = `global: initialDelay0=REJECTED(IllegalArgumentException: Initial delay ticks may not be <= 0) /
+        bukkit: initialDelay0=ACCEPTED` ⇒ 这是**裸 API 的策略差异**，且**已被适配器归一化**
+        （同行 `clampEquivalent=true` + `adapterDelayedEquivalent=true` + `CONCLUSION=CAN … zero visible difference`）
+        ⇒ **设计内差异、非回归** ✓（亦是 `t53/t57` 归一化措辞的**运行时印证** ✓）。
+
+§4 红线自检
+--------------------------------------------------------------------------------
+| 红线 | 结果 |
+|---|---|
+| 不删 jar + 重建已冻结代次 | ✓ 未重建（§5.2 给出充分理由；`7A21729B…`/`DBE04077…`/`53CBEB65…`/`0F2D901C…` 全部零接触）|
+| 不覆盖他人证据 | ✓ 本轮写入前，卡面路径 `阶段5-控制台输出-停服物证.txt` 的空位与同名件冲突**已由对方改名化解**（其件现名 `…-停服物证-开发轮.txt`，`1ABBCB91…` 不变）⇒ 本轮**未覆盖任何他人文件** |
+| 不做 git 写 | ✓ `git status` 仅显示卡面路径与工装副本的 `M`（由队长 `-f` 入库） |
+| 不改 `src` | ✓ 全程 `porcelain -- src` = 0；新增/修改仅 `debug-logs/**` 与 `.scratch/**` |
+| 不改历史证据文档 | ✓ 未触碰 `阶段5-控制台输出-说明.txt`（t61 同轮）、`阶段4-起服日志-T2b.log` 等既有件 |
+| 停机只用 job_kill | ✓（§2.2，未对 java 进程动手）|
+
+§5 申报（逐条：偏差、口径、以及我自己踩到的坑）
+--------------------------------------------------------------------------------
+[5.1] **① 放行口径（最重要）**：本轮起跑时**队长直投的【编辑停止】信号尚未到达** ✗。
+      依据 = 队长上一条报文**明确背书**的判据（"`command-debug` ∈ HEAD ⇒ 编辑停止"）。起跑瞬间现算：
+      `HEAD = b42d775` · `command-debug` ∈ HEAD = **4** · `porcelain -- src` = **0** · src mtime `21:40:43` < 提交 ✓。
+      **据实申报**：这是一次"机械口径放行"，非直投信号；若队长本意不同，本证据**自绑定 commit**，
+      不会污染任何既有代次，可整轮作废重跑。
+[5.2] **② 不重建（口径，非偷懒）**：见 §2.3 + 停服物证 §5.2。要点：代次已归档+登记 ⇒ §3.4 禁止删+重建；
+      重建会改 mtime ⇒ **反转「登记 4」的 F1 链**。本轮改为"同一提交态制品 + 自绑定 commit"。
+[5.3] **③ 工装自曝一次真实缺陷**（族 10 的完整形态）：my runner 第一版把 `bot.tabComplete()` 的返回当**字符串数组**，
+      而 mineflayer 4.39 实际返回 `[{match:"debug"}, …]` ⇒ **4 条正确的 op 补全结果被误报 MISMATCH** ✗。
+      更值得记的是：**我的 `--selftest` 没抓到它** —— 因为自测夹具当时也是字符串数组（"断言集与被测对象形状不一致"）。
+      处置：① 断言层加**形状归一化**；② 自测**新增对象形状夹具**（ok 8 → **9**）⇒ 修正后自测才能覆盖真实形状 ✓。
+[5.4] **④ 另两处自曝**：(a) 首次轮询 `Done (` 命中**上一轮遗留日志** ⇒ 假通过（见停服物证 §5.1）；
+      (b) 非 op bot 首版用户名 `smoke_probe_<6 位>` = **18 字符** > 离线名 16 字符上限 ⇒ **从未 spawn**（第一轮 exit 2）。
+      两者均已定位并修复（会话轮转 + 首行时刻证新鲜度；改名 `probe<6 位>`）。
+[5.5] **⑤ 忽略子树判据（我上报、队长已入规范）**：`.gitignore:84 = debug-logs/**` ⇒ 卡面 4 个 inScope 路径
+      **全在被忽略之树** ⇒ "`git ls-files --others --exclude-standard` 为空"在该树上**恒真 = 真空判据** ✗。
+      本轮改配可核证据：`git status --porcelain --ignored` + `git check-ignore -v`（并已在 §4 表中体现）。
+[5.6] **⑥ out-of-scope 写入（主动申报）**：为让工装随库留存，按队长指示把 **两份 runner 副本**写入
+      `debug-logs/测试记录/`（`t61-smoke-runner.js` = 8173 B / `E42015DE…`；`t63-smoke-runner.js` = 22587 B / `AD843412…`）。
+      两份均**逐字节**与 `.scratch` 原件相同（复制前后 SHA256 一致）。除卡面 4 路径外，**另加这 1 份保留件**
+      `阶段5-控制台输出-停服物证-开发轮.txt` 的**只读核对**（未改动其内容）。
+[5.7] **⑦ 本轮未做的判据（如实）**：未做"数值字面量多重集"比对（卡面未列；改动面为 `command/**` 的字符串出口，
+      t61 同轮件已给数值 diff = 0）；未做**双角色/战斗路径**冒烟（卡面只要求冷却四态 + 调度探针 + op 门控）。
+[5.8] **⑧ 工具申报（队长裁定：以自建 `t63-smoke-runner.js` 为准）** —— 交接包推荐的 `t61-smoke-runner.js` **只捕获 chat** ✗
+      （源码内除 dry-run 解析外**无任何 `run/logs/latest.log` 读取**）⇒ 达不到卡面"**同时捕获 chat 与新增的控制台日志两条路径**"
+      与"**op 门控（Tab 补全与命令输出两侧）**"的要求 ⇒ 故本轮以**自建 `t63-smoke-runner.js`** 为准（**经队长裁定** ✓）；
+      `t61-smoke-runner.js` **未用于本轮判定** ✗，仅作 chat 侧的备份/交叉对照件留存 ✓。
+      **自建设计三要点（均实测出数）**：① chat 与 `[command-debug]` **逐字双捕获** ✓；
+      ② **op/非 op 按偏移切窗**，非 op 窗断言 `[command-debug]` = **0** ✓（op 窗 10462 字符 / 非 op 窗 720 字符）；
+      ③ **Tab 补全带正对照**（op `/role ` 必含 `debug` ⇒ 先证仪器可用，避免"空结果假通过"）✓。
+      另：`--selftest` = **ok 9 / bad 0 / exit 0** ✓（含"空样本被拒"与"模拟 Tab / chat 泄漏被抓出"两类负样本）。
+
+§6 边界与证据落点
+--------------------------------------------------------------------------------
+- 卡面 4 路径：`阶段5-控制台输出-取证说明.txt`（本文件）· `阶段5-起服日志-控制台输出-取证.log` ·
+  `阶段5-控制台输出-停服物证.txt` · `debug-logs/回滚快照/jars/MANIFEST.txt`（登记 5）。
+- 工作区工装：`.scratch/bot/t63-smoke-runner.js` · `t63-smoke-transcript.txt` · `t63-freeze-A-online.log` ·
+  `src-snapshots/t61-final-before/`（91 文件 + SHA256.txt）。
+- 证据区均为 **gitignored**（`.gitignore:84`）⇒ 需队长 `-f` 入库 ✓。
+================================================================================

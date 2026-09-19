@@ -1,0 +1,329 @@
+阶段5 · 插件文档重写 —— 说明与登记
+==================================
+
+本文件是工程过程记录（位于 debug-logs/ 下）。docs/插件文档/ 里只保留使用者与开发者需要的内容，
+过程信息、判据自检与登记一律放在本件。
+
+一、交付物（现算身份）
+----------------------
+
+| 路径 | 字节 | 行数(ReadAllLines) | SHA256 |
+|---|---|---|---|
+| docs/插件文档/README.md | 18980 | 243 | （见结卡报文，按纪律本表不内嵌自身所属批次哈希） |
+| docs/插件文档/角色与技能.md | 23310 | 323 | 同上 |
+| docs/插件文档/架构与组件模型.md | 20497 | 261 | 同上 |
+| docs/插件文档/开发指南-新增角色或组件.md | 23372 | 383 | 同上 |
+| debug-logs/测试记录/日志与证据归档规范.md（迁入件） | 21211 | 223 | 68008694ED8CBDBF4A53F228526962DB785A89A74DE8738C43C0E8E31AF41D7E |
+| debug-logs/测试记录/阶段5-插件文档重写-说明.txt（本件） | — | — | — |
+
+注：上表字节数为结卡前最后一次现算；引用前请当场重算（Get-Item / Get-FileHash）。
+
+四份手册的定位：
+- README.md —— 服主与玩家：环境要求、构建安装部署、命令与权限、玩法速查、已知问题、文档地图。
+- 角色与技能.md —— 玩家与服主：两个角色的逐个组件清单（显示名 / 描述 / 冷却 / 能量 / 图标 / 实际效果）、通用机制、描述文字与实现数值的出入。
+- 架构与组件模型.md —— 开发者：分层、端口白名单、组件生命周期、施放管道、冷却契约、渲染契约、资源回收、平台层与对外接口、扩展点与硬性规则。
+- 开发指南-新增角色或组件.md —— 开发者：新增技能 / 被动 / 主武器 / 角色的步骤与可编译骨架、命令编写规范、提交前检查、目前不支持的能力、禁忌清单。
+
+二、迁出登记（旧路径 → 新路径）
+------------------------------
+
+迁出件：`docs/插件文档/日志与证据归档规范.md` → `debug-logs/测试记录/日志与证据归档规范.md`
+
+原始输出（逐条现算）：
+
+```
+bytes src=21211 dst=21211  sha src=68008694ED8CBDBF4A53F228526962DB785A89A74DE8738C43C0E8E31AF41D7E dst=<同值>  identical=True
+git -C ShadowHunterRoles add -f "debug-logs/测试记录/日志与证据归档规范.md"
+git add -f exit=0
+old path exists now? False
+git -C ShadowHunterRoles ls-files --error-unmatch "debug-logs/测试记录/日志与证据归档规范.md"
+"debug-logs/\346\265\213\350\257\225\350\256\260\345\275\225/\346\227\245\345\277\227\344\270\216\350\257\201\346\215\256\345\275\222\350\214\203.md"
+ls-files exit=0
+```
+
+- 迁入件**逐字节等于**原路径文件（搬家，不改内容）。
+- `debug-logs/**` 被 .gitignore 忽略 ⇒ 新路径必须 `git add -f` 才能保持"被跟踪"。
+  **这是本卡唯一一次 git 索引写**；本卡没有 commit、没有分支操作，HEAD 在开工与结卡时相同（`0c6930d`）。
+
+三、判据自检（开工前旧文档 vs 改写后新文档）
+------------------------------------------
+
+口径：所有检索用 `git -C ShadowHunterRoles grep -nE <模式> -- docs/插件文档`（大小写敏感、裸串；作用域 = 该目录）。
+- 旧侧 = **开工前**的 docs/插件文档（当时 5 份文档，含后来迁出的《日志与证据归档规范.md》），在任何编辑之前测量。
+- 新侧 = 改写后的 docs/插件文档（4 份文档）。
+
+| 判据 | 模式 | 旧侧命中 | 新侧命中 |
+|---|---|---|---|
+| A1 卡号与批次号 | `\bt[0-9]{1,2}\b`、`B[①②③④⑤⑥⑦⑧⑨]`、`T-[0-9]` | 60 行 | **0** |
+| A2a 阶段号 | `\b阶段\s?[0-9]` | 95 行 | **0** |
+| A2b 数字点数字 | `[0-9]\.[0-9]` | 175 行 | 11 行（逐行判定见第四节，全部为版本号） |
+| A3 协作语 | `队长\|队员\|本卡\|立卡\|结卡\|改派\|交接\|独立验证\|独立复核\|评审\|复核\|台账\|回滚\|申报\|口径\|判据\|回归\|硬约束` | 63 行 | **0** |
+| A4 过程文件名 | `debug-logs\|最终重构指南\|组件系统设计\|迁移清单\|交付小结\|协同规范\|任务卡编写指南\|实施指南\|取证` | 147 行 | **0** |
+| A5 元写作口径与过程记号 | `写作口径\|身份一律现算\|现算\|不要照抄\|移动靶\|未覆盖\|计划 ?≠\|✓\|✗\|⚠\|⭐\|eng-` | 52 行 | **0** |
+| A6 流程章节 | `复算命令\|自检清单\|判据集\|验收条目\|边界行为清单` | 10 行 | **0** |
+| verify 合并模式 | 卡面 verify(2) 的整条模式 | 208 行 | **0**（exit 1） |
+
+A3 逐词（旧侧出现次数，`git grep -o`）：
+
+```
+交接 3 · 独立验证 1 · 评审 10 · 复核 3 · 回滚 6 · 申报 1 · 口径 28 · 判据 20 · 回归 1 · 硬约束 8
+队长 0 · 队员 0 · 本卡 0 · 立卡 0 · 结卡 0 · 改派 0 · 独立复核 0 · 台账 0
+```
+
+如实申报：上列 0 的 8 个词在**旧文档里本来就没有** ⇒ 它们在本卡没有取得"旧侧非 0"的判别力证据，
+只能得出"新侧 0 命中"这一半结论；A3 作为**整条模式集**的判别力由非 0 的 10 个词提供（63 行）。
+
+仪器侧证（防止命令行 CJK 转码造成假绿 0）：在同一份确实含痕迹的文件
+（`debug-logs/测试记录/日志与证据归档规范.md`，即刚迁入的那份）上，**内联 CJK 模式**与**落盘模式文件**
+（`git grep -f`）逐条同值：
+
+```
+inline A3 : exit=0 lines=15       file A3 : exit=0 lines=15
+inline A5 : exit=0 lines=16       file A5 : exit=0 lines=16
+inline verify pattern: 91         file verify pattern: 91
+```
+
+⇒ 内联 CJK 模式可信，新侧的 0 命中不是"模式没匹配上"造成的。
+
+四、A2b 逐行判定（`[0-9]\.[0-9]`：新侧 11 行，逐行给判定）
+--------------------------------------------------
+
+命令：`git -C ShadowHunterRoles grep -nE "[0-9]\.[0-9]" -- docs/插件文档`
+
+| 位置 | 命中串 | 判定 |
+|---|---|---|
+| README.md:42 | 1.21.11（两处：api-version / minecraftVersion） | 版本号语境 ✓ |
+| README.md:44 | 1.21.11-R0.1-SNAPSHOT | 版本号语境 ✓ |
+| README.md:45 | gradle-9.6.1-bin、3.0.2（run-paper）、2.4.0（Kotlin） | 版本号语境 ✓ |
+| README.md:49 | 1.0.0（工程 version、jar 名） | 版本号语境 ✓ |
+| README.md:53 | 1.0.0 | 版本号语境 ✓ |
+| README.md:70 | 1.0.0（jar 名） | 版本号语境 ✓ |
+| README.md:79 | 1.21.11 | 版本号语境 ✓ |
+| README.md:85 | 1.21.11 | 版本号语境 ✓ |
+| README.md:86 | 1.0.0（jar 名） | 版本号语境 ✓ |
+| 开发指南-新增角色或组件.md:21 | 1.21.11 | 版本号语境 ✓ |
+| 开发指南-新增角色或组件.md:24 | 1.0.0（jar 名） | 版本号语境 ✓ |
+
+判定结论：11 行全部为版本号（服务端版本 / 编译依赖版本 / 构建工具版本 / 工程产物版本）。
+手册正文里**没有**任何非版本语境的小数（冷却与时长一律写成整秒或刻数；秒数格式统一写作 ` x.xs`；
+数值口径用"整数 + 文字"表达，避免易漂移的读数进手册）。
+
+五、A12 复核表：旧文档里每一条「已知限制 / 边界行为」的现行结论
+--------------------------------------------------------------
+
+判据列一律给「文件 + 符号」；处置列说明它在**新手册**里的去向。
+
+（1）来源：`docs/插件文档/README.md`（旧）「命令的边界行为」8 条
+
+| 旧条目 | 现行结论 | 判据（文件 + 符号） | 处置 |
+|---|---|---|---|
+| 控制台不能用 | 仍成立 | `command/RoleCommand.onCommand` 的 `sender instanceof Player` 分支 | 保留（手册「命令一览」） |
+| 帮助文本不全（只列 set/clear） | 仍成立 | `command/HelpCommand.sendHelp`（5 行文案） | 保留（「已知问题」第 8 条） |
+| `plugin.yml` 的 usage 与实际不符 | 仍成立 | `src/main/resources/plugin.yml` 的 `usage: "/role <list\|choose\|info>"` | 保留为「已知问题」并注明"修正它需要改 plugin.yml" （第 5 条） |
+| 能量数字非法则静默 | 仍成立 | `command/EnergyCommand.handleSetEnergy` 的 `NumberFormatException` 分支 | 保留（边界行为表） |
+| 目标玩家离线/找不到 | 仍成立（文案逐字一致） | `EnergyCommand`、`ClearRoleCommand`、`SetRoleCommand` 的目标解析分支 | 保留（边界行为表） |
+| 目标没有角色 | 仍成立，且**分两种文案**：能量查询恒为 `<名字> has no role!`；清除自己为 `You have no role yet!`、清除别人为 `[<名字>] has no role yet!` | `command/EnergyCommand.handleGetEnergy`、`command/ClearRoleCommand.handleClear` | 保留（边界行为表，已按代码细分） |
+| 角色 id 不存在 | 仍成立 | `command/SetRoleCommand.handleSet` | 保留（边界行为表） |
+| 设角色成功回显 | 仍成立 | `command/SetRoleCommand.handleSet` | 保留（边界行为表） |
+
+（2）来源：`docs/插件文档/README.md`（旧）「已知限制与注意点」7 条
+
+| 旧条目 | 现行结论 | 判据（文件 + 符号） | 处置 |
+|---|---|---|---|
+| 掉线角色不保留 | 仍成立 | `listener/PlayerListener.onPlayerQuit` → `RoleManager.clearRole` | 保留（「已知问题」第 1 条） |
+| 死亡清角色时装备被动无条件清空四个装备槽 | 仍成立 | `roleComponent/meiqihezi/passive/MeiqiheziEquipmentsPassive.stop`、`roleComponent/red/RedEquipmentsPassive.stop` | 保留（第 3 条） |
+| 主武器攻击玩家时无条件进入冷却 | 仍成立（两个武器都在攻击分支里启动冷却） | `MeiqiheziJuejueMainWeapon.onAttack`、`RedSanctifiedBladeMainWeapon.onAttack` | 保留（第 4 条） |
+| `/role` 无参数、`/role energy set abc` 静默 | 仍成立 | `RoleCommand.onCommand`（args.length == 0 分支）、`EnergyCommand.handleSetEnergy` | 保留（第 6 条） |
+| `plugin.yml` usage 文案未实现 | 仍成立 | 同（1）第 3 行 | 保留（第 5 条，含"另需修 plugin.yml"） |
+| 没有配置文件，改数值必须重编译 | 仍成立（`resources/` 下只有 `plugin.yml`；全仓无 `saveDefaultConfig`） | `src/main/resources/`、`ShadowHunterRolesPlugin` | 保留（第 2 条） |
+| 能量无范围校验回显，但写入被 clamp | 仍成立 | `EnergyCommand.handleSetEnergy` → `core/RoleInstance.setCurrentEnergy` 的 `Math.clamp` | 保留（第 7 条） |
+
+补充（旧 README「权限清单」两条断言）：**没有声明任何权限节点**（`plugin.yml` 无 `permissions:` 段）与
+**代码里没有任何权限检查**（全仓 `hasPermission` 0 命中）—— 两者现算仍成立，已并入新手册「权限」一节。
+
+（3）来源：`docs/插件文档/角色与技能.md`（旧）「文案与代码数值不一致」10 条 —— **10 条全部仍成立**
+
+| 旧条目 | 现行结论 | 判据（文件 + 符号） | 处置 |
+|---|---|---|---|
+| 缓慢 III vs amplifier 3（= IV 级） | 仍成立 | `RedEvilShockSkill` 的 `SLOWNESS.createEffect(61, 3)` | 保留（手册最后一节） |
+| 3 秒致盲 vs amplifier 1（II 级） | 仍成立 | 同上 `BLINDNESS.createEffect(61, 1)` | 保留 |
+| 生命恢复 5 / 力量 2 vs amplifier 5 / 2 | 仍成立 | `RedDeeplySorrowSkill` 的 `REGENERATION.createEffect(45, 5)`、`STRENGTH.createEffect(45, 2)` | 保留 |
+| 「五秒后」vs 200 刻（10 秒） | 仍成立 | `AutoRecoverSanTEHealthPassive.update` 的 `noEnemySurroundTime >= 200` | 保留 |
+| 「周围 10 格没有敌人时」未提等待时长 | 仍成立（同样 200 刻门槛） | `AutoRecoverEnergyPassive.update` | 保留 |
+| 装备被动描述是占位词 `ccb` | 仍成立 | `MeiqiheziEquipmentsPassive`、`RedEquipmentsPassive` 构造参数 | 保留 |
+| 二技能「三段突进」vs 实际 4 次 | 仍成立 | `MeiqiheziBloodySlashSkill` 的 `count >= 4` | 保留 |
+| 流血抗性注释写作"抗性 1" vs amplifier 1（II 级） | 仍成立 | `RedBleedPassive` 的 `RESISTANCE ... 100, 1` | 保留（并入等级口径说明） |
+| 惩罚被动显示名/描述为 null | 仍成立 | `DefaultSanTEZeroPunishment` 构造参数传 `null, null` | 保留 |
+| `red` 角色描述只有 3 行（第 4 行被注释） | 仍成立 | `RoleLoader.redBuilder` 中被注释的 `Component.text(...)` | 保留 |
+
+（4）来源：`docs/插件文档/开发指南-新增角色或组件.md`（旧）「未定稿 / 待阶段 6 清单」9 条
+
+| 旧条目 | 现行结论 | 判据（文件 + 符号） | 处置 |
+|---|---|---|---|
+| `roles.yml` 数据驱动 + id 注册表 | 仍未实现 | `registry/RoleLoader` 是唯一装配点；`resources/` 无数据文件 | 保留（「目前不支持的能力」） |
+| `BuffType` 可注册 + 能力表 | 仍未实现 | `core/BuffType` 是固定枚举；`manager/BuffManager.canCastSkill/canUseMainWeapon` 写死 | 保留 |
+| `Faction` 可注册 + 关系策略 | 仍未实现 | `core/Faction` 是固定枚举；`RoleInstance.isHostileTo` 写死 | 保留 |
+| `RoleAPI` 破坏性变更 + 命令迁 Brigadier | 未实施；新顶层命令的 Brigadier 写法已写入手册 | `api/RoleAPI`、`ShadowHunterRolesPlugin.onEnable` | 保留（并新增「新增顶层命令」写法一节） |
+| 组件构造期注入 `svc`、删除 `bind` | **已落地**：构造期注入是唯一形态 | `roleComponent/RoleComponent` 构造函数 + `ComponentFactory.create`；全仓无 `bind(` | 旧条目失效 ⇒ 删除；手册按现状描述 |
+| `RequiresComponents` 声明式依赖校验 | 仍未实现（取不到组件返回 null） | `core/ports/ComponentLookup`、`ComponentLookupImpl` | 保留（「目前不支持的能力」） |
+| 统一渲染器接管（旧状态"当前只是骨架"） | **已落地**：渲染器是唯一渲染者，组件侧无渲染入口 | `core/hotbar/HotbarRenderer.render`（唯一写点）、`buildIcon` | 旧条目失效 ⇒ 删除；手册按接管后契约描述（渲染契约一节） |
+| 组件可读角色模板数据（maxHP/baseATK） | 仍未开放（端口里没有这条通道） | `core/ports/ComponentServices` 的 10 个成员 | 保留（「目前不支持的能力」） |
+| `BuffPort` 新增药水方法（旧写"当前代码里还没有"） | **已落地**：两个重载都在白名单里 | `core/ports/BuffPort` 的 `applyPotionEffect(...)` 两个重载、`core/BuffPortImpl` | 旧句失效 ⇒ 删除；手册在端口表里作为现状列出 |
+
+（5）来源：`docs/插件文档/架构与组件模型.md`（旧）「待做 / 在途」3 条
+
+| 旧条目 | 现行结论 | 判据（文件 + 符号） | 处置 |
+|---|---|---|---|
+| 残留清理：3 行 legacy 注释 + `Skill.onRightClick` 死声明 | 失效：基类已无该声明（全仓同名命中只剩监听器事件处理器） | `core/Skill`、`listener/MainWeaponListener.onRightClick` | 删除（不进手册） |
+| 设计上的统一渲染器接管 | 已落地 ⇒ 见（4）第 7 行 | `core/hotbar/HotbarRenderer` | 删除（改为现状描述） |
+| 已落地项 / 仍开放项（任务合并、冷却命名空间合并、测试源集、真实四行合格线等） | 已落地三项按现状写入手册；"仍开放"项属**内部工程事项**，不是使用者可见能力 | `core/RoleInstance.scanCooldowns`（到期扫描）、`core/CooldownPortImpl`（`end()` 真实语义）、`core/RoleInstance.triggerUpdate`（帧末重绘） | 内部工程事项不进手册；现状行为已写入「冷却」「渲染契约」两节 |
+
+（6）旧文档里的**历史叙述**（"当时是什么、后来改成什么"）一律不进手册：手册只写现状。
+涉及对象包括迁移期标记 / 双路径 / 旧回调 / 阶段编号与批次表 —— 它们不是"当前限制"，而是历史口径。
+
+六、A10 命令面对齐（每条给「代码出处（文件 + 符号）+ 手册对应处」）
+--------------------------------------------------------------
+
+| 手册处（README.md） | 代码出处 |
+|---|---|
+| 命令一览：子指令集合 `set` / `clear` / `energy` / `help` / `debug` | `command/RoleCommand` 构造函数（`registerSubCommand(new SetRoleCommand(...))` … `new HelpCommand()`）、字段 `subCommands`（TreeMap） |
+| 命令一览 / 调试子命令：两级路由（第一级后剥离参数交给子命令；`debug` 再分话题） | `command/RoleCommand.onCommand`（`System.arraycopy` 剥离）、`command/DebugCommand.execute`（话题路由 + 剥离） |
+| 权限：`debug` 仅 op，且**先于任何参数判断**；非 op 得到同一句拒绝文案 | `command/DebugCommand.execute` 的 `if(!player.isOp())`、常量 `NO_PERMISSION` |
+| 命令一览：Tab 补全现状（第一层子指令名；`set` 补角色 id；`energy` 补 `get/set`；`debug` 补 `cooldown/sched`，非 op 为空） | `command/RoleCommand implements CommandExecutor, TabCompleter` → `onTabComplete`；`command/SubCommand.filter`；`command/SetRoleCommand.onTabComplete`；`command/EnergyCommand.onTabComplete`；`command/DebugCommand.onTabComplete` |
+| 命令一览：别名 `/r` | `src/main/resources/plugin.yml` 的 `commands: role: aliases: [r]` |
+| 命令一览：非玩家执行被拒绝 | `command/RoleCommand.onCommand` 的 `sender instanceof Player` 分支 |
+| 命令一览：无参数静默 | `command/RoleCommand.onCommand` 的 `args.length == 0` 分支 |
+| 边界行为：`set` 参数个数不匹配静默 / `clear` 参数个数不匹配静默 | `command/SetRoleCommand.execute`、`command/ClearRoleCommand.execute` |
+| 边界行为：`energy` 无动作 → 统一报错；未知动作或参数个数不对 → 回退帮助文案 | `command/EnergyCommand.execute`（`HelpCommand.sendHelp` 复用） |
+| 边界行为：能量写入被夹到 `0..maxEnergy`、无回显 | `command/EnergyCommand.handleSetEnergy` → `core/RoleInstance.setCurrentEnergy` 的 `Math.clamp` |
+| 边界行为：帮助文案 5 行且不含 energy / debug | `command/HelpCommand.sendHelp` |
+| 调试子命令输出：`cooldown status/end/restart` 的输出行与槽位解析规则 | `command/DebugCooldownCommand.execute`、`resolveComponentId` |
+| 调试子命令输出：`sched` 的探针内容与"关键行同时写服务端日志" | `command/DebugSchedCommand.execute`、`DebugSchedCommand.sendKey`、`DebugCommand.log`（`[command-debug] ` 前缀） |
+| 命令一览：`/role` 由 plugin.yml + 主类 `setExecutor` 注册 | `ShadowHunterRolesPlugin.onEnable` 的 `getCommand("role").setExecutor(new RoleCommand(roleManager, roleRegistry))` |
+
+七、A11 渲染面对齐（每条给「代码出处（文件 + 符号）+ 手册对应处」）
+--------------------------------------------------------------
+
+| 手册处 | 代码出处 |
+|---|---|
+| 四态判定顺序：冷却 → 被禁用 → 能量不足 → 就绪 | `core/hotbar/HotbarRenderer.stateOf`、枚举 `core/hotbar/IconState` |
+| 唯一渲染者 / 唯一写物品点 | `core/hotbar/HotbarRenderer.render`（`inv.setItem`）；`RoleInstance` 只提供 `hotbarItemOf` 与状态输入 |
+| 置脏来源（施放 / 攻击 / 能量变化 / 冷却启动 / 控制效果移除 / 冷却到期 / 显式结束冷却 / 预约刷新） | `core/RoleInstance.handleCast`、`handleAttack`、`setCurrentEnergy`、`scanCooldowns`、`endCooldown`；`core/CooldownPortImpl.start`；`manager/BuffManager.removeBuff`；`RoleInstance.markHotbarDirty`（`hotbarRenderer::markDirty`） |
+| 帧末刷新：判脏 → 写物品 → 清脏；入口条件 `isDirty() \|\| hasCoolingSkill()` | `core/RoleInstance.triggerUpdate`、`hasCoolingSkill`；`core/hotbar/HotbarRenderer.isDirty/clearDirty` |
+| 技能冷却名带 ` x.xs`、主武器不带 | `HotbarRenderer.applySkill`（`String.format("%.1f", ...)` 仅此一处）vs `applyMainWeapon`（无后缀分支） |
+| 材质与颜色（就绪=组件图标 / 被禁用=BARRIER / 冷却与能量不足=STRUCTURE_VOID） | `HotbarRenderer.buildIcon` |
+| 描述行结构（状态行 → 分隔线 → 组件描述） | `HotbarRenderer.buildIcon` 的公共两行 + `applySkill/applyMainWeapon` |
+| 技能/武器物品不可丢弃、不可入容器 | `core/Skill.Utils.SKILL_KEY`（`skill_id`）、`core/MainWeapon.Utils.MAIN_WEAPON_KEY`（`main_weapon_id`）、`listener/SkillListener`（`onPlayerQDropSkillItem` / `onInventoryClick`）、`listener/MainWeaponListener`（`onQDrop` / `onInventoryClick`） |
+| 清角色/死亡/重生时清空带标记物品 | `core/RoleInstance.clearHotbar`、`listener/PlayerListener`（死亡 / 重生分支） |
+
+八、A13 每份文档的首段（面向人类读者，不含流程语）
+------------------------------------------------
+
+- **README.md**
+  > 这份文档写给**服主和玩家**。读完它你能做到三件事：把插件装到自己的 Paper 服务端上；知道玩家进服后能用哪些命令、怎么装配和切换角色；看懂热键栏里每个图标的含义与按键方式。
+  > 想了解内部结构、或者准备自己动手加角色与组件的开发者，请接着看同目录的 `架构与组件模型.md` 与 `开发指南-新增角色或组件.md`。
+
+- **角色与技能.md**
+  > 这份文档逐个列出本插件现有的**角色、技能、被动、主武器**：每个组件的显示名、描述、冷却、能量消耗、图标，以及它实际做了什么。写给**玩家和服主**：想知道「这个技能到底打多少伤害」「描述里的『五秒』是不是真的五秒」，答案都在这里。
+
+- **架构与组件模型.md**
+  > 这份文档写给**准备改这个插件的开发者**。读完它你能回答：一个角色从"模板"到"玩家身上的实例"经过哪些对象；一个技能被触发时经过哪条链路；组件能碰什么、不能碰什么；热键栏是谁在什么时候写的；清除角色时框架会回收哪些东西。
+
+- **开发指南-新增角色或组件.md**
+  > 这份文档写给**要往插件里加内容的开发者**。读完你能照着现有约定写出一个能编译、能装配、能在游戏里验证的技能 / 被动 / 主武器，或者新增一整条角色；也能按仓库的规范加一条命令。
+
+九、A9 文档地图核对
+------------------
+
+`docs/插件文档/README.md` 的「文档地图」列出 4 份文件；逐条现算（Test-Path）：
+
+```
+README.md => True
+角色与技能.md => True
+架构与组件模型.md => True
+开发指南-新增角色或组件.md => True
+```
+
+目录实际文件（Get-ChildItem，4 份 + 0 额外）：
+
+```
+README.md
+开发指南-新增角色或组件.md
+架构与组件模型.md
+角色与技能.md
+```
+
+两侧计数 = 4 / 4；地图里没有列出任何不存在的文件，也没有遗漏目录内的文件。
+
+十、边界、未涉及项与未覆盖项（如实申报）
+--------------------------------------
+
+**本卡未做（有意不做）：**
+1. 未改 `src/**`（`git status --porcelain -- src` = 0 行，开工与结卡同值）。
+2. 未动 `debug-logs/测试记录/` 下任何既有文件；唯一写入 = 迁入件（新路径）+ 本说明件。
+3. 未对 `debug-logs/**` 下的冻结证据做任何"旧路径清扫"（冻结件里的旧路径是"当时路径"，保持原样）。
+4. 未回改 `阶段5-勘误与读法说明.txt`（它属于勘误线，不属于手册线）。
+5. 未处理 `build/libs`、仓库根 `README.md`、`debug-logs/README-文档索引.md`（均不在本卡范围）。
+6. 未做 git 提交（提交权在队长）；未申请提权；未起服、未构建（本卡只改文档，不需要运行级动作）。
+7. `plugin.yml` 的 usage 文案与实际不符 —— **未改** `plugin.yml`，按裁定在手册「已知问题」里如实保留并注明需另行修正。
+
+**未覆盖项（真实缺口）：**
+1. 手册里描述的玩家可见行为（命令回显文案、热键栏四态外观、物品保护、按键触发）来自**源码阅读**，
+   本卡未在真实服务端逐条复跑；上一批的运行级取证覆盖的是渲染接管本身，不覆盖文档描述。
+2. 命令 Debug 子命令的实际刷屏输出未逐行核对（手册只描述输出要点与"关键行进日志"这一机制）。
+3. 手册未列出 `run/server.properties` 的调试端口等本机读数（属易漂移的本机配置，按写作口径不写）。
+4. 未复核 `api/RoleAPI` 的每个方法在实现类里的具体行为（手册只列方法族与"只增不改"原则）。
+
+十一、零 git 写与工作树状态（原始输出）
+------------------------------------
+
+```
+git -C ShadowHunterRoles rev-parse HEAD
+0c6930d5845b0255f4157f5abb505a96eb156c5f          ← 开工与结卡相同（本卡无 commit）
+
+git -C ShadowHunterRoles status --porcelain -- src
+（0 行）
+
+git -C ShadowHunterRoles status --porcelain -- docs
+ M docs/插件文档/README.md
+ M docs/插件文档/开发指南-新增角色或组件.md
+ D docs/插件文档/日志与证据归档规范.md
+ M docs/插件文档/架构与组件模型.md
+ M docs/插件文档/角色与技能.md
+
+git -C ShadowHunterRoles status --porcelain -- debug-logs/测试记录
+A  debug-logs/测试记录/日志与证据归档规范.md        ← 只有迁入件这一条
+
+git -C ShadowHunterRoles ls-files --error-unmatch "debug-logs/测试记录/日志与证据归档规范.md"
+"debug-logs/\346\265\213\350\257\225\350\256\260\345\275\225/\346\227\245\345\277\227\344\270\216\350\257\201\346\215\256\345\275\222\350\214\203.md"
+（exit 0）
+```
+
+十二、仪器
+----------
+
+- 读文本：read 工具 / `[System.IO.File]::ReadAllLines(<绝对路径>, UTF8)`；行数一律用 ReadAllLines；
+  **未**用 `Get-Content` 读 CJK 内容。
+- 检索：`git grep -nE`（大小写敏感、裸串）+ `git grep -f <模式文件>` 双路互证（见第三节）；
+  `git grep -o` 取逐词次数。
+- 文件状态：`Test-Path -LiteralPath`、`Get-Item`、`Get-FileHash -Algorithm SHA256`、`git ls-files`、`git status --porcelain`。
+- 临时工作区：`ShadowHunterRoles/.scratch/t8/`（已被 .gitignore 忽略，不入库）——
+  内含各判据的模式文件（`p-A1.txt` … `p-verify.txt`）与**旧侧命中原文**（`old-A1.out` … `old-verify.out`），
+  可用于复现第三节的旧侧计数。
+
+===============================================================================
+【队长追加 · 更正（不改原句）】
+-------------------------------------------------------------------------------
+上一段把复现材料指向 `ShadowHunterRoles/.scratch/t8/` —— 该目录被 `.gitignore` 忽略、**不在版本控制内**
+⇒ **在全新克隆里该指向会悬空**。这是 `t10` 独立复核的 **F-1（medium）**。
+
+**按 F-1 的 requiredFix（其一）处置**：**权威副本 = `阶段5-文档整理-独立复核报告.md` §2 / §3**（**已入库**）——
+该报告点名了**同一 commit（`0c6930d`）与 5 个 blob**，重建了 **8 组模式**并给出**两侧计数**
+（旧侧 **8/8 非 0** = `60/95/175/63/147/52/10/208`；新侧 **0**），且**独立复现出与本件逐字节相同的模式文件**。
+
+⇒ 本件前述 `.scratch/t8/` 的指向**自本行起视为「仅本地可复现、不入库」的辅助说明**；
+⇒ **引用复现路径请一律改用该报告 §2/§3**。
+
+**未把 `.scratch/t8/` 复制入库的理由**：其中内容是**派生件**（模式列表 + `grep` 输出），可由**点名的 commit / blob 重新生成**，
+不存在不可替代的原始转录 —— 与"原始转录必须入库"（台账 §12.3 第 4 条）的情形不同。
+===============================================================================

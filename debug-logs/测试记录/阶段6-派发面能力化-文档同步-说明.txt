@@ -1,0 +1,373 @@
+阶段6 · 派发面能力化 —— 文档同步 · 说明（t24）
+================================================================
+交付物：docs/插件文档/ 的 3 份活文档把 t22 造成的过时归属改准 + 组合例改对 + 本说明件
+本件位置：debug-logs/测试记录/阶段6-派发面能力化-文档同步-说明.txt
+（debug-logs/** 被 .gitignore 忽略 ⇒ 入库由队长 `git add -f`）
+
+────────────────────────────────────────────────────────────────
+第 0 节 · 一句话
+────────────────────────────────────────────────────────────────
+t22 把「派发面」改成按**能力接口**认组件（`handleCast` 判 `HotbarActionable`）并新增能力接口
+`CooldownAware`（承载 `onCooldownEnd` 与嵌套枚举 `CooldownEndReason`，`ActiveComponent` 已
+`implements CooldownAware`）。本卡把活文档里因此过时的 **4 行类型归属**逐行改准，并把「不必继承」的
+**组合例改对**（新组件要 `implements CooldownAware` 才收得到冷却结束回调、`implements HotbarActionable`
+才会被按键派发），同时守住零 AI 协作痕迹与初学者指南的术语克制两条口径。
+
+零 src 改动；零 git 写；未改任何既有证据与冻结件。
+
+────────────────────────────────────────────────────────────────
+第 1 节 · 身份（现算；含口径声明）
+────────────────────────────────────────────────────────────────
+【提交态】
+  · 本卡开工时 HEAD = 2b25fe8a82f7c069e4d78886127c4bf5838204b9（= 派发面能力化落地的那一代）
+    开工前 `git status --porcelain` = 0 行（t20 的文档已由队长入库 8b283a4）
+  · 本卡结卡时 HEAD = 9c034e692e5a767379b05da67ab8a4a02a492009
+    —— 本批期间队长又提交了两次（4313c3b、9c034e6），`git diff --name-status 2b25fe8 9c034e6` 只有 3 条 M，
+    **全在 `debug-logs/测试记录/`**（滚动台账 + t22 的两份证据件）；两代的 `src/main` tree **逐字相同**
+    （c4bf46b41819fc182a20a9dc3d8108e021dbc719）⇒ 与本批文档改动无关，也不改变本批任何判据读数。
+  · 本批未执行任何 git 写命令（无 add / commit / checkout / restore / stash / reset / switch）
+    ⇒ 改动**全部停在磁盘工作树**，由队长决定提交。
+
+【改动产物的身份】口径 = 落盘后的工作树字节数（CRLF 保留）+ SHA256（`Get-FileHash -Algorithm SHA256`）；
+行数仅作描述，口径 = `[System.IO.File]::ReadAllLines(…, UTF8)`（**不是** `Measure-Object -Line`，
+后者只数非空行）。下列读数与"改动面定稿后"的工作树同刻现算。
+
+  1) docs/插件文档/开发指南-新增角色或组件.md
+     32957 B · 2026-09-19 20:12:37.154 · 481 行
+     SHA256 90E3AB1BAC850BC1A9090DAA466BC0EAD22B7102C96AA30EEEEFB2191EAB473B
+  2) docs/插件文档/架构与组件模型.md
+     26461 B · 2026-09-19 20:12:55.592 · 296 行
+     SHA256 364C26FD6647A6C0D7EA5E8E807979858949561E57B13E0D5CB3958BA511D91E
+  3) docs/插件文档/角色与技能.md
+     25431 B · 2026-09-19 20:12:06.882 · 336 行
+     SHA256 94FC751C0D4F372B0F74F257AFA0655597EE5618DEDD5B3D5E6546BB3D6547E9
+
+【未改动的 inScope 文件（同刻现算，供复核"改动面最小"）】
+  · docs/插件文档/README.md                     19194 B · 244 行 · SHA256 930DEB8C804FD880535A043AEB0D826B76BA8000879E70A106B3091C476B242E
+  · docs/插件文档/初学者指南/01-插件简述.md       5492 B ·  98 行 · SHA256 6FE97C018BD2E3BA25D2A3A258DB2B4A89127621CD093A7C9FFF2EA2670B81BD
+  · docs/插件文档/初学者指南/04-如何创建一个自己的角色.md
+                                                19761 B · 380 行 · SHA256 6DAA6BC806C7AD9F75C40C260CC846E551B4D16F0CFABB68B3099100C7A9DB2C
+
+【本说明件自身的身份】件内不自指（写完才有最终值）；需要时由复核方按上面的口径现算 bytes + SHA256。
+
+────────────────────────────────────────────────────────────────
+第 2 节 · 改动面（逐文件 numstat + 未改文件逐条判定）
+────────────────────────────────────────────────────────────────
+命令：git -C ShadowHunterRoles diff --numstat -- docs
+原始输出（3 行，git 路径按 core.quotepath 转义为八进制，内容逐字照抄）：
+  13	5	"docs/\346\217\222\344\273\266\346\226\207\346\241\243/\345\274\200\345\217\221\346\214\207\345\215\227-\346\226\260\345\242\236\350\247\222\350\211\262\346\210\226\347\273\204\344\273\266.md"
+   6	6	"docs/\346\217\222\344\273\266\346\226\207\346\241\243/\346\236\266\346\236\204\344\270\216\347\273\204\344\273\266\346\250\241\345\236\213.md"
+   1	1	"docs/\346\217\222\344\273\266\346\226\207\346\241\243/\350\247\222\350\211\262\344\270\216\346\212\200\350\203\275.md"
+合计：3 个文件 · +20 / −12。
+
+逐文件说明（改了哪几处 / 为什么属于本次能力接口化）：
+  · 开发指南-新增角色或组件.md（+13 / −5）
+    ＊ 「新增一个技能 › 要点 › 冷却」那一条：把回调的归属写成能力接口（A1 第 1 行）；
+    ＊ 「组件不必继承三个基类」的能力接口表：补 `CooldownAware` 一行；
+    ＊ 同节的组合例：`implements` 列表补 `CooldownAware` + 加 `onCooldownEnd` 覆写体 + 补 import + 首句与注释；
+    ＊ 同节末条结论：把"两条管道入口今天另有收窄（handleCast 要求 ActiveComponent、按键不会派发到它）"
+      改写成"派发按能力接口认组件（handleCast/handleAttack/dispatchCooldownEnd 三处判据）"（A3）。
+  · 架构与组件模型.md（+6 / −6）
+    ＊ 层表「能力接口」行：枚举补 `core/hotbar/CooldownAware`、职责列补"关心冷却结束"；
+    ＊ 「三个可选的便利基类」表 `ActiveComponent` 行：implements 列表补 `CooldownAware`、
+      结果列把 `onCooldownEnd` 的默认实现归给该接口（A1 第 2 行）；
+    ＊ 「能力接口与一个实现点」：组合例补 `CooldownAware`；把"派发另有收窄"那条改写成
+      "三处派发点判的都是能力接口"（A3）；
+    ＊ 「施放管道 › 触发来源」末段：`是主动组件就调 onCast` → `实现 HotbarActionable 就调 onCast`
+      （同一变更面的一致性修正，见第 3 节 (5)）；
+    ＊ 「冷却由组件自己启动」末条：收尾钩子与枚举的归属改准（A1 第 3 行）。
+  · 角色与技能.md（+1 / −1）
+    ＊ 「通用机制 › 冷却」第 6 条：`ActiveComponent.onCooldownEnd(reason)` → `onCooldownEnd(reason)`
+      + 括注"钩子来自能力接口 `core/hotbar/CooldownAware`，`ActiveComponent` 已实现它"（A1 第 4 行）。
+      该文件其余段落一字未动（含「SanTE 归零惩罚」「组件在同一刻的顺序」等 t20 落地的内容）。
+
+**未改动的 inScope 文件，逐条判定"无必要改动"**：
+  · docs/插件文档/README.md（0 行）：面向服主与玩家；`git grep -nE "CooldownEndReason|onCooldownEnd|CooldownAware|ActiveComponent"`
+    在该文件 0 命中 ⇒ 本次能力接口化不触及它的任何一句。
+  · 初学者指南/01-插件简述.md、04-如何创建一个自己的角色.md（各 0 行）：两份都 0 命中同一组锚串
+    （初学者指南**全目录**也不含 `CooldownAware` / `onCooldownEnd` / `ActiveComponent`）⇒ 没有过时归属可改；
+    04 里"框架真正要求的只有 `extends RoleComponent`，`Skill` / `MainWeapon` / `PassiveSkill` 是省事模板"
+    这句在 t22 之后**更成立**（派发面也按接口认组件），措辞无需调整。
+
+────────────────────────────────────────────────────────────────
+第 3 节 · A1：四行过时引用「改前 → 改后」（+ 顺带的一致性修正）
+────────────────────────────────────────────────────────────────
+说明：行号是 t22 报告时点的读数；下面一律用「文件 + 章节/符号」定位（行号是移动靶）。
+源码依据（现算，见第 8 节）：`core/hotbar/CooldownAware.java:16`（接口）· `:19`（`onCooldownEnd` 默认空实现）
+· `:23`（嵌套枚举 `CooldownEndReason`，值 `:25` `:27` `:29`）· `roleComponent/ActiveComponent.java:28`
+（`implements HotbarItem, HotbarActionable, HotbarPresentable, CooldownAware`）· `core/RoleInstance.java:419`
+（`void dispatchCooldownEnd(String, CooldownAware.CooldownEndReason)`）· `:421`（`instanceof CooldownAware`）
+· `:200`（`instanceof HotbarActionable`）· `:218`（`instanceof CombatHook`）。
+
+(1) 【开发指南-新增角色或组件.md】「新增一个技能 › 要点 › 冷却」（时点 :104）
+    改前：`…想收尾自己的状态就覆写 `onCooldownEnd(CooldownEndReason reason)`（枚举值 `EXPIRED` /
+          `ENDED_BY_COMPONENT` / `RESTARTED`）。`
+          （只说"覆写"，没写这个钩子**是谁声明**的 ⇒ 读者会当成基类成员）
+    改后：`…想收尾自己的状态就覆写 `onCooldownEnd(CooldownAware.CooldownEndReason reason)`
+          （枚举值 `EXPIRED` / `ENDED_BY_COMPONENT` / `RESTARTED`）—— 这个钩子与它的原因枚举都挂在
+          能力接口 `core/hotbar/CooldownAware` 上：继承 `Skill` 的组件经
+          `ActiveComponent implements CooldownAware` 直接获得（覆写即可），只 `extends RoleComponent`
+          的组件要自己 `implements CooldownAware` 才收得到回调。`
+
+(2) 【架构与组件模型.md】「三个可选的便利基类」表 · `ActiveComponent` 行（时点 :114）
+    改前：`| `ActiveComponent` | extends RoleComponent implements HotbarItem, HotbarActionable,
+          HotbarPresentable：… | 提供默认 `onCast`（不做事也不进冷却）与 `onCooldownEnd`（空实现） |`
+    改后：`| `ActiveComponent` | extends RoleComponent implements HotbarItem, HotbarActionable,
+          HotbarPresentable, CooldownAware：… | 提供默认 `onCast`（不做事也不进冷却）；
+          `onCooldownEnd` 的默认空实现来自能力接口 `CooldownAware` |`
+
+(3) 【架构与组件模型.md】「冷却由组件自己启动」末条（时点 :202）
+    改前：`- 组件的收尾钩子：`ActiveComponent.onCooldownEnd(CooldownEndReason)`，枚举值 …。
+          回调在条目移除之后派发，所以回调里再 `end()` 只会得到 `false`，不会递归重入。`
+    改后：`- 组件的收尾钩子：`CooldownAware.onCooldownEnd(CooldownAware.CooldownEndReason)` ——
+          钩子与枚举都挂在能力接口 `core/hotbar/CooldownAware` 上（默认空实现），枚举值 …。
+          派发点 `RoleInstance.dispatchCooldownEnd` 判的就是这个接口：`ActiveComponent` 已
+          `implements CooldownAware` ⇒ 继承 `Skill` / `MainWeapon` 的组件照旧收到回调；只
+          `extends RoleComponent` 的组件要自己 `implements CooldownAware`。回调在条目移除之后派发，
+          所以回调里再 `end()` 只会得到 `false`，不会递归重入。`
+
+(4) 【角色与技能.md】「通用机制 › 冷却」第 6 条（时点 :288）
+    改前：`- 组件可以在 `ActiveComponent.onCooldownEnd(reason)` 里收尾自己的状态，`reason` 取 …`
+    改后：`- 组件可以在 `onCooldownEnd(reason)` 里收尾自己的状态（这个钩子来自能力接口
+          `core/hotbar/CooldownAware`，`ActiveComponent` 已实现它），`reason` 取 …`
+
+【顺带的一致性修正（同一变更面，逐条给理由；属"改动面最小"的可辩护范围）】
+(5) 【架构与组件模型.md】「施放管道 › 触发来源」末段（时点 :182）：
+    `是主动组件就调 `onCast`，能参与攻击就调 `onAttack`` → `实现 `HotbarActionable` 就调 `onCast`，
+    实现 `CombatHook` 就调 `onAttack``。理由：t22 把 `handleCast` 的判据从 `ActiveComponent` 换成
+    `HotbarActionable`（`RoleInstance.java:200` vs `:218`），旧句描述的就是被替换掉的那个类型判据。
+(6) 能力接口枚举补全：架构层表「能力接口」行（时点 :53）与开发指南能力接口表（时点 :231）各补
+    `CooldownAware`（前者另在职责列补"关心冷却结束"）。理由：两处都自称"能力接口清单"，漏一个
+    即与源码不符（A2 要求文档与源码一致）。
+(7) 「不必继承」的组合例改对（A3）：
+    · 开发指南（时点 :239 / :253 / :283）：首句与类注释补"还能在冷却结束时收尾自己"；
+      `implements HotbarActionable, CombatHook` → `implements HotbarActionable, CombatHook, CooldownAware`；
+      补 `import com.shadowHunterRolesPlugin.core.hotbar.CooldownAware;` 与
+      `@Override public void onCooldownEnd(CooldownAware.CooldownEndReason reason) { svc().energy().gain(1); }`；
+      末条结论从"**按键不会派发到它**"改为"**真的会被派发到**（三个接口各自对应三处派发判据）"。
+    · 架构与组件模型（时点 :134 / :135）：组合例补 `CooldownAware`；"派发另有收窄"那条改为
+      "派发点判的都是能力接口"。
+    依据：`CooldownAware.java:11-12`（"派发点过去要求 ActiveComponent，现在只要求本接口"）+
+    `RoleInstance.java:200/218/421`。
+
+【前一份说明件的相应声明已被本卡取代】t20 的
+`debug-logs/测试记录/阶段6-统一组件装配-文档同步-说明.txt` 第 8 节 A4 里写的
+"施放入口今天要求 ActiveComponent"是**当时**的源码事实（t22 之前为真）；
+t22 改判之后该说法不再成立，本卡已在活文档里改准。**未改动那份既有说明件**（属本卡
+outOfScope：`debug-logs/测试记录/ 下既有文件`），此处按"新件取代申报"的方式登记。
+
+────────────────────────────────────────────────────────────────
+第 4 节 · A4：`CooldownEndReason|onCooldownEnd` 逐行判读
+────────────────────────────────────────────────────────────────
+命令：git -C ShadowHunterRoles grep -nE "CooldownEndReason|onCooldownEnd" -- docs
+读数：**6 行**（exit 0；口径 = 行级、含代码块、大小写敏感、作用域 = 整个 `docs` —— `docs` 下只有
+`插件文档` 一棵子树）。逐行判读（改动后行号现算）：
+
+  1) 开发指南-新增角色或组件.md:104
+     `…覆写 onCooldownEnd(CooldownAware.CooldownEndReason reason)…挂在能力接口 core/hotbar/CooldownAware 上…`
+     ⇒ **已正确归属 `CooldownAware`**（含"只 `extends RoleComponent` 要自己 implements"的条件）。
+  2) 开发指南-新增角色或组件.md:231（能力接口表的 `CooldownAware` 行）
+     `| CooldownAware | core/hotbar/ | 关心冷却结束：覆写 onCooldownEnd(CooldownAware.CooldownEndReason reason) … |`
+     ⇒ **已正确归属**（本卡新增行）。
+  3) 开发指南-新增角色或组件.md:276（组合例的覆写）
+     `public void onCooldownEnd(CooldownAware.CooldownEndReason reason) {`
+     ⇒ **已正确归属**（组合例 `implements … CooldownAware`；该围栏已实测编译通过，见第 9 节）。
+  4) 架构与组件模型.md:114（`ActiveComponent` 行）
+     `…implements HotbarItem, HotbarActionable, HotbarPresentable, CooldownAware…；onCooldownEnd 的默认空实现来自能力接口 CooldownAware`
+     ⇒ **已正确归属**（并且把 `CooldownAware` 写进了 implements 列表）。
+  5) 架构与组件模型.md:202（收尾钩子条）
+     `CooldownAware.onCooldownEnd(CooldownAware.CooldownEndReason) —— 钩子与枚举都挂在能力接口 …`
+     ⇒ **已正确归属**。
+  6) 角色与技能.md:288（冷却第 6 条）
+     `…onCooldownEnd(reason)…（这个钩子来自能力接口 core/hotbar/CooldownAware，ActiveComponent 已实现它）…`
+     ⇒ **已正确归属**。
+
+判定：6/6 行都**显式**把钩子与枚举归给 `CooldownAware`（或写明"来自能力接口 `CooldownAware`"）；
+**没有任何一行**把 `onCooldownEnd` / `CooldownEndReason` 归给 `ActiveComponent`（旧口径已清零）。
+另外：`ActiveComponent` 作为 `CooldownAware` 的**实现者**出现在上述若干行里，那是事实陈述、不是旧口径。
+本批未新增"历史留痕"式标注 —— 因为活文档只描述当前行为，旧口径直接改准而不留旧句。
+
+────────────────────────────────────────────────────────────────
+第 5 节 · A5：痕迹双向自证
+────────────────────────────────────────────────────────────────
+【模式来源与落盘】复用磁盘上已有的模式文件（不是本卡创建 ⇒ 不在 inScope 之外落盘新文件；它们位于被忽略的
+`.scratch/t8/`，不进版本库、不进 changedPaths）。逐件身份（bytes + SHA256）：
+  p-A1.txt       55 B   FB8E7DE668671521566C11F566980314B12C7D98F9D2B9D367A32C43D8EB3F37
+  p-A2a.txt      17 B   5FF7C308C2BE707B59196281D910522EE99360D8B8F7E6DAA1DA084C3E008754
+  p-A2b.txt      13 B   5B5ED5BEEB7F5521BEB9F630CB3E5C63F121A60EEB0985DB4C3AFF9886921853
+  p-A3.txt      141 B   21BD473E9959E9FDAAAB3CD4E076E87EF602A73BD222183D15D4B2AD9F995F0F
+  p-A4.txt      130 B   5417CA572EB46C822F3B00AE6014ADA5FE385777314A3A5FC31AA5D8B7352AE7
+  p-A5.txt      105 B   1B4EABD6FF0DC4A48B29EDE1C747EB739A500F89BEB923FF899C07EA0C5606E0
+  p-A6.txt       68 B   9D5E55CD518BFB08BF60AFD3A35D3802E95E146F56EA87CE263D196E005B649E
+  p-verify.txt  352 B   5971C7D8AAB341E661C0F30AE0E8D500FDAF65E65CDFBC012E9A9B4589B6C183
+  p-forbidden.txt 217 B DCE5DEF079EDAD020E2B198F64BE2D8352638F3ABF7EE736EB1938A50AA4A4D6
+模式集内容（口径：正则、逐行一条、`git grep -E -f` ⇒ 默认大小写敏感、行级计数、含代码与注释）：
+  A1 = 卡号与批次号（`\bt[0-9]{1,2}\b` · `B[①…⑨]` · `T-[0-9]`）
+  A2a = 阶段号（`阶段\s?[0-9]`）· A2b = 段号形态（`[0-9]\.[0-9]`，人工判读型）
+  A3 = 协作语 18 词 · A4 = 过程文件名 9 项 · A5 = 元口径与过程记号 12 项 · A6 = 面向流程的章节 5 项
+  p-verify = 合并模式（A1 3 条 + A3 15 条 + A4 7 项 + A5 6 项 + `eng-`）
+
+【新侧（工作树 / docs/插件文档）】命令：git -C ShadowHunterRoles grep -rnE -f .scratch/t8/<模式>.txt -- "docs/插件文档"
+  A1 = 0 · A2a = 0 · A3 = 0 · A4 = 0 · A5 = 0 · A6 = 0 · p-verify = 0     （A2b 单独：15 行）
+【旧侧（改写前的提交 0c6930d）】样本 = 0c6930d5845b0255f4157f5abb505a96eb156c5f。
+  为什么取它：**不得**用"产物入库的那次提交"当旧侧样本 —— 那一刻目录内容已是改写后的无痕迹版本
+  ⇒ 恒 0 行 ⇒ 没有判别力（T-E 类错，队长本会话曾自曝）。
+  A1 = 60 · A2a = 95 · A2b = 175 · A3 = 63 · A4 = 147 · A5 = 52 · A6 = 10 · p-verify = 208
+  单文件样本（`docs/插件文档/架构与组件模型.md`）p-verify = 58 行（命令形态与卡面 verify 第 4 条一致）。
+⇒ 两侧计数同写：**新侧 0 / 旧侧 8 个模式全非 0** ⇒ 判据有区分力，且新侧 0 不是"模式没落盘 / 工具空跑"
+  造成的假绿（相邻的旧侧读数与第 6 节的仪器自证同时成立）。
+⇒ 与交接台账记录的 8 组旧→新计数逐字一致：60→0 · 95→0 · 175→（15 行版本号语境）· 63→0 · 147→0 ·
+  52→0 · 10→0 · 208→0。
+【A2b 的 15 行】与 t20 时的读数一致（本批新增文字不含 `数字.数字` 形态）：逐行仍是版本号 / 产物名语境
+  （Paper 1.21.11 · jar 1.0.0 · gradle-9.6.1 · run-paper 3.0.2 · Kotlin 2.4.0），无一行是批号/阶段号/卡号；
+  它是**人工判读型**，不列入"0 命中"主判据，但两侧计数与逐行判读留档（沿用者须**重算行数**，不得改期望值回避）。
+【命令形态说明】目录级读数用 CJK 路径 `-- "docs/插件文档"`；为避免"参数侧 CJK 转码"这一类疑虑，
+  另用 ASCII 路径 `-- docs` 复核过（`docs` 下只有 `插件文档` 一棵子树）：新侧 0 行、旧侧 208 行，读数一致。
+  `git grep` 不搜未跟踪件：本批改动全在**已跟踪**文件上；本说明件位于被忽略的 `debug-logs/**`，
+  天然不在扫描集内（本件正文含大量模式字面量，若被误扫会假阳）。
+
+────────────────────────────────────────────────────────────────
+第 6 节 · A6：初学者指南 20 词禁用表
+────────────────────────────────────────────────────────────────
+命令：git -C ShadowHunterRoles grep -rnE -f .scratch/t8/p-forbidden.txt -- "docs/插件文档/初学者指南"
+读数：**0 行**（作用域 = 初学者指南的 5 份文档；口径 = 行级、含代码块、大小写敏感）。
+20 词表：泛型 · record · 枚举 · 注册表 · 依赖注入 · 生命周期钩子 · 脏标记 · 协程 · 线程池 · 调度器 ·
+PDC · 属性修饰符 · 端口 · 适配器 · 反射 · 工厂模式 · 多态 · 抽象类 · 设计模式 · 注解。
+
+仪器自证（三件齐：模式 + 定域 + 口径；并在已知含命中样本上报数）：
+  ① `08fe741`（初学者指南首次落地那一代，术语审查前）的 `docs/插件文档/初学者指南.md` ⇒ **4 行**
+     （:22 / :217 / :297 命中"注解"；:367 命中"端口"）。
+  ② `0c6930d` 的整目录 ⇒ **65 行**（端口 / 适配器 / 注册表 等）。
+  ③ 探活：`git --version` 与 `git rev-parse HEAD` 均 exit 0；同命令形态在旧侧给出 208 行、新侧 0 行
+     ⇒ 命令非空跑。
+★ 本批**在初学者指南里没有新增任何词**（三份 inScope 的初学者文件 0 改动，见第 2 节），因此术语清单
+  与 t20 登记的一致、无需扩充（见第 10 节）。
+
+────────────────────────────────────────────────────────────────
+第 7 节 · A8：不引用过程文档
+────────────────────────────────────────────────────────────────
+命令：git -C ShadowHunterRoles grep -n "debug-logs" -- "docs/插件文档"
+读数：**0 行**（口径：裸词 `debug-logs`、行级、作用域 = 整个 `docs/插件文档`）。
+本批新增文字里的出处一律是仓库内源码路径 + 符号（`core/hotbar/CooldownAware`、`core/RoleInstance`、
+`roleComponent/ActiveComponent`）。
+
+────────────────────────────────────────────────────────────────
+第 8 节 · A7：API 抽查（8 组 / 0 条查无实据）
+────────────────────────────────────────────────────────────────
+口径：每个符号给「文件 + 符号」，用 `git grep -F`（固定串、大小写敏感）命中；$R = src/main/java/com/shadowHunterRolesPlugin
+
+  ① `CooldownAware` 接口与两个成员
+     git grep -n -F -e "public interface CooldownAware" -e "default void onCooldownEnd(CooldownEndReason reason)" -e "enum CooldownEndReason" -- "$R/core/hotbar/CooldownAware.java"
+     ⇒ `:16` · `:19` · `:23`（三个枚举值 `:25` `:27` `:29`）
+  ② `ActiveComponent` 的 implements 列表（A2 的关键事实）
+     git grep -n -F "implements HotbarItem, HotbarActionable, HotbarPresentable, CooldownAware" -- "$R/roleComponent/ActiveComponent.java"
+     ⇒ `:28`
+  ③ `dispatchCooldownEnd` 的形参与判据
+     git grep -n -F -e "void dispatchCooldownEnd(String componentId, CooldownAware.CooldownEndReason reason)" -e "component instanceof CooldownAware aware" -e "aware.onCooldownEnd(reason)" -- "$R/core/RoleInstance.java"
+     ⇒ `:419` · `:421` · `:422`
+  ④ 施放 / 攻击两处判据（A3 的依据）
+     git grep -n -F -e "component instanceof HotbarActionable active" -e "component instanceof CombatHook hook" -- "$R/core/RoleInstance.java"
+     ⇒ `:200` · `:218`
+  ⑤ `CooldownAware` 全仓引用面：`git grep -rn -F "CooldownAware" -- "$R"` ⇒ **16 行**（端口实现、聚合根、基类、注释）
+  ⑥ 组合例用到的 `EnergyPort.gain(int)`
+     git grep -n -F "void gain(int amount);" -- "$R/core/ports/EnergyPort.java" ⇒ `:10`
+  ⑦ 组合例用到的基类与工具箱访问器
+     git grep -n -F -e "public abstract class RoleComponent" -e "protected final ComponentServices svc()" -- "$R/roleComponent/RoleComponent.java"
+     ⇒ `:17` · `:38`
+  ⑧ `core/hotbar/` 包内文件（接口位置自证）
+     `CooldownAware.java` 与 `HotbarPresentable.java` / `CooldownBearing.java` / `EnergyCosting.java` / `HotbarItem.java`
+     同目录（`core/hotbar/`），`HotbarActionable.java` / `CombatHook.java` 在 `core/dispatch/` ⇒ 文档表里的「位置」列与磁盘一致。
+  ⇒ 8/8 命中，**0 条查无实据**；本批新写的类名 / 方法名 / 枚举没有一个是凭空造出来的。
+
+────────────────────────────────────────────────────────────────
+第 9 节 · 文档片段可编译性探针（正样本 + 负对照 + 逐字一致性）
+────────────────────────────────────────────────────────────────
+目的：本卡改动的**组合例**是文档里唯一的完整代码块，必须证明"照抄能编译"，且证明"不实现
+`CooldownAware` 就覆写不了回调"（A3 的编译期证据）。
+探针位置（**仓库外**，工作区 `.scratch\t24-docsync\`；不进版本库、不进 changedPaths）。
+
+【探针文件（逐件身份）】
+  .scratch/t24-docsync/src/com/shadowHunterRolesPlugin/roleComponent/myRole/MyHybridComponent.java
+      1631 B · SHA256 50E3C41E03F1BAF0CC2D53F5791C3263C605E89C8A2C08FD5D17F8ECD4393C08
+  .scratch/t24-docsync/src/docsync/DocSyncProbe.java
+       646 B · SHA256 12CCA28BE2F01B5C888850E426581EDA467D3964FFAF0925D6DA22DC3558511E
+  .scratch/t24-docsync/negative/NoCooldownAware.java
+       706 B · SHA256 70A025001145B3EB2B6230AEE1C76FE5169B5ADEFEF520DE97D88A0A209AECB7（负对照）
+
+【逐字一致性（不是"差不多"）】命令：用 `ReadAllLines(…, UTF8)` 读文档、定位含 `class MyHybridComponent`
+  的那段 ```java 围栏，与探针文件逐行做**大小写敏感**比较（`-cne`）：
+    组合例围栏 = 第 242–280 行，正文 **37 行**；探针文件 37 行；**不同行数 = 0**。
+  ⇒ 被编译的那份文本与文档里的代码块**逐行相同**。
+
+【正样本（应通过）】
+  命令：javac.exe -encoding UTF-8 -cp <classpath> -d .scratch\t24-docsync\out <2 个 .java>
+  classpath = ShadowHunterRoles/build/classes/java/main + Gradle 缓存里的
+  io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT（…\20961a0e…\paper-api-1.21.11-R0.1-SNAPSHOT.jar）
+  + 39 个依赖 jar（net.kyori / org.jetbrains.annotations / guava / gson / snakeyaml / commons /
+  bungeecord-chat / joml / fastutil / slf4j / log4j 各目录下**非 sources/javadoc** 的 jar）；
+  编译器 = `C:\Program Files\Java\jdk-21\bin\javac.exe`。
+  结果：**exit = 0**；产物 `…/myRole/MyHybridComponent.class`（2491 B）· `docsync/DocSyncProbe.class`（1685 B）。
+
+【负对照（应失败）】
+  探针内容：`NoCooldownAware extends RoleComponent`（**不**实现 `CooldownAware`）却写
+  `@Override public void onCooldownEnd(CooldownAware.CooldownEndReason reason)`。
+  命令：javac.exe -encoding UTF-8 -cp <同一 classpath> -d .scratch\t24-docsync\out-neg NoCooldownAware.java
+  结果：**exit = 1**；stderr 原始输出（控制台码页把 CJK 弄花了，ASCII 定位信息可读）：
+    C:\Users\ROG\Desktop\…\.scratch\t24-docsync\negative\NoCooldownAware.java:17: 错误: 方法不会覆盖或实现超类型的方法
+        @Override
+        ^
+    1 个错误
+  产物目录 `out-neg` **未生成**（Test-Path = False）。
+  ⇒ 双向自证成立：正样本 exit 0 / 负对照 exit 1，且负对照给出的正是"没有可覆写的超类型方法"
+    ⇒ 印证"要 `implements CooldownAware` 才收得到（并覆写得动）冷却结束回调"。
+
+────────────────────────────────────────────────────────────────
+第 10 节 · 术语清单（初学者指南）
+────────────────────────────────────────────────────────────────
+口径：初学者指南的读者前置假设 = 只会「变量 / 列表 / 函数」（外加 02 那六个词：类 · 对象 · 方法 ·
+字段 · 继承 · 接口）。超出者必须同时满足：① 目标所必需；② 首次出现处用一句话解释；③ 登记进清单。
+
+本批结论：**0 个新增词**。理由与证据：
+  · 三份 inScope 的初学者文件（`README.md` / `01` / `04`）本批 **0 行改动**（第 2 节 numstat 与
+    `git status --porcelain` 都只列 3 份参考手册）；
+  · `CooldownAware` / `onCooldownEnd` / `ActiveComponent` / `CooldownEndReason` 在**初学者指南全目录**
+    0 命中 ⇒ 没有需要解释、也没有被带进读者视野的新词；
+  · 20 词禁用表 0 命中（第 6 节）⇒ 既有克制未被破坏。
+t20 登记的 `ItemKind` / `RoleComponent` 等词条仍适用，本卡不新增条款。
+
+────────────────────────────────────────────────────────────────
+第 11 节 · 未覆盖项如实申报
+────────────────────────────────────────────────────────────────
+1. **运行级验证：未做**。本批只改文档：没有起服、没有进游戏。因此"组合例的组件真的会被派发到
+   （按键施放 / 攻击 / 冷却结束回调）"只有**编译级 + 源码判读**，不是运行级复现（t22 自己也把它的
+   接受集结论记在静态级）。最小闭合方式：需要构造一个"实现 `HotbarActionable` 但不是 `ActiveComponent`"
+   的组件进游戏验证 —— 那要改 `src`，属新卡或用户侧（并需起服窗口）。
+2. **`dispatchCooldownEnd` 的运行期到达性未验**：同上（静态级：`:421` 的 `instanceof CooldownAware`）。
+3. **Markdown 渲染未在真实渲染器里看过**（本批只动了表格单元与列表项，未改围栏风格）。
+   最小闭合方式：用任意 Markdown 预览核对这 3 份文件。
+4. **"哪几段算与本次相关"是人工判读**：第 2 / 3 节给了 numstat 与逐处清单；第 3 节 (5)(6) 两处是我
+   判为"同一变更面、必须顺带改准"的追加项（t22 只点了 4 行）⇒ 请复核方按理由逐条判。
+5. **`A2b` 的 15 行是人工判读型**（沿用者须重算行数）。
+6. **未扫第三方**对 `docs/插件文档/` 段落锚点的引用。
+7. **未做** `git grep --untracked --no-exclude-standard` 第三路复核（改动全在已跟踪文件上；
+   未跟踪件只有本说明件与仓库外的探针目录，二者都不属于"零痕迹"的扫描集）。
+
+────────────────────────────────────────────────────────────────
+第 12 节 · 边界
+────────────────────────────────────────────────────────────────
+· **零 git 写**：本批未执行任何 git 写。`git -C ShadowHunterRoles rev-parse HEAD` 开工 2b25fe8…、
+  结卡 9c034e6…；两次位移都来自队长对 `debug-logs/**` 的提交（源树未变）⇒ 本卡改动**一行都没进任何提交**，
+  复核请在**工作树**上重放。
+· **零 src 改动**：`git -C ShadowHunterRoles status --porcelain -- src` ⇒ **0 行**（终态复核仍 0）。
+· **changedPaths ⊆ inScope**（仓库相对 POSIX）：
+    docs/插件文档/开发指南-新增角色或组件.md
+    docs/插件文档/架构与组件模型.md
+    docs/插件文档/角色与技能.md
+    debug-logs/测试记录/阶段6-派发面能力化-文档同步-说明.txt   （被忽略 ⇒ 需队长 `git add -f`）
+  工作树 `git status --porcelain` 的完整读数 = 上述 3 条 ` M`（说明件被忽略、默认不显示）。
+· **仓库外探针**（不进 changedPaths、不进版本库）：`.scratch\t24-docsync\` 下 2 个正样本 + 1 个负对照 + 编译产物。
+· **未改任何既有证据与冻结件**：`debug-logs/测试记录/` 与 `debug-logs/回滚快照/` 下的既有文件一字未改
+  （含 t20 的那份说明件 —— 它的相应当期声明已由本卡按"新件取代申报"登记，见第 3 节末）。
+· **未申请提权**：全程零提权申请；未遇到沙箱拒绝。
+
+（完）

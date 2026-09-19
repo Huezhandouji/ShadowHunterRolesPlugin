@@ -105,7 +105,8 @@ public class BuffManager {
         }
 
         if(instance != null){
-            instance.updateHotbar();
+            //触点⑤（buff 移除）：置脏 + 帧末 flush（`addBuff` 保持不置脏 —— 与迁移前"添加后无刷新"逐字一致）
+            instance.hotbarRenderer().markDirty();
         }
     }
 

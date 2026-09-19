@@ -1,0 +1,65 @@
+阶段6 · C-11 派发序运行级观测（复跑 t25）—— 停服物证（当轮物证）
+=======================================================================
+性质：本文件是【当轮物证】（当轮产出，不是事后补记）· 产出者 = eng-验证（卡 t25）
+覆盖对象：**一代制品** = build/libs/ShadowHunterRolesPlugin-1.0.0.jar
+          （= 归档件 debug-logs/回滚快照/jars/ShadowHunterRolesPlugin-1.0.0-verified-20260919-200537-06750CFE.jar）
+口径：身份一律现算（bytes + SHA256）；行数 = [System.IO.File]::ReadAllLines；时刻 = 本机墙钟
+
+§1 起服前（三路互证，@ 2026-09-19 20:16:13.478）
+- 广播：已向 eng-实现 / captain 发出"占用 25566"（eng-实现 回"窗口归你"）
+- ① netstat 按 LISTENING 过滤 `:25566` = **0 行**（原始 :25566 总行 = 0）
+- ② TcpClient.Connect('127.0.0.1',25566) = **FAIL（refused）**
+- ③ `run\logs\latest.log` 独占打开（FileShare.None）= **OK**
+- java 进程数 = **0**
+- 起服前 latest.log 现值 = **6075 B / mtime 2026-09-19 20:07:17.547 / SHA256 46B1E045…**（= t22 轮的冻结件内容，**旧件**；已计入"防假新鲜"清单）
+- 探针装载：`run\plugins\t25probe.jar` = 10113 B / SHA256 8EAE0E62…（复制自 `.scratch\t25-probe\dist\t25probe.jar`，仓库外工装）
+
+§2 起服与运行（本卡唯一一轮）
+- runServer job 启动时刻 = **2026-09-19 20:16:23.293**（job pwsh-14；同刻打印 jar 身份）
+- 服务端首个日志行 = **[20:16:33]**（晚于 job 启动 ✓）
+- **Mode B 三行**（冻结件内逐字）：
+    [20:16:42] [Server thread/INFO]: [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+    [20:16:42] [Server thread/INFO]: [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+    [20:16:42] [Server thread/INFO]: Done (9.767s)! For help, type "help"
+- **未重建被验证代次**：Gradle 输出含 `> Task :jar UP-TO-DATE`（另 `:compileJava` / `:processResources` / `:classes` UP-TO-DATE）；jar 三时点逐字一致
+- **环境差异（申报）**：本轮 **2 个插件**（`Initialized 2 plugins` / `Bukkit plugins (2): - ShadowHunterRolesPlugin (1.0.0), T25Probe (1.0.0)`；remap 行 `[PluginRemapper] Remapping plugin 'plugins\t25probe.jar'… Done … in 243ms`）——探针是**被测对象之外的第三方工装**，只写 INFO；它会新增自己的 INFO 行，但按级别字段扫描的 WARN+ 集合只多出 §4 的两条 Netty WARN（见下）。
+
+§3 ★ 防「假新鲜」三条件（缺一即无效）
+ ① 本次 runServer 的 job 启动时刻 = **2026-09-19 20:16:23.293**
+ ② 冻结内容首个日志行时间戳 = **[20:16:33]** > ① ✓；源文件 mtime = 20:23:39.949 > ① ✓；冻结件 mtime = 20:27:44.697 > ① ✓
+ ③ 冻结件 SHA256 = `B06549A1A4F850F179FCB9439E6CDEC6CB4496B9C35EC69D29FE9B4EF605532A`，与下列**每一件都不同**：
+    `6041B041…`（t21 冻结件）· `46B1E045…`（t22）· `8318A683…`（t19）· `8268E32C…`（t4）· `527183B0…`（t2）· `73EEF15D…`（t67） ⇒ 六件全不等 ✓
+ ⇒ 三条同时成立 ⇒ 本轮 Mode B / 级别扫描结论**不是**旧件复用。
+
+§4 在线冻结（服务器仍在线时）
+- 冻结动作 @ **2026-09-19 20:27:44.697**（共享读流 CopyTo；服务端仍在运行）
+- 源 `run\logs\latest.log` = 15302 B / mtime **20:23:39.949**；冻结件 = **15302 B / `B06549A1…`** ⇒ 共享读现算 **逐字节相同 = True**
+- mtime 语义（口径）：冻结件 mtime = 冻结动作时刻；源 mtime = 服务端最后一次写日志时刻。两者都晚于 jar mtime（20:05:37.216）⇒ F1 链在两种口径下都成立
+- 冻结件扫描：行数 **131** · 级别字段 `\] \[[^]]*/(ERROR|SEVERE)\]` = **0** · 裸 `ERROR|SEVERE` = **3**（全为 oshi WMI 的 WARN 正文 "Error was …"）· 级别字段 WARN = **15** · **插件归因异常（锚 `^\s+at .*shadowHunterRolesPlugin`）= 0**（形态先在已知正样本 `阶段5-起服日志-4.4外观取证.log` 上验证命中 **4** ⇒ 有判别力）
+- log-delta（锚 `阶段4-起服日志-T2b.log`）：anchor 13 行 / current 15 行 · ADDED = **2** · REMOVED = 0 · A) oshi = 0 · B) world = 0 · **C) OTHER = 2** ⇒ **C ≠ 0**（如实记录，不写成 C=0）；两条 ADDED 逐行归因 = `[Netty NIO IO #2/WARN] Failed to deliver packet, sending fallback clientbound/minecraft:system_chat` 与 `#3` 同文 —— **两处都发生在客户端机器人掉线的那一刻**（20:19:23 / 20:23:39），属"客户端掉线的回退投递"路径，**不是被测插件的回归**
+
+§5 停机（纪律：只 job_kill）
+- 方式：**只 job_kill job pwsh-14**；未强杀 java、未 kill 进程
+- 停机后三路复证 @ **2026-09-19 20:28:09.619**：① netstat LISTENING `:25566` = **0 行** ② TCP = **refused** ③ `latest.log` 独占打开 = **OK** · java 进程数 = **0**
+- 停机后 `latest.log` = 15302 B / mtime 20:23:39.949 / `B06549A1…` = 与在线冻结件**逐字节相同** ⇒ 冻结覆盖整轮
+
+§6 探针移出（硬约束④）
+- 移出前 `Test-Path run\plugins\t25probe.jar` = **True** → 移出后 = **False**
+- `run\plugins` 清单（移出后）= `.paper-remapped | bStats | ShadowHunterRolesPlugin | spark`
+- 残留申报：`.paper-remapped` 索引仍可能含 t25probe 的 remap 映射（缓存残留；jar 已不存在 ⇒ 不影响后续载入）
+
+§7 制品三时点（不得重建/冒充）
+- 开工（20:16:13 前）：165404 B / **2026-09-19 20:05:37.216** / SHA256 **06750CFE187EE7E50E76993F5628D258A1E7FC20A5D225905CA830806D8711E2**
+- 起服前同刻打印（20:16:23）：**逐字一致**；停机后现算：**逐字一致**
+- 归档件 `…-verified-20260919-200537-06750CFE.jar` = 同 bytes / 同 mtime / 同 SHA256（逐字节相同）
+- 未使用任何更早代次（`FCB926AC` / `6A249993` / `21002ABC` 等）冒充：本轮只引用 `06750CFE` 这一代
+
+§8 F1 链（**链尾定义写显**：本卡链尾 = 观测报告）
+- jar（20:05:37.216）< log 内容（20:23:39.949）< **log 冻结动作（20:27:44.697）** < 转录（20:27:57.939）< 停服物证（本件 mtime）< 观测报告（最后写盘）⇒ 机器校验见报告 §7
+- 承重转录：`debug-logs/测试记录/阶段6-C11派发序运行级-复跑-转录.txt` = **108368 B / 1434 行 / mtime 20:27:57.939 / SHA256 7F2F8595D6A70B0E0C9F2C007A77BCB6B1ECD639AA0DCE21DE9547B36AD3E808**（**落在仓库内**，由探针直接写）
+
+§9 未覆盖项（如实）
+1. **目标相位未构造到**：本轮 +4 / −10 / −6 命中均为 **0**，SanTE 序列在采样段恒 100、`SanTEChangeEvent` 序列 34 次全 `delta=0` ⇒ 无任何"同 tick 双写"⇒ **不给 C-11 成立性结论**（退档，详见报告 §6）。
+2. **客户端工具链仍阻塞**：两个机器人在 20:18:53 / 20:23:39 再次掉线（本例定位 = mineflayer 自身 particle 插件抛 `TypeError`，见报告 §5）。
+3. 未做旧代对照（卡面不要求）；未改任何 `*.log` / 既有冻结件；未改 `src`；零 git 写。
+4. 本卡为**限一轮**：本轮之外**未**再迭代（第二段机器人连接属同一服务端实例内的"补刺激"，已在报告 §5.3 显式申报）。

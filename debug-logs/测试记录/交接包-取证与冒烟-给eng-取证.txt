@@ -1,0 +1,96 @@
+================================================================================
+交接包 · **取证与 bot 冒烟**（给 `eng-取证`）
+—— 交接人：`eng-平台`（余量偏紧，按队长裁定交接 ✓）· 测量时刻：**2026-09-18 21:42:00.980**
+—— 使用方式：**先按 §2 速查、按 §3 顺序执行**；§4 是"已踩过的坑"，§5 是"禁止事项" —— 这两节请**逐条过一遍**再动手 ✓
+================================================================================
+
+§0 一句话
+--------------------------------------------------------------------------------
+你要接的是：**`t61`（调试指令输出到控制台）落地 ⇒ 取基线 ⇒ 重建 ⇒ 一轮完整取证（Mode B + 控制台片段 + 新代归档）
+⇒ 冻结 src ⇒ bot 冒烟（冷却四态 + 调度探针 + op 门控）⇒ 解冻** ✓；**现在不要起服** ✗（`t61` 仍在写：`porcelain -- src` = 3 ✗）。
+
+§1 交接时状态（**每个数字带测量时刻**；动手前请**重新现算一次** ✓ per 规范 §7.1 ③）
+--------------------------------------------------------------------------------
+```
+HEAD              = 6c7cf22bcdc29fc492845696cf3986f15f85024f
+porcelain 全树    = 3 ; porcelain -- src = 3 ✗（`t61` 仍在写）; untracked src = 0 ; java = 91
+jar（构建产物）    = 159652 B / 2026-09-18 21:41:02.153 / 0F2D901C6B6FE301E32CDA2B52C7377E940F8C6D058A7E96B6B92D1C3377DF74
+src 新于 jar      = 0 ✓（这代构建晚于最后一次 src 编辑）
+窗口              = free ✓（TCP connect failed ; netstat 中 LISTENING 行 = 0）
+回滚快照/jars/    = 3 代 jar + MANIFEST.txt（4034 B / 44 行 / 6EF160A242211A95…）：
+                    …-203749-7A21729B.jar(148297) · …-205855-DBE04077.jar(148298) · …-212616-53CBEB65.jar(158875)
+⚠ 注：`0F2D901C…`（159652 B）**尚未归档** ✗ —— 若它成为"被验制品"，请按 §3 第 5 步归档并追加 MANIFEST ✓
+```
+规范（**活文档 ⇒ 按 §章节 + 标题 + 测量时刻引用** ✓，**不要引字节数/族数/行号** ✗）：
+`debug-logs/测试记录/协同规范-起服停机取证.txt` —— 用它的 **§1 起服方 / §2 停机方 / §3 取证与制品身份 / §4 post-hoc / §5 仪器口径（10 族）/ §6 立规依据 / §7 引用纪律**。
+
+§2 命令速查（全部为**已验证可用**的形态 ✓）
+--------------------------------------------------------------------------------
+```powershell
+# 构建（不要用 copyPluginJar：那会把 jar 拷进 run/plugins）
+cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles
+$env:GRADLE_USER_HOME = "$PWD\.gradle-work"; .\gradlew build -x copyPluginJar
+
+# 起服（**后台作业**；用 job_output 读、job_kill 停）
+.\gradlew runServer
+
+# ① 取基线 + 白名单形态判据（一次搞定：快照 + 逐文件 SHA256.txt + 判据 + INFO）
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\ROG\Desktop\插件\.scratch\bot\t59-baseline-and-scoped-criteria.ps1 -Name "t61-final-before"
+#    可选 -RepoRoot <path>；它会写 .scratch/bot/src-snapshots\<Name>\（含 SHA256.txt）
+# ② bot 冒烟（**先 dry-run 自测解析器**，再 live）
+cd C:\Users\ROG\Desktop\插件\.scratch\bot
+node .\t61-smoke-runner.js --dry-run --only sched ..\..\ShadowHunterRoles\debug-logs\测试记录\阶段5-调度器迁移-归一化矩阵-停服物证.txt
+node .\t61-smoke-runner.js --out ..\..\ShadowHunterRoles\debug-logs\测试记录\阶段5-起服日志-<本批>.txt   # live（需 25566 在跑）
+#    env：MC_HOST/MC_PORT/MC_VERSION（默认 127.0.0.1:25566/1.21.11）· SMOKE_BOT（默认 HueZhandouji，须是 op）
+#         SMOKE_OPGATE=1 ⇒ 另起非 op 随机名 bot，断言 `/role debug sched all` 被拒 ✓
+# ③ 措辞自检（7 项 expected vs actual；platform/ 未被动时 0/7）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\debug-logs\测试记录\platform-wording-check.ps1
+# ④ 日志集合差（正序；只看 C=0）+ 双口径多重集
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\ROG\Desktop\插件\.scratch\bot\log-delta.ps1 -Anchor <锚日志> -Current <本批日志> -Tag <tag>
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\ROG\Desktop\插件\.scratch\bot\numeric-multiset.ps1 -BaseDir <base快照> -Tag <tag> -Mode both
+```
+工装身份（**引用时按 §7.3 对冻结件引身份 ✓**）：
+`t61-smoke-runner.js` **8173 B / `E42015DEB6794024…`** · `t59-baseline-and-scoped-criteria.ps1` **6318 B / `16BADE3A318CDF25…`** ·
+`numeric-multiset.ps1` 5415 B / `CA32FE7424F4FC62…` · `log-delta.ps1` 4588 B / `4A5A88B0879DE9DF…` ·
+`snapshot-src.ps1` 2438 B / `21A19061D1EB48D7…` · `t6-quit-persistence.js` 22223 B / `EFDBF9EB95949FAD…` ·
+`platform-wording-check.ps1` **7520 B / `D00E6A7159FF6273…`**（仓库内，已被 `-f` 入库 ✓）
+
+§3 顺序（**闸门式**；每步完成再进下一步 ✓）
+--------------------------------------------------------------------------------
+1. **等 `t61` 落地**（停笔点：`porcelain -- src` = 0 且 `git log` 出现该提交 ✓）⇒ **广播"占用 25566"**（§1.1）+ 起服前三路核查（§1.2）。
+2. **取基线**：`-Name t61-final-before` ✓（含 `SHA256.txt` 逐文件自证 ✓ + 白名单形态判据 ✓）；**必须在本批第一次编辑之前取** ✗（§3.4：基线只对"取的那一刻"有效）。
+3. （若需要）**重建一次**：`build -x copyPluginJar` ✓ —— **只能发生在该代证据尚未取证之前** ✓（§3.4）；**绝不对已冻结代次做删除+重建** ✗（要复验"逐字节相同"就在 `build/` 副本上做 ✓）。
+4. **取证**：起服 ⇒ `Done` + 空闲点**先冻结** `run/logs/latest.log` → `debug-logs/测试记录/阶段5-起服日志-<本批>.log`（**仍在线时** ✓ §2.1①）⇒ 记 长度/mtime/SHA256 ⇒ **然后才** `job_kill` ⇒ 停服三路互证（§2.3：TCP 失败 + 日志可独占打开 + netstat **按 LISTENING 过滤** ✓）⇒ 正序集合差 **只看 C=0** ✓ + 双口径 + **控制台片段**（`t61` 的验收点 = 调试指令输出进控制台 ✓）。
+5. **归档**：把本代 jar 复制进 `debug-logs/回滚快照/jars/`（命名 `<插件>-<版本>-verified-<构建时刻>-<SHA前8>.jar` ✓）⇒ **`MANIFEST.txt` 追加一行**（一行一值 ✗：`bytes` / `mtime` / `sha256` / `覆盖证据` / `与前代关系` ✓，**不覆盖旧行** ✓）。
+6. **广播"占用中、勿改 src"**（队长做）⇒ **bot 冒烟**（冷却四态 + 探针 + 可选 op 门控）⇒ 收 transcript ⇒ 断言（锚串见 §4 第 8 条 ✓）。
+7. **解冻** + 广播"已释放（物证已落）" ✓ ⇒ 之后才是 `t60` 清理批（**等队长派卡** ✓）。
+
+§4 已踩过的坑（**10 族仪器口径**摘要 + 我方自曝实例；详见规范 §5）
+--------------------------------------------------------------------------------
+| # | 坑 | 纪律 |
+|---|---|---|
+| 1 | `Get-NetTCPConnection -State Listen` **假 0** ✗；`netstat` **计数 > 0 全是 TIME_WAIT** ✗；**独占打开是互斥探针** ⇒ 两人同时测会**互相假警报** ✗ | 三路互证（TCP connect + 日志打开 + netstat **按 LISTENING 过滤**）；只读探测用**共享读**（`FileShare.ReadWrite`）；**串行做**，以最后一次完整三路为准 ✓ |
+| 2 | 行数口径：`\r?\n` 切分**多算尾部空元素** ✗ | 行数 = **换行符计数** ✓；**别用 `git cat-file -p \| Measure-Object -Line`** ✗（实测 94 vs 真值 102）⇒ blob 落盘后 `ReadAllLines` ✓ |
+| 3 | `Get-Content … \| Select-Object -Skip N` 对含 CJK 的 UTF-8 无 BOM 文件**静默行号漂移** ✗ | 行号定位用 **`git grep -n`** 或 **`read` 工具** ✓ |
+| 4 | `git ls-files` 对非 ASCII 路径输出**带引号 + 八进制转义** ⇒ 喂 `Test-Path` 报 `Illegal characters in path` ✗ | 非 ASCII 路径一律 **`-LiteralPath`** ✓ / `git -c core.quotepath=false ls-files` ✓ |
+| 5 | **工具缺失 ⇒ 空输出比较 = 假 `True`** ✗（`javap` 不在 PATH） | 比较前**断言工具可用 + 输出非空**；比较类结论**必须打印两侧行数** ✓ |
+| 6 | 登记册 `key =` 与**值分两行** ⇒ 按同行解析**配错值** ✗ | 机器可解析登记**一行一值** ✓（MANIFEST 已规范化 ✓） |
+| 7 | 对**原生进程**生产者用 `Select-Object -First N` ⇒ 上游被终止 ⇒ **伪非零退出/伪 stderr** ✗ | 先落变量再筛 / 用 `-Last N` ✓ |
+| 8 | **`git grep` 不搜未跟踪文件** ✗ ⇒ "旧表述 grep = 0"**真空通过** ✗；**把代码搬进新文件**还会让计数**下降** ⇒ **假进展** ✗（今晚真实发生 ✓） | 一律 **`git grep --untracked`** ✓ + 前后打印 `git ls-files --others --exclude-standard` ✓ + `??` 计数归零 ✓（**三者联合读** ✓）；白名单过滤作用在【行】上 ✓ 且**模式锚定使用点**（裸词 `sched` 会命中 `scheduler` ⇒ 白名单外假 22 条 ✗）✓ |
+| 9 | **.NET 文件 API 相对路径按【进程 CWD】解析**（`cd` 不改变它）✗ ⇒ 抛错后变量空 ⇒ 后续全报 `0/False` | 文件 API 用绝对路径 `(Resolve-Path x).Path` / `-LiteralPath` ✓ + 与族 5 合用 ✓ |
+| 10 | **断言/模式自身不可靠** ✗：非 ASCII 字面量在命令行走廊**可能被转码** ⇒ `Contains` 假 False ✓；断言串**少写一个反引号** ⇒ 误报"编辑未落地" ✗ | 断言用 **ASCII 锚**（如 `[7.4]`、`??`）✓ + **先在"已知为真"样本上验证断言** ✓ + 多口径交叉（`Contains`/正则/逐行）✓ |
+额外两条（我今晚自曝）：**① 空输入判据写窄了**（`length===0` 漏掉带 BOM/空行的文件 ⇒ 守卫不触发）⇒ 查 **`trim()`** ✓；**② 断言集必须与被测文件覆盖范围对齐** ✗（把 cooldown 组断言打在只含探针输出的文件上 ⇒ 凭空 MISMATCH ✗）⇒ 用 `--only <组>` ✓。
+
+§5 禁止事项（**踩过的代价，逐条别重犯**）
+--------------------------------------------------------------------------------
+1. **不要**对**已冻结/已归档**的代次做"删除 jar + 重建" ✗（会把"证据早于其 jar"的 F1 链**反向** ⇒ 自相矛盾 ✓；要复验就在 `build/` 副本上做 ✓）。
+2. **不要**在取证新鲜度敏感时用 `git checkout` 还原 src ✗（会改 mtime ⇒ `src 新于 jar` 变非 0 ⇒ 又要重建+重取证 ✓）。
+3. **不要**用普通 `git grep` 做"归零"判据 ✗（族 8）；**不要**用裸 `ERROR` 扫日志 ✗（会命中消息正文里的 "Error was …" ⇒ 我实测 3 命中**全是 oshi WARN** ✓）⇒ 锚定**日志级别字段**（`\] \[[^]]*/ERROR\]`）✓。
+4. **不要**引活文档的**字节身份/族数/行号** ✗ ⇒ 引 **§章节 + 标题 + 测量时刻** ✓；冻结件才引完整 SHA256 ✓。
+5. **不要**在别人窗口内起服 ✗（§1.3：**端口空闲 ≠ 对方取证窗口已结束** ✓）；停机后若日志已被覆盖 ⇒ 按 §4 走 **post-hoc 双标注** ✓，**不得**冒充原始物证 ✓。
+6. **不要**把"开发中构建"当已认领制品 ✗（取证须打在**已提交态**上 ✓，或物证写明工作树状态 ✓）。
+
+§6 交接人状态
+--------------------------------------------------------------------------------
+`eng-平台` 交接后**保持待命** ✓：**不动 `src`、不起服、不做 git 写** ✗；如需**某个现算值**（身份/计数/现算核对）可**直投最小范围的问询** ✓ —— 其余全在本文件、规范与三份物证里 ✓。
+================================================================================

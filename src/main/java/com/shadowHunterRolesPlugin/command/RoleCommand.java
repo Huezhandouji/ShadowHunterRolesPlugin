@@ -3,218 +3,86 @@ package com.shadowHunterRolesPlugin.command;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-public class RoleCommand implements CommandExecutor {
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 
-    private final RoleManager roleManager;
-    //阶段 4（⑤）：RoleRegistry 改为构造注入（D-2 静态桥已删）
-    private final RoleRegistry roleRegistry;
+/**
+ * 主指令 {@code /role}（别名 {@code r}）—— **只做路由 + 统一报错 + 补全**。
+ * <p>
+ * 本类是 {@link SubCommand} 体系的中央分发器（风格对齐 {@code SHDFGamePlugin} 的 {@code ShdfGameCommand}）：
+ * <ol>
+ *     <li>非玩家发送者 → 统一拒绝（既有文案逐字保留）；</li>
+ *     <li>无参数 → **静默返回**（既有行为：历史实现的 {@code sendHelp} 调用被注释掉，本卡按"行为等价"逐字保留）；</li>
+ *     <li>按第一级参数路由到注册的子指令，**参数剥离后**交给该子指令；</li>
+ *     <li>未知子指令 → 统一报错文案（既有文案逐字保留）；</li>
+ *     <li>Tab 补全：第一级补全子指令名，其余交给命中的子指令。</li>
+ * </ol>
+ * <p>
+ * <b>既有顶层命令不迁移 Brigadier</b>：注册方式仍是 `plugin.yml` 的 {@code commands: role:} + 主类
+ * {@code getCommand("role").setExecutor(...)}（`docs/插件文档/开发指南-新增角色或组件.md` §4.5.1/§4.5.2）。
+ */
+public class RoleCommand implements CommandExecutor, TabCompleter {
+
+    private final Map<String, SubCommand> subCommands = new TreeMap<>();
 
     public RoleCommand(RoleManager roleManager, RoleRegistry roleRegistry){
-        this.roleManager = roleManager;
-        this.roleRegistry = roleRegistry;
+        registerSubCommand(new SetRoleCommand(roleManager, roleRegistry));
+        registerSubCommand(new ClearRoleCommand(roleManager));
+        registerSubCommand(new EnergyCommand(roleManager));
+        registerSubCommand(new DebugCommand(roleManager));
+        registerSubCommand(new HelpCommand());
     }
 
+    private void registerSubCommand(SubCommand subCommand){
+        subCommands.put(subCommand.getName().toLowerCase(Locale.ROOT), subCommand);
+    }
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
         if(!(sender instanceof Player player)){
-            sender.sendMessage("Only players can execute this command!");
+            sender.sendMessage(Component.text("Only players can execute this command!"));
             return true;
         }
 
         if(args.length == 0){
-            //sendHelp(player);
+            //既有可见行为逐字保留：/role 空参数不输出任何内容（历史实现的 sendHelp 调用被注释掉）
             return true;
         }
 
-        switch (args[0]){
-            case "set":
-                if(args.length == 2){
-                    handleSet(player, args[1], null);
-                    return true;
-                }
-                else if(args.length == 3){
-                    handleSet(player, args[1], args[2]);
-                    return true;
-                }
-                break;
-
-            case "clear":
-                if(args.length == 1){
-                    handleClear(player, null);
-                    return true;
-                }
-                else if(args.length == 2){
-                    handleClear(player, args[1]);
-                    return true;
-                }
-                break;
-
-            case "energy":
-                if(args.length < 2){
-                    player.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
-                    return true;
-                }
-                switch (args[1]){
-                    case "get":
-                        if(args.length == 2) {
-                            handleGetEnergy(player, null);
-                            return true;
-                        }
-                        if(args.length == 3){
-                            handleGetEnergy(player, args[2]);
-                            return true;
-                        }
-                        break;
-                    case "set":
-                        if(args.length == 3){
-                            handleSetEnergy(player, args[2], null);
-                            return true;
-                        }
-                        if(args.length == 4){
-                            handleSetEnergy(player, args[2], args[3]);
-                            return true;
-                        }
-                        break;
-                }
-                sendHelp(player);
-                return true;
-
-            case "help":
-                sendHelp(player);
-                return true;
-
-            default:
-                player.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
-                return true;
+        SubCommand subCommand = subCommands.get(args[0].toLowerCase(Locale.ROOT));
+        if(subCommand == null){
+            player.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
+            return true;
         }
-        return true;
+
+        //剥离第一个参数，剩余参数交给子指令
+        String[] subArgs = new String[args.length - 1];
+        System.arraycopy(args, 1, subArgs, 0, subArgs.length);
+        return subCommand.execute(player, subArgs);
     }
 
-    private void handleGetEnergy(Player sender, String targetName){
-        Player target;
-
-        if(targetName == null) target = sender;
-        else target = Bukkit.getPlayer(targetName);
-        if(target == null || !target.isOnline()){
-            sender.sendMessage(Component.text("Cannot find the player you provided: " + targetName));
-            return;
-        }
-        if(!roleManager.hasRole(target)) {
-            sender.sendMessage(Component.text(target.getName() + " has no role!"));
-            return;
-        }
-        sender.sendMessage(Component.text("The current energy level of [" + target.getName() + "] is: " + roleManager.getRoleInstance(target).getCurrentEnergy()));
-    }
-
-    private void handleSetEnergy(Player sender, String energyLevel, String targetName){
-        Player target;
-
-        if(targetName == null) target = sender;
-        else target = Bukkit.getPlayer(targetName);
-        if(target == null || !target.isOnline()){
-            sender.sendMessage(Component.text("Cannot find the player you provided: " + targetName));
-            return;
-        }
-        if(!roleManager.hasRole(target)) {
-            sender.sendMessage(Component.text(target.getName() + " has no role!"));
-            return;
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
+        if(args.length == 1){
+            return SubCommand.filter(subCommands.keySet(), args[0]);
         }
 
-        try{
-            int el = Integer.parseInt(energyLevel);
-            roleManager.getRoleInstance(target).setCurrentEnergy(el);
-        }
-        catch (NumberFormatException e){
-            return;
+        SubCommand subCommand = subCommands.get(args[0].toLowerCase(Locale.ROOT));
+        if(subCommand == null){
+            return List.of();
         }
 
-
-    }
-
-    private void handleSet(Player sender, String roleId, String targetName){
-        if(!roleRegistry.contains(roleId)){
-            sender.sendMessage(Component.text("Role '" + roleId + "' not exist!"));
-            return;
-        }
-
-        //选择角色
-        Player target;
-        if(targetName == null){
-            target = sender; // 默认是自己
-        }
-        else{
-            target = Bukkit.getPlayer(targetName);
-            if(target == null || !target.isOnline()){
-                sender.sendMessage(Component.text("Cannot find the player you provided: " + targetName));
-                return;
-            }
-        }
-
-        boolean success = roleManager.selectRole(target, roleId);
-        if(success){
-            if(targetName == null) sender.sendMessage(Component.text("Your role has been set: " + roleRegistry.get(roleId).getId()));
-            else sender.sendMessage(Component.text("The role of player [ " + targetName + "] has been set: " + roleRegistry.get(roleId).getId()));
-        }
-        else{
-            sender.sendMessage(Component.text("Role set operation failed."));
-        }
-    }
-
-    private void handleClear(Player sender, String targetName){
-        // 确定目标玩家
-        Player target;
-        if(targetName == null){
-            target = sender; // 默认自己
-        }
-        else{
-            target = Bukkit.getPlayer(targetName);
-            if(target == null || !target.isOnline()){
-                sender.sendMessage(Component.text("Cannot find the player you provided: " + targetName));
-                return;
-            }
-        }
-
-        //检查是否有角色
-        if(!roleManager.hasRole(target)){
-            if(target.equals(sender)){
-                sender.sendMessage(Component.text("You have no role yet!"));
-            }
-            else{
-                sender.sendMessage(Component.text("[" + targetName + "] has no role yet!"));
-            }
-            return;
-        }
-
-        //移除角色
-        boolean success = roleManager.clearRole(target);
-        if(success){
-            if(target.equals(sender)){
-                sender.sendMessage(Component.text("Your role has been cleared."));
-            }
-            else{
-                sender.sendMessage(Component.text("The role of [" + targetName + "] has been cleared."));
-                target.sendMessage(Component.text("Your role has been cleared."));
-            }
-        }
-        else {
-            sender.sendMessage(Component.text("Failed to clear the role."));
-        }
-        return;
-    }
-
-    private void sendHelp(Player player){
-        player.sendMessage(Component.text("=== ROLE SYSTEM COMMAND ==="));
-        player.sendMessage(Component.text("/role set <roleId> <playerName>  --set role"));
-        player.sendMessage(Component.text("/role set <roleId>  --set role for yourself"));
-        player.sendMessage(Component.text("/role clear <playerName>  --clear role"));
-        player.sendMessage(Component.text("/role clear  --clear your role"));
+        String[] subArgs = new String[args.length - 1];
+        System.arraycopy(args, 1, subArgs, 0, subArgs.length);
+        return subCommand.onTabComplete(sender, subArgs);
     }
 }

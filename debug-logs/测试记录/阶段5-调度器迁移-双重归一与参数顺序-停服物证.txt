@@ -1,0 +1,155 @@
+================================================================================
+t51 承批 增补（eng-审阅 独立复核三点，队长全部采纳 2026-09-18）
+—— **参数顺序易错点（同名反序）+ 双入口归一 + 归一语义申报**：实测与物证
+—— 起服/停服物证（当轮即时记录 2026-09-18 20:15–20:20）
+   · **④p 端口链实测**（组件真入口 `svc().timers()` → TimerPortImpl → Scheduler → 适配器 → GRS）
+   · 逐调用点**参数顺序**核对 · 三列对照表 · 双口径 (d) · 回滚单元 · 运行深度声明
+================================================================================
+
+§0 结论摘要（一句话）
+--------------------------------------------------------------------------------
+① **参数顺序**：`Scheduler`（task 在前）与 `TimerPort`（task 在最后）**同名反序**确属长期隐患 —— 已按规格**在两个接口的 javadoc 各写一处"易错点"对照** ✓，
+   并**逐调用点核对**：5 个生产调用点 + 2 条探针腿**全部写对了自己那一侧的顺序** ✓（唯一转调点 `TimerPortImpl` 显式交换）；
+② **双入口归一**：`TimerPortImpl` 与 `BukkitSchedulerAdapter` **各一处** `Math.max(1L, …)`（幂等 ⇒ 无害）✓，
+   并由 **④p 端口链实测**（走组件真入口、声明 `(0,10)`）证得首/次触发 **1/11**，与 ④m 矩阵期望**逐字相同** ✓；
+③ **归一语义**：**实测证明"不是晚 1 tick"** —— 原生 Bukkit 的 `0L` 语义本就是"下一个 tick 首次执行"，
+   两条路径首/次触发 tick **逐组相同**（`0/1 × period 1/2/10/40/6`）⇒ **归一不构成可见行为变化** ✓（原始值见 §4）。
+
+§1 本增量改动面（4 文件）与**回滚单元的如实更正**
+--------------------------------------------------------------------------------
+| 文件 | 身份（现算） | 性质 |
+|---|---|---|
+| `platform/Scheduler.java` | **1652 B / 27 行 / `01B0B6D46592DD6E649B2B7EEA41BF05734DA264F39236CD082FFCDBABD94E53`** | **仅 javadoc**：参数顺序易错点 + 实现约定（`initialDelay<=0` 由实现侧归一） |
+| `core/ports/TimerPort.java` | **1723 B / 31 行 / `7BA8B2FAAE011852A6A2B9FFDAD52C0D628BD6F9E3BAE0EC5987114F14FB0C6F`** | **仅 javadoc**：同名反序对照 + `initialDelay=0` 合法且由实现侧归一 |
+| `core/TimerPortImpl.java` | **2894 B / 65 行 / `F846719ABC37E3FE46655883917BD8445585E59C90864EC3C77E85ED7D959630`** | **功能 1 行**：`Math.max(1L, initialDelayTicks)`（双入口归一的第二处）＋注释点明"唯一转调点" |
+| `command/RoleCommand.java` | **38088 B / 688 行 / `FAA2264D21C95BFD489A256E2082A3063FA421FAA33FAB3A49B567ED4CFE555A`** | 探针新增 **④p 端口链腿**（临时件，可整段删除） |
+
+> ⚠ **如实更正（与队长规格 D 的冲突）**：规格 D 写"回滚单元 = 适配器 **1 文件**"，但规格 **B③ 明确要求 `TimerPortImpl` + 适配器各一处归一** ⇒ 本增量后
+> **生产回滚单元 = 2 个功能文件**（`platform/BukkitSchedulerAdapter.java` + `core/TimerPortImpl.java`）**＋ 2 个纯 javadoc 文件**（`Scheduler.java` / `TimerPort.java`，无行为）。
+> 若队长坚持"1 文件"，**可只回退 `TimerPortImpl` 那一行**（适配器侧归一仍在，行为不变，因为 `Math.max` 幂等且适配器是必经之路）—— 请裁定。
+>
+> 另：`TimerPortImpl` 是**包私有**（`final class` + 包私有构造），`command/` 侧无法直接实例化它 ⇒ ④p 腿只能经**组件真入口** `svc().timers()` 触达（本卡正是这么做的）。
+
+§2 规格 A：`runRepeating` 调用点精确枚举（含多行实参**摊平**值）与转调链
+--------------------------------------------------------------------------------
+| # | 位置 | 实参（**摊平**） | 入口侧签名 | 顺序 ✓ |
+|---|---|---|---|---|
+| 1 | `roleComponent/DefaultSanTEZeroPunishment.java:56` | **`(0L, 40L, task)`** | `TimerPort`（task 末位） | ✓ |
+| 2 | `roleComponent/meiqiHezi/skill/MeiqiheziBloodySlashSkill.java:50` | **`(0L, 2L, task)`** | `TimerPort` | ✓ |
+| 3 | `roleComponent/red/RedSolitaryArroganceSkill.java:45` | `(1L, 6, task)` | `TimerPort` | ✓ |
+| 4 | `core/RoleInstance.java:118`（多行 `:119-121`） | **`(task, 1L, 1L)`** ← 摊平自 `this::triggerUpdate,` `1L,` `1L` | **`Scheduler`**（task 在前） | ✓ |
+| 5 | `manager/BuffManager.java:136`（多行 `:137-139`） | **`(task, 0L, 1L)`** ← 摊平自 `this::tickAllBuffs,` `0L,` `1L` | **`Scheduler`** | ✓ |
+⇒ **显式 `0L` 初延迟 = 3 处**（#1/#2 两组件 + #5 BuffManager，后者为多行形式 —— 队长的"3 处"口径经摊平后**成立** ✓，但其**顺序侧**不同：#1/#2 走 `TimerPort`、#5 走 `Scheduler`）。
+
+**转调链证据（`0` 会不会被 `TimerPortImpl` 吃掉/改写）**：
+`TimerPortImpl.java:51` = `owner.rolesContext().scheduler().runRepeating(task, Math.max(1L, initialDelayTicks), periodTicks);`
+⇒ 组件侧 `0L` 经 `TimerPort` → **本行**（显式把 task 从末位挪到首位 + 归一为 1）→ `Scheduler` → `BukkitSchedulerAdapter`（再归一一次，幂等）→ `GlobalRegionScheduler.runAtFixedRate`。
+⇒ **适配层归一"覆盖得到"全部 5 个调用点** ✓（不论它们从哪一侧进入）。
+
+§3 规格 B：参数顺序（① javadoc ② 逐调用点核对 ③ 双入口归一）
+--------------------------------------------------------------------------------
+[3.1] **① 两个接口的 javadoc 已各写明对照**（现算行号，逐字）：
+- `platform/Scheduler.java:8-11`："本接口的 `task` 在**前** —— `runLater(Runnable task, long delayTicks)`、`runRepeating(Runnable task, long initialDelayTicks, long periodTicks)`；而组件侧的 `TimerPort` 是 `task` 在**最后** …"（并注明"编译器**不会**报错：两边都是 `long` 与 `Runnable` 的合法组合"）
+- `core/ports/TimerPort.java:10-13`：反向对照（task 在最后 vs 平台侧 task 在前）+ "两者由 `core.TimerPortImpl` **唯一**转调（那一行显式交换顺序）。编译器**不会**替你发现顺序写反。"
+- **签名现算**：`Scheduler.java:24` `runLater(Runnable task, long delayTicks)` / `:26` `runRepeating(Runnable task, long initialDelayTicks, long periodTicks)`；
+  `TimerPort.java:25` `runLater(long delayTicks, Runnable task)` / `:27` `runRepeating(long initialDelayTicks, long periodTicks, Runnable task)` ⇒ **两个方法都反序**（不只 `runRepeating`）。
+[3.2] **② 逐调用点顺序核对**（权威来源 `git grep -n` 的首行内容，非视觉推断）：
+| # | 调用点原文（首行） | 判定 |
+|---|---|---|
+| 1 | `punishmentTask = svc().timers().runRepeating(0L, 40L, new Runnable() {` | 实参 `(long,long,Runnable)` ⇒ 对 `TimerPort` ✓ |
+| 2 | `attackTask = svc().timers().runRepeating(0L, 2L, new Runnable() {` | ✓ |
+| 3 | `attackTask = svc().timers().runRepeating(1L, 6,` | ✓ |
+| 4 | `updateTask = platform.scheduler().runRepeating(` + `this::triggerUpdate, 1L, 1L` | 实参 `(Runnable,long,long)` ⇒ 对 `Scheduler` ✓ |
+| 5 | `updaterTask = instance.rolesContext().scheduler().runRepeating(` + `this::tickAllBuffs, 0L, 1L` | ✓ |
+| 探针 ③d/④m | `probeAdapter.runRepeating(() -> { … }, d, p)` | 对 `Scheduler` ✓ |
+| 探针 ④p | `portSvc.timers().runRepeating(0L, 10L, () -> { … })` | 对 `TimerPort` ✓ |
+| 转调点 | `scheduler().runRepeating(task, Math.max(1L, initialDelayTicks), periodTicks)` | **显式交换** ✓ |
+⇒ **7 处调用 + 1 处转调，顺序全部正确** ✓（无一处写反）。
+[3.3] **③ 双入口归一**：`BukkitSchedulerAdapter.java:51`（`Math.max(1L, initialDelayTicks)`）＋ `TimerPortImpl.java:51`（同值）＝ **两处**；
+      `Math.max` **幂等** ⇒ 双保险无害（同值重复钳制不改变结果）✓。
+[3.4] **④ 三列对照表**（`调用点 | (归一后 initialDelay, period) | 首次触发 tick`）：
+| 调用点 | 归一后 `(delay, period)` | 首次触发 tick（实测） | 实测来源 |
+|---|---|---|---|
+| `DefaultSanTEZeroPunishment.java:56` | `(1, 40)` | **1**（次触发 41） | ④m `(0,40)` 两侧 1/41 |
+| `MeiqiheziBloodySlashSkill.java:50` | `(1, 2)` | **1**（次触发 3） | ④m `(0,2)` 两侧 1/3 |
+| `RedSolitaryArroganceSkill.java:45` | `(1, 6)` | **1**（次触发 7） | ④m `(1,6)` 两侧 1/7 |
+| `core/RoleInstance.java:118`（ticker） | `(1, 1)` | **1**（次触发 2） | ④m `(1,1)` 两侧 1/2 |
+| `manager/BuffManager.java:136`（`0L` 在 `:138`） | `(1, 1)` | **1**（次触发 2） | ④m `(0,1)` 两侧 1/2 |
+| **④p 端口链（真入口，组件 `autoRecoverEnergy_passive`）** | `(1, 10)` | **1**（次触发 **11**） | **④p 直测：`portFirstSecond=1/11`、`identical=true`** |
+> 口径说明：前 5 行的"首次触发 tick"来自**同声明值**的 ④m 实测（非该组件自身触发链路）；**第 6 行是经真实端口链的直测**（这是本增量新增的证据）。
+
+§4 规格 C：归一为 1 的**语义申报**（结论：**实测证明不是"晚 1 tick"**）
+--------------------------------------------------------------------------------
+[4.1] **值域归一规则**：`initialDelay <= 0 → 1`（两处，见 §3.3）；依据 = `GlobalRegionScheduler.runAtFixedRate` 的硬约束
+      （`IllegalArgumentException: Initial delay ticks may not be <= 0`，探针 ② boundary 每次实测）。
+[4.2] **首次触发 tick 等价性实测**（`0/1 × period 1/2/10/40/6`，两路径 A/B，逐组原值）：
+| 声明值 | 原生 Bukkit 首/次 | 适配器（归一后）首/次 | 相同？ |
+|---|---|---|---|
+| (0,1) | 1/2 | 1/2 | ✓ |
+| (0,2) | 1/3 | 1/3 | ✓ |
+| (0,10) | 1/11 | 1/11 | ✓ |
+| (0,40) | 1/41 | 1/41 | ✓ |
+| (1,1) | 1/2 | 1/2 | ✓ |
+| (1,2) | 1/3 | 1/3 | ✓ |
+| (1,6) | 1/7 | 1/7 | ✓ |
+| (1,10) | 1/11 | 1/11 | ✓ |
+[4.3] **申报文字（按"已申报的可见变化"口径）**：
+      ⇒ **归一不构成可见行为变化**：Bukkit 的 `0L` 语义实测就是"**下一个 tick** 首次执行"（首触发 delta = **1**），
+      与归一后的 `1L` **同 tick**；因此队长/审阅担心的"`0L` 延迟变为 1 ⇒ 首次触发晚 1 tick"**在实测下不成立** ✗（未观测到任何 1 tick 偏移）。
+      **用户可据此判断"无需接受任何延迟"**；本项**不列为可见变化**，但**列为已实测的等价项**（原始值如上，可复核）。
+      （若未来在 Folia 或其它平台出现 `0L` 与 `1L` 首触发不同的实证，本条须重新申报 —— 已在此声明前提。）
+
+§5 规格 D：其余取证（Mode B · C=0 · 停服 · 双口径 · 回滚 · 运行深度）
+--------------------------------------------------------------------------------
+[5.1] 起服前广播：20:17 已发 eng-验证（含"排队等窗口"）。窗口：他人占用（PID 41408，20:14:42 起）→ 我**等待至 20:17:46 释放后才起服**（未触碰他人服务器）✓
+[5.2] 构建（build E）：`BUILD SUCCESSFUL in 14s`；jar = **148297 B / 20:16:26.486 / `A74A574703924A8EE74F4BEABEA2BEE77C1449CE9677B7EF98703E24DED85A68`**；
+      最新 `.class` = `ShadowHunterRolesPlugin.class @20:16:25.965`；`src 新于 jar = 0` ✓
+[5.3] Mode B 三行齐（逐字，`debug-logs/测试记录/阶段5-起服日志-调度器迁移-端口链.log`）：
+      `:46` `[20:18:19] … Enabling ShadowHunterRolesPlugin v1.0.0` · `:47` `[20:18:20] … ShadowHunter Character System enabled.` ·
+      `:51` `[20:18:20] … Done (15.837s)! For help, type "help"`；SHDF 依赖行 **0 命中** ✓
+[5.4] 冻结日志 = **6135 B / 20:18:22.441 / `C50C351470D3A8371BEC683CDE4127F9F2C9EBC1EA7EBBCF7F14FD86F53E6DAD`**
+[5.5] 正序集合差（锚 T2b，只看 C）：**ADDED 0 / REMOVED 0 / C 0** ✓；整轮结束（含 bot 会话）复跑仍 **C = 0** ✓；整轮级别行 = **13**（= 基线，未新增）✓
+[5.6] 停服 **只 `job_kill` + 等待**：@**20:19:42.534** TCP connect 25566 = **FAILED** ✓ · `latest.log` 独占打开 = **SUCCEEDED** ✓ · netstat 无 LISTENING（1 条 TIME_WAIT）✓ · java = 2（19:01 daemon）✓
+[5.7] 双口径（base = 承批开工前快照 `t51c-before`，覆盖"矩阵 + 审计 + 双入口 + 端口腿"整批）：
+      **numeric 547 → 634**（diff 87，**全部新增、删除 0**）· **string 342 → 384**（diff 42，**全部新增、删除 0**）✓
+      非探针文件的字面量净变化：**仅 `core/TimerPortImpl.java` 的 `1L`**（归一端点常量）；`Scheduler.java` / `TimerPort.java` = **0 字面量**（纯 javadoc）✓
+[5.8] 回滚单元：见 §1 的**更正**（功能 2 文件 + javadoc 2 文件；最小回退 = `TimerPortImpl` 1 行）
+[5.9] **运行深度**：服务端达到「启用 + 空闲」（Mode B）✓；**加深（已申报）** = 一次 bot 会话，**先 `/role set meiqihezi` 再跑探针**（这是 ④p 腿可测的前提），
+      随后 `/role clear`（角色清除 ⇒ 框架兜底取消组件资源表里的 ④p 任务；清除后至 quit 的 11 秒内**无新 `[sched]` 行、无 SEVERE/ERROR** ⇒ 回收正常）✓
+      **未覆盖**：① 四行合格线（25565 装 SHDF）未执行；② Folia 真机未验；③ 一次性 `run` 相位无原生对照腿（`timers().run(` 调用点 = 0）；④ 组件**业务触发**（受击/技能命中）未构造。
+
+§6 本轮新增的**第三类仪器口径陷阱**（如实记录，供全队）
+--------------------------------------------------------------------------------
+`Get-Content <file> | Select-Object -Skip N -First M` 在本机对**含 CJK 的 UTF-8 无 BOM** 文件会出现**行号漂移**（实测：对 `DefaultSanTEZeroPunishment.java` / `MeiqiheziBloodySlashSkill.java` 按 `git grep` 报的行号取上下文，
+取到的是**别的方法体**；漂移量随 CJK 密度变化，同批 `RoleInstance.java` / `BuffManager.java` 却恰好对上 ⇒ 属**静默错误**）。
+⇒ **纪律**：**行号定位一律用 `git grep -n`（可带 `-A`）或 `read` 工具**，不要用"`Get-Content` + 偏移"读数（会给出**看起来合法但错位**的内容）。
+（前两类：① `Get-NetTCPConnection -State Listen` 在服务器确在监听时可能返回 0；② 行数口径 = 换行符计数，`\r?\n` 切分会多算 1。）
+
+§7 交付物身份（当轮现算；引用请重算）
+--------------------------------------------------------------------------------
+1. `command/RoleCommand.java` = **38088 B / 688 行 / `FAA2264D21C95BFD489A256E2082A3063FA421FAA33FAB3A49B567ED4CFE555A`**
+2. `core/TimerPortImpl.java` = **2894 B / 65 行 / `F846719ABC37E3FE46655883917BD8445585E59C90864EC3C77E85ED7D959630`**
+3. `core/ports/TimerPort.java` = **1723 B / 31 行 / `7BA8B2FAAE011852A6A2B9FFDAD52C0D628BD6F9E3BAE0EC5987114F14FB0C6F`**
+4. `platform/Scheduler.java` = **1652 B / 27 行 / `01B0B6D46592DD6E649B2B7EEA41BF05734DA264F39236CD082FFCDBABD94E53`**
+5. `debug-logs/测试记录/阶段5-起服日志-调度器迁移-端口链.log` = **6135 B / 56 行 / `C50C351470D3A8371BEC683CDE4127F9F2C9EBC1EA7EBBCF7F14FD86F53E6DAD`**
+6. 本文件 `debug-logs/测试记录/阶段5-调度器迁移-双重归一与参数顺序-停服物证.txt`（身份见交卡 output）
+7. 构建：`BUILD SUCCESSFUL in 14s` · jar **148297 B / `A74A5747…`** · 最新 `.class` @20:16:25.965 · `src 新于 jar = 0`
+8. 仓库外工具（**未写入仓库**）：`%TEMP%\t51e-rolefirst-runner.js`（先 set 后探针的运行器）· `%TEMP%\t51e-portchain-bot-out.txt`（§4 逐字来源，**80 行**）；
+   工装 `.scratch\bot\t51d-build.log` · `t51de-multiset.txt` · `logdelta-t51e*.txt`
+
+附：④p 端口链**原始输出**（逐字，取自 `%TEMP%\t51e-portchain-bot-out.txt`）
+--------------------------------------------------------------------------------
+[12:19:01.720] >> /role set meiqihezi
+[12:19:01.869] CHAT Your role has been set: meiqihezi
+[12:19:04.711] >> /role debug sched
+[12:19:04.759] CHAT [sched] ④p port(TimerPortImpl) delay=0 period=10 #1 | tick=855 | delta=1 | component=autoRecoverEnergy_passive
+[12:19:05.243] CHAT [sched] ④p port(TimerPortImpl) delay=0 period=10 #2 | tick=865 | delta=11 | component=autoRecoverEnergy_passive
+[12:19:05.243] CHAT [sched] ④p port leg | component=autoRecoverEnergy_passive,portFirstSecond=1/11 | expectedByMatrix(0,10)=1/11 | identical=true
+[12:19:07.700] CHAT [sched] ⑤ verdict | sameThread=true | periodEquivalent=true (global=20 bukkit=20, declared 20) | delayedEquivalent=true | cancelSemanticsOk=true | rawInitialDelayPolicySame=false (global: initialDelay0=REJECTED(IllegalArgumentException: Initial delay ticks may not be <= 0) / bukkit: initialDelay0=ACCEPTED) | clampEquivalent=true | adapterDelayedEquivalent=true | adapterCancelOk=true | matrixEquivalent=true | portLeg=autoRecoverEnergy_passive,portFirstSecond=1/11 | portLegEquivalent=true | CONCLUSION=CAN swap the platform adapter to GlobalRegionScheduler with zero visible difference (raw APIs differ only on initialDelay<=0; the adapter normalises 0 -> 1 and the A/B on the production declaration 0/10 is tick-identical)
+[12:19:16.223] >> /role clear
+[12:19:16.257] CHAT Your role has been cleared.
+[12:19:16.750] >> quit
+[12:19:16.753] BOT end: port leg done
+（完整 80 行捕获含 ④m 矩阵全量原值，与上一份物证 §2 的矩阵逐字一致；此处只摘 ④p 与 ⑤。）
+> 行数口径 = 换行符计数（`read` 工具与 `Get-Content` 一致）；按 `\r?\n` 切分会多算 1 个尾部空元素。
+================================================================================

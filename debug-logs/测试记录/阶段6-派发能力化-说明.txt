@@ -1,0 +1,162 @@
+阶段 6 · 派发面能力化两刀 —— 交付说明（卡 t22）
+================================================================================================================
+边界声明（开篇）
+  1) 三件证据 = 本件 + 阶段6-起服日志-派发能力化.log + 阶段6-派发能力化-停服物证.txt；jar 归档与 MANIFEST 追加属本卡 inScope。
+  2) **零 git 写**；未改 `api/**`、`internal/**`、渲染三文件、14 个组件、`registry/`、`docs/`；未改任何既有冻结证据；**未重建 `FCB926AC` 那一代**。
+  3) 行号 = 结卡时的**当前树**现值；凡涉及未跟踪新件 `CooldownAware.java` 的检索一律带 `--untracked --no-exclude-standard`（否则默认 `git grep` 看不见它）。
+  4) 点名提交：基线 = `3becba85512a6f3cdce7aaa7b3491cee345a4255`（本批开工时工作树所在提交）；本批改动**未提交**。
+
+第 0 节 · 一句话结论
+  派发面已能力化：① `RoleInstance.handleCast` 的判据由 `instanceof ActiveComponent` 改为 **`instanceof HotbarActionable`**；
+  ② 新增能力接口 **`CooldownAware`**（承接 `onCooldownEnd` 与嵌套枚举 `CooldownEndReason`），`ActiveComponent implements CooldownAware`，
+  `dispatchCooldownEnd` 的判据改为 **`instanceof CooldownAware`**。**两处判据的接受集与改前逐字相同**（证明见第 3 节），
+  现有组件零行为变化；渲染面 0 改动。构建通过、Mode B 三行齐、集合差 `C=0`、两窗级别字段 0、插件归因异常 0/0（形态双向自证）、
+  防假新鲜三条件齐、停服三路互证齐；新代已归档并登记（登记 9）。
+
+第 1 节 · 基线（第一动作 = 取基线，编辑之前）
+  `powershell … .scratch\bot\t59-baseline-and-scoped-criteria.ps1 -Name t22-dispatch-capability-before`
+  ⇒ HEAD = **3becba8…**；snapshot: **95 java files**；SHA256.txt = 95 行；时点 2026-09-19 20:03:39.804。
+  （基线 95 = t18 的 91 + 4 个新类型 ⇒ 与本卡"在 t18 之后"的前提一致。）
+
+第 2 节 · 改动面（3 改 + 1 新；全部 ⊆ inScope）
+  ① `core/RoleInstance.java`：`handleCast` 判据改接口（:200）；`dispatchCooldownEnd` 签名与判据改 `CooldownAware`（:420/:421）；
+     三处调用点的枚举限定名改 `CooldownAware.CooldownEndReason`（:373→:375 区/`:386`/`:391` 一带，逐点见第 4 节）；新增 import `HotbarActionable`/`CooldownAware`；删除因改判而失效的 `import …roleComponent.ActiveComponent`。
+  ② `core/CooldownPortImpl.java`：`start()` 内 `RESTARTED` 的枚举限定名改 `CooldownAware.CooldownEndReason.RESTARTED`；import 由 `ActiveComponent` 改为 `CooldownAware`。
+  ③ `roleComponent/ActiveComponent.java`：`implements HotbarItem, HotbarActionable, HotbarPresentable, **CooldownAware**`；删掉本类内的 `onCooldownEnd` 默认实现与**嵌套枚举** `CooldownEndReason`（迁到接口）⇒ **本类不再保留第二个同名枚举**；加 import。
+  ④ **新增** `core/hotbar/CooldownAware.java`（31 行）：`public interface CooldownAware`（`core/hotbar/CooldownAware.java:16`）
+     + `default void onCooldownEnd(CooldownEndReason reason)`（:19，默认空实现 = 与迁移前 `ActiveComponent` 的默认实现逐字等价）
+     + 嵌套 `enum CooldownEndReason { EXPIRED, ENDED_BY_COMPONENT, RESTARTED }`（:23）。
+
+第 3 节 · 逐条（A1…A14）
+  A1【第一刀】⇒ **pass**：`git grep -n -E 'instanceof HotbarActionable|instanceof CooldownAware' -- …/core/RoleInstance.java`
+      ⇒ `:200 if(!(component instanceof HotbarActionable active)) return false;`（handler 体不变：`active.onCast(new CastSignal(trigger)); hotbarRenderer.markDirty(); return true;`）
+      ⇒ 判据由继承改为能力接口，且该模式变量只用于 `onCast`（`HotbarActionable` 的唯一方法）。
+  A2【第二刀】⇒ **pass**：新接口见第 2 节④；`ActiveComponent.java:28` 逐字 = `implements HotbarItem, HotbarActionable, HotbarPresentable, CooldownAware {`；
+      `RoleInstance:421` = `if(component instanceof CooldownAware aware){`，:422 = `runComponentUpdate("registered", component.getId(), () -> aware.onCooldownEnd(reason));`
+      （注意：这里用的是 `component.getId()`（`RoleComponent` 的 final 方法），**不是** `aware.getId()` —— `CooldownAware` 不声明 `getId`）。
+  A3【核心判据·接受集不变】⇒ **pass（逐条可复算，含 eng-验证 的抽核更正）**
+      · 判据①：改前 = `instanceof ActiveComponent`；改后 = `instanceof HotbarActionable`。
+        全树 `-E 'implements .*HotbarActionable'` ⇒ **1 行**（`roleComponent/ActiveComponent.java:28`）⇒ 树内**每一个** `HotbarActionable` 都是 `ActiveComponent`；
+        反向由 `ActiveComponent implements HotbarActionable` 给出 ⇒ **两个方向都成立 ⇒ 接受集恒等**。
+      · 判据②：改前 = `instanceof ActiveComponent`；改后 = `instanceof CooldownAware`。
+        全树 `-E 'implements .*CooldownAware'` ⇒ **1 行**（同上）⇒ 接受集恒等。
+      · **接受集的精确构成（更正一处先前的粗写）**：接受集 = **`ActiveComponent` 子树** =
+        **8 个活动组件**（`-F 'extends Skill'` = **6** + `-F 'extends MainWeapon'` = **2**）+ 基类自身；
+        **6 个被动不在接受集内**（`-F 'extends PassiveSkill'` = 6，且它们 `extends RoleComponent`，**不是** `ActiveComponent`）——
+        改前改后一致（被动侧文件对 `HotbarActionable|CooldownAware` 命中 = **0**）。
+        ⇒ 精确表述应为「**接受集 = ActiveComponent 子树（8 个技能/主武器组件 + 基类自身）；6 个被动改前改后都不在集合内**」，
+        不得写成"14 个组件全在其下"（该粗写在协作报文里出现过，已按 eng-验证 的抽核更正）。
+      · 攻击入口本来就用能力接口（`handleAttack` = `instanceof CombatHook`），本卡未改（也无需改）。
+  A4【枚举迁移】⇒ **pass（逐点列出改前 → 改后）**
+      | 位置（当前树） | 改前 | 改后 |
+      |---|---|---|
+      | `RoleInstance` `endCooldown`（S3 结束） | `ActiveComponent.CooldownEndReason.ENDED_BY_COMPONENT` | `CooldownAware.CooldownEndReason.ENDED_BY_COMPONENT` |
+      | `RoleInstance` `scanCooldowns` 技能表到期 | `ActiveComponent.CooldownEndReason.EXPIRED` | `CooldownAware.CooldownEndReason.EXPIRED` |
+      | `RoleInstance` `scanCooldowns` 武器表到期 | 同上 | 同上 |
+      | `RoleInstance` `dispatchCooldownEnd` 形参 | `ActiveComponent.CooldownEndReason reason` | `CooldownAware.CooldownEndReason reason` |
+      | `CooldownPortImpl.start`（重启顶替） | `ActiveComponent.CooldownEndReason.RESTARTED` | `CooldownAware.CooldownEndReason.RESTARTED` |
+      | `ActiveComponent` 本体 | 自带 `onCooldownEnd` + 嵌套 `enum CooldownEndReason` | **全部迁出**（本类只剩 `implements CooldownAware` 的注释说明） |
+      判据：`git grep -rn 'ActiveComponent.CooldownEndReason' -- src`（含未跟踪）⇒ **0 命中**；`ActiveComponent` 内**无第二个同名枚举**（`-F 'enum CooldownEndReason'` 全树只命中 `CooldownAware.java:23`）。
+  A5【API 面零改动】⇒ **pass**：`status --porcelain -- …/api …/internal` ⇒ **0 行**；`-F 'CooldownEndReason|onCooldownEnd' -- src/main/java/com/shadowHunterRolesPlugin/api src/main/java/com/shadowHunterRolesPlugin/internal` ⇒ **0 命中**（挪枚举不构成 `RoleAPI` 破坏）。
+  A6【不动渲染路径】⇒ **pass**：`status --porcelain -- …/hotbar/HotbarRenderer.java …/hotbar/ItemKind.java …/hotbar/HotbarSpec.java` ⇒ **0 行**；六条冻结文案各 **1 行**、`%.1f` = **1**（与本批前逐字相同）。
+      **无交集的论证（不是"跳过外观取证"）**：① 本卡只改**两个判据的静态类型测试**与**一个回调的类型归属**，渲染路径读取的是「注册 kind + `spec()` + 冷却表/闸门状态」，
+      与本卡触及的符号集合（`HotbarActionable`/`CooldownAware`/`CooldownEndReason`）**无交集**；② 由 A3 的接受集恒等 ⇒ `handleCast` 的**返回路径与 `markDirty()` 调用序列逐字不变**
+      （同一集合、同一处调用），即渲染器输入（dirty 标志）不因本卡改变；③ `dispatchCooldownEnd` 的接受集恒等 ⇒ 回调触发时刻与集合不变，其后续 `markHotbarDirty.run()`（`scanCooldowns`/`endCooldown`）路径不变；
+      ④ 渲染三文件 0 改动 + 六条文案/`%.1f` 读数不变 ⇒ 外观面无来源改变。⇒ 结论：本卡与外观面**无交集**。
+  A7【编译级例证】⇒ **pass**：仓库外 `.scratch\bot\t22-a7-outofrepo\a7probe\`（不进 changedPaths）放两个探针：
+      `A7Dispatchable` = `extends RoleComponent implements HotbarActionable, CooldownAware`（**不继承** `ActiveComponent`/`Skill`/`MainWeapon`/`PassiveSkill`，并覆写 `onCooldownEnd` 以证枚举可达）；
+      `A7Bind` = 逐字复刻两处判据形态（`if (!(o instanceof HotbarActionable a)) …` / `if (!(o instanceof CooldownAware c)) …`）以便同级编译。
+      命令：`javac -encoding UTF-8 -cp "build/classes/java/main;<paper-api 1.21.11>;<adventure…>" -d …\out <两个探针>` ⇒ **exit = 0**；产物 `A7Dispatchable.class`(1156 B)、`A7Bind.class`(1848 B)；
+      `javap`：`public final class a7probe.A7Dispatchable extends …RoleComponent implements …HotbarActionable,…CooldownAware` + `public void onCooldownEnd(…CooldownAware$CooldownEndReason)`。
+  A8【诚实档位】⇒ **pass（如实退档）**：**运行级**证明"非继承组件真的被派发"**本轮做不到** —— 要它被派发必须先把该组件**注册进某个角色**，
+      而注册面（`Role.Builder.addComponent`）只对插件内代码可用、`RoleAPI` 不开放组件注册 ⇒ 无外部注入点。
+      ⇒ 本卡证据最高档位 = 「**静态证明接受集恒等 + 编译级例证（仓库外）+ 运行级只覆盖"既有组件零回归"**」；
+      **未**、也**不得**写成"运行级已验证"。最小闭合方式（将来另立卡）：加一个**仅测试用**的注册入口（例如 `addComponent` 的测试专用重载 + 一个只对 op/测试世界开放的调试指令），
+      然后把 `A7Dispatchable` 这类组件注册进去、按键/到期各观察一次派发。
+  A9 构建 ⇒ **pass**：`BUILD SUCCESSFUL in 11s`；`.class` mtime 刷新；jar = 164982 → **165404 B / 20:05:37.216**；`src 新于 jar = 0`。
+  A10 运行级 ⇒ **pass**：Mode B 三行（20:07:15/20:07:15/20:07:16 Done 9.636s）· log-delta **C=0**（anchor/current 各 13、ADDED=0/REMOVED=0/A=B=C=0）·
+      **开机窗/运行窗分列** ⇒ ERROR/SEVERE 均 **0**（50 行/6 行）· **插件归因异常扫描 0/0**，且形态已**双向自证**（正样本 t5 件 formA=1/formB=4；负样本 t18 件 0/0）。
+  A11 当轮物证 ⇒ **pass**：**仍在线时冻结**（20:07:28.588，共享读流）→ 只 `job_kill`（20:07:43.344 探测到停止；未强杀 java）→ 停服三路互证；
+      三件证据名与 inScope 逐字一致；F1 链 ORDER 见末节。
+      ★ **防假新鲜三条件**（队长追加，逐条落盘于物证第一节）：① 启动边界 20:06:47.687（起服前三路互证）→ 轮转/首行 **20:07:06**；
+      ② mtime 20:07:17.547 ≤ 冻结 20:07:28.593，均晚于启动；③ SHA256 `46B1E045…` 与旧件清单六件（`6041B041`/`8318A683`/`8268E32C`/`527183B0`/`73EEF15D`/`2F45CF5E`，逐件现算）**全部不等**；
+      另加**轮转侧证**：`2026-09-19-6.log.gz` 解压 = `6041B041…`（= 起服前那份）⇒ 旧件确实被挤走。
+  A12 制品归档 ⇒ **pass**：归档 `…-verified-20260919-200537-06750CFE.jar`（165404 B / 20:05:37.216，与 build/libs 逐字节相同）+ MANIFEST「登记 9」；
+      **未重建 `FCB926AC` 代**：其归档件现算 = 164982 B / 19:22:14.941 / `FCB926AC…`（逐字未变）。
+  A13【文档同步面清点】⇒ **pass（只清点、不改）**：`git grep -n -E 'CooldownEndReason|onCooldownEnd' -- docs`（含未跟踪）⇒ **4 行 / 3 文件**：
+      ① `docs/插件文档/开发指南-新增角色或组件.md:104` —— 「…想收尾自己的状态就覆写 `onCooldownEnd(CooldownEndReason reason)`（枚举值 `EXPIRED` / `ENDED_BY_COMPONENT` / `RESTARTED`）。」
+      ② `docs/插件文档/架构与组件模型.md:114` —— 「`ActiveComponent` | `extends RoleComponent implements HotbarItem, HotbarActionable, HotbarPresentable`…（提供默认 `onCast` 与 `onCooldownEnd`（空实现））」
+      ③ `docs/插件文档/架构与组件模型.md:202` —— 「组件的收尾钩子：`ActiveComponent.onCooldownEnd(CooldownEndReason)`，枚举值 …」
+      ④ `docs/插件文档/角色与技能.md:288` —— 「组件可以在 `ActiveComponent.onCooldownEnd(reason)` 里收尾自己的状态…」
+      ⇒ 这 4 处的**类型归属**（`ActiveComponent.onCooldownEnd`、`ActiveComponent implements …`）本卡之后已**过时**（钩子与枚举现挂在 `CooldownAware`；
+      `ActiveComponent` 的 implements 列表也少了 `CooldownAware`）—— **本卡不改文档**，请据此另立文档卡（建议同时更新「不必继承」的组合例：新组件应 `implements CooldownAware` 而非继承 `ActiveComponent` 才有冷却结束回调）。
+  A14 边界 ⇒ **pass**：未覆盖项见第 5 节；零 git 写；`changedPaths` ⊆ inScope（见第 6 节）。
+
+第 4 节 · 范围外发现（只申报、不改）
+  · `command/DebugCooldownCommand.java:68` 仍 `instanceof ActiveComponent`（**命令面**、非派发面；`command/` 不在本卡 inScope）⇒ 凡写"派发面不再依赖 ActiveComponent"须点名这处特例，**不得**读成"全树零 `ActiveComponent` 依赖"。
+  · `core/ports/CooldownPort.java:10/:12` 的 javadoc 提到 `onCooldownEnd(...)`（**文档性引用**；该文件不在 inScope）⇒ 文字仍成立（方法名未变），仅类型归属在文档卡里一并订正为宜。
+
+第 5 节 · 未覆盖项如实申报
+  1. **运行级"非继承组件被派发"未覆盖**（A8 已详述退档理由与最小闭合方式）。**严禁**读成"运行级已验证"。
+  2. 本卡**未**新增/修改任何测试源集；`A7Bind` 只做编译级证明，未运行。
+  3. 未评估"未来把 `dispatchCooldownEnd` 的枚举再迁回/改名"的兼容面（当前 `api/**` 0 命中 ⇒ 无外部契约面）。
+  4. 第三方插件若以 `ActiveComponent.CooldownEndReason` 全限定名编译，将**源码级不兼容**（二进制层面：嵌套枚举的 `$` 名称变化 ⇒ 需重编译）。本仓 `api/**` 未暴露它，故对 `RoleAPI` 消费者无影响；**未扫仓库外插件**。
+  5. 外观面（六维）与行为面（冷却到期/施放）**本轮无新运行级读数**（无玩家/无 dump）；本卡与外观面**无交集**的论证见 A6，但"无交集的论证"不等于"外观级复测已做"。
+
+第 6 节 · 零 git 写 / changedPaths / 范围外写入
+  · **零 git 写**：未执行 add/commit/checkout/restore/stash/reset；本批改动未提交。
+  · changedPaths（仓库相对 POSIX；逐条 ⊆ inScope）：
+      `src/main/java/com/shadowHunterRolesPlugin/core/RoleInstance.java`
+      `src/main/java/com/shadowHunterRolesPlugin/core/CooldownPortImpl.java`
+      `src/main/java/com/shadowHunterRolesPlugin/roleComponent/ActiveComponent.java`
+      `src/main/java/com/shadowHunterRolesPlugin/core/hotbar/CooldownAware.java`（新）
+      `debug-logs/回滚快照/jars/ShadowHunterRolesPlugin-1.0.0-verified-20260919-200537-06750CFE.jar`
+      `debug-logs/回滚快照/jars/MANIFEST.txt`（追加登记 9）
+      `debug-logs/测试记录/阶段6-派发能力化-说明.txt`
+      `debug-logs/测试记录/阶段6-起服日志-派发能力化.log`
+      `debug-logs/测试记录/阶段6-派发能力化-停服物证.txt`
+  · 范围外（工作区级、非仓库）写入：`.scratch\bot\src-snapshots\t22-dispatch-capability-before\`（基线快照 + SHA256.txt）、
+    `.scratch\bot\t22-build-1.log`、`.scratch\bot\logdelta-t22.txt`、`.scratch\bot\t22-a7-outofrepo\`（A7 探针 + 产物）、
+    `.scratch\bot\pret22-latest-copy.log`（**为 t21 持有人留存**的起服前 latest.log 副本 —— eng-取证 已回复不需要，此处如实登记）⇒ 均属判据/协作要求，未改任何共享仪器脚本。
+
+第 7 节 · 提交态申报（台账 §3 铁律 8）
+  取证时刻 `git status --porcelain -- src` = **4 行**（3 改 + **1 未跟踪新件** `CooldownAware.java`）⇒ 本轮 = **开发构建轮**。
+  点名提交：基线 `3becba8…`（开工时工作树所在提交）；结卡时 HEAD 见末节。制品↔源码绑定 = 「`3becba8` 的 src 树 + 本批工作树改动」。
+  ⚠️ 检索纪律：**未跟踪新件在默认 `git grep` 下不可见**（eng-验证 实测：`CooldownAware` 15 行 vs 加 `--untracked --no-exclude-standard` 16 行；本说明的接口定义行号来自**直读文件**）
+  ⇒ 任何"接口定义存在/树内计数"的判据必须带该开关或直读，否则会**少 1 行甚至假 0**。
+
+页末声明（口径）
+  A. 卡面 verify 的 gradlew 条写作裸 `.\gradlew …`；实际执行形态 = 同一条 pwsh 前置 `$env:GRADLE_USER_HOME="$PWD\.gradle-work"`（一次申报；commandsRun 用卡面原文）。
+  B. 构建判定 = `BUILD SUCCESSFUL` + `build/classes` 最新 `.class` mtime 已刷新（本机 gradlew 会向 stderr 打 `Couldn't open current thread, error = 5` ⇒ 不看退出码）。
+  C. log-delta 本次外层接了 `Select-Object -First 20` ⇒ 报 `exit code 1` 属**生产者侧截断伪值**（族 7）；脚本自身已打印 `written -> …`，判据以 `C=0` 为准。
+第 8 节 · F1 链 ORDER 机器校验（命令 + 输出，逐字）
+  命令：$j=(Get-Item build\libs\ShadowHunterRolesPlugin-1.0.0.jar).LastWriteTime; $l=(Get-Item …阶段6-起服日志-派发能力化.log).LastWriteTime; $e=(Get-Item …阶段6-派发能力化-停服物证.txt).LastWriteTime; $n=(Get-Item …阶段6-派发能力化-说明.txt).LastWriteTime; ($j -lt $l) -and ($l -lt $e) -and ($e -lt $n)
+  jar    mtime = 2026-09-19 20:05:37.216  (build/libs，与归档件同 mtime)
+  log    mtime = 2026-09-19 20:07:28.593  (阶段6-起服日志-派发能力化.log，仍在线时冻结)
+  物证   mtime = 2026-09-19 20:08:39.440
+  说明   mtime = 2026-09-19 20:09:06.839  (本件；追加本节后 mtime 顺延，仍为链尾)
+  ORDER = OK
+  点名提交（不用「HEAD 的 tree」）：基线 = 3becba85512a6f3cdce7aaa7b3491cee345a4255（开工时工作树所在提交）；本批改动未提交。
+
+第 9 节 · ★ 更正（追加，不改原句；来源 = eng-验证 的复算回执 + 本批自查；2026-09-19 20:1x）
+  更正 1 · 预检副本的产生者：第 6 节写的 `.scratch\bot\pret22-latest-copy.log`（"为 t21 持有人留存"的起服前 latest.log 副本）只写了**用途**、未写**产生者** ⇒ 补：
+      产生者 = **本批（eng-实现）的起服前预检**；现算 10460 B / mtime **2026-09-19 20:06:47.781** / SHA256 6041B041…（比本批记录的启动边界 20:06:47.687 晚约 94 ms，正落在我的预检命令内）；
+      用途 = ① 防假新鲜对照（与旧件清单做 SHA 比较）② 为 t21 持有人保留在场副本（eng-取证 事后回复不需要；副本仍留原处不删）。
+  更正 2 · 归属分列（谁提的 / 谁算的）：`6041B041…` 进入 SHA 不等清单的**建议者 = eng-取证**（其 t21 轮的值）；该值由**本批**通过轮转件解压独立现算得出，eng-验证 已独立复现同一值（逐字相同）。
+      ★ 我发给 eng-验证 的协作报文里曾写成"你补的 6041B041…"（把 eng-取证的贡献记到 eng-验证 名下）—— 该措辞**在本件之外**，此处留下更正，以免后人按报文引错来源。
+      eng-验证 提供的对照值清单 = t18 `2F45CF5E…` / t5 `B96011E7…` / t19 `8318A683…` / t67 `73EEF15D…` / t4 `8268E32C…`（五件）；本批补充的是 `2F45CF5E…`（t18）与 `6041B041…`（t21，建议者见上）。
+  更正 3 · 侧证锚点改挂**在库件**（采纳 eng-验证 的建议）：A11 的"轮转侧证"原先只引 `run/logs/2026-09-19-6.log.gz`（被 `.gitignore` 忽略 + 下次起服即被轮转 ⇒ 引用会悬空）⇒
+      正确锚点 = **仓库内** t21 冻结件 `debug-logs/测试记录/阶段6-起服日志-C11派发序运行级.log`（现算 10460 B / mtime 2026-09-19 19:59:58.435 / SHA256 6041B041…）。
+      三处同内容（本批复算，逐字相同）：t21 在库冻结件 · 轮转件 gz 解压 · `.scratch` 预检副本 ⇒ 每条都是 10460 B / 6041B041…（在库锚点可长期追溯，另两条仅作旁证）。
+  更正 4 · 口头引用纪律：此后凡引他人读数一律按「**谁提的（建议者）** + **谁算的（现算者）** + **哪件载体（在库路径优先）**」三件写全 —— 本轮的两处挂错正是这条纪律在冻结件里的落地。
+  更正 5 · 同批已在物证件追加对应更正（第十一节，物证 9697 → 11883 B）；两件证据的**原句一字未改**。
+
+第 10 节 · 更正后 F1 链 ORDER 复算（机器校验，命令与输出逐字；本节为最后一次追加）
+  命令：`$j=(Get-Item build\libs\ShadowHunterRolesPlugin-1.0.0.jar).LastWriteTime; $l=(Get-Item …阶段6-起服日志-派发能力化.log).LastWriteTime; $e=(Get-Item …阶段6-派发能力化-停服物证.txt).LastWriteTime; $n=(Get-Item …阶段6-派发能力化-说明.txt).LastWriteTime; ($j -lt $l) -and ($l -lt $e) -and ($e -lt $n)`
+      jar    mtime = 2026-09-19 20:05:37.216  (build/libs，与归档件同 mtime)
+      log    mtime = 2026-09-19 20:07:28.593  (阶段6-起服日志-派发能力化.log；SHA256 46B1E045…，更正期间**未变**)
+      物证   mtime = 2026-09-19 20:10:55.590  (更正 1–3 追加于第十一节；11883 B / SHA256 E728F473…)
+      说明   mtime = 2026-09-19 20:11:24.441  (本件；更正 1–5 追加于第 9 节，本节随后追加 ⇒ mtime 再顺延，仍为链尾)
+      ORDER = **OK**
+  判读要点：更正只**追加**、不改原句；两处更正使物证/说明的 mtime 顺延，但**未改 log 的 SHA**（46B1E045…）⇒ 链上"证据覆盖自己的制品"三条（jar < log、log 内容自绑定、物证晚于 log）全部仍成立。
+

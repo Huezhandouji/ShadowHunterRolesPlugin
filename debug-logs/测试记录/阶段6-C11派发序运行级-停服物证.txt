@@ -1,0 +1,102 @@
+================================================================================
+停服物证 · 阶段 6 · C-11 派发序运行级观测（t21 / eng-取证）
+—— inScope 文件名逐字：debug-logs/测试记录/阶段6-C11派发序运行级-停服物证.txt
+—— 窗口：25566 · 一轮 runServer（job 启动 2026-09-19 19:52:05.580）· 只 job_kill（未强杀 java）
+—— **本轮结论 = 未构造到目标相位 ⇒ 退档**（见观测报告 §6）；本件只证窗口/冻结/制品链
+================================================================================
+
+§0 本件与自绑定
+--------------------------------------------------------------------------------
+§0.1 本件身份：见结卡 output（bytes/行数/SHA256；**不内嵌自身哈希**）。
+§0.2 对象身份（现算）：
+     被验证代次 jar = build/libs/ShadowHunterRolesPlugin-1.0.0.jar
+                      164982 B / 2026-09-19 19:22:14.941
+                      SHA256 FCB926ACEEA08BC0C0D9044BA1B109E082A170CB866A68EB84036B4C3F876D77
+                      （起服前 / 停服后 三值逐字一致 = 未被覆盖、未重建）
+     归档件 = debug-logs/回滚快照/jars/…-verified-20260919-192214-FCB926AC.jar（现算同 SHA ⇒ 逐字节相同）
+     冻结日志 = debug-logs/测试记录/阶段6-起服日志-C11派发序运行级.log
+                10460 B / 101 行 / mtime 2026-09-19 19:59:58.435（冻结动作；源内容 19:58:41.660）
+                SHA256 6041B041C686F78146AF65824D82D537B20E7F6E5D99A3CD85C81D4E0133AE5D
+     转录（探针插件写）= debug-logs/测试记录/阶段6-C11派发序运行级-转录.txt
+                447260 B / 5894 行 / mtime 2026-09-19 20:00:00.788
+                SHA256 D464819871C2CA64ABA22F0FBDC101778E75C7FEECD7DF23A742CE6DD985341D
+     commit：开工 213e2d2c3bd09f7a0535b23feda16b088144624e ；结卡 8b283a4c…（他人提交推进）
+     src 改动：git status --porcelain -- src = **0 行**（全仓 porcelain = 0 行）⇒ 本卡不产生新代
+     F1 链（**链尾 = 本件**）：jar 19:22:14.941 < log 内容 19:58:41.660 < 冻结动作 19:59:58.435
+                < 转录 20:00:00.788 < 报告 < 本件 ⇒ 严格递增 = True
+
+§1 起服前（广播 + 三路互证）
+--------------------------------------------------------------------------------
+- 广播（起服前三条）：to=eng-实现 / to=eng-验证 / to=captain（写明占用 25566、探针装入 run/plugins、
+  只 job_kill、结束广播释放、"2 plugins"属预期）。
+- 三路互证 @2026-09-19 19:52:0x（T_check 已落 .scratch/bot/t21-check-t.txt）：
+  ① netstat 按 LISTENING 过滤 :25566 = **0 行**；② TCP connect = **refused**；
+  ③ run/logs/latest.log 独占打开 = **OK**；另 java = 0。
+- 并行互证：eng-验证 @19:52:03.223 独立现算同结论（并确认 run/ 被 .gitignore:31 覆盖）。
+
+§2 起服（job 启动 + Mode B + 探针加载）
+--------------------------------------------------------------------------------
+- 实际执行形态 = 卡面原文 + 前置 $env:GRADLE_USER_HOME="$PWD\.gradle-work"，并置 **T21_OUT** 指向
+  in-scope 转录路径（cmd：cd <repo>; $env:GRADLE_USER_HOME=…; $env:T21_OUT=…; .\gradlew runServer）。
+- job 启动 = **2026-09-19 19:52:05.580**。
+- Mode B 三行（冻结件逐字）：
+      [ShadowHunterRolesPlugin] Enabling ShadowHunterRolesPlugin v1.0.0
+      [ShadowHunterRolesPlugin] ShadowHunter Character System enabled.
+      Done (10.046s)! For help, type "help"
+- **环境差异（申报）**：`Initialized 2 plugins` / `- ShadowHunterRolesPlugin (1.0.0), T21Probe (1.0.0)`
+  ⇒ 多出的 T21Probe = **本卡探针**，不是被观测对象；探针只以 INFO 级写日志（未进入 log-delta 的 WARN+ 集合）。
+- 探针加载与取数证明：`[T21Probe] Loading/Enabling` + `ev=API_RESOLVED class=…RoleAPIImpl | registration-plugin=ShadowHunterRolesPlugin | priority=Normal`。
+
+§3 冻结（仍在线时先冻结）
+--------------------------------------------------------------------------------
+- 冻结动作 **19:59:58.435**（服务端仍在跑）；共享读流复制（服务端独占 ⇒ Get-FileHash/ReadAllText 会抛）。
+- 冻结件与源 latest.log **逐字节相同**（共享读现算同 SHA / 同 bytes）。
+- 假新鲜三条件：① job 19:52:05.580 ② 源 mtime 19:58:41.660 > ①（True）
+  ③ 与四件旧冻结件 SHA **全不同**：t18 2F45CF5E… / t5 B96011E7… / t19 8318A683… / t67 73EEF15D…。
+
+§4 停机（只 job_kill + 探针移出）
+--------------------------------------------------------------------------------
+- 停机 = **只 job_kill**；未强杀 java、未 clean/未删 build/libs/未强制 rebuild。
+- **探针移出（可复核）**：移出前 jar = 8336 B / E544C38D9DB233F260ED522B32A82F5702C9EB50C0B27C07A1E0E35C74E77B04；
+  移出后 `Test-Path run\plugins\t21probe.jar` = **False**；`run\plugins` 清单 = `.paper-remapped | bStats | ShadowHunterRolesPlugin | spark`。
+  ⚠️ `.paper-remapped/index.json` **仍含 t21probe 映射**（remap 缓存残留；jar 已不存在 ⇒ 不影响后续载入）——如实申报，建议后续轮清缓存。
+
+§5 停服三路复证
+--------------------------------------------------------------------------------
+  ① netstat LISTENING :25566 = **0 行**（总行 0）；② TCP connect = **refused**；
+  ③ run/logs/latest.log 独占打开 = **OK**；另 java = **0**。
+
+§6 开机窗 / 运行窗分列 + log-delta（只看 C=0）
+--------------------------------------------------------------------------------
+  冻结件 101 行；**开机窗（首行 → `Done (` 前一行）= 54 行；运行窗（`Done (` 行起）= 47 行**（54+47=101）。
+  两个切片的集合差各自 **ADDED 0 / C 0**：开机窗 REMOVED 6、运行窗 REMOVED 7（开机窗少的是 `Done` 之后才异步打的
+  Paper 版本横幅；运行窗少的是启动段的 OFFLINE/oshi 噪声）⇒ 按判据**只看 C = 0**，两个窗口都成立。
+  【就地订正 + 取代申报】本件 §6 初版曾写"48 / 53 行"，那是**另一个切片边界约定**（未把 `Done` 行计入任一侧）；
+  现按"`Done` 行归运行窗"的统一约定改为 **54 / 47**，并给两切片的 C 读数。只改本件，未动冻结件。
+  log-delta（锚 = 阶段4-起服日志-T2b.log；Instrument = .scratch\bot\log-delta.ps1）：
+      整件：anchor 13 行 / current 13 行，**ADDED 0 / REMOVED 0 / C 0**（产物 logdelta-t21.txt）
+  说明：探针自己只写 INFO ⇒ WARN+ 集合差为 0；C=0 的成立可解释（不靠删行）。
+
+§7 运行级扫描（A10/A11）
+--------------------------------------------------------------------------------
+  级别字段 `\] \[[^]]*/(ERROR|SEVERE)\]` = **0**（裸 ERROR|SEVERE = 3，全为 oshi WARN 正文）。
+  插件归因异常（形态 = 插件名 + WARN/ERROR/SEVERE）：本卡 = **0**（ShadowHunterRolesPlugin / T21Probe 各自 0）。
+  形态有效性：已知正样本 t5 件 86–95 行 = warn 1 + 栈帧 4（命中 ✓）；已知负样本 t18 件 = 0/0。
+  ⚠️ 自曝 **D-t21-1**：原"栈帧含 com.shadowHunterRolesPlugin"形态被探针自己的 INFO 行
+  （`ev=API_RESOLVED class=com.shadowHunterRolesPlugin.internal.api.RoleAPIImpl`）假阳性命中（初值 0/1）；
+  按行首帧前缀 `^\s+at .*com\.shadowHunterRolesPlugin` 复算 ⇒ 本卡 = **0**（正样本仍命中）。
+
+§8 C-11 观测的实际深度（结论以观测报告 §6 为准）
+--------------------------------------------------------------------------------
+  - 逐 tick 采样：5850 行（有效 3042 / 哨兵 −78 = 2808）；**有效段 sante 恒 = 100**。
+  - 写入者签名命中：`d=4`（流血 +4）= **0**；`d=-10`（黯然销魂排空）= **0**；`d=-6`（同 tick 双写）= **0**。
+  - 状态机停在 LEARN_BLEED；**置 SanTE=9 未执行**；CAST/COFIRE/SET9/SUMMARY 事件 = 0。
+  - ⇒ **未构造到目标相位 ⇒ 退档**（不把 t17 §7.4 静态预测写成已验证）。三条根因与最小闭合方式见报告 §6。
+
+§9 边界
+--------------------------------------------------------------------------------
+- 零 src（`-- src` = 0 行）· 零 git 写 · 未改任何既有冻结件 · 未重建/未冒充任何代次 ·
+  只 job_kill（未强杀 java）· 未申请提权 · 探针/客户端脚本全在仓库外 .scratch/（不入库，已申报）·
+  唯一仓库内写入 = 本卡四件 inScope（其中转录由探针插件写）。
+- 引用纪律：冻结件引完整 SHA256；源码引「文件:行」；本卡所有"未覆盖"均在报告 §9 逐条申报。
+================================================================================

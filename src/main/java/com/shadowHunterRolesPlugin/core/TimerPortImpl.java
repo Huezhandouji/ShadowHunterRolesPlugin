@@ -46,7 +46,9 @@ final class TimerPortImpl implements TimerPort {
 
     @Override
     public Task runRepeating(long initialDelayTicks, long periodTicks, Runnable task) {
-        Task handle = owner.rolesContext().scheduler().runRepeating(task, initialDelayTicks, periodTicks);
+        //⚠ 本行是 TimerPort 与 Scheduler 两个"同名反序"签名之间的**唯一**转调点：此处把 task 从末位挪到首位。
+        //initialDelay <= 0 归一为 1：与 BukkitSchedulerAdapter 同值归一（Math.max 幂等 ⇒ 双入口双保险）。
+        Task handle = owner.rolesContext().scheduler().runRepeating(task, Math.max(1L, initialDelayTicks), periodTicks);
         track(handle);
         return handle;
     }

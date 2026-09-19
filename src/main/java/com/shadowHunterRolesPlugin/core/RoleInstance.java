@@ -6,6 +6,10 @@ import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
 import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
+import com.shadowHunterRolesPlugin.core.dispatch.HotbarActionable;
+import com.shadowHunterRolesPlugin.core.hotbar.CooldownAware;
+import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
+import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -14,7 +18,6 @@ import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.platform.Task;
-import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -25,7 +28,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
@@ -78,7 +80,13 @@ public class RoleInstance {
 
     //阶段 4：组件注册表（组件集合 + 每组件资源表 + getComponent 查找）与统一渲染器（骨架）
     private final ComponentRegistry componentRegistry = new ComponentRegistry();
-    private final HotbarRenderer hotbarRenderer = new HotbarRenderer();
+    private final HotbarRenderer hotbarRenderer = new HotbarRenderer(this);
+    /**
+     * **唯一的方法引用持有者**（阶段 5 判据 C-03）：供三条"程序化刷新"路径共用 ——
+     * 冷却到点（启动时预约）、每 tick 到期扫描、显式结束冷却（S3）。
+     * 它们都**不**额外产生裸直呼点（阶段 5 判据 C-02 的计数守恒：5 处直呼 + 1 处方法引用）。
+     */
+    private final Runnable markHotbarDirty = hotbarRenderer::markDirty;
     private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
 
     //T-2 ①③：迁移标记已删 —— 所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）。
@@ -121,7 +129,9 @@ public class RoleInstance {
                 1L
         );
 
-        updateHotbar();
+        //阶段 5 · 4.4：构造期**同步首刷一次**（与迁移前的可见时机逐字一致 = 选角色瞬间热键栏即就绪、零延迟）；
+        //首个 tick 因置脏初值为 true 还会再写一次同内容（不可见、且此后空闲 tick 不再写）。
+        hotbarRenderer.render();
     }
 
     //平台上下文：阶段 2 的组件取用入口（阶段 4 起逐批收窄为 ComponentServices 端口白名单）
@@ -132,6 +142,16 @@ public class RoleInstance {
 
     //组件注册表（框架内部：装配、资源兜底、getComponent 查找）
     public ComponentRegistry componentRegistry() { return componentRegistry; }
+
+    /**
+     * **临时调试用**（冷却自管理冒烟入口）：取某组件一对一的服务集，使调试命令能调用**同一个**端口实例
+     * （如 {@code cooldowns().end()} / {@code cooldowns().start(ticks)}）。
+     * 冒烟结束后随调试入口一并删除（见交付报告的删除清单）。
+     */
+    public ComponentServices servicesOf(String componentId){
+        RoleComponent component = componentRegistry.getById(componentId);
+        return component != null ? componentServices.get(component) : null;
+    }
 
     /**
      * 组件与其**一对一**的服务集（含按本组件 id/kind 构造的冷却端口、按本组件 id 定位资源表的定时器端口）。
@@ -176,13 +196,12 @@ public class RoleInstance {
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
-        if(!(component instanceof ActiveComponent active)) return false;
+        //阶段 6 · 派发面能力化：判据由「继承关系」改为「能力接口」——本处只用到 onCast（HotbarActionable 的唯一方法）
+        if(!(component instanceof HotbarActionable active)) return false;
 
-        CastResult result = active.onCast(new CastSignal(trigger));
-        if(result == CastResult.SUCCEED){
-            //声明值是唯一真值来源（4.7/O-13）：框架按 getCooldownTicks() 启动冷却
-            componentServices.get(component).cooldowns().start(active.getCooldownTicks());
-        }
+        //冷却自管理（D1）：框架**不再**代启动冷却 —— 组件在施放成功处自行 svc().cooldowns().start(getCooldownTicks())；
+        //声明值仍是唯一真值来源（4.7/O-13），启动点与启动值都与旧框架代启动逐字一致 ⇒ 可观察行为不变。
+        active.onCast(new CastSignal(trigger));
         hotbarRenderer.markDirty();
         return true;
     }
@@ -198,40 +217,34 @@ public class RoleInstance {
         RoleComponent component = componentRegistry.getById(id);
         if(!(component instanceof CombatHook hook)) return false;
 
-        CastResult result = hook.onAttack(new AttackSignal(victim));
-        if(result == CastResult.SUCCEED){
-            componentServices.get(component).cooldowns().start(((ActiveComponent) component).getCooldownTicks());
-        }
+        //冷却自管理（D1）：框架不再代启动冷却（同 handleCast）
+        hook.onAttack(new AttackSignal(victim));
         hotbarRenderer.markDirty();
         return true;
     }
 
+    /**
+     * 组件初始化（阶段 6 · 统一装配）：**只遍历 {@code role.getComponents()} 一次** ——
+     * 遍历顺序 = `Builder.add*` 的调用顺序 = **纯注册序**（旧的三段遍历
+     * 「技能 → 被动 → 主武器」已删除，见交付说明的派发序申报）。
+     * <p>权威 kind 由注册处随条目给出，并交给 {@link #createServices(String, ItemKind)}
+     * （冷却端口在组件被构造**之前**就绑定了 kind）。
+     */
     private void initComponents(){
-        for(String skillId : role.getSkillIds()){
-            ComponentServices services = createServices(skillId, ItemKind.SKILL);
-            Skill skill = role.createSkill(skillId, services);
-            if(skill != null){
-                skillMap.put(skillId, skill);
-                registerCreated(skill, services);
-            }
-        }
+        for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
+            String componentId = entry.getKey();
+            ItemKind kind = entry.getValue().getKind();
 
-        for(String passiveId : role.getPassiveSkillIds()){
-            ComponentServices services = createServices(passiveId, ItemKind.SKILL);
-            PassiveSkill passive = role.createPassive(passiveId, services);
-            if(passive != null){
-                passiveMap.put(passiveId, passive);
-                registerCreated(passive, services);
-            }
-        }
+            ComponentServices services = createServices(componentId, kind);
+            RoleComponent component = role.createComponent(componentId, services);
+            if(component == null) continue;
 
-        for(String weaponId : role.getMainWeaponIds()){
-            ComponentServices services = createServices(weaponId, ItemKind.MAIN_WEAPON);
-            MainWeapon mainWeapon = role.createMainWeapon(weaponId, services);
-            if(mainWeapon != null){
-                mainWeaponMap.put(weaponId, mainWeapon);
-                registerCreated(mainWeapon, services);
-            }
+            //旧窄类型视图（供既有公共访问器使用）：按**具体类型**归位，不按 kind 猜测
+            if(component instanceof Skill skill) skillMap.put(componentId, skill);
+            if(component instanceof MainWeapon weapon) mainWeaponMap.put(componentId, weapon);
+            if(component instanceof PassiveSkill passive) passiveMap.put(componentId, passive);
+
+            registerCreated(component, services);
         }
     }
 
@@ -252,9 +265,8 @@ public class RoleInstance {
         int endTick = Bukkit.getCurrentTick() + ticks;
         skillCooldowns.put(skillId, endTick);
 
-        updateHotbar();
-        //冷却结束后刷新物品
-        platform.scheduler().runLater(this::updateHotbar, getRemainingSkillCooldownTicks(skillId));
+        //冷却到点置脏（方法引用形态，避免新增直呼点）：到点那一 tick 的帧末 flush 完成图标恢复。
+        platform.scheduler().runLater(markHotbarDirty, getRemainingSkillCooldownTicks(skillId));
 
     }
 
@@ -286,7 +298,7 @@ public class RoleInstance {
         if(skill == null){
             caster.sendMessage(Component.text("unknown skill!"));
         }
-        //T-2c：T-1 的未迁移回退已删（组件侧一律走新管道）；可见刷新由 handleCast 的 markDirty() + updateHotbar 每 tick 保证。
+        //T-2c：T-1 的未迁移回退已删（组件侧一律走新管道）；可见刷新由 handleCast 的置脏 + 帧末 flush 保证。
         return false;
     }
 
@@ -319,9 +331,9 @@ public class RoleInstance {
     public void startMainWeaponCooldown(String weaponId, int ticks){
         int endTick = Bukkit.getCurrentTick() + ticks;
         mainWeaponCooldowns.put(weaponId, endTick);
-        updateHotbar();
 
-        platform.scheduler().runLater(this::updateHotbar, getRemainingMainWeaponCooldownTicks(weaponId));
+        //冷却到点置脏（同技能侧；主武器无秒数文本 ⇒ 冷却中不需要每 tick 刷新）
+        platform.scheduler().runLater(markHotbarDirty, getRemainingMainWeaponCooldownTicks(weaponId));
     }
 
     public int getRemainingMainWeaponCooldownTicks(String weaponId){
@@ -331,6 +343,84 @@ public class RoleInstance {
 
     public float getRemainingMainWeaponCooldownSeconds(String weaponId){
         return getRemainingMainWeaponCooldownTicks(weaponId) / 20f;
+    }
+
+    // ───────── 冷却自管理（阶段 4 追补 D1/D2/D3/D4）─────────
+
+    private Map<String, Integer> cooldownTable(ItemKind kind){
+        return kind == ItemKind.SKILL ? skillCooldowns : mainWeaponCooldowns;
+    }
+
+    /** 冷却是否**正在进行**（条目存在且未到期）。与 {@code isReady()} 互补：后者对"无条目/已到期"都返回 true。 */
+    boolean isCooling(String componentId, ItemKind kind){
+        Integer endTick = cooldownTable(kind).get(componentId);
+        return endTick != null && Bukkit.getCurrentTick() < endTick;
+    }
+
+    /** 重启顶替（S2）：旧段**未到期** ⇒ 清掉旧条目（调用方随后回调 {@code RESTARTED} 并起新冷却）；返回是否确实顶替了一段冷却。 */
+    boolean clearCooldownForRestart(String componentId, ItemKind kind){
+        if(!isCooling(componentId, kind)) return false;
+        cooldownTable(kind).remove(componentId);
+        return true;
+    }
+
+    /**
+     * 显式结束冷却（S3）：**仅在冷却中生效** ⇒ 移除条目 + 回调 {@code ENDED_BY_COMPONENT} + 一次可见刷新；
+     * 不在冷却中 ⇒ 无副作用（幂等）。
+     * @return 是否确实结束了一段冷却
+     */
+    boolean endCooldown(String componentId, ItemKind kind){
+        if(!isCooling(componentId, kind)) return false;
+        cooldownTable(kind).remove(componentId);
+        dispatchCooldownEnd(componentId, CooldownAware.CooldownEndReason.ENDED_BY_COMPONENT);
+        markHotbarDirty.run();
+        return true;
+    }
+
+    /**
+     * 每 tick 扫描两张冷却表：**到期 ⇒ 移除条目**（关闭 O-21：条目不再永驻）＋ 回调 {@code EXPIRED} ＋ **一次**可见刷新。
+     * 复用既有每 tick 路径（{@link #triggerUpdate()}），**不新建 ticker**（与 t17 划界）。
+     */
+    private void scanCooldowns(){
+        boolean removed = false;
+        for(String skillId : expiredIds(skillCooldowns)){
+            skillCooldowns.remove(skillId);
+            dispatchCooldownEnd(skillId, CooldownAware.CooldownEndReason.EXPIRED);
+            removed = true;
+        }
+        for(String weaponId : expiredIds(mainWeaponCooldowns)){
+            mainWeaponCooldowns.remove(weaponId);
+            dispatchCooldownEnd(weaponId, CooldownAware.CooldownEndReason.EXPIRED);
+            removed = true;
+        }
+        if(removed){
+            //到期移除后置脏（方法引用形态）：同 tick 的帧末 flush 即完成图标恢复（冷却结束不再有可见延迟）
+            markHotbarDirty.run();
+        }
+    }
+
+    /** 先收集到期 id 再移除（避免边遍历边改表）；只遍历尚未到期的条目，到期即移除 ⇒ 扫描开销有界。 */
+    private List<String> expiredIds(Map<String, Integer> table){
+        List<String> ids = new ArrayList<>();
+        for(Map.Entry<String, Integer> entry : table.entrySet()){
+            if(Bukkit.getCurrentTick() >= entry.getValue()){
+                ids.add(entry.getKey());
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * 冷却结束回调的唯一派发点（D4）：**先移除条目、再回调** ⇒ 回调内再 {@code end()} 只会得到 {@code false}（不递归重入）；
+     * 异常隔离沿用 {@link #runComponentUpdate}（与 update()/onSanTEChange 同键）。
+     * <p>阶段 6 · 派发面能力化：判据由 {@code ActiveComponent} 改为能力接口 {@link CooldownAware}
+     * （{@code ActiveComponent implements CooldownAware} ⇒ 既有组件的接受集逐字不变）。
+     */
+    void dispatchCooldownEnd(String componentId, CooldownAware.CooldownEndReason reason){
+        RoleComponent component = componentRegistry.getById(componentId);
+        if(component instanceof CooldownAware aware){
+            runComponentUpdate("registered", component.getId(), () -> aware.onCooldownEnd(reason));
+        }
     }
 
     //释放主武器技能
@@ -366,69 +456,21 @@ public class RoleInstance {
 
 
 
-    //更新技能物品栏，设置物品或者替换物品
+    //热键栏渲染：阶段 5 · 4.4 起**唯一渲染者 = HotbarRenderer**（写物品只发生在 core/hotbar 内）；
+    //本容器只提供查表与状态输入，旧的"更新物品栏 / 更新元数据"方法（连同其两条调用路径）已随本批删除。
 
-
-    public void updateHotbar(){
-        Player p = player;
-        Inventory inv = p.getInventory();
-
-        //获取角色武器技能栏位配置
-        Map<Integer, String> slotMap = role.getSlotMap();
-        if(slotMap == null || slotMap.isEmpty()) return;
-
-        //填充武器技能
-        for(Map.Entry<Integer, String> entry : slotMap.entrySet()){
-            int slot = entry.getKey();
-            String id = entry.getValue();
-
-            //如果是武器
-            if(mainWeaponMap.containsKey(id)){
-                MainWeapon weapon = mainWeaponMap.get(id);
-                inv.setItem(slot, weapon.createIconItem(this));
-                continue;
-            }
-
-            //如果是技能
-            if(skillMap.containsKey(id)){
-                Skill skill = skillMap.get(id);
-                inv.setItem(slot, skill.createIconItem(this));
-            }
-        }
-    }
-
-    //更新元数据，主要是冷却
-    public void updateSkillItemMeta(String skillId){
-        Skill skill = skillMap.getOrDefault(skillId, null);
-        if(skill == null) return;
-
-        Map<Integer, String> slotMap = role.getSlotMap();
-        if(!slotMap.containsValue(skillId)) return;
-
-        int slot = 0;
-        for(int key : slotMap.keySet()){
-            if(slotMap.getOrDefault(key, null).equals(skillId)){
-                slot = key;
-                break;
-            }
-        }
-
-        Inventory inv = player.getInventory();
-        ItemStack item = inv.getItem(slot);
-        if(item == null) return;
-
-        ItemMeta meta = item.getItemMeta();
-
-        meta.displayName(skill.getDisplayName(this));
-
-        //元数据设回物品
-        item.setItemMeta(meta);
-    }
-
-    public void updateAllSkillItemMeta(){
-        for(String skillId : role.getSkillIds()){
-            updateSkillItemMeta(skillId);
-        }
+    /**
+     * 统一渲染器的查表入口：按槽位表里的 id 取可渲染组件（未注册 id ⇒ {@code null}，渲染器跳过该槽位）。
+     * <p>**适配点（阶段 6）**：优先取 {@link HotbarPresentable#asHotbarItem()} 的规格视图 ——
+     * 这样「只 `extends RoleComponent` + 实现 `HotbarPresentable`」的新式组件同样可被渲染；
+     * 旧式实现（自身即 `HotbarItem`）原样返回。
+     * <p>行为分支（技能/主武器）由**注册 kind** 决定，不在此处区分。
+     */
+    public HotbarItem hotbarItemOf(String id){
+        RoleComponent component = componentRegistry.getById(id);
+        if(component == null) return null;
+        if(component instanceof HotbarPresentable presentable) return presentable.asHotbarItem();
+        return component instanceof HotbarItem item ? item : null;
     }
 
     //清除主武器，技能占用的快捷栏
@@ -496,7 +538,8 @@ public class RoleInstance {
         int preEnergy = currentEnergy;
 
         this.currentEnergy = Math.clamp(amount, 0, role.getMaxEnergy());
-        updateHotbar();
+        //触点④（能量单一入口）：**无条件**置脏（不做"跨阈值才置脏"的优化 —— 那属阶段 5 性能项）
+        hotbarRenderer.markDirty();
 
         EnergyChangeEvent event = new EnergyChangeEvent(player, this, preEnergy, currentEnergy, role.getMaxEnergy());
         Bukkit.getPluginManager().callEvent(event);
@@ -519,6 +562,9 @@ public class RoleInstance {
 
         SanTEChangeEvent event = new SanTEChangeEvent(player, this, preSanTE, currentSanTE, role.getMaxSanTE());
         Bukkit.getPluginManager().callEvent(event);
+
+        //I-15：容器**直派**（不再经 RoleEventListener 转发；上一行的事件发布保持不变）
+        dispatchSanTEChange(preSanTE, currentSanTE);
     }
 
     public void increaseSanTE(int amount){
@@ -615,21 +661,61 @@ public class RoleInstance {
         }
     }
 
-    public void triggerEnergyChange(int preEnergy, int newEnergy){
-        if(player == null ) return;
-    }
+    //I-14：SanTE 派发的重入护栏状态。哨兵 Integer.MIN_VALUE = 无待发值；
+    //派发期间的组件重入写入只记最新值（禁止嵌套），返回后合并补发一次。
+    private boolean sanTEDispatching = false;
+    private int sanTEPendingValue = Integer.MIN_VALUE;
 
-    public void triggerSanTEChange(int preSanTE, int newSanTE){
+    /**
+     * SanTE 变更的**唯一派发点**（阶段 4 追补 I-15 容器直派 + I-14 重入护栏）。
+     * <ul>
+     *   <li><b>真变化才派发</b>（{@code pre == now} 直接返回）—— B⑨ 口径不变：SanTE 已为 0 时再扣不再通知组件；</li>
+     *   <li><b>禁止嵌套派发</b>：派发期间组件再次改写 SanTE ⇒ 只把最新值记为待发并立即返回；</li>
+     *   <li><b>合并成末次一次</b>：本次派发返回后，若期间有重入写入，则对"末次待发值"补发**一次**（中间态被合并掉）；</li>
+     *   <li><b>`notified` 机制（**为什么不能拿 `currentSanTE` 比**）</b>：{@code setCurrentSanTE} 是**先写字段、后派发**，
+     *       所以派发期间字段值已经等于重入写入的目标值 —— 若把补偿条件写成 {@code currentSanTE != target}，该条件**恒假**，
+     *       补偿分支会退化成**不可达死代码**（且给人"已实现合并"的假象）。故这里改用局部 {@code notified}
+     *       （初值 = 本次 {@code newSanTE}；每补发一次更新为 {@code target}）与 {@code target} 比较：
+     *       **无重入 ⇒ 不补发（与旧行为逐字一致）**；**有重入 ⇒ 恰好补发末次一次**；
+     *       循环退出条件 = {@code sanTEPendingValue == Integer.MIN_VALUE}（哨兵 = 无待发值）；</li>
+     *   <li>异常隔离沿用 {@link #runComponentUpdate}（单个组件抛异常不影响其余组件）。</li>
+     * </ul>
+     * 现存两个实现者（{@code DefaultSanTEZeroPunishment} / {@code RedDeeplySorrowSkill} 的
+     * {@code onSanTEChange}）都**不在钩子内同步写 SanTE**（前者只调度任务、后者只起冷却）
+     * ⇒ 护栏在当前组件集下**不可达**，属防御性设施。
+     */
+    private void dispatchSanTEChange(int preSanTE, int newSanTE){
         if(player == null ) return;
-
-        //阶段 4（B⑨）：**真变化才派发**（已申报可见变化，裁定 (i)）——
-        //SanTE 已为 0 时再扣（0 → 0）不再通知组件 ⇒ 惩罚不再被重复触发/延长（O-6 重复任务路径由此闭合）。
-        //注意：`SanTEChangeEvent` 的对外发布仍然**无条件**（第三方挂点），此处只收紧**组件侧钩子**。
         if(preSanTE == newSanTE) return;
 
-        //阶段 4（B⑨）：为**注册表内组件**广播新基类钩子 onSanTEChange(pre, now)（顺序 = 注册表顺序，
-        //与 update()/start()/stop() 的新钩子广播同源）；异常隔离复用 runComponentUpdate。
-        //已迁移组件**不再实现 legacy SanTE 接口** ⇒ 只被这一条路径调用，不会双触发。
+        if(sanTEDispatching){
+            sanTEPendingValue = newSanTE;
+            return;
+        }
+
+        sanTEDispatching = true;
+        try{
+            //notified = "上一次已广播的 now"。**不要**改成与 currentSanTE 比较：
+            //setCurrentSanTE 先写字段、后派发 ⇒ 重入时 currentSanTE 已等于 target，比较恒假 ⇒ 补偿永不发生（死代码）。
+            int notified = newSanTE;
+            broadcastSanTEChange(preSanTE, newSanTE);
+
+            while(sanTEPendingValue != Integer.MIN_VALUE){
+                int target = sanTEPendingValue;
+                sanTEPendingValue = Integer.MIN_VALUE;
+                if(notified != target){
+                    broadcastSanTEChange(notified, target);
+                    notified = target;
+                }
+            }
+        }
+        finally{
+            sanTEDispatching = false;
+        }
+    }
+
+    /** 按注册表顺序广播组件侧 {@code onSanTEChange(pre, now)}（顺序与 update()/start()/stop() 同源）。 */
+    private void broadcastSanTEChange(int preSanTE, int newSanTE){
         for(RoleComponent component : componentRegistry.all()){
             runComponentUpdate("registered", component.getId(), () -> component.onSanTEChange(preSanTE, newSanTE));
         }
@@ -646,14 +732,28 @@ public class RoleInstance {
             runComponentUpdate("registered", component.getId(), component::update);
         }
 
-        if(shouldUpdateHotbar()){
-            updateHotbar();
+        //阶段 4 追补（冷却自管理 · D2）：到期条目 ⇒ 移除 + 回调（关闭 O-21）；可见刷新改由同 tick 的帧末 flush 承担
+        scanCooldowns();
+
+        //阶段 5 · 4.4 帧末 flush（落点 = tick 末尾，紧接组件更新与到期扫描之后）：
+        //① 判脏 → ② 写物品（唯一写点 = HotbarRenderer.render）→ ③ 清脏（此顺序不可交换）
+        //入口条件并入 B-2：**有技能冷却中** ⇒ 每 tick 至少刷一次（否则技能名里的 " x.xs" 不再逐 tick 递减 = 可见行为变化）。
+        if(hotbarRenderer.isDirty() || hasCoolingSkill()){
+            hotbarRenderer.render();
+            hotbarRenderer.clearDirty();
         }
 
-        if(shouldUpdateItemMeta()){
-            updateAllSkillItemMeta();
-        }
+    }
 
+    /**
+     * B-2 谓词：是否存在**冷却中**（条目存在且未到期）的技能。
+     * 只数技能 —— 主武器冷却名没有秒数文本，外观恒定 ⇒ 不需要每 tick 刷新（与迁移前一致）。
+     */
+    private boolean hasCoolingSkill(){
+        for(String skillId : skillCooldowns.keySet()){
+            if(!isSkillReady(skillId)) return true;
+        }
+        return false;
     }
 
     //单个组件抛异常时不能中断这一tick其他组件的更新；同一个组件的异常只上报一次，恢复正常后再提示一次
@@ -675,25 +775,8 @@ public class RoleInstance {
         }
     }
 
-    //检测是否应该更新物品
-    private boolean shouldUpdateHotbar(){
-        for(String skillId : skillCooldowns.keySet()){
-            if(isSkillReady(skillId)) return true;
-        }
-        for(String weaponId : mainWeaponCooldowns.keySet()){
-            if(isMainWeaponReady(weaponId)) return true;
-        }
-        return false;
-    }
-
-    private boolean shouldUpdateItemMeta(){
-        for(String skillId : skillCooldowns.keySet()){
-            if(!isSkillReady(skillId)){
-                return true;
-            }
-        }
-        return false;
-    }
+    //阶段 5 · 4.4：旧的两条每 tick 轮询判定（"检测是否应该更新物品"）已删 ——
+    //其中一条是恒假死路径，另一条的语义（B-2）并入 triggerUpdate 末尾的帧末 flush 入口条件。
 
     //清除这个实例时使用，重置玩家状态
     public void clear(){

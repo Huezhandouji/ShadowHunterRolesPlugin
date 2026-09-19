@@ -1,0 +1,338 @@
+阶段 5 · 4.4 统一渲染器接管批 —— 交付说明（卡 t2；判据来源 = 阶段5-需求与验收.md 的 C-01…C-16）
+====================================================================================================
+边界声明（开篇）
+  1) 本件 + 阶段5-起服日志-4.4接管.log + 阶段5-4.4接管-停服物证.txt 三件是本批证据；jar 归档与 MANIFEST 追加属本卡 inScope。
+  2) **零 git 写**：本批未执行 add/commit/checkout/restore/stash/reset（全仓 porcelain 只出现「本批 + 队长/他人既有」的 M 行，见第 12 节）。
+  3) 未改 docs/、未改 api/**、未改 plugin.yml、未改任何既有冻结证据、未做 Folia 适配、未合并 ticker、未对已冻结代次做「删 jar + 重建」。
+  4) 本文所有读数 = **本批现算**（工作目录 C:\Users\ROG\Desktop\插件；`git -C ShadowHunterRoles …`）；行号是**当前树**现值（引用前请重算）。
+  5) 判据一律「模式 + 定域 + 口径」三件齐；裸计数与调用点口径**分开**写。
+
+第 0 节 · 一句话结论
+  4.4 已落地：`HotbarRenderer` 从骨架升级为**唯一渲染者**（唯一写物品点 = `render()` 内的 `inv.setItem`），
+  五触点置脏接线完成（施放 2 + 冷却启动 1 + 能量 1 + buff 移除 1 = 5 处直呼；冷却到点等三条程序化路径共用
+  **唯一方法引用持有者**），`triggerUpdate()` 末尾接帧末 flush（isDirty → 写物品 → clearDirty），
+  T⑦ 的四条旧基类渲染方法与两条 legacy 刷新方法**同批删除**；静态判据全绿、构建通过、运行级（Mode B 三行
+  + 正序集合差只看 C=0 + 级别字段 ERROR/SEVERE=0 + 停服三路互证）齐备，新代制品已归档并登记。
+
+第 1 节 · 施工顺序与基线（卡面 A1）
+  1.1 第一动作 = 取基线（在**任何编辑之前**）：
+      命令：cd C:\Users\ROG\Desktop\插件; powershell -NoProfile -ExecutionPolicy Bypass -File .scratch\bot\t59-baseline-and-scoped-criteria.ps1 -Name t44takeover-before
+      输出要点：HEAD = 42dde5e5069ff99876eea9a35977b47a0037dc95；snapshot: 91 java files；
+                SHA256.txt = 91 行 → .scratch\bot\src-snapshots\t44takeover-before；src porcelain lines = 0；
+                newest src mtime = 2026-09-18 21:59:56.550（RedDeeplySorrowSkill.java）
+      时点：2026-09-19 12:48:36.075（现算）
+  1.2 开工前复算依赖卡冻结件（阶段5-需求与验收.md §0.1/§4）的 before 值 —— 逐条相符（不 符即停手；本次**全部相符**）：
+      判据（t1 冻结 before）                       命令口径                                    t1 值  我 12:48 复算
+      `markDirty();` 仅调用点                      `-E '\bmarkDirty\(\);' -- src/main/java`     2      2（RoleInstance:194/:211）
+      `::markDirty|markDirty,`                     `-E '::markDirty\b|\bmarkDirty,'`            0      0（exit 1）
+      `updateHotbar();` 仅调用点                   `-E '\bupdateHotbar\(\);'`                   8      8（7×RoleInstance + BuffManager:108）
+      `setItem(`                                   `-F 'setItem('`                              4      4（渲染 2 + 清空 2）
+      `createIconItem`                             `-F 'createIconItem'`                        4      4
+      `getDisplayName(RoleInstance`                `-F`                                         2      2
+      `getDisplayName(this)`                       `-F`                                         1      1
+      `isDirty()/clearDirty()` 调用点              `-E '\.(isDirty|clearDirty)\(\)'`            0      0（只有定义）
+      `%.1f`                                       `-E '%\.1f'`                                 2      2（Skill:63/:105）
+      roleComponent 渲染入口                       `-E 'HotbarRenderer|markDirty'`              0      0
+      顺带复算：`updateHotbar` 裸词 10（8 调用 + 定义 + HotbarRenderer javadoc 1）；`shouldUpdateHotbar` 2（定义 + 调用）；`getEnergyCost`(RoleInstance) 0；`runRepeating`(RoleInstance/BuffManager) 1/1。
+
+第 2 节 · 改动面（6 个源文件；`git diff --stat -- src/main/java` 现算 = 6 files changed, 205 insertions(+), 272 deletions(-)）
+  2.1 core/hotbar/HotbarRenderer.java（骨架 → 唯一渲染者）
+      - 新增 `owner` 引用（构造期注入 `RoleInstance`）；`markDirty/isDirty/clearDirty/stateOf` 保留原语义（stateOf 一字未改）。
+      - 新增 `render()`：遍历 `role.getSlotMap()`，`owner.hotbarItemOf(id)` 查表（**主武器优先**，与旧实现一致），
+        对 1 处 `inv.setItem(slot, buildIcon(item))`（:81）= **全仓唯一渲染写点**。
+      - 新增 `buildIcon(HotbarItem)`：`stateOf(ready, canCast, energy, energyCost)` 四段判定 + 材质/名称/lore/PDC 逐字复刻。
+      - 新增 `applySkill(...)` / `applyMainWeapon(...)`：技能与主武器**分表复刻**（冻结差异：技能冷却名带 `" x.xs"`，主武器不带）。
+  2.2 core/RoleInstance.java
+      - 字段：`new HotbarRenderer(this)`；新增 **唯一方法引用持有者** `private final Runnable markHotbarDirty = hotbarRenderer::markDirty;`
+      - 构造器：`updateHotbar();` → `hotbarRenderer.render();`（**同步首刷，零延迟**，见第 3 节）
+      - `startSkillCooldown` / `startMainWeaponCooldown`：删 `updateHotbar();`；`runLater(this::updateHotbar, …)` → `runLater(markHotbarDirty, …)`
+      - `endCooldown`（S3）：`updateHotbar();` → `markHotbarDirty.run();`
+      - `scanCooldowns`（每 tick 到期扫描）：`updateHotbar();` → `markHotbarDirty.run();`
+      - `setCurrentEnergy`：`updateHotbar();` → `hotbarRenderer.markDirty();`（**无条件**）
+      - `triggerUpdate()` 末尾：帧末 flush（见第 5 节）
+      - 删除：`updateHotbar()`、`updateSkillItemMeta(String)`、`updateAllSkillItemMeta()`、`shouldUpdateHotbar()`、`shouldUpdateItemMeta()`
+      - 新增：`hotbarItemOf(String id)`（查表入口）、`hasCoolingSkill()`（B-2 谓词）；移除因删除而失效的 `import …ItemMeta`
+  2.3 core/CooldownPortImpl.java：`start(int)` 分派之后追加 `owner.hotbarRenderer().markDirty();`（触点②，一个落点覆盖两 kind）
+  2.4 manager/BuffManager.java：`removeBuff` 内 `instance.updateHotbar();` → `instance.hotbarRenderer().markDirty();`（`addBuff` **未接线**）
+  2.5 core/Skill.java：删 `createIconItem(RoleInstance)` 与 `getDisplayName(RoleInstance)`；清理因此失效的 import（NamedTextColor/TextDecoration/ArrayList/List）
+  2.6 core/MainWeapon.java：同上删两条方法 + 清 import；`Utils.MAIN_WEAPON_KEY` 由 `private static final` → **`public static final`**（见第 9 节 (e)）
+
+第 3 节 · ★ 必须交代的一件事：`updateHotbar()` 的去向 = **删除**（不是保留、不是只读降级、不是改名保留）
+  3.1 去向与判据（现算；口径 = 行级；含定义与注释者已逐条说明）
+      `-F 'updateHotbar()'`       （裸计数，含定义+javadoc）       before 10  →  **after 0**
+      `-E '\bupdateHotbar\(\);'`  （仅调用点）                     before  8  →  **after 0**
+      `-E '\bvoid\s+updateHotbar\('`（定义行）                     before  1  →  **after 0**
+      `-F 'updateHotbar'`         （**连裸词**，含注释/javadoc）     before 10  →  **after 0**
+      `-F 'shouldUpdateHotbar'`   （死路径定义+调用）               before  2  →  **after 0**
+      `-E '\bupdateSkillItemMeta|\bupdateAllSkillItemMeta'`        before  4  →  **after 0**
+      ⇒ 本批之后**不存在第二条写物品路径**：`setItem(` 全仓 = 3 = `clearHotbar` 家族的两处 `setItem(i, null);`（角色清除路径，本批不动）
+        + 渲染器的 1 处；渲染写点口径（`setItem(` − `setItem(i, null);`）= **1**，且落在 `core/hotbar/`（目录内 `setItem(` = 1）。
+      ⇒ 「唯一渲染者」在**静态级**成立；`updateHotbar` 这条路径及其 `runLater(this::updateHotbar)` 机制**全部消失**（无残留、无死代码）。
+  3.2 为什么删而不是保留：保留任何写物品逻辑都会构成第二条写物品路径（t4 预申报的判定风险）；
+      且它原有的 8 条调用路径本批已逐条改由「置脏 + 帧末 flush」承担（第 4 节）。
+
+第 4 节 · 五触点置脏：逐条命令 + 内容片段（C-01 / A5）
+  触点① 施放（**保持不动**）：core/RoleInstance.java `handleCast` / `handleAttack`
+      片段：`active.onCast(new CastSignal(trigger));` 后 `hotbarRenderer.markDirty();`（:202）
+            `hook.onAttack(new AttackSignal(victim));` 后 `hotbarRenderer.markDirty();`（:219）
+      命令：`git -C ShadowHunterRoles grep -n -E '\bmarkDirty\(\);' -- src/main/java/com/shadowHunterRolesPlugin/core/RoleInstance.java` ⇒ 3 行（:202/:219/:537）
+  触点② 冷却启动（**新增，落点 = 端口适配器**）：core/CooldownPortImpl.java `start(int)`
+      片段（分派之后）：`owner.hotbarRenderer().markDirty();`（:53）
+      命令：`… grep -n -E '\bmarkDirty\(\);' -- …/core/CooldownPortImpl.java` ⇒ 1 行；自检样本 `-F 'addBuff'`(BuffManager) ⇒ 1 行（证明 pathspec 落到文件）
+      覆盖两 kind：`start()` 内 `if (kind == ItemKind.SKILL) … else …` 之后**同一行**置脏 ⇒ 技能与主武器共用该落点。
+  触点③ 冷却到点（**方法引用形态**）：core/RoleInstance.java
+      片段：`platform.scheduler().runLater(markHotbarDirty, getRemainingSkillCooldownTicks(skillId));`（:270）
+            `platform.scheduler().runLater(markHotbarDirty, getRemainingMainWeaponCooldownTicks(weaponId));`（:337）
+      方法引用唯一持有者（:87）：`private final Runnable markHotbarDirty = hotbarRenderer::markDirty;`
+      命令：`-E '::markDirty\b|\bmarkDirty,' -- src/main/java` ⇒ **1** 行（:87）
+      自检样本：`-E '::updateHotbar\b' -- src/main/java` ⇒ before 2 / **after 0**（该类 pattern 在本树可命中，防「该 pattern 永远为 0」的假绿灯）
+      ⇒ 同一持有者另供两条程序化路径：`scanCooldowns()` 到期分支 `markHotbarDirty.run();`（:402）· `endCooldown()` S3 `markHotbarDirty.run();`（:377）
+        —— 二者都**不计** C-02/C-03（不产生新的直呼点，也不新增方法引用）。
+  触点④ 能量单一入口：core/RoleInstance.java `setCurrentEnergy(int)`（:537）
+      片段：`this.currentEnergy = Math.clamp(...);` 之后 `hotbarRenderer.markDirty();`
+      覆盖性：`increaseEnergy`/`decreaseEnergy` 都经它；外部还有 command/** 与 internal/api/RoleAPIImpl（都不新增写物品路径）。
+  触点⑤ buff 移除：manager/BuffManager.java `removeBuff(BuffType)`（:109）
+      片段：`if(instance != null){ instance.hotbarRenderer().markDirty(); }`
+      宿主方法核对：命中在 `removeBuff` 内（方法起点 :100，命中 :109；`addBuff` 起点 :35 内**无**命中）。
+
+第 5 节 · 帧末 flush 与唯一消费者（C-04 / C-05 / C-06 / A6）
+  5.1 落点 = `RoleInstance.triggerUpdate()` 末尾（tick 末尾，紧接组件 update 广播与到期扫描之后）：
+        if(hotbarRenderer.isDirty() || hasCoolingSkill()){      // :736 ① 判脏（入口）
+            hotbarRenderer.render();                            // :737 ② 写物品（唯一写点）
+            hotbarRenderer.clearDirty();                        // :738 ③ 清脏（尾部）
+        }
+      三段**同方法体内且有序**（isDirty → 写 → clearDirty，不可交换）。
+  5.2 读数（现算，三件齐）
+      `-E 'isDirty\(\)|clearDirty\(\)' -- src/main/java` ⇒ 4 行 = 2 定义（HotbarRenderer:57/:62）+ 2 调用（RoleInstance:736/:738）
+      `-E '\.clearDirty\(\);'`（仅调用点，带接收者）      ⇒ **1**（before 0）
+      `-E '\.isDirty\(\)'`（仅调用点，带接收者）          ⇒ **1**（before 0）
+      裸计数对照：`-F 'clearDirty()'` = 2（定义 1 + 调用 1）· `-F 'isDirty()'` = 2 —— 差集恒为「定义 1」。
+  5.3 `clearDirty()` 的唯一消费者 = flush 尾部（:738）；端口/组件/渲染器内部**均未**调用（见 5.2 的调用点计数 = 1）。
+
+第 6 节 · B-2（冷却中每 tick 置脏）：形态与红线 R-4
+  6.1 谓词（**不得新增第 6 个直呼点** ⇒ 并入 flush 入口条件）：
+        private boolean hasCoolingSkill(){ for(String skillId : skillCooldowns.keySet()){ if(!isSkillReady(skillId)) return true; } return false; }
+      （:747-752；命令 `-F 'hasCoolingSkill'` ⇒ 2 行 = 定义 1 + flush 入口引用 1）
+      口径：**只数技能**（主武器冷却名无秒数文本 ⇒ 外观恒定，与迁移前一致）。
+  6.2 与迁移前的机制差异（**必须申报**）：迁移前逐 tick 刷的是 `displayName`（不调 `inv.setItem`）；
+      接管后逐 tick 走的是 flush ⇒ 写的是**整物品**（`inv.setItem`）。可见属性逐维不变（第 8 节），
+      写形态由「名称写入」变为「物品重写」——本批接受该口径（t1 冻结件 §3.4/§5.4 即如此要求），
+      量化 setItem 次数**不是**本批承诺（指向 t17/t18，见第 14 节）。
+
+第 7 节 · 逐条判据结论（C-01…C-16；after 值全部现算）
+  C-01 五触点锚点齐全 ⇒ **pass**（第 4 节五条，逐条「文件 + 符号 + 片段 + 命令 + 期望/实测」）
+  C-02 `\bmarkDirty\(\);` 仅调用点 = **5** ⇒ pass
+       5 行逐条：core/CooldownPortImpl.java:53（触点②）· core/RoleInstance.java:202（触点①施放）· :219（触点①攻击）· :537（触点④）
+                  · manager/BuffManager.java:109（触点⑤）
+       裸计数对照：`-F 'markDirty();'` = **5**（与调用点口径**相等** ⇒ 注释行复核差集 = 0，逐行判读首字符均为代码行）；
+                   `-F 'markDirty()'` = 7（多出 1 定义行 + 1 javadoc `{@link #markDirty()}`）；`-F 'markDirty'` = 9（再多 2 处 javadoc/注释提及）⇒ 三种数法的差集**逐行可解释**。
+       自检样本：`-E '\bmarkDirty' -- …/core/hotbar/HotbarRenderer.java` ⇒ 6 行（非空 ⇒ pathspec 落到文件）。
+  C-03 方法引用形态 = **1** ⇒ pass（RoleInstance:87，且 `runLater(markHotbarDirty, …)` **不**命中 `\bmarkDirty,` —— 无词边界，逐行核过）
+  C-04 帧末 flush 三段同处且有序 ⇒ pass（第 5 节）
+  C-05 `clearDirty()` 唯一消费者 = **1** ⇒ pass · C-06 `isDirty()` 消费者 = **1** ⇒ pass
+  C-07 渲染写点收敛 = **1** 且落在渲染器 ⇒ pass（`setItem(`=3 · `setItem(i, null);`=2 · `core/hotbar` 内 `setItem(`=**1**；`setItemMeta(`=9，不计入渲染写点）
+  C-08 旧渲染四方法归零 = **0/0/0** ⇒ pass（`createIconItem`=0 · `getDisplayName(RoleInstance`=0 · `getDisplayName(this)`=0）
+       自检样本：`-F 'getDisplayName(' -- src/main/java` ⇒ 22 行（= 无参 getter，全在 `ActiveComponent`/调用侧），与本判据无交集。
+  C-09 `updateHotbar()` 去向 = 删除 ⇒ pass（第 3 节全部四口径归零）
+  C-10 `updateSkillItemMeta`/`updateAllSkillItemMeta` 去向 = 删除 ⇒ pass（结构口径 4 → **0**）
+  C-11 组件侧零渲染入口 ⇒ pass（`-E 'HotbarRenderer|markDirty|createIconItem|getDisplayName\(RoleInstance' -- …/roleComponent` = **0**；
+       自检样本 `-F 'BuffType.' -- …/roleComponent` = 1 行 ⇒ 目录 pathspec 有效，0 不是假绿）
+  C-12 `ComponentServices` 白名单 = **10** 成员 ⇒ pass（:11-:20，逐行可读；未新增 HotbarPort）
+  C-13 `api/**` 零改动 ⇒ pass（`status --porcelain -- …/api` = 0 行；`diff --name-only 42dde5e5… -- …/api` = 0 行）
+  C-14 构建 + Mode B + C=0 + 当轮物证 ⇒ pass（第 10 节）
+  C-15 外观级逐维取证 ⇒ **本批不认领**（由 t5 执行；本轮无玩家/无 dump，见第 13/14 节）
+  C-16 制品代次纪律 ⇒ pass（本批只产一代；归档 + 登记 7；未重建任何已冻结代次，见第 11 节）
+  R-1 `BuffManager#addBuff` 不接线 ⇒ pass（该文件内 `hotbarRenderer|markDirty|updateHotbar` 命中 = 1，宿主 = `removeBuff`）
+  R-2 能量无条件置脏 ⇒ pass（`getEnergyCost` 在 RoleInstance = **0** 行；未做"跨阈值才置脏"）
+  R-3 不合并 ticker ⇒ pass（`runRepeating`：RoleInstance :124 = 1 · BuffManager :137 = 1；`this::triggerUpdate` = 1 —— 三者与 before 相同）
+  R-4 未新增第 6 个直呼点 ⇒ pass（C-02=5 且 B-2 由 flush 入口承担）
+  R-5 浮点格式/本地化未变 ⇒ pass（`%.1f` = **1**（HotbarRenderer:136，技能冷却分支）· `core/**` 的 `Locale` = **0** · `String.format` 3 → **2**（另一处在 command/DebugCooldownCommand，与本批无关））
+  R-6 B-2 谓词存在且被 flush 入口引用 ⇒ pass（静态级；**运行级平滑性未取证**，见第 13/14 节）
+  R-7 PDC 真值来源未分裂 ⇒ pass（`"main_weapon_id"` = 1（MainWeapon:47）· `"skill_id"` = 1（Skill:40）；两字面量**都不在** `core/hotbar/**` —— 渲染器引用的是公开常量）
+
+第 8 节 · 静态级等价性：四态 × 两 kind 逐维（A8；来源 = t1 冻结件 §5 的 S1–S10 与两张状态表）
+  口径：判据 = **可见属性**（材质枚举 / 名称纯文本 / 颜色与装饰 / lore 行序 / PDC 键）；不作 Component JSON 逐字比对。
+  ┌ 技能（ItemKind.SKILL）—— 渲染器锚点 ───────────────────────────────────────────────┐
+  │ READY      ：材质 `item.getIcon()`（:98）· 名 `GREEN+BOLD`（:148）· 无后缀 · lore ["Skill is ready.", "====", desc]（:149/:117/:118）│
+  │ COOLDOWN   ：`STRUCTURE_VOID`（:103）· 名 `GRAY+BOLD` + `" " + %.1f(remainingSeconds) + "s"`（:135-137）· lore ["Skill is on cooldown.", …]（:138）│
+  │ DISABLED   ：`BARRIER`（:100）· 名 `RED+BOLD` + `" DISABLED"`（:141-142）· lore ["Skill has been disabled.", …]（:143）│
+  │ ENERGY_LACK：`STRUCTURE_VOID`（:103）· 名 `GRAY+BOLD` + `" ENERGY LACK"`（:145-146）· lore **无状态行**，只有公共两行（:117-118）│
+  │ PDC        ：`Skill.Utils.SKILL_KEY`(STRING) = `item.getId()`（:122）│
+  └──────────────────────────────────────────────────────────────────────────────────┘
+  ┌ 主武器（ItemKind.MAIN_WEAPON）────────────────────────────────────────────────────┐
+  │ READY      ：`item.getIcon()`（:98）· 名 `GREEN+BOLD`（:167）· lore ["MainWeapon is ready.", …]（:168）│
+  │ COOLDOWN   ：`STRUCTURE_VOID`（:103）· 名 `GRAY+BOLD`（:158）· **无秒数后缀**（冻结差异）· lore ["MainWeapon is on cooldown.", …]（:159）│
+  │ DISABLED   ：`BARRIER`（:100）· 名 `RED+BOLD` + `" DISABLED"`（:162-163）· lore ["MainWeapon has been disabled.", …]（:164）│
+  │ ENERGY_LACK：**不可达**（energyCost ≡ 0 且能量 clamp ≥ 0）⇒ 未造新外观（:170-172 为空分支 + 注释）│
+  │ PDC        ：`MainWeapon.Utils.MAIN_WEAPON_KEY`(STRING) = `item.getId()`（:124）│
+  └──────────────────────────────────────────────────────────────────────────────────┘
+  判定顺序：`stateOf` 的四段顺序 = COOLDOWN → DISABLED → ENERGY_LACK → READY（:181-190，方法体一字未改）；
+            材质映射：READY → icon / DISABLED → BARRIER / 其余（COOLDOWN 与 ENERGY_LACK）→ STRUCTURE_VOID（旧实现即共用）。
+  第 8 维（刷新时机，t1 §5.4）：空闲 tick 不置脏 ⇒ flush 入口条件为假 ⇒ 0 次写物品（**不得退化**）；
+            施放/冷却启动/冷却到点/能量/buff 移除 ⇒ 置脏 + 帧末 flush（延迟 ≤ 1 tick，与迁移前的可见时机不晚于 1 tick）；
+            构造期首刷 = 构造器末尾**同步** `render()`（零延迟，与迁移前时机一致）。
+
+第 9 节 · 逐条申报的差异与设计选择（(a)…(f)；均属"不可见 / 必申报"两类）
+  (a) 构造期首刷：保留「同步首刷」（构造器末尾 `hotbarRenderer.render();`）⇒ 选 t1 §2.6 第 1 条的**方案②（零延迟）**。
+      副作用：置脏初值仍为 `true`（骨架原样）⇒ **首个 tick 会再写一次同内容**（1 次额外写、内容相同、不可见；
+      之后空闲 tick 的入口条件为假 ⇒ 不再写）。此副作用在源码注释里同处写明。
+  (b) 旧 null 分支消失：`createIconItem(null) → null` 与 `getDisplayName(null) → "RoleInstance is Null!"` 属**不可达路径**
+      （渲染器只对已注册组件生效；`hotbarItemOf` 对未知 id 返回 null 即跳过）⇒ 随方法删除。
+      证据：字符串多重集 `"RoleInstance is Null!"` 2 → **0**（见第 10 节 (d) 表）。
+  (c) 冷却中的写形态：`displayName` 单写 → **整物品重写**（第 6.2 节）。
+  (d) 冷却到期路径去重：迁移前有「`scanCooldowns` 到期刷新」+「`runLater(this::updateHotbar, remaining)`」两条；
+      本批两者都收敛到同一持有者 ⇒ 到点那一 tick 至少置脏一次（`scanCooldowns` 在 flush 之前运行 ⇒ 同 tick 必刷），
+      若 `runLater` 回调落在 flush 之后，则会在下一 tick 再刷一次**同内容**（≤1 次额外写、不可见）。
+  (e) `MainWeapon.Utils.MAIN_WEAPON_KEY` 由 `private` → `public static final`（t1 §8.2 的**方案 (a)**，与 `Skill.Utils.SKILL_KEY` 对称，
+      并与 `platform/KeyFactory` javadoc 的既有陈述一致）—— 属**可见性扩权**，在此申报；**未**复制键值字面量（R-7）。
+  (f) 删除后失效的 import 已同批清理（Skill/MainWeapon 各 4 条、RoleInstance 1 条 `ItemMeta`）；
+      `Skill.java` 的 `Player`/`TextColor` 与 `MainWeapon.java` 的 `Player`/`RoleManager` 是**改动前就存在**的未用 import，
+      本批**未动**（不属本批引入的死 import，避免把无关改动混进 diff）。
+
+第 10 节 · 收敛组/减少组双口径与 (d) 逐条申报（A7）
+  10.1 双口径（两个共享仪器，命令与输出如实）
+     口径 A（path-aware）：powershell … .scratch\bot\numeric-multiset.ps1 -BaseDir C:\Users\ROG\Desktop\插件\.scratch\bot\src-snapshots\t44takeover-before -Mode both -Tag t44takeover
+         numeric：before 658 → after 657（net **-1**）· string：before 396 → after 386（net **-10**）
+     口径 B（value-only）：powershell … .scratch\bot\t59-literal-net.ps1 -Before <同快照> -After C:\Users\ROG\Desktop\插件\ShadowHunterRoles\src -Tag t44takeover
+         numeric：before 658 → after 657，net **-1**，REMOVED = [0]，ADDED = 0
+         string ：before 396 → after 386，net **-10**，REMOVED = [" ", " DISABLED"×2, " ENERGY LACK", "%.1f", "====================", "registered", "RoleInstance is Null!"×2, "s"]，ADDED = 0
+      ⇒ 两条口径**方向一致（delta < 0）**；本批是**真删代码**批 ⇒ 减少组**不是 0 行**。
+  10.2 (d) 逐条申报（**数值**）
+      数值 net -1 = 唯一来源：`RoleInstance.updateSkillItemMeta` 内的 `int slot = 0;`（删）——
+      自证：数值多重集里字面量 `0` 的出现次数 211 → **210**（差 1），本批**未新增**任何数值字面量。
+  10.3 (d) 逐条申报（**字符串**，9 条真实减少 + 1 条仪器幻影）
+      | 值 | before | after | net | 归因 |
+      | " " | 3 | 2 | -1 | Skill 两处冷却名拼接 → 渲染器一处（去重 1） |
+      | " DISABLED" | 4 | 2 | -2 | Skill/MainWeapon 各 2 → 渲染器各 1（去重 2） |
+      | " ENERGY LACK" | 2 | 1 | -1 | Skill 2 → 渲染器 1 |
+      | "%.1f" | 2 | 1 | -1 | Skill 2 → 渲染器 1（技能分支唯一处） |
+      | "====================" | 2 | 1 | -1 | Skill/MainWeapon 各 1 → 渲染器 1 |
+      | "RoleInstance is Null!" | 2 | 0 | -2 | 旧 null 分支文案随不可达路径删除（第 9 节 (b)） |
+      | "s" | 2 | 1 | -1 | 同 " " 的去重（秒数后缀） |
+      | （其余 5 条状态行文案） | 1 | 1 | 0 | 移到渲染器，计数不变 |
+      ⇒ 真实字符串 net = **-9**。
+  10.4 ★ 仪器口径与一条**幻影行**（如实申报，供 t4 复核时对齐）
+      - `numeric-multiset.ps1` 的 string 模式先剥块注释、再剥行注释；其块注释正则是 `(?s)/\*.*?\*/`。
+      - 本树 `RoleInstance.java` 的注释行 `//**顺序说明**：…` 里存在 `/*`（两个斜杠 + 紧跟的星号）⇒ 被判为块注释起点，
+        直到下一个 `*/`（现为 B-2 谓词的 javadoc 收尾）为止的内容被整体吞掉 ⇒ 该区间内的字面量 `"registered"`（triggerUpdate 的广播调用）
+        在 after 侧**少算 1 次**，于是产生 `- "registered"` 这一**幻影行**（工具 string net 因此报 -10，真值 -9）。
+      - 双向核对（现算）：用「先剥行注释、再剥块注释」的口径逐值计数 ⇒ `"registered"` **before 3 / after 3**（net 0），
+        其余 9 条与工具输出**逐条相同** ⇒ 幻影行只有这一条。
+      - 该正则现象**在 before 树也存在**（另一处 `//**` 触发，吞掉区间 693..725），只是未覆盖到字面量 ⇒ 属工具的既有口径缺陷，
+        不属本批改动；本批**未修改**共享仪器（只如实记录复现方式：`git -C ShadowHunterRoles grep -n -F '"registered"'` 逐行可数）。
+      - 处置：A7 结论以**真值**为准（数值 -1 / 字符串 -9，均 < 0），并把幻影行计入 (d) 申报，避免 t4 按工具输出误判。
+
+第 11 节 · 构建、制品代次与归档（A10 / A14 / A15 / C-16）
+  11.1 构建（命令 = 卡面原文；实际执行形态前置 `$env:GRADLE_USER_HOME="$PWD\.gradle-work"`，见页末声明）
+       cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"; .\gradlew build -x copyPluginJar --console=plain
+       输出：`BUILD SUCCESSFUL in 13s`（3 actionable tasks: 2 executed, 1 up-to-date）；退出码 = 0；
+             附注：本机 gradlew 仍会向 stderr 打 `Couldn't open current thread, error = 5`（原生文件监视器）——
+             **判定不看退出码**，看 `BUILD SUCCESSFUL` + class mtime。
+       证据：build/classes/java/main/… 最新 .class mtime = 2026-09-19 12:54:06（构建前该树最新 src = 12:53:38）⇒ 已刷新；
+             构建后 **src 新于 jar = 0**（逐文件 mtime 比较，jar = 12:54:07.286）。
+  11.2 本代制品（唯一一代）：
+       build/libs/ShadowHunterRolesPlugin-1.0.0.jar = 159512 B / 2026-09-19 12:54:07.286 /
+         SHA256 6A249993ECDE32C9AAB4E651191C5277C198F97DB5C35A603FC68893C67FF734
+       起服侧自述其载入的就是这一文件（服务端日志：`[PluginRemapper] Remapping plugin '…\build\libs\ShadowHunterRolesPlugin-1.0.0.jar'`）。
+  11.3 归档（inScope: debug-logs/回滚快照/jars/）：
+       ShadowHunterRolesPlugin-1.0.0-verified-20260919-125407-6A249993.jar（与 build/libs 制品**逐字节相同**：SHA256 相等、bytes/mtime 一致）
+       MANIFEST.txt 追加「登记 7」（一行一个 key = value：登记时刻/文件/bytes/mtime/sha256/覆盖证据/与前代关系/备注）。
+  11.4 与前代关系：前代 21002ABC…（159661 B）与 53CBEB65…/0F2D901C… **不存在** class 级等价主张（本批是结构性改动）⇒ 自出运行证据。
+  11.5 **未对任何已冻结代次做「删 jar + 重建」**：本批的构建是**新一代**（159661 → 159512 B）；
+       5 份归档件（7A21729B/DBE04077/53CBEB65/0F2D901C/21002ABC）在构建前后 **bytes 与 mtime 逐字未变**（现算对照见物证第 1 节同口径复核）。
+       未做「重建后逐字节相同」类检查（无需要）；若 t4 要做，请按 t1 §9 在**副本**上进行。
+
+第 12 节 · 边界、红线与范围外申报（A9 / A16 / A19）
+  A9 三条红线逐个读数：① `BuffManager.add` 未接线（R-1 = 1 命中且在 `removeBuff`）· ② 能量**无条件**置脏（`getEnergyCost`(RoleInstance)=0）
+     · ③ **未合并 ticker**（`runRepeating` 1/1 与 `this::triggerUpdate` 1 与改动前一致）
+  A16 红线核对：`status --porcelain -- …/api` = 0 行 · `status --porcelain -- src/main/resources/plugin.yml` = 0 行 ·
+     `ComponentServices` 成员 = 10 · `callEvent` = 2 行（RoleInstance 的 EnergyChangeEvent 与 SanTEChangeEvent 发布点，保留）
+  A19 零 git 写：本批未执行任何 git 写命令（add/commit/checkout/restore/stash/reset）。
+     全仓 `git status --porcelain` 现算 = 7 行：本批 6 个 src 文件（M）+ `debug-logs/回滚快照/jars/MANIFEST.txt`（M，本批追加登记 7）；
+     其中两处**属本卡 inScope**（`debug-logs/回滚快照/jars/` 目录）。其余在办批次的改动（如 docs/活文档）**不属本批**，未触碰。
+     范围外但判据要求的写入：**无**（证据三件与 jar 归档路径均在卡面 inScope 内逐字给出）。
+
+第 13 节 · 运行深度如实申报（A17）
+  【有运行级证据】① Mode B 三行齐（12:57:11/12:57:11/12:57:12，冻结件内逐字）· ② 正序集合差只看 **C=0**（anchor/current 各 13 行、
+  ADDED=0/REMOVED=0/A=B=C=0）· ③ 级别字段扫描 `\] \[[^]]*/(ERROR|SEVERE)\]` = **0**（裸 ERROR/SEVERE=3 全是 oshi WARN 正文）·
+  ④ 插件在本代制品上被 Paper 实际加载并启用（日志自述 remap 的就是本代 jar）· ⑤ 停机三路互证（在线冻结 → 只 job_kill → 复证）。
+  【只有静态级证据】① 四态 × 两 kind 的**可见属性**逐维等价（第 8 节；无玩家/dump ⇒ 未做外观级）·
+  ② 「空闲 tick 零 setItem」与「冷却中每 tick 刷新」的**运行次数**（未挂探针）· ③ 秒数文本逐 tick 递减的平滑性 ·
+  ④ B-2 谓词在运行期的实际命中次数 · ⑤ 主线程 flush 延迟（只给"落点在 tick 末尾"的结构性论证，不做硬断言）·
+  ⑥ `BuffManager#addBuff` 可见时机（R-1 保护的那条差异）的运行级复核。
+
+第 14 节 · 未覆盖项如实申报（A18；无则写"无"—— 本批**不是**无）
+  1. **外观级逐维取证（C-15）未在本批执行**：本轮无真人玩家/机器人上线 ⇒ 材质/名称颜色/后缀/lore/PDC 读回只有**静态级**对照。
+     最小闭合方式：t5 按 t1 §5 两表逐维 dump 或截图（含 PDC 读回与冷却秒数两次抽样不同）。
+  2. **setItem 次数（性能契约）未量化**：本批只承诺"空闲 tick 不置脏"的**结构性**事实；量化归 t17/t18。
+  3. **秒数递减平滑性**只有静态依据 ⇒ 指向 t5 的三点抽样（t / t+10 / t+20）。
+  4. **`BuffManager#addBuff` 的可见时机**运行级未取证（需构造"上 STUN 但不起冷却"用例）⇒ 指向 t4/t5。
+  5. **JVM 默认 locale 对 `%.1f` 的影响**：本沙箱无法改 locale 复现；本批只登记"不得改动"（R-5），不测。
+  6. **Folia 真机**未验证（本批不做 Folia 适配；与既有裁定一致）。
+  7. 本轮**未做** `setItem` 计数探针、未做物品栏 dump、未跑 mineflayer（这些属 t4/t5 的范围）。
+  8. 尚存的技术尾巴（非本批引入、如实转述）：`t15` 的"沙箱物理不可执行"三项、`t19` 挂账项、`t47` 死锁空卡 —— 本批**不涉**。
+
+第 15 节 · 证据自绑定（A12 / A13；身份一律现算）
+  冻结日志：debug-logs/测试记录/阶段5-起服日志-4.4接管.log = 6077 B / mtime 2026-09-19 13:00:33.240 /
+            SHA256 527183B0F242D591130E90E83E066BBFEAD6274EBB2E109B9A17EB1413263A8A
+            （**在服务器仍在线时冻结**：13:00:25.496 与 13:00:33.231 两次冻结逐字节相同；停机后 latest.log 与其逐字节相同）
+  当轮物证：debug-logs/测试记录/阶段5-4.4接管-停服物证.txt（停机时刻、三路互证、java 进程数、日志独占读结果、F1 链）
+  本代制品：build/libs jar 与归档件（第 11 节；逐字节相同）
+  F1 链：jar（12:54:07.286）< log（13:00:33.240）< 物证 < 本说明；机器校验 ORDER 结果见本件末节。
+  引用纪律：本批**不引**「HEAD 的 tree」这类相对说法；改动前基线点名 commit 42dde5e5…（本批改动未提交，提交由队长执行）。
+
+页末声明（口径）
+  A. 卡面 verify 的 gradlew 条写作裸 `.\gradlew …`；**实际执行形态** = 同一条 pwsh 前置 `$env:GRADLE_USER_HOME="$PWD\.gradle-work"`
+     （机器级/用户级均未设置该变量，且 C:\Users\ROG\.gradle 在工作区外被沙箱拒写）。此为一次申报，commandsRun 用卡面原文。
+  B. 本机 `.\gradlew` 会向 stderr 打 `Couldn't open current thread, error = 5`（原生文件监视器）⇒ 构建判定一律看
+     `BUILD SUCCESSFUL` + `build/classes` 下最新 .class 的 mtime 已刷新，不看退出码。
+  C. 本文所有计数均给出「模式 + 定域 + 口径（含/不含定义与注释）」；裸计数与仅调用点两者都在文中出现，差值逐行解释。
+第 16 节 · F1 链 ORDER 机器校验（命令 + 输出，逐字）
+  命令：$j=(Get-Item build\libs\ShadowHunterRolesPlugin-1.0.0.jar).LastWriteTime; $l=(Get-Item …阶段5-起服日志-4.4接管.log).LastWriteTime; $e=(Get-Item …阶段5-4.4接管-停服物证.txt).LastWriteTime; $n=(Get-Item …阶段5-4.4接管-说明.txt).LastWriteTime; ($j -lt $l) -and ($l -lt $e) -and ($e -lt $n)
+  jar   mtime = 2026-09-19 12:54:07.286  (build/libs，与归档件同 mtime)
+  log   mtime = 2026-09-19 13:00:33.240  (阶段5-起服日志-4.4接管.log，仍在线时冻结)
+  物证  mtime = 2026-09-19 13:01:37.789  (阶段5-4.4接管-停服物证.txt)
+  说明  mtime = 2026-09-19 13:02:43.743  (本件；追加本节后 mtime 顺延，仍为链尾)
+  ORDER = OK
+  注：ORDER 只判「时间先后」；逐件身份（bytes/SHA256）见第 11/15 节与物证；追加本节后说明件 mtime 更新为 2026-09-19 13:02:56.342（仍晚于物证）。
+
+第 17 节 · 范围外（工作区级、非仓库）写入申报（A19 的补充；第 12 节'无'一栏以此节为准）
+  下列写入**不在仓库内**（仓库根 = C:\Users\ROG\Desktop\插件\ShadowHunterRoles；它们位于工作区根 C:\Users\ROG\Desktop\插件\.scratch\bot），
+  因此既不在卡面 inScope（仓库相对形式）之内，也不是仓库内容变更；其中 A1 与三条仪器命令的**输出路径由卡面/依赖卡指定** ⇒ 属'判据要求的写入'，逐条申报如下：
+   1) .scratch/bot/src-snapshots/t44takeover-before/（A1 强制基线：91 个 .java 快照 + SHA256.txt = 91 行）
+   2) .scratch/bot/numeric-before-t44takeover.txt · numeric-after-t44takeover.txt（口径 A numeric 输出）
+   3) .scratch/bot/string-before-t44takeover.txt · string-after-t44takeover.txt（口径 A string 输出）
+   4) .scratch/bot/logdelta-t44takeover.txt（log-delta.ps1 输出，C=0 的落盘件）
+   5) .scratch/bot/t59-literal-net-t44takeover.txt（口径 B value-only 输出）
+  未修改任何**共享仪器脚本**本身（numeric-multiset.ps1 / t59-literal-net.ps1 / log-delta.ps1 一字未动；第 10.4 节的幻影行只作记录）。
+  本批**未**写入仓库内 inScope 之外的路径（仓库 porcelain 中除本批 6 个 src + MANIFEST 外，无本批产生的行）。
+
+第 18 节 · 提交态说明（点名 commit，不用「HEAD 的 tree」）
+  基线（本批开工时工作树所在提交，点名）：42dde5e5069ff99876eea9a35977b47a0037dc95
+  本批施工期间 HEAD 因**他人批次**前移（本批零 git 写，未参与任何提交）：
+    abb1991 checkpoint: the phase five acceptance criteria are frozen …（= t1 的需求与验收冻结件入库）
+    6712625 checkpoint: the errata note points the fourth generation …（= t3 的交接收口入库）
+  这两次提交只含 debug-logs/测试记录/ 下 3 个文档（阶段5-需求与验收.md · 阶段5-勘误与读法说明.txt · 阶段5-取证轮-独立复核报告.md），
+  **不含**本批的 src 改动 ⇒ 本批的构建与运行对象 = 「42dde5e 的 src 树 + 本批工作树改动」（src 树未被那两次提交触碰，可核：
+  git diff --stat HEAD -- src/main/java/…/core/hotbar/HotbarRenderer.java 仍显示本批改动为未提交状态）。
+  本批改动**未提交**（提交权在队长）⇒ 制品↔提交态的绑定请以「42dde5e 的 src 树 + 本批 diff」这一口径认领，而不是「HEAD 的 tree」。
+
+===============================================================================
+【队长追加 · 更正（不改原句）】
+-------------------------------------------------------------------------------
+第 18 节前述表述（见 :312-318，要点 =「本批改动未提交」+「绑定以 42dde5e 的 src 树 + 本批 diff 认领」）
+**已被后续事实取代** ⇒ 按本工程惯例【追加更正、不改写原句】。
+
+| 原表述 | 现行事实 |
+|---|---|
+| 「本批改动**未提交**（提交权在队长）」 | 队长已入库**三代**提交：`b062252`（本批 6 个 src + MANIFEST）· `1d94ce6`（第 6 代归档 jar 入库）· `11bb792`（本件 + 冻结日志 + 停服物证） |
+| 「制品↔提交态的绑定以『42dde5e 的 src 树 + 本批 diff』认领」 | 绑定**已升级为提交态**：`b062252` 的 `src/main` tree；`git status --porcelain -- src` = 空 |
+| 「这两次提交…**不含**本批的 src 改动」（:315-316） | 该句在写作时刻属实；此后 `b062252` **专门**入库了本批 src ⇒ 现应读作「`abb1991`/`6712625` 不含本批 src；`b062252` 含」 |
+
+**不影响本件任何判据**：F1 链、Mode B 三行、`C = 0`、双口径、制品身份（159512 B / 12:54:07.286 / `6A249993…`）全部不变。
+
+**身份变更申报（取代）**：本件追加前 = 37075 B / `CEB56433…`；追加后身份**以现算为准**（引用本件旧身份者请按「取代申报」处理）。追加后 mtime 变为追加时刻，仍满足 F1 **必备环**（`jar < log 内容终点` 且 `jar < 每件证据`）；注意证据件**彼此之间**的先后**不构成判据**，详见 `口径澄清-F1链的项序列.md`。
+
+**更正人**：队长（卡外动作；理由：原作者名下无在办卡，为三行勘误开卡不经济；且该件为既成证据件，追加更正须具名归属）。
+===============================================================================
+

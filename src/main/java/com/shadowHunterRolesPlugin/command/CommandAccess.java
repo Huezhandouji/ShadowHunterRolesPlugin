@@ -32,11 +32,14 @@ import java.util.Map;
  * <p>
  * <b>判定规则</b>：
  * <ol>
- *   <li>{@link Player} 且等级 ≥ {@value #REQUIRED_LEVEL} ⇒ 允许；</li>
- *   <li>{@link Player} 且等级 &lt; {@value #REQUIRED_LEVEL}（含**不在 `ops.json` 中**）⇒ 拒绝；</li>
+ *   <li>{@link Player} 且等级 ≥ **要求等级** ⇒ 允许；</li>
+ *   <li>{@link Player} 且等级 &lt; 要求等级（含**不在 `ops.json` 中**）⇒ 拒绝；</li>
  *   <li>控制台 / RCON ⇒ **允许**（等价等级 4）；</li>
  *   <li>其他 {@link CommandSender}（如命令方块）⇒ 拒绝。</li>
  * </ol>
+ * <b>要求等级 = 配置字段</b>：{@code config.yml} 的 {@value #CONFIG_KEY}
+ * （取值范围 0-{@value #MAX_LEVEL}，默认 {@value #DEFAULT_REQUIRED_LEVEL}；越界自动夹取、缺失/非法回落默认）
+ * —— 改配置后需重启或 `/reload confirm` 才生效（配置对象是内存缓存），而玩家等级侧的 {@code ops.json} 最迟一个 TTL 生效。
  * <p>
  * <b>失败关闭（fail-closed）</b>：{@code ops.json} 缺失 / 不可读 / JSON 非法 / 任一条目缺 `name` 或 `level`
  * ⇒ **整个文件视为不可信 ⇒ 所有玩家一律拒绝**，并打一条**含原因的 SEVERE**（不静默）；恢复后打一条 INFO。
@@ -49,8 +52,17 @@ import java.util.Map;
  */
 final class CommandAccess {
 
-    /** 允许使用本插件指令所需的最低权限等级（用户裁定：≥ 3）。 */
-    static final int REQUIRED_LEVEL = 3;
+    /** {@code config.yml} 里的要求等级字段名（用户裁定：等级由配置给出，不硬编码）。 */
+    static final String CONFIG_KEY = "command-permission-level";
+
+    /** 配置缺失/非法时使用的要求等级（= 用户裁定的 3）。 */
+    static final int DEFAULT_REQUIRED_LEVEL = 3;
+
+    /** 允许的等级上限（Minecraft 权限等级范围 0-4）。 */
+    static final int MAX_LEVEL = 4;
+
+    /** 上次已打日志的要求等级（配置值变化时再打一行，便于运行级取证）。 */
+    private static int loggedRequiredLevel = Integer.MIN_VALUE;
 
     /** 玩家侧拒绝文案（与 `DebugCommand` 既有文案**逐字相同**；沿用工程既有风格）。 */
     static final String NO_PERMISSION = "You do not have permission to use this command.";
@@ -90,8 +102,10 @@ final class CommandAccess {
             refreshIfStale();
             Integer level = levels.get(player.getName().toLowerCase(Locale.ROOT));
             int effective = level != null ? level : 0;
-            boolean allowed = effective >= REQUIRED_LEVEL;
-            log((allowed ? "allowed " : "denied ") + action + " for " + player.getName() + " (level=" + effective + ")");
+            int required = requiredLevel();
+            boolean allowed = effective >= required;
+            log((allowed ? "allowed " : "denied ") + action + " for " + player.getName()
+                    + " (level=" + effective + ", required=" + required + ")");
             return allowed;
         }
         if (sender instanceof ConsoleCommandSender || sender instanceof RemoteConsoleCommandSender) {
@@ -100,6 +114,28 @@ final class CommandAccess {
         }
         log("denied " + action + " for " + sender.getClass().getSimpleName() + " (unsupported sender)");
         return false;
+    }
+
+    /**
+     * 当前**要求等级**：读 {@code config.yml} 的 {@value #CONFIG_KEY}
+     * （缺失/非法 ⇒ {@value #DEFAULT_REQUIRED_LEVEL}），并夹到 {@code 0}-{@value #MAX_LEVEL}。
+     * 值变化时打一行 INFO（便于运行级取证：配置确实被读到了）。
+     */
+    static int requiredLevel() {
+        ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
+        int configured = DEFAULT_REQUIRED_LEVEL;
+        if (plugin != null) {
+            configured = plugin.getConfig().getInt(CONFIG_KEY, DEFAULT_REQUIRED_LEVEL);
+        }
+        int clamped = Math.clamp(configured, 0, MAX_LEVEL);
+        if (clamped != configured) {
+            log("config " + CONFIG_KEY + "=" + configured + " out of range 0-" + MAX_LEVEL + " — clamped to " + clamped);
+        }
+        if (loggedRequiredLevel != clamped) {
+            loggedRequiredLevel = clamped;
+            log("required level = " + clamped + " (config " + CONFIG_KEY + ")");
+        }
+        return clamped;
     }
 
     /** 把玩家侧拒绝文案发给该 sender（非玩家 sender 不发聊天）。 */

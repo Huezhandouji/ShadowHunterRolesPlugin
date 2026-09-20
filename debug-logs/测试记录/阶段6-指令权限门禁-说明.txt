@@ -1,0 +1,132 @@
+阶段 6 · /role 指令权限门禁（含要求等级配置字段）—— 交付说明（卡 t30，含修订 A14–A20）
+================================================================================================================
+边界声明（开篇）
+  1) 三件证据 = 本件 + `阶段6-起服日志-指令权限门禁.log` + `阶段6-指令权限门禁-停服物证.txt`；jar 归档与 MANIFEST 追加属本卡 inScope。
+  2) **零 git 写**；未改 `RoleAPI`、未改渲染路径、**未改 `src/main/resources/plugin.yml`**、未改 `docs/`、未改 `core/`、未改 `roleComponent/`。
+  3) 行号 = 结卡时当前树现值；点名提交：开工基线 = `60da506…`；起服前 HEAD = `18d0f016…`。
+  4) ★ **需求反转过程如实留痕（两轮作废 + 一次撤回令）**：
+      · 用户追加「加 `config.yml` + 可配置权限等级」→ 我先落地；
+      · 队长令「误发，撤回，回退到卡面范围」→ 我删掉配置件/读取逻辑并重建；
+      · 队长再令「**不是误发，是用户真实意愿**，保留并改卡（t30 revision 1）」→ 我按修订契约把配置版加回，并把读取机制改为**文件 + TTL/文件戳**（见 A16）。
+      · 期间产生 **2 轮作废运行**（20:19–20:21「改配置前」、20:25–20:28「读内存 Config」版），**均未产出成立证据**；其日志内容分别留存为 `.scratch/bot/pret30b-latest-copy.log`（`2D38EA9E…`）与 `.scratch/bot/pret30c-latest-copy.log`（`92987454…`）并列入"旧件"清单。**本卡证据只认第 3 轮**（jar `68EAA080…`）。
+      · **纪律接受**：与冻结卡面冲突的指令，先回报队长再动 —— 本卡我按用户追加要求直接执行过一次，已按队长要求改为"回报优先"。
+
+第 0 节 · 一句话结论
+  `/role`（别名 `r`）的**全部 7 条子指令路径**已由 `RoleCommand` 根入口的**单一门禁**统一拦下：**要求等级由 `config.yml` 的 `command-permission-level` 给出（默认 3、域 0–4、缺失/非整数/越界/不可读均安全回落）**；
+  玩家等级来源 = 服务器根目录 `ops.json`（`Bukkit.getWorldContainer()` 推导、不硬编码）；控制台/RCON 放行、其他 sender 拒绝；`ops.json` 坏 ⇒ **失败关闭**并打含原因的错误日志。
+  运行级**八相全部实测通过**（无 op 被拒 / L4 通过 / L2 拒 / L3 过 / 坏文件拒 / 还原恢复 / **配置=4 未重载即生效 ⇒ L3 被拒** / 越界与非整数与删键与删文件皆回落默认 3）；构建通过、Mode B 三行齐、判别性 log-delta（干净窗口三条件成立）、插件归因扫描（干净窗口 0/0）、防假新鲜三条 + 轮转侧证、停服三路互证、F1 链 ORDER = OK；新代已归档并登记（登记 12）。
+
+第 1 节 · 基线（第一动作 = 取基线，编辑之前）
+  `… t59-baseline-and-scoped-criteria.ps1 -Name t30-command-gate-before` ⇒ HEAD = `60da506…`；快照 + SHA256.txt；时点 **2026-09-20 20:14:09.282**。
+  API 先核实（铁律 ①，全部 javap 于**编译期那个** `paper-api-1.21.11-R0.1-SNAPSHOT.jar`）：
+  `Bukkit.getWorldContainer()` ✔ · `ConsoleCommandSender` ✔ · `RemoteConsoleCommandSender` ✔ · `YamlConfiguration.loadConfiguration(File)` ✔ · `JavaPlugin.getDataFolder()` ✔；
+  `gson` 经 `paper-api` 传递依赖已在 **compileClasspath**（`gradlew dependencies --configuration compileClasspath` 现算：`com.google.code.gson:gson:2.11.0`）⇒ 未改 `build.gradle.kts` 即可用 `JsonParser`。
+
+第 2 节 · 实现（1 新 + 2 改；`command/` 内）
+  ① **`CommandAccess.java`（新）** —— 全插件唯一权限判定口径：
+      · `REQUIRED_LEVEL` 不再硬编码：`requiredLevel()`（`:144-179`）读**数据目录 `config.yml`** 的 `command-permission-level`
+        （`:163` `YamlConfiguration.loadConfiguration(file).getInt(CONFIG_KEY, DEFAULT_REQUIRED_LEVEL)`；`:164` 文件不存在 ⇒ `plugin.getConfig().getInt(...)` 取 jar 内置默认）；
+        **同一套失效机制**：`:71 CONFIG_TTL_MILLIS = 5_000L` + `:154` 文件戳（mtime×31+长度）比较 ⇒ 文件一变即重读、否则 TTL 内走缓存；
+        `:171 Math.clamp(value, 0, MAX_LEVEL)`；`:165-168 catch (Throwable)` ⇒ 回落默认且不抛异常；`:175-177` 值变化时打一行 INFO。
+      · `check(sender, action)`（`:118`）：`Player` ⇒ `level >= requiredLevel()`（允许/拒绝各打一行 INFO）；`ConsoleCommandSender`/`RemoteConsoleCommandSender` ⇒ 允许；其他 sender ⇒ 拒绝（各打一行）。
+      · `opsFile()`（`:103`）= `new File(Bukkit.getWorldContainer(), "ops.json")`；`refreshIfStale()`（`:196`/`:213`）同款 TTL + 文件戳；`parse()`（`:246` 起）逐条校验 `name`/`level`，
+        任一条目不合法 ⇒ 抛 ⇒ 失败关闭 + `:213` 起打**含原因**的 `Logger.severe(...)`（渲染为 `[Server thread/ERROR]`，见物证第七节口径注）。
+      · `NO_PERMISSION`（`:80`）= **全仓唯一副本**的拒绝文案。
+  ② **`RoleCommand.java`**：`gate(...)`（`:60`）把「判定 + 发文案」合成一处；`onCommand` **第一行**调用它（`:68`）；`onTabComplete` **第一行**调用它（`:97`）；
+      子指令路由（`:91` `subCommand.execute`、`:112` `subCommand.onTabComplete`）都在其后 ⇒ 七条子指令路径无一绕行（源码顺序判据见 A1）。
+  ③ **`DebugCommand.java`**：原 `:74 if(!player.isOp())` ⇒ `:74 if(!CommandAccess.check(sender, "/role debug"))`；原 `:93` 补全门禁 ⇒ `:93` 同 helper；自持的 `NO_PERMISSION` 常量**删除**（唯一副本在 `CommandAccess`）。
+
+第 3 节 · 逐条（A1…A20）
+  A1【单一门禁点】⇒ **pass（源码顺序 + 调用点判据）**：`RoleCommand:60` 是唯一 gate 实现，`:68`（执行）与 `:97`（补全）是它的**仅有两个调用点**；七条子指令的落点在它们之后 ——
+      `help/set/clear/energy/debug` 走 `:82 subCommands.get(...)` → `:91 subCommand.execute`；`debug cooldown/sched` 走 `DebugCommand:79 topics.get(...)` → `:87 topic.execute`（而 `DebugCommand:74` 又被同一 helper 再拦一次）；
+      补全侧同理：`:105 subCommands.get(...)` → `:112 subCommand.onTabComplete`。判据：`grep -nE 'gate\(sender|CommandAccess\.check'` ⇒ 3 处（`RoleCommand:60/:68/:97` + `DebugCommand:74/:93`），且 `subCommand.execute`/`topic.execute` 行号均大于门禁行号。
+  A2【等级来源 = `ops.json`】⇒ **pass**：`CommandAccess:103 return new File(Bukkit.getWorldContainer(), "ops.json");` ⇒ **无 `run/` 硬编码**（判据：`grep -F 'run/' -- command/` ⇒ **0**）；
+      运行级证据：`[command-access] ops.json resolved at C:\Users\ROG\Desktop\插件\ShadowHunterRoles\run\.\ops.json (entries=2)`（物证第七节 #1）⇒ 解析到的**绝对路径**已入日志。
+  A3【判定规则（四分支）】⇒ **pass（逐类）**：① `Player && level >= required` ⇒ 允许（运行级：#6 `level=3, required=3` allowed；#15 `level=4, required=4` allowed）；② `Player && level < required`（含不在表中）⇒ 拒绝（#3 `level=0`、#5 `level=2`、#14 `level=3, required=4`）；③ 控制台/RCON ⇒ 允许（`check()` 内 `ConsoleCommandSender`/`RemoteConsoleCommandSender` 分支；**静态级**：本轮未开 RCON、未跑控制台指令）；④ 其他 sender ⇒ 拒绝（同分支链尾；静态级）。
+      ★ **卡面口径澄清（须队长确认）**：`RoleCommand` **既有**的"仅玩家可执行"检查（`sender instanceof Player` 失败 ⇒ `Only players can execute this command!`）在本卡**未改** ⇒ 控制台/RCON 通过**门禁**（不被判无权限），随后仍收到那句**既有文案**；即"控制台被允许"体现在**门禁判定**层面，而非"控制台真的能跑"（子指令签名本身要求 `Player`）。未改它属"不改无关面"（A8）——如需控制台真可执行，属另一条裁定。
+  A4【失败关闭 + 响亮日志】⇒ **pass（判据 + 实测）**：`parse()` 对"文件不存在 / JSON 非法 / 根不是数组 / 条目非对象 / 条目缺 `name` / 条目缺整型 `level`"一律抛 ⇒ `refreshIfStale()` 把 `levels` 置空并打**一条含原因**的 `severe`（`:213` 起）。
+      实测：把 `run/ops.json` 换成非法 JSON 后，4 级玩家也被拒 —— `[20:31:38] [Server thread/ERROR]: … cannot read ops.json at …\run\.\ops.json — all players will be denied — JsonSyntaxException: … MalformedJsonException: Expected ':' at line 1 column 9 path $.this` + `[20:31:38] … denied /role for testplayer01 (level=0, required=3)`（物证第七节 #8/#9）。
+  A5【缓存与生效时效·ops】⇒ **pass**：`CACHE_TTL_MILLIS = 5_000`（`:83`）+ 文件戳（mtime×31+长度，`:196`）⇒ 不每次执行都读盘；**改完最迟 5 s 内生效、文件一变立即失效**。
+      实测：坏文件写入后 ≤7 s 的被拒（#9），还原后 ≤7 s 的恢复放行（#11 并伴 `ops.json readable again: … (entries=2)`）。
+  A6【单一口径】⇒ **pass**：`grep -nE 'isOp\(\)|hasPermission' -- command/` ⇒ **0 命中**；`DebugCommand` 两处已改走 `CommandAccess.check`（`:74`/`:93`），其自持文案常量已删 ⇒ 全仓唯一判定 = `CommandAccess`。
+  A7【拒绝文案】⇒ **pass**：原文 = `You do not have permission to use this command.`（`CommandAccess:80`，与 `DebugCommand` 既有文案**逐字相同**，Adventure `Component.text(...)` 承载；无过程中/协作类词汇）；
+      全仓该字符串仅 1 处定义（判据：`grep -F 'You do not have permission to use this command.' -- src/main/java` ⇒ 1 命中）。
+  A8【不改无关面】⇒ **pass**：`porcelain -- src/main/java/com/shadowHunterRolesPlugin/{api,core,roleComponent}` ⇒ 0 行；`porcelain -- src/main/resources/plugin.yml` ⇒ 0 行；
+      `RoleAPI`/渲染路径未触碰；`docs/` 未改（`porcelain -- docs` ⇒ 0 行）。
+  A9 构建/制品 ⇒ **pass**：`BUILD SUCCESSFUL in 10s`；`build/classes` 最新 `.class` mtime = **20:29:17.119**（刷新）；jar = **171579 B / 2026-09-20 20:29:17.252 / `68EAA080…`**；`src 新于 jar = 0`；
+      归档 `…-verified-20260920-202917-68EAA080.jar`（逐字节相同）+ MANIFEST「登记 12」；**未重建任何已取证代次**（`B8C3259E` 165857 B / `305BA1AD` 165428 B 现算逐字未变）。
+  A10【运行级·门禁】⇒ **pass**：Mode B 三行齐（20:30:02 ×2 + `Done (8.840s)!`）；**无 op 被拒** = `denied /role for T30NoPermProbe (level=0, required=3)`；**达标通过** = `allowed /role for testplayer01 (level=4, required=3)`（两条原始行见物证第七节 #3/#4，且**同轮**另有 L2 拒/L3 过/L4 过三条，构成"相同门禁下相反结果"的正对照）。
+      **正序集合差（不只看 C=0）**：**干净窗口**（P3 之前冻结的副本）四元组 = `anchor=13 · current=13 · ADDED=0 · REMOVED=0` ⇒ **三条件同时成立** ✔；
+      整轮冻结件四元组 = `anchor=13 · current=14 · ADDED=1 · REMOVED=0`，其唯一 ADDED = 我**故意**制造的坏文件测试行（逐字见物证第七节③）⇒ 期望值事先写死、实测一致。
+      **级别字段扫描**：开机窗 49 行 ⇒ ERROR/SEVERE = **0**；运行窗 141 行 ⇒ **1**（同上故意行）；全件 = 1。**插件归因异常**（锚 `^\s+at `）：干净窗口 **0/0**、整轮 **formA=1（同一条故意行）/formB=0**；形态自证 = 正样本 1/4、负样本 0/0。
+      **C=0 口径事先选定**：本轮**挂机器人**（门禁必须真连接）⇒ 预先声明"出现 ADDED 必须逐行归因"；实测无未归因 ADDED。
+  A11【防假新鲜三条 + 轮转侧证】⇒ **pass**：① 启动边界 = 起服前三路互证 **20:29:38.297** → 轮转 **20:29:53** / 首行 **20:29:54**；② latest.log mtime **20:33:05.092**、冻结件 mtime **20:33:48.803**（均晚于启动边界）；
+      ③ 本轮 SHA **`FB8C021C…`** 与清单九件（含 `92987454` 起服前 / `2D38EA9E` 作废轮 / `25C200B0` / `3F04913F` / `B06549A1` / `46B1E045` / `8318A683` / `8268E32C` / `527183B0`）**逐件现算全不等**；
+      ★ **轮转侧证**：`run/logs/2026-09-20-2.log.gz`（mtime 20:29:53）解压 = **14830 B / `92987454…`** 逐字等于起服前那份 ⇒ 旧件确实被挤走。
+  A12 三件证据 + F1 链 ⇒ **pass**：文件名与 inScope 逐字一致；`jar 20:29:17.252 < log 20:33:48.803 < 物证 < 说明` ⇒ **ORDER = OK**（机器校验命令与输出见本件末节）；点名提交：开工 `60da506…`、起服前 `18d0f016…`（结卡时 HEAD 与 porcelain 见第 5 节）。
+  A13 边界 ⇒ **pass**：未覆盖项见第 4 节；零 git 写；changedPaths ⊆ inScope（见第 5 节）。
+  A14【新增配置文件】⇒ **pass**：`src/main/resources/config.yml` = **694 B / SHA256 `86C31CB8E554E04654AE854E9BD0D20DA1D49A6EF71804E4C0165C9B6BE7117F`**，
+      含**一条**字段 `command-permission-level: 3`；注释原文（逐字）：`# 使用本插件指令（/role 及其全部子指令）所需的最低权限等级。` / `#   · 取值范围 0-4；默认 3（缺省/非整数/读不动时回落默认，不会让指令不可用）。` /
+      `#   · 玩家等级来源 = 服务器根目录下的 ops.json（本版 paper-api 不提供可读的等级 API）。` / `#   · 生效时效：本文件与 ops.json 走同一套失效机制（5 秒 TTL + 文件变更即失效）` / `#     ⇒ 改完最迟 5 秒内生效，无需重启或 reload。` /
+      `#   · 控制台 / RCON 不受此限制（等价等级 4）；其他指令发送者（如命令方块）一律拒绝。`；jar 内同名资源 694 B（`processResources` 已打包 ✓）。
+  A15【配置健壮性】⇒ **pass（逐项实测，无异常、指令全程可用）**：
+      · **越界** `99` ⇒ `config command-permission-level=99 out of range 0-4 — clamped to 4` ⇒ 3 级被拒（#17/#18）；4 级仍放行（#19）；
+      · **非整数** `abc` ⇒ 回落默认 3（#20 `required level = 3`；#21 3 级放行）；
+      · **删键**（文件只剩注释）⇒ 仍为默认 3（#22）；
+      · **删文件**（不存在）⇒ 回落 jar 内置默认 3（#23/#24）。
+      **还原**：读毕**删除**该文件、回到**测试前状态**（该文件在测试前并不存在 —— 见第 4 节未覆盖 #1 的机制说明）⇒ 还原后身份 = **NOT-EXIST**（未创建态）。
+      ★ 口径：`getConfig().getInt(KEY, 默认)` 对非数字值**直接返回默认、不抛异常** ⇒ 代码中 `catch (Throwable)` 兜底分支本轮**未被触发**（"非整数 ⇒ 回落默认"的行为已实测，但走的是 Bukkit 默认值语义）。**静态级声明**，见第 4 节。
+  A16【配置生效时效】⇒ **pass（机制 + 实测）**：机制 = **数据目录 `config.yml` 的 5 s TTL + 文件戳（mtime×31+长度）变更即失效**（与 `ops.json` 等级表同一套）⇒ **改完最迟一个 TTL 内生效、文件一变立即重读，无需重启或 reload**。
+      实测：写 `command-permission-level: 4` 后**未做任何 reload**，下一条 `/role` 判定即为 `[20:32:06] … required level = 4 (config command-permission-level)` ⇒ 3 级被拒（#13/#14），4 级放行（#15）；等过 TTL（20:32:22）结论不变（#16）。
+      ★ 旁证：**本轮全程无 `/reload`**；且第 2 轮实测 `/reload confirm` 在 Paper 1.21.11 下被拒（bot 转录原文 `Incorrect argument for command`）⇒ 生效**只能**来自本机制。
+  A17【判定链不变】⇒ **pass**：唯一比较点仍是一行 `boolean allowed = effective >= required;`（`check()` 内，`:118` 起），`required` 只是由常量变配置；A3 四分支语义未改（配置相里 `required=4` 时 L3 拒/L4 过，与 `required=3` 时 L3 过/L4 过完全同构）。
+  A18【运行级·含配置四条】⇒ **pass**：① 无 op 被拒 = #3；② 达标通过 = #4；③ **配置改 4 ⇒ 3 级探针被拒** = #13/#14（并配同轮正对照 #15 `level=4, required=4` 放行）；④ **改回 3 ⇒ 恢复通过** = #20/#21（`abc` 回落默认 3 后的同一条路径；另 #23/#24 为"删文件回默认 3 ⇒ 放行"）。
+      探针名均为**唯一新名**（`T30Level2Probe` / `T30Level3Probe`；未新增任何与基线 `HueZhandouji` 同名的条目）✓；每次改动后**等过 TTL**（7 s / 6 s）再测 ✓。
+  A19【基线还原】⇒ **pass**：`run/ops.json` 已逐字节还原为基线 **416 B / mtime 2026-09-19 20:54:41.017 / SHA256 `2531C80AB66984C08C8CE52C8CD0392D9E9AD8DCA79C0079E7A9537DFB73FD97`**（现算比较 = True）；
+      基线自带的**重复同名条目**（两条 `HueZhandouji`）**未清理** ✓；还原后复测 L4 放行（#25）。
+  A20 边界 ⇒ **pass**：未覆盖项见第 4 节；零 git 写；changedPaths ⊆ inScope（见第 5 节）。
+
+第 4 节 · 未覆盖项如实申报
+  1. **`saveDefaultConfig()` 未接**（属主类，超出 inScope）：`config.yml` 由 jar 内置默认生效，但**不会自动落盘到数据目录**；运维若不手工创建该文件，就只能用默认 3。
+     "自动落盘 / 增加 reload 子指令"建议另立卡（主类 + 可能的子指令）。
+  2. **配置读异常兜底分支未被触发**（见 A15 口径）：`getInt` 对非数字值返回默认、不抛 ⇒ `catch (Throwable)` 为**静态级**存在；"坏文件（例如把 config.yml 写成非法 YAML 结构）"这一路**未做运行级**。
+  3. **`/reload` 路径未获结论**：`/reload confirm` 在 Paper 1.21.11 下语法被拒；本轮生效不依赖它。
+  4. **控制台/RCON 分支未做运行级**（本轮未开 RCON、未从控制台执行 `/role`）；判定为静态级（`check()` 显式分支）。
+  5. **子指令覆盖面为静态级**：运行级只跑了 `/role help` 一种参数形态；七条子指令的"都过门禁"由源码顺序 + 调用点判据支持，未逐条运行。
+  6. **性能未实测**：判定是每 tick 之外的一次字符串/整数比较 + 5 s 一次的读盘（配置与 ops 各一条），未做压测。
+  7. **并发未验证**：缓存为静态字段、无同步；依赖"指令与 tick 都在主线程"这一既有执行模型。
+  8. **A4 的"SEVERE"是调用级别而非渲染字面**：Paper 把 JUL `SEVERE` 渲染为 `[Server thread/ERROR]` ⇒ `grep '/SEVERE]'` = 0 命中属预期（物证第七节口径注）。
+
+第 5 节 · 零 git 写 / changedPaths / 提交态申报
+  · **零 git 写**：未执行 add/commit/checkout/restore/stash/reset。
+  · changedPaths（仓库相对 POSIX；逐条 ⊆ inScope）：
+      `src/main/java/com/shadowHunterRolesPlugin/command/CommandAccess.java`（新）
+      `src/main/java/com/shadowHunterRolesPlugin/command/RoleCommand.java`
+      `src/main/java/com/shadowHunterRolesPlugin/command/DebugCommand.java`
+      `src/main/resources/config.yml`（新；修订契约 A14 纳入 inScope）
+      `debug-logs/回滚快照/jars/ShadowHunterRolesPlugin-1.0.0-verified-20260920-202917-68EAA080.jar`
+      `debug-logs/回滚快照/jars/MANIFEST.txt`（追加登记 12）
+      `debug-logs/测试记录/阶段6-指令权限门禁-说明.txt`
+      `debug-logs/测试记录/阶段6-起服日志-指令权限门禁.log`
+      `debug-logs/测试记录/阶段6-指令权限门禁-停服物证.txt`
+  · 范围外（工作区级、非仓库）写入：`.scratch\bot\` 下的基线快照 `src-snapshots\t30-command-gate-before\`、`t30-build-{1..8}.log`、
+    `t30-gate-probe.js`（自写最小探针）、`t30-p*.txt` 转录、`t30d-clean-window.log`、`logdelta-t30*.txt`、
+    `t30-ops-original.json`（ops.json 备份）、`pret30b/pret30c-latest-copy.log`（起服前副本）⇒ 均属判据要求；未改任何共享仪器脚本。
+  · 运行期数据：`run/ops.json` 已逐字节还原（A19）；`run/plugins/ShadowHunterRolesPlugin/config.yml` 已删除回未创建态（A15）。
+  · **提交态申报**：起服前一刻 HEAD = `18d0f016…`、`porcelain` = **3 行未提交** ⇒ 严格档位 = **开发构建轮**；制品↔源码绑定 =「`18d0f016` 的 src 树 + 本批工作树改动」。
+
+页末声明（口径）
+  A. 卡面 verify 的 gradlew 条写作裸 `.\gradlew …`；实际执行形态 = 同一条 pwsh 前置 `$env:GRADLE_USER_HOME="$PWD\.gradle-work"`（一次申报）。
+  B. 构建判定 = `BUILD SUCCESSFUL` + `build/classes` 最新 `.class` mtime 已刷新（本机 gradlew 会向 stderr 打 `Couldn't open current thread, error = 5` ⇒ 不看退出码）。
+  C. 逐 tick 之外：本卡的运行级探针 = `.scratch/bot/t30-gate-probe.js`（自写；每跑一次连一个机器人、发**一条**指令、抓聊天与服务器侧判定行）；
+     机器人名 `T30NoPermProbe`（不在 ops.json）、`T30Level2Probe`(L2)、`T30Level3Probe`(L3)、`testplayer01`(L4，基线已有的 op 账号) 与 `T30Level2/3Probe` 的临时条目，测试后全部清理。
+
+第 6 节 · F1 链 ORDER 机器校验（命令 + 输出，逐字；本节为最后一次追加）
+  命令：$j=(Get-Item build\libs\ShadowHunterRolesPlugin-1.0.0.jar).LastWriteTime; $l=(Get-Item …阶段6-起服日志-指令权限门禁.log).LastWriteTime; $e=(Get-Item …阶段6-指令权限门禁-停服物证.txt).LastWriteTime; $n=(Get-Item …阶段6-指令权限门禁-说明.txt).LastWriteTime; ($j -lt $l) -and ($l -lt $e) -and ($e -lt $n)
+  jar  mtime = 2026-09-20 20:29:17.252  (build/libs 与归档件同 mtime；= 提交 18d0f016 的 src 树 + 本批工作树改动)
+  log  mtime = 2026-09-20 20:33:48.803  (阶段6-起服日志-指令权限门禁.log；仍在线时冻结；SHA FB8C021C…)
+  物证 mtime = 2026-09-20 20:35:03.590
+  说明 mtime = 2026-09-20 20:35:41.428  (本件；追加本节后 mtime 顺延，仍为链尾)
+  ORDER = OK
+  点名 commit（不用「HEAD 的 tree」）：开工基线 60da506… · 起服前 18d0f016…（本批改动未提交 ⇒ 开发构建轮）
+

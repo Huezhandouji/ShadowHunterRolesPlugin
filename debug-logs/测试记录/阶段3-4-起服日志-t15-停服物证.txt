@@ -1,9 +1,0 @@
-t15 复验（修复后）停服物证
-时间戳（+08:00）：2026-09-18 19:43:14.819
-25566 监听：False（条数 0）
-java 进程数：3
-run/logs/latest.log 可独占读：True（size=5638）
-停机方式：仅 job_kill（未强杀 java）
-日志：debug-logs/测试记录/阶段3-4-起服日志-t15.log（5638 B / SHA256 4ABB921F9769180B57F3FE566A7A664F89F773E50E99E36C69CB353764B22940）
-状态锚：HEAD=e539a53ebc97ef065a88ef3bf9760884c9d33e85 ; src porcelain=0 行
-jar：139891 B / 2026-09-18 19:35:00.686 / SHA256 4FAED39614EA03FCC4A7CC3F486B9DC898A7650D7ADBE946752CB7969FCF9654 ; src 新于 jar = 0

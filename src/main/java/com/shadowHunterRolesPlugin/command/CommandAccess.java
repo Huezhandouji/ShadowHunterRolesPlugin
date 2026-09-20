@@ -9,6 +9,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.command.RemoteConsoleCommandSender;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 import java.io.File;
@@ -38,8 +39,10 @@ import java.util.Map;
  *   <li>其他 {@link CommandSender}（如命令方块）⇒ 拒绝。</li>
  * </ol>
  * <b>要求等级 = 配置字段</b>：{@code config.yml} 的 {@value #CONFIG_KEY}
- * （取值范围 0-{@value #MAX_LEVEL}，默认 {@value #DEFAULT_REQUIRED_LEVEL}；越界自动夹取、缺失/非法回落默认）
- * —— 改配置后需重启或 `/reload confirm` 才生效（配置对象是内存缓存），而玩家等级侧的 {@code ops.json} 最迟一个 TTL 生效。
+ * （取值范围 0-{@value #MAX_LEVEL}，默认 {@value #DEFAULT_REQUIRED_LEVEL}；越界自动夹取、缺失/非整数/不可读回落默认且不抛异常）。
+ * <p><b>生效时效</b>：本字段与 {@code ops.json} 等级表**同一套失效机制** —— 数据目录内配置文件的
+ * {@value #CONFIG_TTL_MILLIS} ms TTL + 文件戳（mtime×长度）变更即失效 ⇒ 改完配置文件**最迟一个 TTL** 内生效，
+ * **无需重启或 reload**（文件不存在时回落到 jar 内置默认值）。
  * <p>
  * <b>失败关闭（fail-closed）</b>：{@code ops.json} 缺失 / 不可读 / JSON 非法 / 任一条目缺 `name` 或 `level`
  * ⇒ **整个文件视为不可信 ⇒ 所有玩家一律拒绝**，并打一条**含原因的 SEVERE**（不静默）；恢复后打一条 INFO。
@@ -63,6 +66,15 @@ final class CommandAccess {
 
     /** 上次已打日志的要求等级（配置值变化时再打一行，便于运行级取证）。 */
     private static int loggedRequiredLevel = Integer.MIN_VALUE;
+
+    /** 配置文件读取缓存 TTL（毫秒）——与 ops.json 等级表同一机制。 */
+    private static final long CONFIG_TTL_MILLIS = 5_000L;
+
+    /** 上次读配置文件的时刻（ms）。 */
+    private static long configLoadedAt = 0L;
+
+    /** 上次读配置文件时的文件戳（mtime×31+长度）；文件一变即失效。 */
+    private static long configFileStamp = Long.MIN_VALUE;
 
     /** 玩家侧拒绝文案（与 `DebugCommand` 既有文案**逐字相同**；沿用工程既有风格）。 */
     static final String NO_PERMISSION = "You do not have permission to use this command.";
@@ -91,6 +103,12 @@ final class CommandAccess {
         return new File(Bukkit.getWorldContainer(), "ops.json");
     }
 
+    /** 本插件数据目录内的 {@code config.yml}（缺失时回落 jar 内置默认值）。 */
+    static File configFile() {
+        ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
+        return plugin != null ? new File(plugin.getDataFolder(), "config.yml") : null;
+    }
+
     /**
      * 单一门禁判定：{@code true} = 允许本次指令（同时把判定结果打进服务端日志）。
      *
@@ -117,19 +135,42 @@ final class CommandAccess {
     }
 
     /**
-     * 当前**要求等级**：读 {@code config.yml} 的 {@value #CONFIG_KEY}
-     * （缺失/非法 ⇒ {@value #DEFAULT_REQUIRED_LEVEL}），并夹到 {@code 0}-{@value #MAX_LEVEL}。
+     * 当前**要求等级**：读数据目录内 {@code config.yml} 的 {@value #CONFIG_KEY}
+     * （{@value #CONFIG_TTL_MILLIS} ms TTL + 文件戳失效，与 {@code ops.json} 同一机制）；
+     * 文件不存在时回落 jar 内置默认；越界夹到 {@code 0}-{@value #MAX_LEVEL}；
+     * 缺失键 / 非整数 / 读不动 ⇒ 回落 {@value #DEFAULT_REQUIRED_LEVEL} 且**不抛异常**（指令不会因此不可用）。
      * 值变化时打一行 INFO（便于运行级取证：配置确实被读到了）。
      */
     static int requiredLevel() {
         ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
-        int configured = DEFAULT_REQUIRED_LEVEL;
-        if (plugin != null) {
-            configured = plugin.getConfig().getInt(CONFIG_KEY, DEFAULT_REQUIRED_LEVEL);
+        if (plugin == null) {
+            return DEFAULT_REQUIRED_LEVEL;
         }
-        int clamped = Math.clamp(configured, 0, MAX_LEVEL);
-        if (clamped != configured) {
-            log("config " + CONFIG_KEY + "=" + configured + " out of range 0-" + MAX_LEVEL + " — clamped to " + clamped);
+        long now = System.currentTimeMillis();
+        File file = new File(plugin.getDataFolder(), "config.yml");
+        long stamp = file.isFile() ? (file.lastModified() * 31L + file.length()) : -1L;
+
+        int cached = loggedRequiredLevel;
+        if (now - configLoadedAt < CONFIG_TTL_MILLIS && stamp == configFileStamp && configLoadedAt != 0L) {
+            return cached == Integer.MIN_VALUE ? DEFAULT_REQUIRED_LEVEL : cached;
+        }
+        configLoadedAt = now;
+        configFileStamp = stamp;
+
+        int value;
+        try {
+            value = file.isFile()
+                    ? YamlConfiguration.loadConfiguration(file).getInt(CONFIG_KEY, DEFAULT_REQUIRED_LEVEL)
+                    : plugin.getConfig().getInt(CONFIG_KEY, DEFAULT_REQUIRED_LEVEL);
+        } catch (Throwable t) {
+            //A15：非整数 / 坏文件 / 读不动 ⇒ 回落默认，绝不抛异常、绝不让指令因此不可用
+            value = DEFAULT_REQUIRED_LEVEL;
+            log("config " + CONFIG_KEY + " unreadable — falling back to " + DEFAULT_REQUIRED_LEVEL
+                    + " (" + t.getClass().getSimpleName() + ")");
+        }
+        int clamped = Math.clamp(value, 0, MAX_LEVEL);
+        if (clamped != value) {
+            log("config " + CONFIG_KEY + "=" + value + " out of range 0-" + MAX_LEVEL + " — clamped to " + clamped);
         }
         if (loggedRequiredLevel != clamped) {
             loggedRequiredLevel = clamped;

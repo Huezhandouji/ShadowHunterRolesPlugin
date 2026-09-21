@@ -49,9 +49,13 @@ public class RoleInstance {
     //药水记账（D6 / O-7）：只记录本系统施加到本实例玩家身上的效果类型，clear() 只回收这些
     private final Set<PotionEffectType> appliedPotionTypes = new LinkedHashSet<>();
 
-    //冷却游戏刻时间戳
-    private Map<String, Integer> skillCooldowns = new HashMap<>();
-    private Map<String, Integer> mainWeaponCooldowns = new HashMap<>();
+    /**
+     * **单一冷却命名空间**（阶段 8 前置 · 合并两张表）：`组件 id → 到期游戏刻`。
+     * <p>合并前是 `skillCooldowns` / `mainWeaponCooldowns` 两张表，端口必须在**构造期**绑定 kind 才能选表
+     * ⇒ 那是"删 `ItemKind`"的硬阻塞。现在**只有这一张表**：组件 id 在全仓本就是**跨类型唯一**的命名空间
+     * （`Role.Builder` 的 id 去重是跨类型的）⇒ 一张表足以表达全部冷却，端口构造不再需要 kind。
+     */
+    private final Map<String, Integer> cooldowns = new HashMap<>();
 
     //丢弃物品时，mc服务端会发送挥手数据包，这回导致触发左键交互事件，使用这个标记变量阻止按q时触发左键逻辑
     private boolean isDropping = false;
@@ -154,16 +158,18 @@ public class RoleInstance {
     }
 
     /**
-     * 组件与其**一对一**的服务集（含按本组件 id/kind 构造的冷却端口、按本组件 id 定位资源表的定时器端口）。
-     * 收尾批⑤：改按 {@code (id, kind)} 构造 —— 服务集必须先于组件实例存在（构造期注入）。
+     * 组件与其**一对一**的服务集（按本组件 id 构造的冷却端口、按本组件 id 定位资源表的定时器端口）。
+     * <p><b>阶段 8 前置</b>：冷却表已合并为**单一命名空间** ⇒ 本方法**不再需要 kind**
+     * （合并前冷却端口必须在构造期绑定 kind 才能选表，那是"删 `ItemKind`"的硬阻塞）。
+     * 权威 kind 仍由注册处承载（`Role.componentKindOf`），供框架侧行为分支按需读取。
      */
-    private ComponentServices createServices(String componentId, ItemKind kind){
+    private ComponentServices createServices(String componentId){
         return new ComponentServices(
                 new SelfImpl(this),
                 new EnergyPortImpl(this),
                 new SanTEPortImpl(this),
                 new VitalsPortImpl(this),
-                new CooldownPortImpl(this, componentId, kind),
+                new CooldownPortImpl(this, componentId),
                 new BuffPortImpl(this),
                 new FactionPortImpl(this),
                 new DamagePortImpl(),
@@ -227,15 +233,14 @@ public class RoleInstance {
      * 组件初始化（阶段 6 · 统一装配）：**只遍历 {@code role.getComponents()} 一次** ——
      * 遍历顺序 = `Builder.add*` 的调用顺序 = **纯注册序**（旧的三段遍历
      * 「技能 → 被动 → 主武器」已删除，见交付说明的派发序申报）。
-     * <p>权威 kind 由注册处随条目给出，并交给 {@link #createServices(String, ItemKind)}
-     * （冷却端口在组件被构造**之前**就绑定了 kind）。
+     * <p>权威 kind 由注册处随条目给出（`Role.componentKindOf`，供框架侧行为分支读取）；
+     * **服务集构造不再需要 kind**（阶段 8 前置：冷却表已合并为单一命名空间）。
      */
     private void initComponents(){
         for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
             String componentId = entry.getKey();
-            ItemKind kind = entry.getValue().getKind();
 
-            ComponentServices services = createServices(componentId, kind);
+            ComponentServices services = createServices(componentId);
             RoleComponent component = role.createComponent(componentId, services);
             if(component == null) continue;
 
@@ -256,24 +261,13 @@ public class RoleInstance {
 
 
     //技能相关
+    /** 就绪判定（**单一冷却命名空间**的视图）：无条目/已到期 ⇒ {@code true}。 */
     public boolean isSkillReady(String skillId){
-        int endTick = skillCooldowns.getOrDefault(skillId, 0);
-        return Bukkit.getCurrentTick() >= endTick;
-    }
-
-    public void startSkillCooldown(String skillId, int ticks){
-        int endTick = Bukkit.getCurrentTick() + ticks;
-        skillCooldowns.put(skillId, endTick);
-
-        //冷却到点置脏（方法引用形态，避免新增直呼点）：到点那一 tick 的帧末 flush 完成图标恢复。
-        platform.scheduler().runLater(markHotbarDirty, getRemainingSkillCooldownTicks(skillId));
-
+        return isCooldownReady(skillId);
     }
 
     public int getRemainingSkillCooldownTicks(String skillId){
-        int endTick = skillCooldowns.getOrDefault(skillId, 0);
-        int remaining = endTick - Bukkit.getCurrentTick();
-        return Math.max(0, remaining);
+        return remainingCooldownTicks(skillId);
     }
 
     public float getRemainingSkillCooldownSeconds(String skillId){
@@ -324,43 +318,63 @@ public class RoleInstance {
     }
 
     public boolean isMainWeaponReady(String weaponId){
-        int endTick = mainWeaponCooldowns.getOrDefault(weaponId, 0);
-        return Bukkit.getCurrentTick() >= endTick;
-    }
-
-    public void startMainWeaponCooldown(String weaponId, int ticks){
-        int endTick = Bukkit.getCurrentTick() + ticks;
-        mainWeaponCooldowns.put(weaponId, endTick);
-
-        //冷却到点置脏（同技能侧；主武器无秒数文本 ⇒ 冷却中不需要每 tick 刷新）
-        platform.scheduler().runLater(markHotbarDirty, getRemainingMainWeaponCooldownTicks(weaponId));
+        return isCooldownReady(weaponId);
     }
 
     public int getRemainingMainWeaponCooldownTicks(String weaponId){
-        int endTick = mainWeaponCooldowns.getOrDefault(weaponId, 0);
-        return Math.max(0, endTick - Bukkit.getCurrentTick());
+        return remainingCooldownTicks(weaponId);
     }
 
     public float getRemainingMainWeaponCooldownSeconds(String weaponId){
         return getRemainingMainWeaponCooldownTicks(weaponId) / 20f;
     }
 
-    // ───────── 冷却自管理（阶段 4 追补 D1/D2/D3/D4）─────────
+    // ───────── 冷却自管理（阶段 4 追补 D1/D2/D3/D4）· 阶段 8 前置：**单一命名空间** ─────────
 
-    private Map<String, Integer> cooldownTable(ItemKind kind){
-        return kind == ItemKind.SKILL ? skillCooldowns : mainWeaponCooldowns;
+    /** 就绪判定（单一表的规范读法）：无条目/已到期 ⇒ {@code true}。 */
+    public boolean isCooldownReady(String componentId){
+        return Bukkit.getCurrentTick() >= cooldowns.getOrDefault(componentId, 0);
     }
 
-    /** 冷却是否**正在进行**（条目存在且未到期）。与 {@code isReady()} 互补：后者对"无条目/已到期"都返回 true。 */
-    boolean isCooling(String componentId, ItemKind kind){
-        Integer endTick = cooldownTable(kind).get(componentId);
+    /** 剩余刻（单一表的规范读法）：无条目/已到期 ⇒ {@code 0}。 */
+    public int remainingCooldownTicks(String componentId){
+        return Math.max(0, cooldowns.getOrDefault(componentId, 0) - Bukkit.getCurrentTick());
+    }
+
+    /**
+     * **起冷却**（单一表的规范写法；合并前是 `startSkillCooldown` / `startMainWeaponCooldown` 两支）。
+     *
+     * @return 是否**真的写了表**。`false` = 该组件"没有冷却这回事"（今天的定义 = 被动，见
+     *         {@link #hasCooldownNamespace(String)}）⇒ 调用方**不得**因此置脏（无声语义逐字保留）。
+     */
+    public boolean startCooldown(String componentId, int ticks){
+        if(!hasCooldownNamespace(componentId)) return false;
+        cooldowns.put(componentId, Bukkit.getCurrentTick() + ticks);
+
+        //冷却到点置脏（方法引用形态，避免新增直呼点）：到点那一 tick 的帧末 flush 完成图标恢复。
+        platform.scheduler().runLater(markHotbarDirty, remainingCooldownTicks(componentId));
+        return true;
+    }
+
+    /**
+     * 该组件**有没有冷却这回事**：合并前由冷却端口在**构造期**按 kind 挡下被动（"被动没有冷却 ⇒
+     * 恒就绪 / 剩余 0 / 不写表 / `end()` 恒 false"）；现在端口不再持有 kind，这一句收在**表这一层**。
+     * <p>今天 = 非 {@code PASSIVE}（权威 kind 取自注册处）。
+     */
+    private boolean hasCooldownNamespace(String componentId){
+        return role.componentKindOf(componentId) != ItemKind.PASSIVE;
+    }
+
+    /** 冷却是否**正在进行**（条目存在且未到期）。与 {@code isCooldownReady()} 互补：后者对"无条目/已到期"都返回 true。 */
+    boolean isCooling(String componentId){
+        Integer endTick = cooldowns.get(componentId);
         return endTick != null && Bukkit.getCurrentTick() < endTick;
     }
 
     /** 重启顶替（S2）：旧段**未到期** ⇒ 清掉旧条目（调用方随后回调 {@code RESTARTED} 并起新冷却）；返回是否确实顶替了一段冷却。 */
-    boolean clearCooldownForRestart(String componentId, ItemKind kind){
-        if(!isCooling(componentId, kind)) return false;
-        cooldownTable(kind).remove(componentId);
+    boolean clearCooldownForRestart(String componentId){
+        if(!isCooling(componentId)) return false;
+        cooldowns.remove(componentId);
         return true;
     }
 
@@ -369,28 +383,23 @@ public class RoleInstance {
      * 不在冷却中 ⇒ 无副作用（幂等）。
      * @return 是否确实结束了一段冷却
      */
-    boolean endCooldown(String componentId, ItemKind kind){
-        if(!isCooling(componentId, kind)) return false;
-        cooldownTable(kind).remove(componentId);
+    boolean endCooldown(String componentId){
+        if(!isCooling(componentId)) return false;
+        cooldowns.remove(componentId);
         dispatchCooldownEnd(componentId, CooldownAware.CooldownEndReason.ENDED_BY_COMPONENT);
         markHotbarDirty.run();
         return true;
     }
 
     /**
-     * 每 tick 扫描两张冷却表：**到期 ⇒ 移除条目**（关闭 O-21：条目不再永驻）＋ 回调 {@code EXPIRED} ＋ **一次**可见刷新。
+     * 每 tick 扫描**唯一那张**冷却表：**到期 ⇒ 移除条目**（关闭 O-21：条目不再永驻）＋ 回调 {@code EXPIRED} ＋ **一次**可见刷新。
      * 复用既有每 tick 路径（{@link #triggerUpdate()}），**不新建 ticker**（与 t17 划界）。
      */
     private void scanCooldowns(){
         boolean removed = false;
-        for(String skillId : expiredIds(skillCooldowns)){
-            skillCooldowns.remove(skillId);
-            dispatchCooldownEnd(skillId, CooldownAware.CooldownEndReason.EXPIRED);
-            removed = true;
-        }
-        for(String weaponId : expiredIds(mainWeaponCooldowns)){
-            mainWeaponCooldowns.remove(weaponId);
-            dispatchCooldownEnd(weaponId, CooldownAware.CooldownEndReason.EXPIRED);
+        for(String componentId : expiredIds(cooldowns)){
+            cooldowns.remove(componentId);
+            dispatchCooldownEnd(componentId, CooldownAware.CooldownEndReason.EXPIRED);
             removed = true;
         }
         if(removed){
@@ -748,10 +757,13 @@ public class RoleInstance {
     /**
      * B-2 谓词：是否存在**冷却中**（条目存在且未到期）的技能。
      * 只数技能 —— 主武器冷却名没有秒数文本，外观恒定 ⇒ 不需要每 tick 刷新（与迁移前一致）。
+     * <p>阶段 8 前置（单一冷却表）：表里现在混放着各 kind 的条目 ⇒ 这里用**权威 kind**
+     * （{@code Role.componentKindOf}）把主武器排除掉，口径与合并前**逐字相同**。
      */
     private boolean hasCoolingSkill(){
-        for(String skillId : skillCooldowns.keySet()){
-            if(!isSkillReady(skillId)) return true;
+        for(String componentId : cooldowns.keySet()){
+            if(role.componentKindOf(componentId) != ItemKind.SKILL) continue;
+            if(!isSkillReady(componentId)) return true;
         }
         return false;
     }
@@ -805,8 +817,7 @@ public class RoleInstance {
         buffManager.clearAll();
 
 
-        skillCooldowns.clear();
-        mainWeaponCooldowns.clear();
+        cooldowns.clear();
     }
 
 }

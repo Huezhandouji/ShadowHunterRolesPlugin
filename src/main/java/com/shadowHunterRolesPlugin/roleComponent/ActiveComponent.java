@@ -25,7 +25,7 @@ import org.bukkit.Material;
  * 也从不由装配入口消费 —— 因此这条路径与阶段 6 逐字等价。
  * <p>
  * 行为分支（冷却表 / 闸门 / PDC 键 / 文案表）一律由**注册处**的 kind 决定
- * （`Role.Builder` 统一入口的入参 ⇒ `RoleInstance.createServices(id, kind)`）；
+ * （`Role.Builder` 统一入口的入参 ⇒ `RoleInstance.createServices(id)`）；
  * 本类规格里的 kind **只作表现用途**。新组件若不需要"能施放 + 能渲染"这套默认组合，
  * 可以只 `extends RoleComponent` 并按需实现能力接口（本批不删三个基类）。
  */

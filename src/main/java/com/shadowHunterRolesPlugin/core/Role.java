@@ -131,8 +131,8 @@ public class Role {
      * **唯一组件创建点**（阶段 6 起对全部 kind 生效）：全仓**创建路径**只有这里调用
      * {@link ComponentFactory#create(String, ComponentServices)}；装配表按 id 查条目的工厂。
      * <p>服务集**在构造期**交给组件：组件返回时即已持有它，容器随后立刻登记。
-     * 权威 kind **不**经本方法传递给组件（组件无从得知，见 `RoleInstance.createServices(id, kind)`），
-     * 它由 {@link #componentKindOf(String)} 供框架侧行为分支读取。
+     * 权威 kind **不**经本方法传递给组件（组件无从得知；服务集构造自阶段 8 前置起也不再需要它，
+     * 见 `RoleInstance.createServices(id)`），它由 {@link #componentKindOf(String)} 供框架侧行为分支读取。
      */
     public RoleComponent createComponent(String id, ComponentServices services){
         ComponentEntry entry = components.get(id);

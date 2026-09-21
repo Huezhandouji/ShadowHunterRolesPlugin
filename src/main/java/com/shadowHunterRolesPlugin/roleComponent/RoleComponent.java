@@ -84,7 +84,7 @@ public abstract class RoleComponent {
      * <b>职责</b>：
      * <ul>
      *   <li>{@link #kind()} —— 权威种类，**在 {@link #create(String, ComponentServices)} 之前即可读**
-     *       （服务集在组件被构造**之前**就要它：`RoleInstance.createServices(id, kind)`）；</li>
+     *       （服务集在组件被构造**之前**就要它：`RoleInstance.createServices(id)`）；</li>
      *   <li>{@link #hasSlot()} / {@link #slot()} —— 占不占栏位。**"不占栏位"是栏位的缺失**（本类型内部
      *       用可空的 `Integer` 表达），**不是 `-1` 哨兵**；无栏位时 {@link #slot()} **抛异常**而不是返回哨兵；</li>
      *   <li>{@link #freeze()} —— 装配期冻结：产出**不可变快照** {@link Snapshot}。此后描述符自身也拒绝再改

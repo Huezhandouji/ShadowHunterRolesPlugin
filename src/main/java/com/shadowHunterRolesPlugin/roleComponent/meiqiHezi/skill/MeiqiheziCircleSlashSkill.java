@@ -3,7 +3,6 @@ package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
@@ -49,17 +48,18 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
     /**
      * 批次②（B②-b-2）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
-     * 判定顺序（2026-09-18 调整）：**先判 `canCastSkill`** —— 不满足 → `REJECTED_DISABLED`（让"被禁用"有框架反馈），
-     * **再**做能量 `tryConsume` —— 不满足 → `NO_COOLDOWN`（与旧路径一致、**不启冷却**）；
-     * 冷却改为 `SUCCEED` 由本组件在施放成功处按声明值 **200** 启动；
+     * 判定顺序（2026-09-18 调整）：**先判 `canCastSkill`** —— 不满足 → 直接返回（被禁用，不施放、不扣能量），
+     * **再**做能量 `tryConsume` —— 不满足 → 直接返回（与旧路径一致、**不启冷却**）；
+     * 冷却由本组件在施放成功处按声明值 **200** 启动；
      * 缓慢用 **5 参重载**（`ambient=true, particles=false` 逐字保真，R-1 方法族）；
      * 前摇任务改由 `svc().timers()` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
+     * <p>阶段 8：返回类型改 {@code void}（旧的施放结果枚举已删，返回值无消费点 ⇒ 零行为变化）。
      */
     @Override
-    public CastResult onCast(CastSignal signal){
+    public void onCast(CastSignal signal){
         Player caster = svc().self().player();
-        if(!svc().buffs().canCastSkill()) return CastResult.REJECTED_DISABLED;
-        if(!svc().energy().tryConsume(getEnergyCost())) return CastResult.NO_COOLDOWN;
+        if(!svc().buffs().canCastSkill()) return;
+        if(!svc().energy().tryConsume(getEnergyCost())) return;
 
         //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果（标志位与旧写法逐字一致）
         svc().buffs().applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
@@ -99,7 +99,6 @@ public class MeiqiheziCircleSlashSkill extends Skill {
             }
         });
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
-        return CastResult.SUCCEED;
     }
 
     @Override

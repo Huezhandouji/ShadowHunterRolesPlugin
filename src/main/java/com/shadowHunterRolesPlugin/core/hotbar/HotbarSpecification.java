@@ -10,17 +10,17 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.util.List;
 
 /**
- * 热键栏**表现规格 + 带栏位描述符**（阶段 6 立、阶段 7 · A 步改全拼并升格为描述符）：
- * 把过去分散在基类里的 7 个表现字段收敛成一个不可变值对象，并**同时**承担
+ * 热键栏**表现规格 + 带栏位描述符**（阶段 6 立、阶段 7 · A 步改全拼并升格为描述符、**阶段 8 收敛为纯声明**）：
+ * 把过去分散在基类里的表现字段收敛成一个不可变值对象，并**同时**承担
  * {@link RoleComponent.Specification} 的"怎么造这个组件"的职责（两者**合一**，不并列）。
  * <p>
- * 分工（阶段 7 冻结）：
+ * 分工（阶段 8 冻结）：
  * <ul>
  *   <li>{@link HotbarPresentable#specification()} = **唯一实现点** —— 组件只写这一处；</li>
- *   <li>本类自身即 {@link HotbarItem} 的读写面（渲染器形参类型在本批保留），
+ *   <li>本类自身即 {@link HotbarItem} 的**声明面**（图标 / 显示名 / 描述 / 冷却 / 耗能），
  *       因此 {@link HotbarPresentable#asHotbarItem()} 直接返回本对象，无需适配代码；</li>
- *   <li>本对象里的 {@code kind} **只作表现用途**；行为分支（冷却表 / 闸门 / PDC / 文案）一律读
- *       **注册处**给出的 kind（{@code Role#componentKindOf(String)}）。</li>
+ *   <li><b>纯声明</b>：阶段 8 删掉了 {@code kind} 字段与构造参数 —— 描述符不再自述种类；
+ *       "物品长什么样（含运行期状态）"由组件基类的 {@link HotbarItemProviding#buildItem()} 回答；</li>
  *   <li><b>栏位必填</b>：本类型 {@link #requiresSlot()} = {@code true}（不带栏位的组件用另一支描述符）。</li>
  * </ul>
  * <b>栏位（阶段 7 · A 步）</b>：本类型是**带栏位**的那一支 —— 装配器用
@@ -48,9 +48,9 @@ public class HotbarSpecification<T extends RoleComponent>
     private final int cooldownTicks;
     private final int energyCost;
 
-    protected HotbarSpecification(String id, Component displayName, Component description, Material icon,
-                                  int cooldownTicks, int energyCost, ItemKind kind) {
-        super(kind);
+    protected HotbarSpecification(String descriptorLabel, String id, Component displayName, Component description,
+                                  Material icon, int cooldownTicks, int energyCost) {
+        super(descriptorLabel);
         this.declaredId = id;
         this.displayName = displayName;
         this.description = description;
@@ -59,11 +59,15 @@ public class HotbarSpecification<T extends RoleComponent>
         this.energyCost = energyCost;
     }
 
-    /** 唯一的构造入口（不可变 ⇒ 组件可在构造期一次建好）。 */
-    public static <T extends RoleComponent> HotbarSpecification<T> of(String id, Component displayName,
-                                                                     Component description, Material icon,
-                                                                     int cooldownTicks, int energyCost, ItemKind kind) {
-        return new HotbarSpecification<>(id, displayName, description, icon, cooldownTicks, energyCost, kind);
+    /**
+     * 唯一的构造入口（不可变 ⇒ 组件可在构造期一次建好）。
+     *
+     * @param descriptorLabel 诊断标签（**不是行为分支**；只出现在装配期异常的文案里，取值如 "Skill"）
+     */
+    public static <T extends RoleComponent> HotbarSpecification<T> of(String descriptorLabel, String id,
+                                                                     Component displayName, Component description,
+                                                                     Material icon, int cooldownTicks, int energyCost) {
+        return new HotbarSpecification<>(descriptorLabel, id, displayName, description, icon, cooldownTicks, energyCost);
     }
 
     /** 本类型**必须**有栏位：见 {@link RoleComponent.Specification#freeze()} 的 fail-fast。 */
@@ -85,8 +89,8 @@ public class HotbarSpecification<T extends RoleComponent>
      * **失败关闭（fail-fast）**：本类的默认创建体不造任何组件 —— 具体组件由**组件自己声明的嵌套
      * `Specification`** 覆写本方法给出（阶段 7 · B 步落地）。把裸的 {@link HotbarSpecification}
      * 交给装配入口会立刻在这里抛异常，而不是造出一个语义不明的组件。
-     * <p>本类在阶段 7 · A 步的另一半职责是"组件内部的表现值对象"：{@link HotbarPresentable#specification()}
-     * 返回它、渲染器读它，那条路径**从不调用本方法**。
+     * <p>本类在阶段 7 · A 步的另一半职责是"组件内部的声明值对象"：{@link HotbarPresentable#specification()}
+     * 返回它、基类默认画法读它，那条路径**从不调用本方法**。
      */
     @Override
     public T create(String id, ComponentServices services) {
@@ -111,9 +115,10 @@ public class HotbarSpecification<T extends RoleComponent>
     /**
      * **基础物品**（阶段 7 · C 步 · 默认实现）：由图标 / 显示名 / 描述生成热键栏物品底稿 ——
      * 材质 = {@link #getIcon()}、显示名 = {@link #getDisplayName()}、lore = 单行 {@link #getDescription()}。
-     * <p>框架随后施加**状态装饰**（三态材质覆盖 / 名称颜色与加粗 / 冷却秒数或后缀 / 状态行 lore /
-     * 分隔线 / 两个 PDC 键），因此本方法**不碰**这些冻结面。
-     * <p>需要特殊渲染逻辑的组件：在自己的嵌套 `Specification` 里覆写本方法即可。
+     * <p><b>阶段 8 起</b>：它只提供**底稿**（材质 / 名称 / 描述），状态装饰
+     * （三态材质覆盖 / 名称颜色与加粗 / 冷却秒数或后缀 / 状态行 lore / 分隔线 / 两个 PDC 键）
+     * 由 `core/Skill#buildItem()` 与 `core/MainWeapon#buildItem()` 施加，因此本方法**不碰**这些冻结面。
+     * <p>需要特殊底稿的组件：在自己的嵌套 `Specification` 里覆写本方法即可。
      */
     @Override
     public ItemStack baseItem(String id) {
@@ -150,14 +155,5 @@ public class HotbarSpecification<T extends RoleComponent>
     @Override
     public int getEnergyCost() {
         return energyCost;
-    }
-
-    /**
-     * 表现用的自述种类：委托到描述符根类型的 {@link RoleComponent.Specification#kind()}
-     * （阶段 7 起两者是同一个值，不再各存一份）。
-     */
-    @Override
-    public ItemKind getKind() {
-        return kind();
     }
 }

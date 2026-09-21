@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
 import com.shadowHunterRolesPlugin.core.Skill;
-import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -57,14 +56,13 @@ public class RedDeeplySorrowSkill extends Skill {
     }
 
     @Override
-    public CastResult onCast(CastSignal signal) {
-        if(signal.trigger() != CastTrigger.RIGHT_CLICK) return CastResult.NO_COOLDOWN;
-        if(!svc().buffs().canCastSkill()) return CastResult.NO_COOLDOWN;
+    public void onCast(CastSignal signal) {
+        if(signal.trigger() != CastTrigger.RIGHT_CLICK) return;
+        if(!svc().buffs().canCastSkill()) return;
         running = true;
         svc().self().player().getWorld().playSound(svc().self().player().getLocation().clone(), Sound.ENTITY_WITHER_DEATH, 2, 1);
         //冷却 600 由本组件在施放成功处按声明值启动（T-2 ③ 后所有组件无条件走新管道）
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
-        return CastResult.SUCCEED;
     }
 
     @Override

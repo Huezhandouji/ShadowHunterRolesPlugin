@@ -5,7 +5,6 @@ import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.core.MainWeapon;
 import com.shadowHunterRolesPlugin.core.ParticleUtil;
 import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
-import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import net.kyori.adventure.text.Component;
@@ -57,7 +56,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
      * 两条分支都返回 {@code SUCCEED}（旧路径的冷却由 listener 在调用前启动 ⇒ 等价、且**不双启动**）。
      */
     @Override
-    public CastResult onAttack(AttackSignal signal) {
+    public void onAttack(AttackSignal signal) {
         Player attacker = svc().self().player();
         Player victim = signal.victim();
 
@@ -65,14 +64,13 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         if (svc().energy().current() >= 20) {
             castAreaDamage(attacker);
             svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
-            return CastResult.SUCCEED;
+            return;
         }
 
         if (victim != null) {
             svc().damage().physicalDamage(victim, attacker, 8, 0.5);
         }
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
-        return CastResult.SUCCEED;
     }
 
     /**
@@ -81,17 +79,16 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
      * 能量 `>= 20` 时打出范围伤害 ⇒ 返回 {@code SUCCEED}（冷却由本组件在施放成功处按声明值启动）。
      */
     @Override
-    public CastResult onCast(CastSignal signal) {
+    public void onCast(CastSignal signal) {
         if (signal.trigger() != CastTrigger.LEFT_CLICK) {
-            return CastResult.NO_COOLDOWN;
+            return;
         }
 
         Player player = svc().self().player();
-        if (svc().energy().current() < 20) return CastResult.NO_COOLDOWN;
+        if (svc().energy().current() < 20) return;
 
         castAreaDamage(player);
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
-        return CastResult.SUCCEED;
     }
 
     /**

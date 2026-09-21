@@ -2,7 +2,6 @@ package com.shadowHunterRolesPlugin.roleComponent.red;
 
 import com.shadowHunterRolesPlugin.core.MainWeapon;
 import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
-import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Color;
@@ -46,9 +45,10 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
      * 语义与旧 `onAttack(Player, Player, RoleInstance)` **逐条等价**：流血层数经
      * {@code RedBleedPassive.applyStacks(...)} 写入**同一份私有账本**；**拿不到账本时只跳过流血、
      * 继续结算普攻伤害**（原意保留）；伤害 `8` / 击退 `1` 逐字不变；冷却由本组件在施放成功处按声明值启动。
+     * <p>阶段 8：返回类型改 {@code void}（旧的施放结果枚举已删，返回值无消费点）。
      */
     @Override
-    public CastResult onAttack(AttackSignal signal) {
+    public void onAttack(AttackSignal signal) {
         Player attacker = svc().self().player();
         Player victim = signal.victim();
 
@@ -72,7 +72,6 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
 
         //冷却由框架按 getCooldownTicks() 启动（声明值是唯一真值来源）
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
-        return CastResult.SUCCEED;
     }
 
 }

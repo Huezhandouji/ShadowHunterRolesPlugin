@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
 import com.shadowHunterRolesPlugin.core.Skill;
-import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
@@ -36,13 +35,14 @@ public class RedEvilShockSkill extends Skill{
 
     /**
      * 批次①（B①）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
-     * 触发条件/范围/持续时间/增幅/层数/音效均不变；`canCastSkill` 不满足时返回 {@link CastResult#NO_COOLDOWN}
-     * （今天该路径直接 return、**不启冷却**）；冷却改为 {@link CastResult#SUCCEED}，由本组件在施放成功处按声明值启动。
+     * 触发条件/范围/持续时间/增幅/层数/音效均不变；`canCastSkill` 不满足时**直接返回**
+     * （该路径**不启冷却**）；冷却由本组件在施放成功处按声明值启动。
+     * <p>阶段 8：返回类型改 {@code void}（旧的施放结果枚举已删，返回值无消费点）。
      */
     @Override
-    public CastResult onCast(CastSignal signal){
+    public void onCast(CastSignal signal){
         Player caster = svc().self().player();
-        if(!svc().buffs().canCastSkill()) return CastResult.NO_COOLDOWN;
+        if(!svc().buffs().canCastSkill()) return;
 
         RedBleedPassive bleed = getComponent(RedBleedPassive.class);
         for(Player p : caster.getLocation().getNearbyPlayers(5)){
@@ -61,6 +61,5 @@ public class RedEvilShockSkill extends Skill{
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
 
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
-        return CastResult.SUCCEED;
     }
 }

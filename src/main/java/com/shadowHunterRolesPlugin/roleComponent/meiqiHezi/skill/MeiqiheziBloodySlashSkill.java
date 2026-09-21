@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
 
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -48,17 +47,18 @@ public class MeiqiheziBloodySlashSkill extends Skill {
 
     /**
      * 右击施放（新管道；批次⑧-b/B⑧-b 迁移）。与旧 `onRightClick(Player, RoleInstance)` **逐条等价**：
-     * 能量不足 / 被禁用时**直接返回且不启动冷却**（旧代码即如此）⇒ 返回 {@code NO_COOLDOWN}；
+     * 能量不足 / 被禁用时**直接返回且不启动冷却**（旧代码即如此）⇒ 早返回跳过后续语句；
      * 否则扣能量 `8`、以 `0L` 初始延迟 / `2L` 周期启动前摇任务（**登记进本组件资源表**，角色清除时由框架兜底取消
      * ⇒ 原 `isValid()` 守卫不需要）、四周 `4` 格内敌对目标各受 `14` 点物理伤害、粒子/音效逐字不变；
-     * 冷却改为 `SUCCEED`，由本组件在施放成功处按声明值 **160** 启动。
+     * 冷却由本组件在施放成功处按声明值 **160** 启动。
+     * <p>阶段 8：返回类型改 {@code void}（旧的施放结果枚举已删，返回值无消费点）。
      */
     @Override
-    public CastResult onCast(CastSignal signal) {
+    public void onCast(CastSignal signal) {
         Player caster = svc().self().player();
 
-        if (svc().energy().current() < getEnergyCost()) return CastResult.NO_COOLDOWN;
-        if(!svc().buffs().canCastSkill()) return CastResult.NO_COOLDOWN;
+        if (svc().energy().current() < getEnergyCost()) return;
+        if(!svc().buffs().canCastSkill()) return;
         svc().energy().tryConsume(getEnergyCost());
 
         attackTask = svc().timers().runRepeating(0L, 2L, new Runnable() {
@@ -97,7 +97,6 @@ public class MeiqiheziBloodySlashSkill extends Skill {
         });
 
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
-        return CastResult.SUCCEED;
     }
 
     @Override

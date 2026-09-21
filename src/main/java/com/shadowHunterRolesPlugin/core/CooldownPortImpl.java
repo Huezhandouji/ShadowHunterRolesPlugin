@@ -7,8 +7,8 @@ import com.shadowHunterRolesPlugin.core.ports.CooldownPort;
  * {@link CooldownPort} 的独立适配器：**构造期只绑定本组件 id**（组件不再传 id，也不再传 kind）。
  * <p>
  * <b>阶段 8 前置（本批）</b>：技能与主武器的两张冷却表已合并为**单一冷却命名空间**
- * （`RoleInstance` 内唯一那张表）⇒ 本适配器**不再需要在构造期绑定 {@code ItemKind}`** ——
- * 那正是"删 `ItemKind`"的硬阻塞（只要还是两张表，建服务集时就必须知道 kind）。
+ * （`RoleInstance` 内唯一那张表）⇒ 本适配器**不再需要在构造期绑定 kind（那个枚举已删）** ——
+ * 那正是"删 kind 枚举"的硬阻塞（只要还是两张表，建服务集时就必须知道 kind）。
  * 于是"被动没有冷却"这条**无声语义**从端口挪到了表那一层（{@code RoleInstance.startCooldown} 返回
  * 是否真的写了表）⇒ 可见行为逐字不变：不写表、不派发、**不置脏**。
  * <p>

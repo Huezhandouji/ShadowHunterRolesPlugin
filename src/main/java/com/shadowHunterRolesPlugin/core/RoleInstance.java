@@ -1,17 +1,16 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
-import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
 import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
 import com.shadowHunterRolesPlugin.core.dispatch.HotbarActionable;
 import com.shadowHunterRolesPlugin.core.hotbar.CooldownAware;
+import com.shadowHunterRolesPlugin.core.hotbar.CooldownBearing;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
-import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
@@ -52,7 +51,7 @@ public class RoleInstance {
     /**
      * **单一冷却命名空间**（阶段 8 前置 · 合并两张表）：`组件 id → 到期游戏刻`。
      * <p>合并前是 `skillCooldowns` / `mainWeaponCooldowns` 两张表，端口必须在**构造期**绑定 kind 才能选表
-     * ⇒ 那是"删 `ItemKind`"的硬阻塞。现在**只有这一张表**：组件 id 在全仓本就是**跨类型唯一**的命名空间
+     * ⇒ 那是"删 kind 枚举"的硬阻塞。现在**只有这一张表**：组件 id 在全仓本就是**跨类型唯一**的命名空间
      * （`Role.Builder` 的 id 去重是跨类型的）⇒ 一张表足以表达全部冷却，端口构造不再需要 kind。
      */
     private final Map<String, Integer> cooldowns = new HashMap<>();
@@ -160,8 +159,8 @@ public class RoleInstance {
     /**
      * 组件与其**一对一**的服务集（按本组件 id 构造的冷却端口、按本组件 id 定位资源表的定时器端口）。
      * <p><b>阶段 8 前置</b>：冷却表已合并为**单一命名空间** ⇒ 本方法**不再需要 kind**
-     * （合并前冷却端口必须在构造期绑定 kind 才能选表，那是"删 `ItemKind`"的硬阻塞）。
-     * 权威 kind 仍由注册处承载（`Role.componentKindOf`），供框架侧行为分支按需读取。
+     * （合并前冷却端口必须在构造期绑定 kind 才能选表，那是"删 kind 枚举"的硬阻塞）。
+     * 阶段 8 本卡把 kind 枚举整个删掉 ⇒ 注册处也不再承载任何"权威种类"。
      */
     private ComponentServices createServices(String componentId){
         return new ComponentServices(
@@ -233,8 +232,8 @@ public class RoleInstance {
      * 组件初始化（阶段 6 · 统一装配）：**只遍历 {@code role.getComponents()} 一次** ——
      * 遍历顺序 = `Builder.add*` 的调用顺序 = **纯注册序**（旧的三段遍历
      * 「技能 → 被动 → 主武器」已删除，见交付说明的派发序申报）。
-     * <p>权威 kind 由注册处随条目给出（`Role.componentKindOf`，供框架侧行为分支读取）；
-     * **服务集构造不再需要 kind**（阶段 8 前置：冷却表已合并为单一命名空间）。
+     * <p>阶段 8：**没有任何"种类"值**需要传递或读取（kind 枚举已删）；
+     * **服务集构造也不再需要 kind**（阶段 8 前置：冷却表已合并为单一命名空间）。
      */
     private void initComponents(){
         for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
@@ -244,7 +243,7 @@ public class RoleInstance {
             RoleComponent component = role.createComponent(componentId, services);
             if(component == null) continue;
 
-            //旧窄类型视图（供既有公共访问器使用）：按**具体类型**归位，不按 kind 猜测
+            //旧窄类型视图（供既有公共访问器使用）：按**具体类型**归位，不按任何"种类"猜测
             if(component instanceof Skill skill) skillMap.put(componentId, skill);
             if(component instanceof MainWeapon weapon) mainWeaponMap.put(componentId, weapon);
             if(component instanceof PassiveSkill passive) passiveMap.put(componentId, passive);
@@ -359,10 +358,22 @@ public class RoleInstance {
     /**
      * 该组件**有没有冷却这回事**：合并前由冷却端口在**构造期**按 kind 挡下被动（"被动没有冷却 ⇒
      * 恒就绪 / 剩余 0 / 不写表 / `end()` 恒 false"）；现在端口不再持有 kind，这一句收在**表这一层**。
-     * <p>今天 = 非 {@code PASSIVE}（权威 kind 取自注册处）。
+     * <p><b>阶段 8</b>：判据由"权威 kind ≠ PASSIVE"改为**能力接口** {@link CooldownBearing}
+     * —— 没有冷却这回事的组件（今天 = 被动）压根不实现该接口 ⇒ 与迁移前**同一接受集**，
+     * 且不再有任何"种类"概念。**不写表 ⇒ 不派发 ⇒ 不置脏**逐字保留。
+     * <p>用 {@code componentRegistry.all()} 线性扫描而不走 {@code getById}：本方法可能在
+     * **注册表冻结前**被调用（组件构造期若自行起冷却）⇒ 不引入"冻结前调用抛异常"的新前置条件。
+     * <p><b>语义收紧（如实申报）</b>：未注册的 id 从"会写表"变为"不写表"（旧口径里
+     * {@code componentKindOf} 对未知 id 返回 {@code null}，而 {@code null != PASSIVE} ⇒ 放行）。
+     * 仓内唯一的调用方是冷却端口（id 必然已注册）⇒ 无观察差异。
      */
     private boolean hasCooldownNamespace(String componentId){
-        return role.componentKindOf(componentId) != ItemKind.PASSIVE;
+        for(RoleComponent component : componentRegistry.all()){
+            if(componentId.equals(component.getId())){
+                return component instanceof CooldownBearing;
+            }
+        }
+        return false;
     }
 
     /** 冷却是否**正在进行**（条目存在且未到期）。与 {@code isCooldownReady()} 互补：后者对"无条目/已到期"都返回 true。 */
@@ -473,7 +484,9 @@ public class RoleInstance {
      * <p>**适配点（阶段 6）**：优先取 {@link HotbarPresentable#asHotbarItem()} 的规格视图 ——
      * 这样「只 `extends RoleComponent` + 实现 `HotbarPresentable`」的新式组件同样可被渲染；
      * 旧式实现（自身即 `HotbarItem`）原样返回。
-     * <p>行为分支（技能/主武器）由**注册 kind** 决定，不在此处区分。
+     * <p><b>阶段 8</b>：渲染器**不再经本方法取值**（它直接取组件实例调
+     * {@code HotbarItemProviding#buildItem()}）；本方法保留为描述符视图的公开访问器，仓内 0 调用点
+     * （已申报）。行为分支（技能/主武器）**不再由任何"种类"决定**。
      */
     public HotbarItem hotbarItemOf(String id){
         RoleComponent component = componentRegistry.getById(id);
@@ -746,8 +759,10 @@ public class RoleInstance {
 
         //阶段 5 · 4.4 帧末 flush（落点 = tick 末尾，紧接组件更新与到期扫描之后）：
         //① 判脏 → ② 写物品（唯一写点 = HotbarRenderer.render）→ ③ 清脏（此顺序不可交换）
-        //入口条件并入 B-2：**有技能冷却中** ⇒ 每 tick 至少刷一次（否则技能名里的 " x.xs" 不再逐 tick 递减 = 可见行为变化）。
-        if(hotbarRenderer.isDirty() || hasCoolingSkill()){
+        //入口条件并入 B-2（阶段 8 口径，**与冻结口径等价**）：**外观含秒数**的占栏位组件在冷却
+        //⇒ 每 tick 至少刷一次（否则技能名里的 " x.xs" 不再逐 tick 递减 = 可见行为变化）。
+        //**主武器不让入口因它而变**（冷却名不带秒数 ⇒ 冻结差异；见 hasCoolingTickingComponent）。
+        if(hotbarRenderer.isDirty() || hasCoolingTickingComponent()){
             hotbarRenderer.render();
             hotbarRenderer.clearDirty();
         }
@@ -755,15 +770,25 @@ public class RoleInstance {
     }
 
     /**
-     * B-2 谓词：是否存在**冷却中**（条目存在且未到期）的技能。
-     * 只数技能 —— 主武器冷却名没有秒数文本，外观恒定 ⇒ 不需要每 tick 刷新（与迁移前一致）。
-     * <p>阶段 8 前置（单一冷却表）：表里现在混放着各 kind 的条目 ⇒ 这里用**权威 kind**
-     * （{@code Role.componentKindOf}）把主武器排除掉，口径与合并前**逐字相同**。
+     * B-2 谓词（阶段 8 口径；**与冻结口径等价**）：是否存在**外观含秒数**的**占栏位**组件正在冷却。
+     * <p>作用 = 让"冷却中每刻至少刷一次"成立：技能名里的 {@code x.xs} 才会逐刻递减
+     * （装饰搬进组件之后，框架只剩 {@link CooldownBearing#isCooling()} 这条读口）。
+     * <p><b>为什么判据落在 `Skill` 家族上</b>：旧口径是"权威 kind == SKILL"（阶段 8 已把那个枚举删除）；
+     * 它的**语义**是"该组件的外观是否含秒数" —— 那正是**技能家族默认画法**
+     * （{@code Skill#buildItem()} 的 COOLDOWN 分支里那唯一一处秒数格式串，即归属判据 C-13 的同一套事实）
+     * ⇒ 新判据与旧判据的**接受集逐字相同**。
+     * <p><b>边界（A12）</b>：主武器**不得**让帧入口因它而变 —— {@code core/MainWeapon} 家族的冷却名
+     * **不带**秒数（冻结差异）⇒ 本谓词对它恒 {@code false} ⇒ 主武器冷却不驱动每 tick 刷新，与迁移前一致。
+     * <p>接受集成立性：占栏位组件全是 {@code HotbarPresentable}（⊇ {@link CooldownBearing}）
+     * ⇒ 被本谓词检查到的技能组件一定能回答 {@code isCooling()}。
      */
-    private boolean hasCoolingSkill(){
-        for(String componentId : cooldowns.keySet()){
-            if(role.componentKindOf(componentId) != ItemKind.SKILL) continue;
-            if(!isSkillReady(componentId)) return true;
+    private boolean hasCoolingTickingComponent(){
+        for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
+            if(!entry.getValue().hasSlot()) continue;
+            RoleComponent component = componentRegistry.getById(entry.getKey());
+            //「外观含秒数」= 技能家族的默认画法（秒数格式串只在那里出现）
+            if(!(component instanceof Skill)) continue;
+            if(component instanceof CooldownBearing bearing && bearing.isCooling()) return true;
         }
         return false;
     }

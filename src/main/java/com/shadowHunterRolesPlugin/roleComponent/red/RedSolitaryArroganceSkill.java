@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.red;
 
 import com.shadowHunterRolesPlugin.core.Skill;
-import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
@@ -47,17 +46,18 @@ public class RedSolitaryArroganceSkill extends Skill {
 
     /**
      * 批次③（B③）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
-     * `canCastSkill` 不满足 → {@link CastResult#NO_COOLDOWN}（**旧写法 `:34` 就是直接 return、不启冷却**，已现场核）；
+     * `canCastSkill` 不满足 → **直接返回**（**旧写法 `:34` 就是直接 return、不启冷却**，已现场核）；
      * 循环任务由 `svc().timers().runRepeating(1L, 6, …)` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）；
      * `:57` 射线几何仍用**静态** `SkillUtil.getPlayersInSightLine`（无状态工具，不进端口白名单）；
-     * 伤害 8 与回血 4 **逐字不变**；冷却改为 `SUCCEED`，由本组件在施放成功处按声明值 **200** 启动。
+     * 伤害 8 与回血 4 **逐字不变**；冷却由本组件在施放成功处按声明值 **200** 启动。
      * <p>`isValid()` 守卫按四步等价链删除：任务登记进资源表 ⇒ `clear()` 的 `cancelAllAndClear()` 必取消它 ⇒
      * 延迟体在 `valid=false` 之后不可达。
+     * <p>阶段 8：返回类型改 {@code void}（旧的施放结果枚举已删，返回值无消费点）。
      */
     @Override
-    public CastResult onCast(CastSignal signal){
+    public void onCast(CastSignal signal){
         Player caster = svc().self().player();
-        if(!svc().buffs().canCastSkill()) return CastResult.NO_COOLDOWN;
+        if(!svc().buffs().canCastSkill()) return;
         attackTask = svc().timers().runRepeating(1L, 6,
                 new Runnable() {
                     private Player cas = caster;
@@ -106,7 +106,6 @@ public class RedSolitaryArroganceSkill extends Skill {
                 }
         );
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
-        return CastResult.SUCCEED;
     }
 
     @Override

@@ -23,10 +23,26 @@ public class RedSolitaryArroganceSkill extends Skill {
     private Task attackTask;
 
 
-    public RedSolitaryArroganceSkill(String id, ComponentServices services) {
-        super(id, services, Component.text("孤妄自赏"),
-                Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命"),
-                200,0, Material.FERMENTED_SPIDER_EYE);
+    public RedSolitaryArroganceSkill(String id, ComponentServices services, Specification specification) {
+        super(id, services, specification);
+    }
+
+    /**
+     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
+     * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
+     */
+    public static final class Specification extends Skill.Specification {
+
+        public Specification(){
+            super(Component.text("孤妄自赏"),
+                    Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命"),
+                    200, 0, Material.FERMENTED_SPIDER_EYE);
+        }
+
+        @Override
+        public RedSolitaryArroganceSkill create(String id, ComponentServices services){
+            return new RedSolitaryArroganceSkill(id, services, this);
+        }
     }
 
     /**

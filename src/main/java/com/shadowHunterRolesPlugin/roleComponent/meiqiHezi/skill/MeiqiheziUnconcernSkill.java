@@ -14,16 +14,30 @@ import org.bukkit.potion.PotionEffectType;
 
 public class MeiqiheziUnconcernSkill extends Skill {
 
-    public MeiqiheziUnconcernSkill(String id, ComponentServices services){
-        super(
-                id,
-                services,
-                Component.text("漫不经心"),
-                Component.text("获得2秒速度5"),
-                100,
-                0,
-                Material.BLAZE_POWDER
-        );
+    public MeiqiheziUnconcernSkill(String id, ComponentServices services, Specification specification){
+        super(id, services, specification);
+    }
+
+    /**
+     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
+     * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
+     */
+    public static final class Specification extends Skill.Specification {
+
+        public Specification(){
+            super(
+                    Component.text("漫不经心"),
+                    Component.text("获得2秒速度5"),
+                    100,
+                    0,
+                    Material.BLAZE_POWDER
+            );
+        }
+
+        @Override
+        public MeiqiheziUnconcernSkill create(String id, ComponentServices services){
+            return new MeiqiheziUnconcernSkill(id, services, this);
+        }
     }
 
     /**

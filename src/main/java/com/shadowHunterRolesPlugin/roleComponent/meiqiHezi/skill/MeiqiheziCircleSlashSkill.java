@@ -21,16 +21,30 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     private Task castTask;
 
 
-    public MeiqiheziCircleSlashSkill(String id, ComponentServices services){
-        super(
-                id,
-                services,
-                Component.text("圆弧斩"),
-                Component.text("前摇1秒后对7m范围内所有敌人造成20真实伤害"),
-                200,
-                15,
-                Material.GOLD_INGOT
-        );
+    public MeiqiheziCircleSlashSkill(String id, ComponentServices services, Specification specification){
+        super(id, services, specification);
+    }
+
+    /**
+     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
+     * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
+     */
+    public static final class Specification extends Skill.Specification {
+
+        public Specification(){
+            super(
+                    Component.text("圆弧斩"),
+                    Component.text("前摇1秒后对7m范围内所有敌人造成20真实伤害"),
+                    200,
+                    15,
+                    Material.GOLD_INGOT
+            );
+        }
+
+        @Override
+        public MeiqiheziCircleSlashSkill create(String id, ComponentServices services){
+            return new MeiqiheziCircleSlashSkill(id, services, this);
+        }
     }
 
     /**

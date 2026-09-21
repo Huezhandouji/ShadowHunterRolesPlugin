@@ -16,15 +16,29 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
     //每次普攻施加的流血层数
     private static final int BLEED_STACKS_PER_HIT = 15;
 
-    public RedSanctifiedBladeMainWeapon(String id, ComponentServices services) {
-        super(
-                id,
-                services,
-                Component.text("至洁之刃"),
-                Component.text("攻击施加流血效果"),
-                Material.IRON_SWORD,
-                100
-        );
+    public RedSanctifiedBladeMainWeapon(String id, ComponentServices services, Specification specification) {
+        super(id, services, specification);
+    }
+
+    /**
+     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 图标 / 冷却逐字段一致；
+     * 主武器的能量消耗由类型恒为 0），栏位由装配点 {@code setSlot} 指定。
+     */
+    public static final class Specification extends MainWeapon.Specification {
+
+        public Specification(){
+            super(
+                    Component.text("至洁之刃"),
+                    Component.text("攻击施加流血效果"),
+                    Material.IRON_SWORD,
+                    100
+            );
+        }
+
+        @Override
+        public RedSanctifiedBladeMainWeapon create(String id, ComponentServices services){
+            return new RedSanctifiedBladeMainWeapon(id, services, this);
+        }
     }
 
     /**

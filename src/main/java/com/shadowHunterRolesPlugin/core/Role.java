@@ -46,7 +46,11 @@ public class Role {
     private final Set<String> skillIds;
     private final Set<String> passiveIds;
     private final Set<String> mainWeaponIds;
-    //武器和技能所在的栏位
+    /**
+     * **栏位视图（派生）**（阶段 7 · B 步）：栏位归属**不再由本类维护** —— 它随组件自己的描述符走
+     * （装配点只写 {@code setSlot}）。本表是构造期**一次性从组件表派生**出来的只读视图，
+     * 只为公开 API {@link #getSlotMap()} 保留（签名与语义不变）。
+     */
     private final Map<Integer, String> slotMap;
 
     private final Faction faction;
@@ -69,10 +73,25 @@ public class Role {
         this.skillIds = Collections.unmodifiableSet(filterIds(this.components, ItemKind.SKILL));
         this.passiveIds = Collections.unmodifiableSet(filterIds(this.components, ItemKind.PASSIVE));
         this.mainWeaponIds = Collections.unmodifiableSet(filterIds(this.components, ItemKind.MAIN_WEAPON));
-        this.slotMap = Collections.unmodifiableMap(builder.slotMap);
+        this.slotMap = Collections.unmodifiableMap(deriveSlotMap(this.components));
 
         this.icon = builder.icon;
 
+    }
+
+    /**
+     * **装配期一次性派生栏位视图**（阶段 7 · B 步）：遍历组件表，把**占栏位**的条目收成 `栏位 → id`。
+     * <p>遍历顺序 = 注册序 ⇒ 同一栏位不可能出现两次（装配期已校验），派生结果与旧实现写入的那张表逐项相同。
+     */
+    private static Map<Integer, String> deriveSlotMap(Map<String, ComponentEntry> components){
+        Map<Integer, String> derived = new HashMap<>();
+        for(Map.Entry<String, ComponentEntry> entry : components.entrySet()){
+            ComponentEntry component = entry.getValue();
+            if(component.hasSlot()){
+                derived.put(component.getSlot(), entry.getKey());
+            }
+        }
+        return derived;
     }
 
     /** 按 kind 过滤出**保持声明序**的 id 视图（`LinkedHashSet`）。 */
@@ -175,9 +194,8 @@ public class Role {
         private int maxSanTE = 100;
         private Faction faction = Faction.UNKNOWN;
 
-        /** 唯一有序组件表（声明序 = 装配调用序）—— 阶段 6 的派发序载体。 */
+        /** 唯一有序组件表（声明序 = 装配调用序）—— 阶段 6 的派发序载体，也是**栏位的唯一来源**（阶段 7 · B 步）。 */
         private final Map<String, ComponentEntry> components = new LinkedHashMap<>();
-        private final Map<Integer, String> slotMap = new HashMap<>();
 
         private Material icon;
 
@@ -310,11 +328,12 @@ public class Role {
         }
 
         /**
-         * **唯一内部装配路径**（阶段 6 立、阶段 7 · A 步改为"栏位可有可无"）：新描述符入口、
-         * 两个旧重载与三个弃用别名都只调用这里 ⇒ 校验、id 去重、栏位写入、入表各只有一处实现。
+         * **唯一内部装配路径**（阶段 6 立、阶段 7 · A 步改为"栏位可有可无"、B 步改为"栏位随组件走"）：
+         * 新描述符入口、两个旧重载与三个弃用别名都只调用这里 ⇒ 校验、id 去重、入表各只有一处实现。
+         * <p>本类**不再维护栏位表**：栏位只作为条目的一个值存在（{@code ComponentEntry.slot}），
+         * 角色构造期再一次性派生出 {@code slotMap} 视图。
          *
-         * @param slot 栏位；{@code null} = **不占栏位**（不占热键栏，不写 `slotMap`）——
-         *             旧版用 {@code -1} 哨兵表达同一件事，本版改成"值的缺失"
+         * @param slot 栏位；{@code null} = **不占栏位**（不占热键栏）——旧版用 {@code -1} 哨兵表达同一件事
          */
         private Builder addComponentInternal(String id, ItemKind kind, Integer slot,
                                              ComponentFactory<? extends RoleComponent> factory){
@@ -334,9 +353,6 @@ public class Role {
             }
 
             components.put(id, new ComponentEntry(factory, kind, slot));
-            if(slot != null){
-                slotMap.put(slot, id);
-            }
 
             return this;
         }
@@ -363,13 +379,20 @@ public class Role {
             };
         }
 
-        //O-12：槽位冲突 fail-fast（§10 裁决 1）—— 抛异常、该角色不注册，不再"告警 + 覆盖"
+        /**
+         * O-12：槽位冲突 fail-fast（§10 裁决 1）—— 抛异常、该角色不注册，不再"告警 + 覆盖"。
+         * <p>阶段 7 · B 步：冲突判定改为**扫组件表里已占栏位的条目**（本类不再另存栏位表），
+         * 异常类型与文案**逐字不变**。
+         */
         private void validateSlot(int slot){
             if(slot < 0 || slot > 8){
                 throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
             }
-            if(slotMap.containsKey(slot)){
-                throw new IllegalArgumentException("Slot " + slot + " is already occupied by '" + slotMap.get(slot) + "'.");
+            for(Map.Entry<String, ComponentEntry> entry : components.entrySet()){
+                ComponentEntry registered = entry.getValue();
+                if(registered.hasSlot() && registered.getSlot() == slot){
+                    throw new IllegalArgumentException("Slot " + slot + " is already occupied by '" + entry.getKey() + "'.");
+                }
             }
         }
 
@@ -418,6 +441,26 @@ public class Role {
     }
 
     public Faction getFaction() { return faction; }
+
+    /**
+     * 栏位视图（**派生**，阶段 7 · B 步）：`栏位 → 组件 id`，由构造期一次性从组件表派生。
+     * 签名与语义与迁移前**完全一致**（公开 API，只增不改）；栏位归属本身随组件自己的描述符走。
+     */
     public Map<Integer, String> getSlotMap() { return slotMap; }
+
+    /**
+     * 按栏位取组件 id（**新增**，阶段 7 · B 步）：走与渲染器**同一趟**组件表遍历
+     * （`栏位 → id` 的唯一来源是条目里的栏位值），未占用 ⇒ {@code null}。
+     * <p>给 {@code DebugCooldownCommand} 的"纯数字 = 热键栏槽位"解析用，避免它去读第二套栏位表。
+     */
+    public String componentIdAtSlot(int slot){
+        for(Map.Entry<String, ComponentEntry> entry : components.entrySet()){
+            ComponentEntry component = entry.getValue();
+            if(component.hasSlot() && component.getSlot() == slot){
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
 }
 

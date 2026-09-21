@@ -19,16 +19,30 @@ public class MeiqiheziBloodySlashSkill extends Skill {
     private Task attackTask;
 
 
-    public MeiqiheziBloodySlashSkill(String id, ComponentServices services){
-        super(
-                id,
-                services,
-                Component.text("血腥连斩"),
-                Component.text("向前移动4格并斩击，重复四次"),
-                160,
-                8,
-                Material.IRON_INGOT
-        );
+    public MeiqiheziBloodySlashSkill(String id, ComponentServices services, Specification specification){
+        super(id, services, specification);
+    }
+
+    /**
+     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
+     * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
+     */
+    public static final class Specification extends Skill.Specification {
+
+        public Specification(){
+            super(
+                    Component.text("血腥连斩"),
+                    Component.text("向前移动4格并斩击，重复四次"),
+                    160,
+                    8,
+                    Material.IRON_INGOT
+            );
+        }
+
+        @Override
+        public MeiqiheziBloodySlashSkill create(String id, ComponentServices services){
+            return new MeiqiheziBloodySlashSkill(id, services, this);
+        }
     }
 
 

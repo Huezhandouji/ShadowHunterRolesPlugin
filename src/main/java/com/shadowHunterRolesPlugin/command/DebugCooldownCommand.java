@@ -126,11 +126,16 @@ public class DebugCooldownCommand implements SubCommand {
         return List.of();
     }
 
-    /** 目标解析：纯数字 = 热键栏槽位（读 {@code Role.getSlotMap()}，不猜）；否则按组件 id（须在注册表内）。 */
+    /**
+     * 目标解析：纯数字 = 热键栏槽位（走与渲染器**同一趟**组件表遍历：{@code Role.componentIdAtSlot(int)}），
+     * 否则按组件 id（须在注册表内）。
+     * <p>阶段 7 · B 步：栏位随组件自己的描述符走 ⇒ 这里**不再**读 `Role.getSlotMap()` 那张派生视图，
+     * 但仍与它同源（都来自条目里的栏位值）⇒ 数字解析不会因栏位来源改变而静默失效。
+     */
     private String resolveComponentId(RoleInstance instance, String target){
         if(target.matches("\\d+")){
-            Integer slot = Integer.parseInt(target);
-            return instance.getRole().getSlotMap().get(slot);
+            int slot = Integer.parseInt(target);
+            return instance.getRole().componentIdAtSlot(slot);
         }
         return instance.componentRegistry().getById(target) != null ? target : null;
     }

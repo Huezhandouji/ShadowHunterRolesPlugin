@@ -32,12 +32,30 @@ import org.bukkit.Material;
 public abstract class ActiveComponent extends RoleComponent
         implements HotbarItem, HotbarActionable, HotbarPresentable, CooldownAware {
 
-    private final HotbarSpecification<RoleComponent> specification;
+    private final HotbarSpecification<?> specification;
 
+    /**
+     * **描述符口径的构造**（阶段 7 · B 步）：表现规格**不再由构造实参内联**，而是由组件自己的
+     * 嵌套 `Specification` 声明、经装配入口 {@code Role.Builder.addComponent(id, specification)}
+     * 交给容器，容器再经 {@code Specification.create(id, services)} 把它交给本构造器。
+     * <p>本类持有的这一份同时是**渲染器的读面**（{@link #specification()}）；它由装配期
+     * {@code freeze()} 置为只读 ⇒ 同一实例被多个玩家实例共享也不会被串改。
+     */
+    protected ActiveComponent(String id, ComponentServices services, HotbarSpecification<?> specification) {
+        super(id, services);
+        this.specification = specification;
+    }
+
+    /**
+     * 旧构造口径（表现参数内联）：**保留为兼容别名** —— 语义等价于把七个参数原样交给
+     * {@link HotbarSpecification#of}（kind 由子类给定）。
+     *
+     * @deprecated 改用 `(id, services, specification)`：表现值写进组件自己的嵌套 `Specification`。
+     */
+    @Deprecated
     protected ActiveComponent(String id, ComponentServices services, Component displayName, Component description,
                               int cooldownTicks, int energyCost, Material icon, ItemKind kind) {
-        super(id, services);
-        this.specification = HotbarSpecification.of(id, displayName, description, icon, cooldownTicks, energyCost, kind);
+        this(id, services, HotbarSpecification.of(id, displayName, description, icon, cooldownTicks, energyCost, kind));
     }
 
     /** **唯一实现点**：表现规格（`getId` / `getDisplayName` / … 7 个访问器由接口 default 委托到本方法）。 */

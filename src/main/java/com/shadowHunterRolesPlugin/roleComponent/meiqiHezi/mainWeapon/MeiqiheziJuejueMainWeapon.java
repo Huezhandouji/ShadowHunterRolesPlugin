@@ -21,15 +21,29 @@ import java.util.Collection;
 public class MeiqiheziJuejueMainWeapon extends MainWeapon {
 
 
-    public MeiqiheziJuejueMainWeapon(String id, ComponentServices services) {
-        super(
-                id,
-                services,
-                Component.text("Jue Jue"),
-                Component.text("A ShadowHunter mainWeapon"),
-                Material.DIAMOND_HOE,
-                20
-        );
+    public MeiqiheziJuejueMainWeapon(String id, ComponentServices services, Specification specification) {
+        super(id, services, specification);
+    }
+
+    /**
+     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 图标 / 冷却逐字段一致；
+     * 主武器的能量消耗由类型恒为 0），栏位由装配点 {@code setSlot} 指定。
+     */
+    public static final class Specification extends MainWeapon.Specification {
+
+        public Specification(){
+            super(
+                    Component.text("Jue Jue"),
+                    Component.text("A ShadowHunter mainWeapon"),
+                    Material.DIAMOND_HOE,
+                    20
+            );
+        }
+
+        @Override
+        public MeiqiheziJuejueMainWeapon create(String id, ComponentServices services){
+            return new MeiqiheziJuejueMainWeapon(id, services, this);
+        }
     }
 
     /**

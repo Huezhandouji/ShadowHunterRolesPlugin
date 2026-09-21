@@ -12,10 +12,26 @@ import org.bukkit.potion.PotionEffectType;
 
 public class RedEvilShockSkill extends Skill{
 
-    public RedEvilShockSkill(String id, ComponentServices services) {
-        super(id, services, Component.text("煞气震赫"),
-                Component.text("对周围5格范围内的敌人造成3秒致盲和缓慢III，结算他们5层流血。恢复[红]的10点TE值"),
-                120,0, Material.REDSTONE);
+    public RedEvilShockSkill(String id, ComponentServices services, Specification specification) {
+        super(id, services, specification);
+    }
+
+    /**
+     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
+     * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
+     */
+    public static final class Specification extends Skill.Specification {
+
+        public Specification(){
+            super(Component.text("煞气震赫"),
+                    Component.text("对周围5格范围内的敌人造成3秒致盲和缓慢III，结算他们5层流血。恢复[红]的10点TE值"),
+                    120, 0, Material.REDSTONE);
+        }
+
+        @Override
+        public RedEvilShockSkill create(String id, ComponentServices services){
+            return new RedEvilShockSkill(id, services, this);
+        }
     }
 
     /**

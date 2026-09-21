@@ -29,8 +29,22 @@ public abstract class MainWeapon extends ActiveComponent implements CombatHook {
      * **顺序与含义与迁移前逐字一致**（icon 仍在 cooldown 之前）⇒ 2 个武器子类只需在首位补这两个参数。
      * 旧回调 `onAttack/onLeftClick/onRightClick/onDrop`（后者已在 T-1 ④ 删除；组件侧一律走新钩子；T-2 后无迁移标记）。
      */
+    /**
+     * **描述符口径的构造**（阶段 7 · B 步）：表现值由组件自己的 {@link Specification} 提供，
+     * 本构造器只做"把描述符转交给基类"这一件事（主武器的能量消耗由类型恒为 0）。
+     */
+    public MainWeapon(String id, ComponentServices services, Specification specification){
+        super(id, services, specification);
+    }
+
+    /**
+     * 旧构造口径（表现参数内联）：**保留为兼容别名** —— 与迁移前逐字同序同义（`energyCost` 仍恒传 0）。
+     *
+     * @deprecated 改用 `(id, services, Specification)`：表现值写进组件自己的嵌套 `Specification`。
+     */
+    @Deprecated
     public MainWeapon(String id, ComponentServices services, Component displayName, Component description, Material icon, int cooldown){
-        super(id, services, displayName, description, cooldown, 0, icon, ItemKind.MAIN_WEAPON);
+        super(id, services, HotbarSpecification.of(id, displayName, description, icon, cooldown, 0, ItemKind.MAIN_WEAPON));
     }
 
     /**

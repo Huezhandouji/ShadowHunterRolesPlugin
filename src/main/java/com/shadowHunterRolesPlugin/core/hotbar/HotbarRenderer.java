@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.core.hotbar;
 
 import com.shadowHunterRolesPlugin.core.MainWeapon;
+import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.Skill;
 import net.kyori.adventure.text.Component;
@@ -64,38 +65,48 @@ public final class HotbarRenderer {
     }
 
     /**
-     * 帧末 flush 的**写物品段**（全仓唯一渲染写点）：遍历角色槽位表，按 {@link #stateOf} 的四段顺序重绘。
-     * <p>只对**已注册**的组件生效（未知 id 跳过）。**kind 一律取注册处的权威值**
-     * （{@code Role#componentKindOf(String)}）——组件自述 kind 不参与任何行为分支。
-     * <p>第三分支（{@code PASSIVE}）：被动**不占热键栏、不参与渲染**；即使被塞进槽位表也在此显式跳过。
+     * 帧末 flush 的**写物品段**（全仓唯一渲染写点）：**按注册序遍历组件表**，遇带栏位者落位，
+     * 按 {@link #stateOf} 的四段顺序重绘。
+     * <p><b>阶段 7 · B 步</b>：栏位随组件自己的描述符走 ⇒ 本渲染器不再读 `Role.getSlotMap()`（那张表
+     * 已降级为派生视图），而是遍历 {@code Role.getComponents()}（`LinkedHashMap` = 装配调用序）
+     * 并读条目里的栏位值。**每个栏位至多被写一次**（装配期已禁止重复栏位）⇒ 落位结果与旧实现逐格相同；
+     * 由此「注册序 = 渲染序」在代码上直接可见（不再依赖槽位表的迭代顺序）。
+     * <p>只对**已注册**的组件生效（未知 id 跳过）。**kind 一律取注册处的权威值**（条目里的 kind）
+     * ——组件自述 kind 不参与任何行为分支。
+     * <p>第三分支（{@code PASSIVE}）：被动**不占热键栏、不参与渲染**；即使被塞进栏位表也在此显式跳过。
      */
     public void render() {
         Player player = owner.getPlayer();
         if (player == null) return;
 
         Inventory inv = player.getInventory();
-        Map<Integer, String> slotMap = owner.getRole().getSlotMap();
-        if (slotMap == null || slotMap.isEmpty()) return;
+        Map<String, Role.ComponentEntry> components = owner.getRole().getComponents();
+        if (components == null || components.isEmpty()) return;
 
-        for (Map.Entry<Integer, String> entry : slotMap.entrySet()) {
-            String id = entry.getValue();
-            ItemKind kind = owner.getRole().componentKindOf(id);
+        for (Map.Entry<String, Role.ComponentEntry> entry : components.entrySet()) {
+            Role.ComponentEntry component = entry.getValue();
+            //不占栏位 ⇒ 不渲染（被动天然走这一支）
+            if (!component.hasSlot()) continue;
+            ItemKind kind = component.getKind();
             if (kind == null || kind == ItemKind.PASSIVE) continue;
+            String id = entry.getKey();
             HotbarItem item = owner.hotbarItemOf(id);
             if (item == null) continue;
-            inv.setItem(entry.getKey(), buildIcon(item, kind));
+            inv.setItem(component.getSlot(), buildIcon(id, item, kind));
         }
     }
 
     /**
      * 按四段状态构建单个热键栏物品（材质 / 名称 / 后缀 / lore / PDC 与旧基类实现逐字一致）。
+     * <p>{@code id} = **注册处的组件 id**（阶段 7 · B 步起显式传入：表现描述符由组件自带，
+     * 它的 id 字段不再由构造实参提供，因此权威 id 只能取自注册表——本参数就是它）。
      * <p>{@code kind} = **注册处的权威 kind**（形参传入，不从组件自述读）。
      * <p>技能与主武器的差异是**冻结差异**：技能冷却名带 `" x.xs"` 秒数，主武器冷却名**不带**任何追加段；
      * 主武器 `energyCost ≡ 0`（且能量被 clamp 到 ≥ 0）⇒ 永不进入 {@link IconState#ENERGY_LACK}。
      */
-    public ItemStack buildIcon(HotbarItem item, ItemKind kind) {
+    public ItemStack buildIcon(String id, HotbarItem item, ItemKind kind) {
         boolean skill = kind == ItemKind.SKILL;
-        boolean ready = skill ? owner.isSkillReady(item.getId()) : owner.isMainWeaponReady(item.getId());
+        boolean ready = skill ? owner.isSkillReady(id) : owner.isMainWeaponReady(id);
         boolean canCast = skill ? owner.getBuffManager().canCastSkill() : owner.getBuffManager().canUseMainWeapon();
         IconState state = stateOf(ready, canCast, owner.getCurrentEnergy(), item.getEnergyCost());
 
@@ -114,7 +125,7 @@ public final class HotbarRenderer {
 
         List<Component> lore = new ArrayList<>();
         if (skill) {
-            applySkill(meta, lore, item, state);
+            applySkill(meta, lore, id, item, state);
         } else {
             applyMainWeapon(meta, lore, item, state);
         }
@@ -125,21 +136,26 @@ public final class HotbarRenderer {
         meta.lore(lore);
 
         if (skill) {
-            meta.getPersistentDataContainer().set(Skill.Utils.SKILL_KEY, PersistentDataType.STRING, item.getId());
+            meta.getPersistentDataContainer().set(Skill.Utils.SKILL_KEY, PersistentDataType.STRING, id);
         } else {
-            meta.getPersistentDataContainer().set(MainWeapon.Utils.MAIN_WEAPON_KEY, PersistentDataType.STRING, item.getId());
+            meta.getPersistentDataContainer().set(MainWeapon.Utils.MAIN_WEAPON_KEY, PersistentDataType.STRING, id);
         }
 
         stack.setItemMeta(meta);
         return stack;
     }
 
-    /** 技能侧文案与 lore（**唯一一处**秒数格式串，且只在技能冷却分支）。 */
-    private void applySkill(ItemMeta meta, List<Component> lore, HotbarItem item, IconState state) {
+    /**
+     * 技能侧文案与 lore（**唯一一处**秒数格式串，且只在技能冷却分支）。
+     * <p>秒数按 {@code id}（**注册处的组件 id**）查 —— 阶段 7 · B 步起表现描述符由组件自带，
+     * 它的 `id` 字段不再由构造实参提供，因此**不得**再用 {@code item.getId()} 查冷却表
+     * （那是本批第一轮实测到的真实回归：查到 `null` ⇒ 冷却名恒显示 `0.0s`）。
+     */
+    private void applySkill(ItemMeta meta, List<Component> lore, String id, HotbarItem item, IconState state) {
         switch (state) {
             case COOLDOWN -> {
                 meta.displayName(item.getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)
-                        .append(Component.text(" " + String.format("%.1f", owner.getRemainingSkillCooldownSeconds(item.getId())) + "s")
+                        .append(Component.text(" " + String.format("%.1f", owner.getRemainingSkillCooldownSeconds(id)) + "s")
                                 .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)));
                 lore.add(Component.text("Skill is on cooldown."));
             }

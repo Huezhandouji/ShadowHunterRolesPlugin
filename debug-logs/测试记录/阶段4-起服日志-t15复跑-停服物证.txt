@@ -1,8 +1,0 @@
-t15 复跑（verify#2）停服物证
-时间戳（+08:00）：2026-09-18 19:35:01.566
-25566 监听：False（条数 0）
-java 进程数：3
-run/logs/latest.log 可独占读：True（size=5699）
-停机方式：仅 job_kill（未强杀 java）
-日志副本：debug-logs/测试记录/阶段4-起服日志-t15复跑.log（C:\Users\ROG\Desktop\插件\ShadowHunterRoles\debug-logs\测试记录\阶段4-起服日志-t15复跑.log.Length B / SHA256 8E4A9DC0CFF022A1655093EC6B5908B25054F71BECA631434AD75BFC5754D4EC）
-复跑时状态锚：HEAD=9b6be952405aac8f6d2b12c3a8ccc509d3fcfbb7；git status 计数见报告 §7

@@ -126,16 +126,21 @@ public class Role {
     }
 
     /**
-     * 装配条目：`(工厂, 权威 kind, 槽位?)`。
-     * <p>槽位 = {@code -1} 表示**不占热键栏**（不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它）。
+     * 装配条目：`(工厂, 权威 kind, 栏位?)`（阶段 7 · A 步）。
+     * <p><b>不占栏位 = 栏位的缺失</b>：栏位用**可空的 {@link Integer}** 表达（`null` = 不占热键栏，
+     * 不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它）。
+     * 旧版的 `-1` 哨兵已删除 —— {@link #getSlot()} 在无栏位时**抛异常**，而不是返回一个能参与算术的值；
+     * 想表达"不占栏位"只剩一条路：装配一个**没有栏位**的描述符（如 `PassiveSkill.Specification`）。
+     * <p>本条目是装配期从描述符取到的**不可变快照**：只持有三个值，**不持有描述符对象** ⇒
+     * 同一份描述符实例被两个角色共享时，后手改动影响不到先手。
      */
     public static final class ComponentEntry{
 
         private final ComponentFactory<? extends RoleComponent> factory;
         private final ItemKind kind;
-        private final int slot;
+        private final Integer slot;
 
-        ComponentEntry(ComponentFactory<? extends RoleComponent> factory, ItemKind kind, int slot){
+        ComponentEntry(ComponentFactory<? extends RoleComponent> factory, ItemKind kind, Integer slot){
             this.factory = factory;
             this.kind = kind;
             this.slot = slot;
@@ -146,10 +151,16 @@ public class Role {
         /** **权威 kind**（行为分支的唯一来源）。 */
         public ItemKind getKind() { return kind; }
 
-        /** 槽位；{@code -1} = 无槽位（不占热键栏）。 */
-        public int getSlot() { return slot; }
+        /** 栏位（0..8）；**不占栏位 ⇒ 抛异常**（本版不再有 `-1` 哨兵）。 */
+        public int getSlot() {
+            if (slot == null) {
+                throw new IllegalStateException("Component does not occupy a hotbar slot.");
+            }
+            return slot;
+        }
 
-        public boolean hasSlot() { return slot >= 0; }
+        /** 占不占热键栏（`false` ⇒ 不进 `slotMap`）。 */
+        public boolean hasSlot() { return slot != null; }
     }
 
     public static class Builder{
@@ -231,21 +242,39 @@ public class Role {
         }
 
         /**
+         * **统一装配入口（描述符口径，阶段 7 · A 步新增）**：吃一个**装配期描述符**
+         * （{@link com.shadowHunterRolesPlugin.roleComponent.RoleComponent.Specification}），
+         * 权威 kind 与栏位都从描述符读，**不再由调用点传值**。
+         * <p>占不占栏位由**描述符的类型**决定：带栏位的描述符（`HotbarSpecification` 一支）用
+         * {@code setSlot} 指定位置，装配期未设栏位 ⇒ 此处抛异常；不带栏位的描述符
+         * （`PassiveSkill.Specification`）**没有** {@code setSlot} ⇒ 天然不占栏位。
+         * <p>本方法对传入描述符取**不可变快照**（{@code Specification#freeze()}）：条目只留
+         * `(kind, 栏位, 工厂)` 三个值，**不持有描述符对象**。
+         */
+        public Builder addComponent(String id, RoleComponent.Specification<?> specification){
+            Objects.requireNonNull(specification);
+            RoleComponent.Specification.Snapshot snapshot = specification.freeze();
+            return addComponentInternal(id, snapshot.getKind(),
+                    snapshot.hasSlot() ? Integer.valueOf(snapshot.getSlot()) : null,
+                    snapshot.getFactory());
+        }
+
+        /**
          * **统一装配入口（占热键栏）**：权威 kind 由注册处给出（技能 / 主武器 / 被动都走这里）。
          * <p>工厂形参放宽到 {@code ComponentFactory<? extends RoleComponent>} ⇒ 组件**不必**继承
          * `Skill` / `MainWeapon` / `PassiveSkill`，只需 `extends RoleComponent` 并按需实现能力接口。
          * <p>槽位写入与 id 去重都发生在**唯一内部路径** {@code addComponentInternal} 内。
          */
         public Builder addComponent(String id, ComponentFactory<? extends RoleComponent> factory, int slot, ItemKind kind){
-            return addComponentInternal(id, factory, kind, slot);
+            return addComponentInternal(id, kind, slot, factory);
         }
 
         /**
-         * **统一装配入口（不占热键栏）**：无槽位 ⇒ 不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它。
+         * **统一装配入口（不占热键栏）**：无栏位 ⇒ 不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它。
          * <p>其余语义与四参重载完全一致（同一条内部路径）。
          */
         public Builder addComponent(String id, ComponentFactory<? extends RoleComponent> factory, ItemKind kind){
-            return addComponentInternal(id, factory, kind, -1);
+            return addComponentInternal(id, kind, null, factory);
         }
 
         /**
@@ -256,18 +285,18 @@ public class Role {
          */
         @Deprecated
         public Builder addSkill(String skillId, ComponentFactory<Skill> factory, int slot){
-            return addComponentInternal(skillId, factory, ItemKind.SKILL, slot);
+            return addComponentInternal(skillId, ItemKind.SKILL, slot, factory);
         }
 
         /**
-         * 装配一条被动（**弃用别名**）：语义等价于统一入口的无槽位重载（权威 kind = `PASSIVE`；
-         * 无槽位 ⇒ 不占热键栏）。
+         * 装配一条被动（**弃用别名**）：语义等价于统一入口的无栏位重载（权威 kind = `PASSIVE`；
+         * 无栏位 ⇒ 不占热键栏）。
          *
-         * @deprecated 改用统一入口的无槽位重载 `addComponent` —— 同一条内部路径。
+         * @deprecated 改用统一入口的无栏位重载 `addComponent` —— 同一条内部路径。
          */
         @Deprecated
         public Builder addPassive(String passiveId, ComponentFactory<PassiveSkill> factory){
-            return addComponentInternal(passiveId, factory, ItemKind.PASSIVE, -1);
+            return addComponentInternal(passiveId, ItemKind.PASSIVE, null, factory);
         }
 
         /**
@@ -277,17 +306,18 @@ public class Role {
          */
         @Deprecated
         public Builder addMainWeapon(String mainWeaponId, ComponentFactory<MainWeapon> factory, int slot){
-            return addComponentInternal(mainWeaponId, factory, ItemKind.MAIN_WEAPON, slot);
+            return addComponentInternal(mainWeaponId, ItemKind.MAIN_WEAPON, slot, factory);
         }
 
         /**
-         * **唯一内部装配路径**（阶段 6）：两个新重载与三个弃用别名都只调用这里 ⇒ 校验、id 去重、
-         * 槽位写入、入表各只有一处实现。
+         * **唯一内部装配路径**（阶段 6 立、阶段 7 · A 步改为"栏位可有可无"）：新描述符入口、
+         * 两个旧重载与三个弃用别名都只调用这里 ⇒ 校验、id 去重、栏位写入、入表各只有一处实现。
          *
-         * @param slot 槽位；{@code < 0} = 无槽位（不占热键栏，不写 `slotMap`）
+         * @param slot 栏位；{@code null} = **不占栏位**（不占热键栏，不写 `slotMap`）——
+         *             旧版用 {@code -1} 哨兵表达同一件事，本版改成"值的缺失"
          */
-        private Builder addComponentInternal(String id, ComponentFactory<? extends RoleComponent> factory,
-                                             ItemKind kind, int slot){
+        private Builder addComponentInternal(String id, ItemKind kind, Integer slot,
+                                             ComponentFactory<? extends RoleComponent> factory){
             // 与迁移前临时实例取 id 的 fail-fast 等价：null 工厂在**装配期**立刻 NPE，而不是拖到实例创建
             Objects.requireNonNull(factory);
 
@@ -299,13 +329,12 @@ public class Role {
             }
             ensureIdNotRegistered(kind, id);
 
-            boolean hasSlot = slot >= 0;
-            if(hasSlot){
+            if(slot != null){
                 validateSlot(slot);
             }
 
-            components.put(id, new ComponentEntry(factory, kind, hasSlot ? slot : -1));
-            if(hasSlot){
+            components.put(id, new ComponentEntry(factory, kind, slot));
+            if(slot != null){
                 slotMap.put(slot, id);
             }
 

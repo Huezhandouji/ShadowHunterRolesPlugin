@@ -4,9 +4,10 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 
 /**
- * 「这个组件能出现在热键栏」的能力接口（阶段 6）：**唯一实现点是 {@link #spec()}**，
+ * 「这个组件能出现在热键栏」的能力接口（阶段 6 立、阶段 7 · A 步改全拼）：
+ * **唯一实现点是 {@link #specification()}**，
  * 其余访问器（{@link HotbarItem} 的 7 个表现 getter + 冷却/能量两个能力 getter）都由本接口的
- * `default` 方法委托给它 ⇒ 新组件**只写 spec()**，不写任何委托。
+ * `default` 方法委托给它 ⇒ 新组件**只写 specification()**，不写任何委托。
  * <p>
  * 与继承的关系（阶段 6 冻结）：新组件只需 `extends RoleComponent` + 按需实现能力接口
  * （本接口 / {@link CooldownBearing} / {@link EnergyCosting} / `HotbarActionable` / `CombatHook`），
@@ -22,39 +23,51 @@ import org.bukkit.Material;
  */
 public interface HotbarPresentable extends HotbarItem, CooldownBearing, EnergyCosting {
 
-    /** **唯一实现点**：表现规格。 */
-    HotbarSpec spec();
+    /** **唯一实现点**：表现规格（阶段 7 · A 步改全拼；旧短名 `spec()` 保留为 `@Deprecated` 别名）。 */
+    HotbarSpecification<?> specification();
+
+    /**
+     * 旧短名的兼容别名（**只增不改**）：与 {@link #specification()} 是同一个值，**没有**第二套实现。
+     *
+     * @deprecated 改用 {@link #specification()}（新名 = 全拼）。返回类型放宽到父类型
+     *             {@link HotbarSpecification}（旧声明为子类型 {@code HotbarSpec}）——
+     *             实例本就是同一个对象，不需要任何转换代码。
+     */
+    @Deprecated
+    default HotbarSpecification<?> spec() {
+        return specification();
+    }
 
     default String getId() {
-        return spec().getId();
+        return specification().getId();
     }
 
     default Component getDisplayName() {
-        return spec().getDisplayName();
+        return specification().getDisplayName();
     }
 
     default Component getDescription() {
-        return spec().getDescription();
+        return specification().getDescription();
     }
 
     default Material getIcon() {
-        return spec().getIcon();
+        return specification().getIcon();
     }
 
     default int getCooldownTicks() {
-        return spec().getCooldownTicks();
+        return specification().getCooldownTicks();
     }
 
     default int getEnergyCost() {
-        return spec().getEnergyCost();
+        return specification().getEnergyCost();
     }
 
     default ItemKind getKind() {
-        return spec().kind();
+        return specification().getKind();
     }
 
     /** 渲染器读写面视图（`HotbarItem` 在本批保留，不删）。 */
     default HotbarItem asHotbarItem() {
-        return spec();
+        return specification();
     }
 }

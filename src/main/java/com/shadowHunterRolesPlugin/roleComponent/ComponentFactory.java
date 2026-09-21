@@ -12,6 +12,13 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
  *
  * <p>泛型 {@code T} 保留具体组件类型，便于调用方拿到强类型返回值；实现通常写作方法引用，
  * 例如 {@code MeiqiheziUnconcernSkill::new}（其构造器为 {@code (String id, ComponentServices services)}）。
+ *
+ * <p><b>阶段 7 · A 步：本接口与装配期描述符的关系</b> ——
+ * {@link RoleComponent.Specification#create(String, ComponentServices)} 与
+ * {@link #create(String, ComponentServices)} **同签名同语义**，因此任何一个描述符都可以直接当作本接口用
+ * （{@code spec::create}）；装配入口 {@code Role.Builder.addComponent(String, Specification)} 内部就是这么取的。
+ * 本接口**不删**：旧装配重载（{@code (id, 工厂, 槽位, kind)} 与 {@code (id, 工厂, kind)}）仍然只收它，
+ * 两条路径最终汇成同一个不可变快照（{@link RoleComponent.Specification.Snapshot}）。
  */
 @FunctionalInterface
 public interface ComponentFactory<T extends RoleComponent> {

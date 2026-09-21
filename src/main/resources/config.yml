@@ -1,5 +1,8 @@
 # ShadowHunterRoles 配置
 #
+# 本文件在插件**首次启用时自动写入**数据目录（saveDefaultConfig）——
+# 在此之前它不会出现在 plugins/ShadowHunterRolesPlugin/ 里，运维看不出有哪些字段。
+#
 # command-permission-level
 #   使用本插件指令（/role 及其全部子指令）所需的最低权限等级。
 #   · 取值范围 0-4；默认 3（缺省/非整数/读不动时回落默认，不会让指令不可用）。
@@ -7,4 +10,5 @@
 #   · 生效时效：本文件与 ops.json 走同一套失效机制（5 秒 TTL + 文件变更即失效）
 #     ⇒ 改完最迟 5 秒内生效，无需重启或 reload。
 #   · 控制台 / RCON 不受此限制（等价等级 4）；其他指令发送者（如命令方块）一律拒绝。
+#   · 取值变化时服务端日志会打一行：[config] command-permission-level: 旧值 -> 新值
 command-permission-level: 3

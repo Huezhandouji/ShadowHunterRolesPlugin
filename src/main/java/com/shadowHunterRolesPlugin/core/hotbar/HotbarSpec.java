@@ -1,88 +1,37 @@
 package com.shadowHunterRolesPlugin.core.hotbar;
 
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 
 /**
- * 热键栏**表现规格**（阶段 6 · 统一装配的数据对象）：把过去分散在基类里的 7 个表现字段收敛成一个不可变值对象。
+ * 旧短名（**只保留为 `@Deprecated` 别名**，阶段 7 · A 步全拼改名）：阶段 6 引入的
+ * {@code HotbarSpec} 在阶段 7 改名为 {@link HotbarSpecification}（全拼）并升格为"表现规格 + 带栏位描述符"。
  * <p>
- * 分工（阶段 6 冻结）：
- * <ul>
- *   <li>{@link HotbarPresentable#spec()} = **唯一实现点** —— 组件只写这一处；</li>
- *   <li>{@code HotbarSpec} 自身即 {@link HotbarItem} 的读写面（渲染器形参类型在本批保留），
- *       因此 {@link HotbarPresentable#asHotbarItem()} 直接返回本对象，无需适配代码；</li>
- *   <li>本对象里的 {@code kind} **只作表现用途**；行为分支（冷却表 / 闸门 / PDC / 文案）一律读
- *       **注册处**给出的 kind（{@code Role#componentKindOf(String)}）。</li>
- * </ul>
+ * 本类**只做两件事**：① 让旧名仍然可解析（所有旧调用点无需改名即可继续编译）；
+ * ② 把旧的 `of(...)` 静态工厂转发到新类。**没有**独立实现，也没有第二套字段。
+ * <p>
  * 命名沿用工程的 JavaBean 风格（设计 §4.3：不引入 record 风格访问器）。
+ *
+ * @deprecated 改用 {@link HotbarSpecification}（新名 = 全拼；旧名不再新增功能）。
  */
-public final class HotbarSpec implements HotbarItem {
-
-    private final String id;
-    private final Component displayName;
-    private final Component description;
-    private final Material icon;
-    private final int cooldownTicks;
-    private final int energyCost;
-    private final ItemKind kind;
+@Deprecated
+public class HotbarSpec<T extends RoleComponent> extends HotbarSpecification<T> {
 
     private HotbarSpec(String id, Component displayName, Component description, Material icon,
                        int cooldownTicks, int energyCost, ItemKind kind) {
-        this.id = id;
-        this.displayName = displayName;
-        this.description = description;
-        this.icon = icon;
-        this.cooldownTicks = cooldownTicks;
-        this.energyCost = energyCost;
-        this.kind = kind;
-    }
-
-    /** 唯一的构造入口（不可变 ⇒ 组件可在构造期一次建好）。 */
-    public static HotbarSpec of(String id, Component displayName, Component description, Material icon,
-                                int cooldownTicks, int energyCost, ItemKind kind) {
-        return new HotbarSpec(id, displayName, description, icon, cooldownTicks, energyCost, kind);
-    }
-
-    @Override
-    public String getId() {
-        return id;
-    }
-
-    @Override
-    public Component getDisplayName() {
-        return displayName;
-    }
-
-    @Override
-    public Component getDescription() {
-        return description;
-    }
-
-    @Override
-    public Material getIcon() {
-        return icon;
-    }
-
-    @Override
-    public int getCooldownTicks() {
-        return cooldownTicks;
-    }
-
-    @Override
-    public int getEnergyCost() {
-        return energyCost;
-    }
-
-    @Override
-    public ItemKind getKind() {
-        return kind;
+        super(id, displayName, description, icon, cooldownTicks, energyCost, kind);
     }
 
     /**
-     * 内部委托访问器：供 {@link HotbarPresentable} 的 default 方法读取本对象的自述种类，
-     * 使 hotbar 包内不出现「读自述 kind」的调用点（阶段 6 判据 C-04 的口径：行为分支只认注册 kind）。
+     * 旧构造入口的别名（语义与参数顺序逐字不变）。
+     *
+     * @deprecated 改用 {@link HotbarSpecification#of(String, Component, Component, Material, int, int, ItemKind)}。
      */
-    public ItemKind kind() {
-        return kind;
+    @Deprecated
+    public static <T extends RoleComponent> HotbarSpec<T> of(String id, Component displayName, Component description,
+                                                             Material icon, int cooldownTicks, int energyCost,
+                                                             ItemKind kind) {
+        return new HotbarSpec<>(id, displayName, description, icon, cooldownTicks, energyCost, kind);
     }
 }

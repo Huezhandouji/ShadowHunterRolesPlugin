@@ -1,0 +1,127 @@
+package com.shadowHunterRolesPlugin.core.hotbar;
+
+import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import net.kyori.adventure.text.Component;
+import org.bukkit.Material;
+
+/**
+ * 热键栏**表现规格 + 带栏位描述符**（阶段 6 立、阶段 7 · A 步改全拼并升格为描述符）：
+ * 把过去分散在基类里的 7 个表现字段收敛成一个不可变值对象，并**同时**承担
+ * {@link RoleComponent.Specification} 的"怎么造这个组件"的职责（两者**合一**，不并列）。
+ * <p>
+ * 分工（阶段 7 冻结）：
+ * <ul>
+ *   <li>{@link HotbarPresentable#specification()} = **唯一实现点** —— 组件只写这一处；</li>
+ *   <li>本类自身即 {@link HotbarItem} 的读写面（渲染器形参类型在本批保留），
+ *       因此 {@link HotbarPresentable#asHotbarItem()} 直接返回本对象，无需适配代码；</li>
+ *   <li>本对象里的 {@code kind} **只作表现用途**；行为分支（冷却表 / 闸门 / PDC / 文案）一律读
+ *       **注册处**给出的 kind（{@code Role#componentKindOf(String)}）。</li>
+ *   <li><b>栏位必填</b>：本类型 {@link #requiresSlot()} = {@code true}（不带栏位的组件用另一支描述符）。</li>
+ * </ul>
+ * <b>栏位（阶段 7 · A 步）</b>：本类型是**带栏位**的那一支 —— 装配器用
+ * {@link #setSlot(int)} 指定它在热键栏里的位置，装配期未设栏位则
+ * {@link RoleComponent.Specification#freeze()} **抛异常**（绝不静默变成"不占栏位"）。
+ * <b>"不占栏位"由类型表达</b>：不带栏位的组件用 {@code PassiveSkill.Specification}（它继承根类型、
+ * **没有** {@code setSlot}），或直接实现 {@link HotbarPresentable}；本类型内部不再出现 `-1` 哨兵。
+ * <p>
+ * 命名沿用工程的 JavaBean 风格（设计 §4.3：不引入 record 风格访问器）；
+ * 旧短名 {@code HotbarSpec} 保留为 `@Deprecated` 别名（见该类）。
+ */
+public class HotbarSpecification<T extends RoleComponent>
+        extends RoleComponent.Specification<T> implements HotbarItem {
+
+    /** 组件 id（由注册处声明；表现用，装配与行为分支不读它）。 */
+    private final String id;
+    private final Component displayName;
+    private final Component description;
+    private final Material icon;
+    private final int cooldownTicks;
+    private final int energyCost;
+
+    protected HotbarSpecification(String id, Component displayName, Component description, Material icon,
+                                  int cooldownTicks, int energyCost, ItemKind kind) {
+        super(kind);
+        this.id = id;
+        this.displayName = displayName;
+        this.description = description;
+        this.icon = icon;
+        this.cooldownTicks = cooldownTicks;
+        this.energyCost = energyCost;
+    }
+
+    /** 唯一的构造入口（不可变 ⇒ 组件可在构造期一次建好）。 */
+    public static <T extends RoleComponent> HotbarSpecification<T> of(String id, Component displayName,
+                                                                     Component description, Material icon,
+                                                                     int cooldownTicks, int energyCost, ItemKind kind) {
+        return new HotbarSpecification<>(id, displayName, description, icon, cooldownTicks, energyCost, kind);
+    }
+
+    /** 本类型**必须**有栏位：见 {@link RoleComponent.Specification#freeze()} 的 fail-fast。 */
+    @Override
+    protected boolean requiresSlot() {
+        return true;
+    }
+
+    /**
+     * **装配器设置栏位**（这一支唯一会在装配期写入的参数；其余表现字段由组件自己的描述符声明默认值）。
+     * 冻结后调用、重复改成别的位置、越界（非 0..8）一律抛异常。
+     */
+    public final HotbarSpecification<T> setSlot(int slot) {
+        assignSlot(slot);
+        return this;
+    }
+
+    /**
+     * **失败关闭（fail-fast）**：本类的默认创建体不造任何组件 —— 具体组件由**组件自己声明的嵌套
+     * `Specification`** 覆写本方法给出（阶段 7 · B 步落地）。把裸的 {@link HotbarSpecification}
+     * 交给装配入口会立刻在这里抛异常，而不是造出一个语义不明的组件。
+     * <p>本类在阶段 7 · A 步的另一半职责是"组件内部的表现值对象"：{@link HotbarPresentable#specification()}
+     * 返回它、渲染器读它，那条路径**从不调用本方法**。
+     */
+    @Override
+    public T create(String id, ComponentServices services) {
+        throw new UnsupportedOperationException(
+                "HotbarSpecification is a presentation/descriptor base and cannot create a component by itself; "
+                        + "declare a component-nested Specification and override create(String, ComponentServices).");
+    }
+
+    @Override
+    public String getId() {
+        return id;
+    }
+
+    @Override
+    public Component getDisplayName() {
+        return displayName;
+    }
+
+    @Override
+    public Component getDescription() {
+        return description;
+    }
+
+    @Override
+    public Material getIcon() {
+        return icon;
+    }
+
+    @Override
+    public int getCooldownTicks() {
+        return cooldownTicks;
+    }
+
+    @Override
+    public int getEnergyCost() {
+        return energyCost;
+    }
+
+    /**
+     * 表现用的自述种类：委托到描述符根类型的 {@link RoleComponent.Specification#kind()}
+     * （阶段 7 起两者是同一个值，不再各存一份）。
+     */
+    @Override
+    public ItemKind getKind() {
+        return kind();
+    }
+}

@@ -11,6 +11,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
+import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
@@ -27,6 +28,38 @@ public abstract class Skill extends ActiveComponent {
      */
     public Skill(String id, ComponentServices services, Component displayName, Component description, int cooldown, int energyCost, Material icon){
         super(id, services, displayName, description, cooldown, energyCost, icon, ItemKind.SKILL);
+    }
+
+    /**
+     * **技能描述符**（阶段 7 · A 步骨架）：kind 固定为 {@link ItemKind#SKILL}，**带栏位**
+     * （继承 {@link HotbarSpecification} ⇒ 有 {@code setSlot}）。
+     * <p>参数顺序 = 本类构造器去掉前两位（`id` / `services`）后的**原样顺序** ⇒ 阶段 7 · B 步的迁移是机械可对拍的：
+     * 把构造实参从子类构造器**原样粘贴**进它自己的嵌套 `Specification` 即可。
+     * <p>与主武器的规则差异（阶段 7 拍板"规则进类型"）：
+     * <ul>
+     *   <li>技能**可以**有非零能量消耗（`energyCost` 是本类型的构造参数）；</li>
+     *   <li>{@code setSlot} 由本类型提供（技能占热键栏）。</li>
+     * </ul>
+     * 本类型**不实现** {@link #create(String, ComponentServices)} ⇒ 具体组件必须自己声明嵌套
+     * `Specification` 并覆写它（编译期强制，不会漏）。
+     */
+    public abstract static class Specification extends HotbarSpecification<Skill> {
+
+        /** 声明式构造（推荐）：id 属于注册处，不写进组件描述符。 */
+        protected Specification(Component displayName, Component description, int cooldownTicks,
+                                int energyCost, Material icon){
+            this(null, displayName, description, cooldownTicks, energyCost, icon);
+        }
+
+        /** 带 id 的构造（表现面需要 id 时用；{@code null} = 由注册处给出）。 */
+        protected Specification(String id, Component displayName, Component description, int cooldownTicks,
+                                int energyCost, Material icon){
+            super(id, displayName, description, icon, cooldownTicks, energyCost, ItemKind.SKILL);
+        }
+
+        /** 具体组件必须给出创建逻辑（保留抽象 ⇒ 漏写是**编译错误**，不是运行期惊喜）。 */
+        @Override
+        public abstract Skill create(String id, ComponentServices services);
     }
 
 

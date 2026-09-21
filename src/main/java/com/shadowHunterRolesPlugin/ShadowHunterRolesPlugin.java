@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin;
 
 import com.shadowHunterRolesPlugin.api.RoleAPI;
 import com.shadowHunterRolesPlugin.command.RoleCommand;
+import com.shadowHunterRolesPlugin.config.ConfigurationManager;
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.internal.api.RoleAPIImpl;
@@ -33,6 +34,12 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
     public void onEnable() {
 
         instance = this;
+
+        //阶段 7 · A 步 · 默认配置落盘：此前全仓 0 处调用 ⇒ 数据目录里那份 config.yml **永不出现**，
+        //运维（与任何读配置的人）根本发现不了 command-permission-level 这个字段。
+        //saveDefaultConfig() 只在文件不存在时从 jar 内置默认值写一份；随后安装**唯一读盘口径**。
+        saveDefaultConfig();
+        ConfigurationManager.install(new ConfigurationManager(this));
 
         //平台层剥离（阶段 2）：上下文在这里构造并注入，领域层/组件层不再引用插件主类单例
         KeyFactory keys = key -> new NamespacedKey(this, key);

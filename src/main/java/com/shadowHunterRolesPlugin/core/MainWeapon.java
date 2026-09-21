@@ -13,6 +13,7 @@ import org.bukkit.persistence.PersistentDataType;
 import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastResult;
 import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
+import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.hotbar.ItemKind;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
@@ -30,6 +31,34 @@ public abstract class MainWeapon extends ActiveComponent implements CombatHook {
      */
     public MainWeapon(String id, ComponentServices services, Component displayName, Component description, Material icon, int cooldown){
         super(id, services, displayName, description, cooldown, 0, icon, ItemKind.MAIN_WEAPON);
+    }
+
+    /**
+     * **主武器描述符**（阶段 7 · A 步骨架）：kind 固定为 {@link ItemKind#MAIN_WEAPON}，**带栏位**
+     * （继承 {@link HotbarSpecification} ⇒ 有 {@code setSlot}）。
+     * <p>参数顺序 = 本类构造器去掉前两位（`id` / `services`）后的**原样顺序**。
+     * <p><b>规则进类型</b>（阶段 7 拍板）：本类型**没有** `setEnergyCost` —— 能量消耗**根本不是参数**，
+     * 在构造期以字面量 {@code 0} 交给父类 ⇒ **"主武器 `energyCost ≡ 0`"由类型封死**，
+     * 不再是"装配点记得传 0"的自觉；`ENERGY LACK` 态因此对主武器**不可达**（冻结面口径不变）。
+     * <p>本类型**不实现** {@link #create(String, ComponentServices)} ⇒ 具体组件必须自己声明嵌套
+     * `Specification` 并覆写它（编译期强制）。
+     */
+    public abstract static class Specification extends HotbarSpecification<MainWeapon> {
+
+        /** 声明式构造（推荐）：id 属于注册处，不写进组件描述符。 */
+        protected Specification(Component displayName, Component description, Material icon, int cooldownTicks){
+            this(null, displayName, description, icon, cooldownTicks);
+        }
+
+        /** 带 id 的构造（表现面需要 id 时用；{@code null} = 由注册处给出）。 */
+        protected Specification(String id, Component displayName, Component description, Material icon,
+                                int cooldownTicks){
+            super(id, displayName, description, icon, cooldownTicks, 0, ItemKind.MAIN_WEAPON);
+        }
+
+        /** 具体组件必须给出创建逻辑（保留抽象 ⇒ 漏写是**编译错误**，不是运行期惊喜）。 */
+        @Override
+        public abstract MainWeapon create(String id, ComponentServices services);
     }
 
     /** 攻击路径的新契约：今天 listener 在攻击后**无条件**启动武器冷却 ⇒ 默认 `SUCCEED`（设计 §4.3）。 */

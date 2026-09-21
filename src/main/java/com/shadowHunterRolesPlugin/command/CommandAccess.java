@@ -4,12 +4,13 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
+import com.shadowHunterRolesPlugin.config.ConfigKey;
+import com.shadowHunterRolesPlugin.config.ConfigurationManager;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.command.RemoteConsoleCommandSender;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 import java.io.File;
@@ -41,8 +42,11 @@ import java.util.Map;
  * <b>要求等级 = 配置字段</b>：{@code config.yml} 的 {@value #CONFIG_KEY}
  * （取值范围 0-{@value #MAX_LEVEL}，默认 {@value #DEFAULT_REQUIRED_LEVEL}；越界自动夹取、缺失/非整数/不可读回落默认且不抛异常）。
  * <p><b>生效时效</b>：本字段与 {@code ops.json} 等级表**同一套失效机制** —— 数据目录内配置文件的
- * {@value #CONFIG_TTL_MILLIS} ms TTL + 文件戳（mtime×长度）变更即失效 ⇒ 改完配置文件**最迟一个 TTL** 内生效，
+ * {@value ConfigurationManager#TTL_MILLIS} ms TTL + 文件戳（mtime×长度）变更即失效 ⇒ 改完配置文件**最迟一个 TTL** 内生效，
  * **无需重启或 reload**（文件不存在时回落到 jar 内置默认值）。
+ * <p><b>单一读盘口径（阶段 7 · A 步）</b>：本类**不再自己读配置** —— 字段的值一律委托
+ * {@link ConfigurationManager}（默认值 / 校验 / 说明集中在 {@link ConfigKey}）。
+ * 本类只剩两件事：读 {@code ops.json} 的等级表，以及做这一次判定。
  * <p>
  * <b>失败关闭（fail-closed）</b>：{@code ops.json} 缺失 / 不可读 / JSON 非法 / 任一条目缺 `name` 或 `level`
  * ⇒ **整个文件视为不可信 ⇒ 所有玩家一律拒绝**，并打一条**含原因的 SEVERE**（不静默）；恢复后打一条 INFO。
@@ -56,25 +60,13 @@ import java.util.Map;
 final class CommandAccess {
 
     /** {@code config.yml} 里的要求等级字段名（用户裁定：等级由配置给出，不硬编码）。 */
-    static final String CONFIG_KEY = "command-permission-level";
+    static final String CONFIG_KEY = ConfigurationManager.COMMAND_PERMISSION_LEVEL.getPath();
 
     /** 配置缺失/非法时使用的要求等级（= 用户裁定的 3）。 */
-    static final int DEFAULT_REQUIRED_LEVEL = 3;
+    static final int DEFAULT_REQUIRED_LEVEL = ConfigurationManager.COMMAND_PERMISSION_LEVEL.getDefaultValue();
 
     /** 允许的等级上限（Minecraft 权限等级范围 0-4）。 */
-    static final int MAX_LEVEL = 4;
-
-    /** 上次已打日志的要求等级（配置值变化时再打一行，便于运行级取证）。 */
-    private static int loggedRequiredLevel = Integer.MIN_VALUE;
-
-    /** 配置文件读取缓存 TTL（毫秒）——与 ops.json 等级表同一机制。 */
-    private static final long CONFIG_TTL_MILLIS = 5_000L;
-
-    /** 上次读配置文件的时刻（ms）。 */
-    private static long configLoadedAt = 0L;
-
-    /** 上次读配置文件时的文件戳（mtime×31+长度）；文件一变即失效。 */
-    private static long configFileStamp = Long.MIN_VALUE;
+    static final int MAX_LEVEL = ConfigurationManager.COMMAND_PERMISSION_LEVEL.getMax();
 
     /** 玩家侧拒绝文案（与 `DebugCommand` 既有文案**逐字相同**；沿用工程既有风格）。 */
     static final String NO_PERMISSION = "You do not have permission to use this command.";
@@ -103,10 +95,10 @@ final class CommandAccess {
         return new File(Bukkit.getWorldContainer(), "ops.json");
     }
 
-    /** 本插件数据目录内的 {@code config.yml}（缺失时回落 jar 内置默认值）。 */
+    /** 本插件数据目录内的 {@code config.yml}（缺失时回落 jar 内置默认值）；阶段 7 起由配置管理器持有。 */
     static File configFile() {
-        ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
-        return plugin != null ? new File(plugin.getDataFolder(), "config.yml") : null;
+        ConfigurationManager manager = ConfigurationManager.installed();
+        return manager != null ? manager.getFile() : null;
     }
 
     /**
@@ -135,48 +127,19 @@ final class CommandAccess {
     }
 
     /**
-     * 当前**要求等级**：读数据目录内 {@code config.yml} 的 {@value #CONFIG_KEY}
-     * （{@value #CONFIG_TTL_MILLIS} ms TTL + 文件戳失效，与 {@code ops.json} 同一机制）；
+     * 当前**要求等级**：**委托** {@link ConfigurationManager} 读数据目录内 {@code config.yml} 的
+     * {@value #CONFIG_KEY}（{@value ConfigurationManager#TTL_MILLIS} ms TTL + 文件戳失效，与 {@code ops.json} 同一机制）；
      * 文件不存在时回落 jar 内置默认；越界夹到 {@code 0}-{@value #MAX_LEVEL}；
      * 缺失键 / 非整数 / 读不动 ⇒ 回落 {@value #DEFAULT_REQUIRED_LEVEL} 且**不抛异常**（指令不会因此不可用）。
-     * 值变化时打一行 INFO（便于运行级取证：配置确实被读到了）。
+     * 取值变化时由配置管理器打一行含**新旧值**的 INFO（运行级证据可直接取原始行）。
+     * <p>管理器未安装（插件未启用）⇒ 直接给字段的默认值，同样不抛异常。
      */
     static int requiredLevel() {
-        ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
-        if (plugin == null) {
+        ConfigurationManager manager = ConfigurationManager.installed();
+        if (manager == null) {
             return DEFAULT_REQUIRED_LEVEL;
         }
-        long now = System.currentTimeMillis();
-        File file = new File(plugin.getDataFolder(), "config.yml");
-        long stamp = file.isFile() ? (file.lastModified() * 31L + file.length()) : -1L;
-
-        int cached = loggedRequiredLevel;
-        if (now - configLoadedAt < CONFIG_TTL_MILLIS && stamp == configFileStamp && configLoadedAt != 0L) {
-            return cached == Integer.MIN_VALUE ? DEFAULT_REQUIRED_LEVEL : cached;
-        }
-        configLoadedAt = now;
-        configFileStamp = stamp;
-
-        int value;
-        try {
-            value = file.isFile()
-                    ? YamlConfiguration.loadConfiguration(file).getInt(CONFIG_KEY, DEFAULT_REQUIRED_LEVEL)
-                    : plugin.getConfig().getInt(CONFIG_KEY, DEFAULT_REQUIRED_LEVEL);
-        } catch (Throwable t) {
-            //A15：非整数 / 坏文件 / 读不动 ⇒ 回落默认，绝不抛异常、绝不让指令因此不可用
-            value = DEFAULT_REQUIRED_LEVEL;
-            log("config " + CONFIG_KEY + " unreadable — falling back to " + DEFAULT_REQUIRED_LEVEL
-                    + " (" + t.getClass().getSimpleName() + ")");
-        }
-        int clamped = Math.clamp(value, 0, MAX_LEVEL);
-        if (clamped != value) {
-            log("config " + CONFIG_KEY + "=" + value + " out of range 0-" + MAX_LEVEL + " — clamped to " + clamped);
-        }
-        if (loggedRequiredLevel != clamped) {
-            loggedRequiredLevel = clamped;
-            log("required level = " + clamped + " (config " + CONFIG_KEY + ")");
-        }
-        return clamped;
+        return manager.get(ConfigurationManager.COMMAND_PERMISSION_LEVEL);
     }
 
     /** 把玩家侧拒绝文案发给该 sender（非玩家 sender 不发聊天）。 */

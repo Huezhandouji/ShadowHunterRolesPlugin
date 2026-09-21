@@ -17,6 +17,7 @@ import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 
@@ -211,12 +212,25 @@ public class RoleAPIImpl implements RoleAPI {
     @Override
     public int getPlayerSanTE(Player player) {
         RoleInstance instance = getRoleInstance(player);
-        return instance != null ? instance.getCurrentSanTE() : -78;
+        return instance != null ? instance.getCurrentSanTE() : RoleAPI.NO_ROLE_SAN_TE_SENTINEL;
     }
     @Override
     public int getPlayerSanTE(UUID uuid) {
         RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? instance.getCurrentSanTE() : -78;
+        return instance != null ? instance.getCurrentSanTE() : RoleAPI.NO_ROLE_SAN_TE_SENTINEL;
+    }
+
+    /** 只增入口（阶段 7 · 清理批）：无角色 ⇒ 空 Optional（不再需要调用方认哨兵）。 */
+    @Override
+    public OptionalInt getPlayerSanTEOptional(Player player) {
+        RoleInstance instance = getRoleInstance(player);
+        return instance != null ? OptionalInt.of(instance.getCurrentSanTE()) : OptionalInt.empty();
+    }
+
+    @Override
+    public OptionalInt getPlayerSanTEOptional(UUID uuid) {
+        RoleInstance instance = getRoleInstance(uuid);
+        return instance != null ? OptionalInt.of(instance.getCurrentSanTE()) : OptionalInt.empty();
     }
 
     @Deprecated

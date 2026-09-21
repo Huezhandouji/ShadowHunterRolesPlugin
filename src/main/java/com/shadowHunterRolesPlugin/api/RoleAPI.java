@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 
@@ -76,9 +77,32 @@ public interface RoleAPI {
     void decreaseEnergy(UUID uuid, int amount);
 
     //sanTE
+    /**
+     * {@link #getPlayerSanTE(Player)} / {@link #getPlayerSanTE(UUID)} 在**玩家没有角色**时返回的哨兵值。
+     * <p>阶段 7 · 清理批**只增**：把那个"魔法数"变成有名字、有文档的常量（**值与原实现逐字相同 = -78**）。
+     * 新代码请改用 {@link #getPlayerSanTEOptional(UUID)} —— 它把"没有角色"表达成**空 Optional**，
+     * 调用方不必先 {@link #hasRole(UUID)} 再读、也不必认哨兵。
+     */
+    int NO_ROLE_SAN_TE_SENTINEL = -78;
+
+    /**
+     * 当前 SanTE 值；**玩家没有角色时返回哨兵 {@value #NO_ROLE_SAN_TE_SENTINEL}**
+     * （语义与迁移前**逐字不变**，本批未动它）。
+     * <p>新代码建议改用 {@link #getPlayerSanTEOptional(Player)}。
+     */
     @Deprecated
     int getPlayerSanTE(Player player);
+    /** 同 {@link #getPlayerSanTE(Player)}（UUID 口径）。 */
     int getPlayerSanTE(UUID uuid);
+
+    /**
+     * **只增入口**（阶段 7 · 清理批）：当前 SanTE 值；**玩家没有角色时返回空 {@link OptionalInt}**。
+     * <p>与 {@link #getPlayerSanTE(UUID)} 的哨兵语义**互补而非取代**：旧方法与旧返回值一字未动，
+     * 本方法只是给"没有角色"提供一个**不需要认哨兵**的读法。
+     */
+    OptionalInt getPlayerSanTEOptional(Player player);
+    /** 同 {@link #getPlayerSanTEOptional(Player)}（UUID 口径）。 */
+    OptionalInt getPlayerSanTEOptional(UUID uuid);
 
     @Deprecated
     int getPlayerMaxSanTE(Player player);

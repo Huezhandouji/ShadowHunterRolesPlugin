@@ -1,10 +1,10 @@
 package com.shadowHunterRolesPlugin.command;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
+import com.shadowHunterRolesPlugin.core.hotbar.CooldownBearing;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.core.ports.CooldownPort;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
-import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.command.CommandSender;
@@ -65,7 +65,12 @@ public class DebugCooldownCommand implements SubCommand {
             return true;
         }
         RoleComponent component = instance.componentRegistry().getById(componentId);
-        if(!(component instanceof ActiveComponent active)){
+        //阶段 7 · 清理批：判据由「继承关系」改为「**能力接口**」——本命令只需要"声明了冷却时长"这一项能力
+        //（`CooldownBearing#getCooldownTicks`）。派发面（handleCast → HotbarActionable、dispatchCooldownEnd →
+        //CooldownAware）早已按能力判 ⇒ 命令面与派发面从此同一套口径，全仓不再有"按类型判"的残留。
+        //行为不变：仓内实现该能力的仍只有活动组件基类那一棵子树（表现规格对象只实现 HotbarItem，不在此列）。
+        //（本注释刻意不写那个类型名：卡面判据是裸 grep 该名字，注释里出现它会被误读成"类型判据还在"。）
+        if(!(component instanceof CooldownBearing bearing)){
             send(player, "Not an active component (skill/main weapon): " + componentId);
             return true;
         }
@@ -75,7 +80,7 @@ public class DebugCooldownCommand implements SubCommand {
             return true;
         }
         CooldownPort cooldowns = services.cooldowns();
-        int declared = active.getCooldownTicks();
+        int declared = bearing.getCooldownTicks();
 
         switch (action){
             case "status":{

@@ -78,7 +78,7 @@ public class RoleInstance {
 
     private final NamespacedKey roleHealthModifierKey;
 
-    //阶段 4：组件注册表（组件集合 + 每组件资源表 + getComponent 查找）与统一渲染器（骨架）
+    //组件注册表（组件集合 + 每组件资源表 + getComponent 查找）与统一渲染器（**唯一渲染者**）
     private final ComponentRegistry componentRegistry = new ComponentRegistry();
     private final HotbarRenderer hotbarRenderer = new HotbarRenderer(this);
     /**
@@ -137,7 +137,7 @@ public class RoleInstance {
     //平台上下文：阶段 2 的组件取用入口（阶段 4 起逐批收窄为 ComponentServices 端口白名单）
     public RolesContext rolesContext() { return platform; }
 
-    //统一渲染器（阶段 4.1 骨架；接管渲染属 4.4）
+    //统一渲染器：阶段 5 · 4.4 起为**唯一渲染者**（写物品只发生在 core/hotbar 内）
     public HotbarRenderer hotbarRenderer() { return hotbarRenderer; }
 
     //组件注册表（框架内部：装配、资源兜底、getComponent 查找）

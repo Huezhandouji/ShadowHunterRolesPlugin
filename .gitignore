@@ -89,3 +89,9 @@ debug-logs/**
 .agent-teams/
 .scratch/
 .b-flow-scratch/
+
+# ---------- debug-logs（用户裁定 2026-09-21：整体不入库）----------
+# 本目录只存在于工作目录，不随克隆/推送传播。
+# 其中 debug-logs/回滚快照/jars 的 11 代归档制品是本机唯一副本，请自行备份。
+# 因此：不要再对 debug-logs 执行 git add -f；也不要用 git grep 对 debug-logs 下的文件做判据（未跟踪件恒空）。
+# 证据与台账仍在盘上、仍可 read，但不再与 commit 绑定。

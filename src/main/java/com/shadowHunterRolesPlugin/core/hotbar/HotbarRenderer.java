@@ -101,6 +101,10 @@ public final class HotbarRenderer {
      * <p>{@code id} = **注册处的组件 id**（阶段 7 · B 步起显式传入：表现描述符由组件自带，
      * 它的 id 字段不再由构造实参提供，因此权威 id 只能取自注册表——本参数就是它）。
      * <p>{@code kind} = **注册处的权威 kind**（形参传入，不从组件自述读）。
+     * <p><b>阶段 7 · C 步 · 取值路径</b>：**基础物品由组件/描述符提供**（{@link HotbarItem#baseItem(String)}），
+     * 框架只在其上套**状态装饰** —— 材质按状态覆盖（就绪态沿用基础物品的材质）、名称套颜色/加粗/后缀、
+     * 状态行 lore、分隔线、两个 PDC 键。**三态判定 / 六条文案 / x.xs 差异 / PDC / 帧末 flush 全部留在本方法**，
+     * 组件覆写 {@code baseItem} 影响不到它们。
      * <p>技能与主武器的差异是**冻结差异**：技能冷却名带 `" x.xs"` 秒数，主武器冷却名**不带**任何追加段；
      * 主武器 `energyCost ≡ 0`（且能量被 clamp 到 ≥ 0）⇒ 永不进入 {@link IconState#ENERGY_LACK}。
      */
@@ -110,9 +114,19 @@ public final class HotbarRenderer {
         boolean canCast = skill ? owner.getBuffManager().canCastSkill() : owner.getBuffManager().canUseMainWeapon();
         IconState state = stateOf(ready, canCast, owner.getCurrentEnergy(), item.getEnergyCost());
 
+        //① 基础物品：**向组件（经其描述符）取**（阶段 7 · C 步）—— 材质/显示名/描述都由它给
+        ItemStack base = item.baseItem(id);
+        ItemMeta baseMeta = base.getItemMeta();
+        Material baseMaterial = base.getType();
+        Component baseName = baseMeta != null && baseMeta.displayName() != null
+                ? baseMeta.displayName() : item.getDisplayName();
+        List<Component> baseLore = baseMeta != null && baseMeta.lore() != null && !baseMeta.lore().isEmpty()
+                ? baseMeta.lore() : List.of(item.getDescription());
+
+        //② 状态装饰（框架侧 · 冻结面）：材质由状态决定，就绪态沿用基础物品的材质
         Material material;
         if (state == IconState.READY) {
-            material = item.getIcon();
+            material = baseMaterial;
         } else if (state == IconState.DISABLED) {
             material = Material.BARRIER;
         } else {
@@ -125,14 +139,14 @@ public final class HotbarRenderer {
 
         List<Component> lore = new ArrayList<>();
         if (skill) {
-            applySkill(meta, lore, id, item, state);
+            applySkill(meta, lore, id, baseName, state);
         } else {
-            applyMainWeapon(meta, lore, item, state);
+            applyMainWeapon(meta, lore, baseName, state);
         }
 
         //公共两行 lore 对**所有**状态与**两种** kind 都追加（含"能量不足态只有这两行"这条非对称）
         lore.add(Component.text("===================="));
-        lore.add(item.getDescription());
+        lore.addAll(baseLore);
         meta.lore(lore);
 
         if (skill) {
@@ -151,42 +165,42 @@ public final class HotbarRenderer {
      * 它的 `id` 字段不再由构造实参提供，因此**不得**再用 {@code item.getId()} 查冷却表
      * （那是本批第一轮实测到的真实回归：查到 `null` ⇒ 冷却名恒显示 `0.0s`）。
      */
-    private void applySkill(ItemMeta meta, List<Component> lore, String id, HotbarItem item, IconState state) {
+    private void applySkill(ItemMeta meta, List<Component> lore, String id, Component baseName, IconState state) {
         switch (state) {
             case COOLDOWN -> {
-                meta.displayName(item.getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)
+                meta.displayName(baseName.color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)
                         .append(Component.text(" " + String.format("%.1f", owner.getRemainingSkillCooldownSeconds(id)) + "s")
                                 .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)));
                 lore.add(Component.text("Skill is on cooldown."));
             }
             case DISABLED -> {
-                meta.displayName(item.getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD)
+                meta.displayName(baseName.color(NamedTextColor.RED).decorate(TextDecoration.BOLD)
                         .append(Component.text(" DISABLED")).color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
                 lore.add(Component.text("Skill has been disabled."));
             }
-            case ENERGY_LACK -> meta.displayName(item.getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)
+            case ENERGY_LACK -> meta.displayName(baseName.color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)
                     .append(Component.text(" ENERGY LACK")).color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
             case READY -> {
-                meta.displayName(item.getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
+                meta.displayName(baseName.color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
                 lore.add(Component.text("Skill is ready."));
             }
         }
     }
 
     /** 主武器侧文案与 lore（**无秒数后缀**：冻结差异，不得"顺手统一"成技能形态）。 */
-    private void applyMainWeapon(ItemMeta meta, List<Component> lore, HotbarItem item, IconState state) {
+    private void applyMainWeapon(ItemMeta meta, List<Component> lore, Component baseName, IconState state) {
         switch (state) {
             case COOLDOWN -> {
-                meta.displayName(item.getDisplayName().color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
+                meta.displayName(baseName.color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
                 lore.add(Component.text("MainWeapon is on cooldown."));
             }
             case DISABLED -> {
-                meta.displayName(item.getDisplayName().color(NamedTextColor.RED).decorate(TextDecoration.BOLD)
+                meta.displayName(baseName.color(NamedTextColor.RED).decorate(TextDecoration.BOLD)
                         .append(Component.text(" DISABLED")).color(NamedTextColor.RED).decorate(TextDecoration.BOLD));
                 lore.add(Component.text("MainWeapon has been disabled."));
             }
             case READY -> {
-                meta.displayName(item.getDisplayName().color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
+                meta.displayName(baseName.color(NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
                 lore.add(Component.text("MainWeapon is ready."));
             }
             case ENERGY_LACK -> {

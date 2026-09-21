@@ -109,6 +109,13 @@ public abstract class RoleComponent {
         /** 冻结位：装配期 {@link #freeze()} 之后禁止再改（防止被共享后被串改）。 */
         private boolean frozen;
 
+        /**
+         * 装配期绑定的**注册 id**（{@link #bindId(String)} 写入；未绑定 ⇒ {@code null}）。
+         * <p>与栏位同属"**必须由装配器设置**的参数"：组件自带的描述符不知道自己的注册 id，
+         * 若不绑定，任何读 id 的代码都会拿到 {@code null}（t34 第一轮的真实回归即由此而来）。
+         */
+        private String boundId;
+
         protected Specification(ItemKind kind) {
             if (kind == null) {
                 throw new IllegalArgumentException("Component kind cannot be null.");
@@ -152,6 +159,34 @@ public abstract class RoleComponent {
                         "Slot already assigned to " + this.slot + " for kind " + kind + "; refusing to move it to " + slot + ".");
             }
             this.slot = slot;
+        }
+
+        /**
+         * **装配器绑定注册 id**（与 {@link #assignSlot(int)} 同族：都是"必须由装配器设置"的参数）。
+         * <p>为什么必须有它：组件自带的描述符用"不带 id 的构造"声明（id 属于注册处）⇒ 若不绑定，
+         * 描述符里任何读 id 的路径都会拿到 {@code null}（t34 第一轮的真实回归根因）。绑定后
+         * **描述符的 id 与注册处同源同值**，字段不再撒谎。
+         * <p>id 为空 / 已冻结 / 已绑定到**另一个** id ⇒ 抛异常（同 id 重复绑定是幂等的）。
+         */
+        public final void bindId(String id) {
+            if (frozen) {
+                throw new IllegalStateException(
+                        "Component specification of kind " + kind + " is frozen and cannot be changed.");
+            }
+            if (id == null || id.trim().isEmpty()) {
+                throw new IllegalArgumentException("Component ID cannot be null or empty.");
+            }
+            if (boundId != null && !boundId.equals(id)) {
+                throw new IllegalStateException(
+                        "Component specification of kind " + kind + " is already bound to '" + boundId
+                                + "'; refusing to rebind it to '" + id + "'.");
+            }
+            this.boundId = id;
+        }
+
+        /** 装配期绑定的注册 id；**未绑定 ⇒ {@code null}**（装配入口保证已装配的描述符都已绑定）。 */
+        public final String boundId() {
+            return boundId;
         }
 
         /**

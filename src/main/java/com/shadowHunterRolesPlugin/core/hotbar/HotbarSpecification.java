@@ -4,6 +4,10 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+
+import java.util.List;
 
 /**
  * 热键栏**表现规格 + 带栏位描述符**（阶段 6 立、阶段 7 · A 步改全拼并升格为描述符）：
@@ -31,8 +35,13 @@ import org.bukkit.Material;
 public class HotbarSpecification<T extends RoleComponent>
         extends RoleComponent.Specification<T> implements HotbarItem {
 
-    /** 组件 id（由注册处声明；表现用，装配与行为分支不读它）。 */
-    private final String id;
+    /**
+     * **声明的 id**（{@link #of} 传入，可为 {@code null}）。
+     * <p>阶段 7 · C 步起：{@link #getId()} **优先**返回**装配期绑定的注册 id**
+     * （{@link RoleComponent.Specification#bindId(String)}，由装配入口写入）；只有未经装配的描述符
+     * （例如探针直接构造的）才回落到这里 ⇒ **字段不再撒谎**。
+     */
+    private final String declaredId;
     private final Component displayName;
     private final Component description;
     private final Material icon;
@@ -42,7 +51,7 @@ public class HotbarSpecification<T extends RoleComponent>
     protected HotbarSpecification(String id, Component displayName, Component description, Material icon,
                                   int cooldownTicks, int energyCost, ItemKind kind) {
         super(kind);
-        this.id = id;
+        this.declaredId = id;
         this.displayName = displayName;
         this.description = description;
         this.icon = icon;
@@ -86,9 +95,36 @@ public class HotbarSpecification<T extends RoleComponent>
                         + "declare a component-nested Specification and override create(String, ComponentServices).");
     }
 
+    /**
+     * 组件 id：**优先**取装配期绑定的注册 id（{@link RoleComponent.Specification#bindId(String)}），
+     * 未绑定时才回落到 {@link #of} 传入的声明 id。
+     * <p>阶段 7 · C 步的修法（A7 · 选 (a)）：B 步后组件自带的描述符一律走"不带 id 的构造"，若只留声明 id，
+     * 这个字段就会**恒为 null 而仍可被读**（t34 第一轮的真实回归正是它导致的）⇒ 现在装配入口把注册 id
+     * 绑进描述符，字段与注册处**同源同值**。
+     */
     @Override
     public String getId() {
-        return id;
+        String bound = boundId();
+        return bound != null ? bound : declaredId;
+    }
+
+    /**
+     * **基础物品**（阶段 7 · C 步 · 默认实现）：由图标 / 显示名 / 描述生成热键栏物品底稿 ——
+     * 材质 = {@link #getIcon()}、显示名 = {@link #getDisplayName()}、lore = 单行 {@link #getDescription()}。
+     * <p>框架随后施加**状态装饰**（三态材质覆盖 / 名称颜色与加粗 / 冷却秒数或后缀 / 状态行 lore /
+     * 分隔线 / 两个 PDC 键），因此本方法**不碰**这些冻结面。
+     * <p>需要特殊渲染逻辑的组件：在自己的嵌套 `Specification` 里覆写本方法即可。
+     */
+    @Override
+    public ItemStack baseItem(String id) {
+        ItemStack stack = new ItemStack(icon);
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.displayName(displayName);
+            meta.lore(description != null ? List.of(description) : List.of());
+            stack.setItemMeta(meta);
+        }
+        return stack;
     }
 
     @Override

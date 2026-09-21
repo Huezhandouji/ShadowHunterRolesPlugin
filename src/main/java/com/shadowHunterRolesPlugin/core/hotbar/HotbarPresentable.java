@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.core.hotbar;
 
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
 
 /**
  * 「这个组件能出现在热键栏」的能力接口（阶段 6 立、阶段 7 · A 步改全拼）：
@@ -69,5 +70,13 @@ public interface HotbarPresentable extends HotbarItem, CooldownBearing, EnergyCo
     /** 渲染器读写面视图（`HotbarItem` 在本批保留，不删）。 */
     default HotbarItem asHotbarItem() {
         return specification();
+    }
+
+    /**
+     * **基础物品**（阶段 7 · C 步）：委托给唯一实现点 {@link #specification()} 的同名方法
+     * ⇒ 组件只写一处（描述符），渲染器读到的就是它；**状态装饰仍由框架施加**。
+     */
+    default ItemStack baseItem(String id) {
+        return specification().baseItem(id);
     }
 }

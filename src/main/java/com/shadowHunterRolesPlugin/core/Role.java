@@ -271,6 +271,9 @@ public class Role {
          */
         public Builder addComponent(String id, RoleComponent.Specification<?> specification){
             Objects.requireNonNull(specification);
+            //阶段 7 · C 步（A7 选 (a)）：**把注册 id 绑进描述符**再冻结 —— 组件自带的描述符用
+            //"不带 id 的构造"声明，不绑定的话描述符里的 id 字段会恒为 null（t34 第一轮的真实回归根因）。
+            specification.bindId(id);
             RoleComponent.Specification.Snapshot snapshot = specification.freeze();
             return addComponentInternal(id, snapshot.getKind(),
                     snapshot.hasSlot() ? Integer.valueOf(snapshot.getSlot()) : null,

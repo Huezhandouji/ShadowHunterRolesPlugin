@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
+import com.shadowHunterRolesPlugin.roleComponent.ComponentDependencyException;
 import com.shadowHunterRolesPlugin.roleComponent.ComponentFactory;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
@@ -115,7 +116,121 @@ public class Role {
     }
 
     public RoleInstance createInstance(Player player, RolesContext context){
+        //阶段 10 · t54（A2 · 检查时机）：依赖检查必须发生在 **任何实例化/awake 之前** ——
+        // 这里是"造实例"的唯一入口（{@code manager/RoleManager#selectRole} 与测试探针都走它）⇒
+        // 在这里再查一次，任何路径都不可能绕过检查进到 {@code awake()}。
+        // 幂等：{@code registry/RoleLoader#loadInto} 在注册前已经查过一次（不注册的模板根本到不了这里）。
+        verifyDependencies();
         return new RoleInstance(player, this, context);
+    }
+
+    // ───────────── 阶段 10 · t54：装配期依赖检查（用户计划第三条） ─────────────
+
+    /**
+     * **装配期依赖检查**（唯一实现点）：① **必需依赖必须齐**；② **依赖图不得有环**。
+     * <p><b>时机</b>（A2）：由调用方在 {@code Role.build()} **之后**、**任何 {@code awake()} 之前**调用 ——
+     * 框架里有两处：{@code registry/RoleLoader#loadInto}（**注册之前** ⇒ 坏模板根本不进注册表）与
+     * {@link #createInstance(Player, RolesContext)}（**实例化之前** ⇒ 任何路径都绕不过去）。
+     * <p><b>失败形态</b>（硬失败，不降级）：抛 {@link ComponentDependencyException}；调用方
+     * {@code RoleLoader} 记一条 {@code SEVERE} 并**跳过该角色**（其余角色继续装配）。
+     * <p><b>匹配规则（写死）</b>：组件 A 的必需类型 R 被满足 ⟺ 存在**另一个**组件 B（B 的 id ≠ A 的 id）
+     * 使 {@code R.isAssignableFrom(B.providedType())}。**A 自己不算提供者** —— 用户原话是"检查自己需要的
+     * 依赖（**其他组件**）"，因此"只有自己提供该类型"按**缺依赖**处理（这也是冻结件 §4.3 的"自环"用例：
+     * 它在本实现里落成一条可读的缺依赖错误，而不是一个能被自己满足的假通过）。
+     * <p><b>为什么不用反射去"扫"组件实例</b>：装配期**还没有任何实例**（实例化发生在
+     * {@code RoleInstance} 的构造期）⇒ 检查只能基于描述符声明的类型，这也是它能在"注册之前"完成的原因。
+     * <p><b>不检查什么（如实申报）</b>：可选依赖缺失不报错；提供类型是**族级**的组件（三个家族描述符的
+     * 泛型实参是家族基类）无法满足"按具体类"的依赖声明，除非该描述符覆写
+     * {@code providedType()}（见 {@code RoleComponent.Specification#providedType()}）。
+     *
+     * @throws ComponentDependencyException 缺必需依赖或依赖图有环（消息里点名角色 / 组件 id / 缺的类型）
+     */
+    public void verifyDependencies(){
+        List<String> problems = new ArrayList<>(missingRequiredDependencies());
+        problems.addAll(dependencyCycles());
+        if(!problems.isEmpty()){
+            throw new ComponentDependencyException(
+                    "Role '" + id + "' failed the assembly-time dependency check: " + String.join(" | ", problems));
+        }
+    }
+
+    /**
+     * **缺必需依赖的清单**（诊断用；空 = 齐）。每条都点名：组件 id · 该组件**提供**的类型 · **缺**的类型。
+     * <p>{@link #verifyDependencies()} 的异常消息直接由它拼出 ⇒ 消息与清单**同源**，不会各说一套。
+     */
+    public List<String> missingRequiredDependencies(){
+        List<String> problems = new ArrayList<>();
+        for(Map.Entry<String, ComponentEntry> entry : components.entrySet()){
+            String componentId = entry.getKey();
+            ComponentEntry component = entry.getValue();
+            for(Class<? extends RoleComponent> required : component.getRequiredTypes()){
+                if(!hasProviderOtherThan(componentId, required)){
+                    problems.add("component '" + componentId + "' (provides " + component.getProvidedType().getName()
+                            + ") requires missing component type '" + required.getName() + "'");
+                }
+            }
+        }
+        return problems;
+    }
+
+    /** 是否存在**另一个**组件提供该类型（自己不算；见 {@link #verifyDependencies()} 的匹配规则）。 */
+    private boolean hasProviderOtherThan(String requesterId, Class<? extends RoleComponent> required){
+        for(Map.Entry<String, ComponentEntry> entry : components.entrySet()){
+            if(entry.getKey().equals(requesterId)) continue;
+            if(required.isAssignableFrom(entry.getValue().getProvidedType())) return true;
+        }
+        return false;
+    }
+
+    /**
+     * **依赖环检测**（冻结件 §4.3 / 裁定②：禁止依赖循环）：把"必需依赖"连成有向图
+     * （A → B ⟺ A 的某个必需类型由 B 提供，B ≠ A），返回可读的环清单（空 = 无环）。
+     * <p>自环（A→A）在**连边阶段就被排除**（自己不算提供者）⇒ 它的可观测形态 = 缺依赖错误；
+     * 互环（A→B→A）与更长的环都在这里被抓到，消息给出**完整路径**（例：{@code a -> b -> a}）。
+     */
+    public List<String> dependencyCycles(){
+        List<String> cycles = new ArrayList<>();
+        Set<String> finished = new LinkedHashSet<>();
+        for(String start : components.keySet()){
+            if(finished.contains(start)) continue;
+            Set<String> onPath = new LinkedHashSet<>();
+            Deque<String> path = new ArrayDeque<>();
+            walkForCycles(start, path, onPath, finished, cycles);
+        }
+        return cycles;
+    }
+
+    private void walkForCycles(String current, Deque<String> path, Set<String> onPath, Set<String> finished,
+                               List<String> cycles){
+        if(onPath.contains(current)){
+            List<String> cycle = new ArrayList<>();
+            boolean collecting = false;
+            for(String node : path){
+                if(node.equals(current)) collecting = true;
+                if(collecting) cycle.add(node);
+            }
+            cycle.add(current);
+            String rendered = "dependency cycle: " + String.join(" -> ", cycle);
+            if(!cycles.contains(rendered)) cycles.add(rendered);
+            return;
+        }
+        if(finished.contains(current)) return;
+        onPath.add(current);
+        path.addLast(current);
+        ComponentEntry entry = components.get(current);
+        if(entry != null){
+            for(Class<? extends RoleComponent> required : entry.getRequiredTypes()){
+                for(Map.Entry<String, ComponentEntry> other : components.entrySet()){
+                    if(other.getKey().equals(current)) continue;
+                    if(required.isAssignableFrom(other.getValue().getProvidedType())){
+                        walkForCycles(other.getKey(), path, onPath, finished, cycles);
+                    }
+                }
+            }
+        }
+        path.removeLast();
+        onPath.remove(current);
+        finished.add(current);
     }
 
     /** 旧窄类型入口（保留兼容）：kind 不符时返回 {@code null}（与"该类型未装配"同义）。 */
@@ -154,7 +269,8 @@ public class Role {
     }
 
     /**
-     * 装配条目：`(工厂, 栏位?, 描述符类型)`（阶段 7 · A 步；**阶段 8 去掉 kind**）。
+     * 装配条目：`(工厂, 栏位?, 描述符类型, 提供类型, 必需依赖, 可选依赖)`（阶段 7 · A 步；**阶段 8 去掉 kind**；
+     * **阶段 10 · t54 增加依赖声明**）。
      * <p><b>不占栏位 = 栏位的缺失</b>：栏位用**可空的 {@link Integer}** 表达（`null` = 不占热键栏，
      * 不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它）。
      * 旧版的 `-1` 哨兵已删除 —— {@link #getSlot()} 在无栏位时**抛异常**，而不是返回一个能参与算术的值；
@@ -163,23 +279,47 @@ public class Role {
      * 同一份描述符实例被两个角色共享时，后手改动影响不到先手。
      * <p>阶段 8：`descriptorType` = 描述符的**类型**（旧 `kind` 的唯一职责改由它承担：三个 id 视图按
      * 类型归类）；它**不参与任何行为分支**。
+     * <p>阶段 10 · t54：`providedType` / `requiredTypes` / `optionalTypes` 是**依赖检查的三元组** ——
+     * 提供类型是"我能被谁依赖"，必需/可选是"我依赖谁"。它们只被
+     * {@link Role#verifyDependencies()} 读取（**不参与任何运行期行为分支**）。
      */
     public static final class ComponentEntry{
 
         private final ComponentFactory<? extends RoleComponent> factory;
         private final Integer slot;
         private final Class<?> descriptorType;
+        /** 本组件**提供**的类型（依赖检查的供给面；无描述符的装配入口按工厂形参类型给族级值）。 */
+        private final Class<? extends RoleComponent> providedType;
+        /** **必需**依赖类型（缺任一 ⇒ {@link Role#verifyDependencies()} 抛异常）。 */
+        private final List<Class<? extends RoleComponent>> requiredTypes;
+        /** **可选**依赖类型（缺失不报错）。 */
+        private final List<Class<? extends RoleComponent>> optionalTypes;
 
-        ComponentEntry(ComponentFactory<? extends RoleComponent> factory, Integer slot, Class<?> descriptorType){
+        ComponentEntry(ComponentFactory<? extends RoleComponent> factory, Integer slot, Class<?> descriptorType,
+                       Class<? extends RoleComponent> providedType,
+                       List<Class<? extends RoleComponent>> requiredTypes,
+                       List<Class<? extends RoleComponent>> optionalTypes){
             this.factory = factory;
             this.slot = slot;
             this.descriptorType = descriptorType;
+            this.providedType = providedType;
+            this.requiredTypes = List.copyOf(requiredTypes);
+            this.optionalTypes = List.copyOf(optionalTypes);
         }
 
         public ComponentFactory<? extends RoleComponent> getFactory() { return factory; }
 
         /** **描述符类型**（旧 kind 的唯一职责承担者：仅供三个 id 视图归类，不参与行为分支）。 */
         public Class<?> getDescriptorType() { return descriptorType; }
+
+        /** 本组件**提供**的类型（依赖检查按它匹配：`required.isAssignableFrom(provided)`）。 */
+        public Class<? extends RoleComponent> getProvidedType() { return providedType; }
+
+        /** 本组件声明的**必需**依赖类型（不可变副本）。 */
+        public List<Class<? extends RoleComponent>> getRequiredTypes() { return requiredTypes; }
+
+        /** 本组件声明的**可选**依赖类型（不可变副本）。 */
+        public List<Class<? extends RoleComponent>> getOptionalTypes() { return optionalTypes; }
 
         /** 栏位（0..8）；**不占栏位 ⇒ 抛异常**（本版不再有 `-1` 哨兵）。 */
         public int getSlot() {
@@ -278,7 +418,9 @@ public class Role {
          * {@code setSlot} 指定位置，装配期未设栏位 ⇒ 此处抛异常；不带栏位的描述符
          * （`PassiveSkill.Specification`）**没有** {@code setSlot} ⇒ 天然不占栏位。
          * <p>本方法对传入描述符取**不可变快照**（{@code Specification#freeze()}）：条目只留
-         * `(栏位, 工厂, 描述符类型)`，**不持有描述符对象**。
+         * `(栏位, 工厂, 描述符类型, 提供类型, 必需依赖, 可选依赖)`，**不持有描述符对象**。
+         * <p>阶段 10 · t54：描述符上的依赖声明（{@code requires(...)} / {@code requiresOptional(...)}）与
+         * **提供类型**（{@code providedType()}）随快照进入条目，供 {@link Role#verifyDependencies()} 在装配期检查。
          */
         public Builder addComponent(String id, RoleComponent.Specification<?> specification){
             Objects.requireNonNull(specification);
@@ -288,7 +430,8 @@ public class Role {
             RoleComponent.Specification.Snapshot snapshot = specification.freeze();
             return addComponentInternal(id, specification.getClass(),
                     snapshot.hasSlot() ? Integer.valueOf(snapshot.getSlot()) : null,
-                    snapshot.getFactory(), snapshot.getDescriptorLabel());
+                    snapshot.getFactory(), snapshot.getDescriptorLabel(),
+                    snapshot.getProvidedType(), snapshot.getRequiredTypes(), snapshot.getOptionalTypes());
         }
 
         /**
@@ -296,25 +439,37 @@ public class Role {
          * 不占热键栏 ⇒ 不进 `slotMap` ⇒ 渲染器遍历时天然看不到它，也不会被要求画物品。
          * <p>"是被动"由**工厂形参的类型**表达（{@code ComponentFactory<PassiveSkill>}）⇒
          * 三个 id 视图按 `PassiveSkill.Specification` 归类；其余语义与描述符入口一致（同一条内部路径）。
+         * <p><b>阶段 10 · t54 的依赖面（如实申报）</b>：本入口**没有描述符** ⇒
+         * ① 提供类型只能是**族级** {@code PassiveSkill.class}（依赖检查按它匹配）；
+         * ② **无法**声明依赖（{@code requires} 只在描述符上）。要按具体类被依赖或要声明依赖的被动，
+         * 应改走描述符入口（给该被动加一个嵌套 {@code PassiveSkill.Specification}）—— 属逐组件迁移卡的范围。
          */
         public Builder addPassive(String passiveId, ComponentFactory<PassiveSkill> factory){
             Objects.requireNonNull(factory);
-            return addComponentInternal(passiveId, PassiveSkill.Specification.class, null, factory, "Passive");
+            return addComponentInternal(passiveId, PassiveSkill.Specification.class, null, factory, "Passive",
+                    PassiveSkill.class, List.of(), List.of());
         }
 
         /**
          * **唯一内部装配路径**（阶段 6 立、阶段 7 · A 步改为"栏位可有可无"、B 步改为"栏位随组件走"、
-         * **阶段 8 去掉 kind**）：描述符入口与无栏位入口都只调用这里 ⇒ 校验、id 去重、入表各只有一处实现。
+         * **阶段 8 去掉 kind**、**阶段 10 · t54 增加依赖三元组**）：描述符入口与无栏位入口都只调用这里
+         * ⇒ 校验、id 去重、入表各只有一处实现。
          * <p>本类**不再维护栏位表**：栏位只作为条目的一个值存在（{@code ComponentEntry.slot}），
          * 角色构造期再一次性派生出 {@code slotMap} 视图。
          *
          * @param slot           栏位；{@code null} = **不占栏位**（不占热键栏）——旧版用 {@code -1} 哨兵表达同一件事
          * @param descriptorType 描述符**类型**（旧 kind 的唯一职责承担者：三个 id 视图按它归类）
          * @param descriptorLabel 诊断标签（只用于重复 id 的异常文案，与迁移前逐字相同）
+         * @param providedType   本组件**提供**的类型（依赖检查的供给面）
+         * @param requiredTypes  **必需**依赖类型（缺任一 ⇒ {@link Role#verifyDependencies()} 抛异常）
+         * @param optionalTypes  **可选**依赖类型（缺失不报错）
          */
         private Builder addComponentInternal(String id, Class<?> descriptorType, Integer slot,
                                              ComponentFactory<? extends RoleComponent> factory,
-                                             String descriptorLabel){
+                                             String descriptorLabel,
+                                             Class<? extends RoleComponent> providedType,
+                                             List<Class<? extends RoleComponent>> requiredTypes,
+                                             List<Class<? extends RoleComponent>> optionalTypes){
             // 与迁移前临时实例取 id 的 fail-fast 等价：null 工厂在**装配期**立刻 NPE，而不是拖到实例创建
             Objects.requireNonNull(factory);
 
@@ -324,13 +479,17 @@ public class Role {
             if(descriptorType == null){
                 throw new IllegalArgumentException("Component descriptor type cannot be null.");
             }
+            if(providedType == null){
+                throw new IllegalArgumentException("Component provided type cannot be null.");
+            }
             ensureIdNotRegistered(descriptorLabel, id);
 
             if(slot != null){
                 validateSlot(slot);
             }
 
-            components.put(id, new ComponentEntry(factory, slot, descriptorType));
+            components.put(id, new ComponentEntry(factory, slot, descriptorType, providedType,
+                    requiredTypes, optionalTypes));
 
             return this;
         }

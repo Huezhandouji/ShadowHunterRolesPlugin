@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.*;
+import java.util.logging.Level;
 
 public class RoleManager {
 
@@ -23,7 +24,20 @@ public class RoleManager {
         this.roleRegistry = roleRegistry;
     }
 
-    //选择角色
+    /**
+     * 选择角色。
+     * <p><b>阶段 10 · t54（A5 · AR-2 修正）</b>：旧写法是"**先 clear 旧角色、再裸构造新实例**"且全文件
+     * 0 处 try/catch ⇒ 构造一旦失败，玩家**先丢角色、再吃逃逸异常**。现在：
+     * <ol>
+     *   <li><b>预检先行</b>：{@link Role#verifyDependencies()} 放在**清理旧角色之前** ⇒ 依赖不齐这类
+     *       "可预知"的失败**不会**让玩家先丢角色（反例判据：依赖缺失时玩家仍持有原角色）；</li>
+     *   <li><b>异常不逃逸</b>：预检与构造各自包在 try/catch 里，失败只记 {@code SEVERE} 并返回 {@code false}；</li>
+     *   <li><b>如实申报的残留</b>：**非依赖类**的构造异常（例如某个组件构造器抛）发生在 {@code clearRole}
+     *       **之后** ⇒ 此时旧角色已被回收、无法回滚。安全的"先构造后清理"需要 {@code RoleInstance} 的新 API
+     *       （旧实例的 {@code clear()} 会按**共享 key** 移除新实例的属性修饰符、并清空新实例的热键栏/药水）
+     *       ⇒ 不在本卡 inScope，已在交付说明里申报（最小闭合 = 另立卡给 {@code RoleInstance} 加两阶段构造）。</li>
+     * </ol>
+     */
     public boolean selectRole(Player player, String roleId){
         if(!roleRegistry.contains(roleId)) return false;
 
@@ -31,9 +45,28 @@ public class RoleManager {
         Role role = roleRegistry.get(roleId);
         if(role == null) return false;
 
+        //A5 ①：预检（装配期依赖检查）必须在**清理旧角色之前** —— 它不产生任何副作用
+        try {
+            role.verifyDependencies();
+        } catch (Throwable failure) {
+            context.logger().log(Level.SEVERE,
+                    "Role '" + roleId + "' failed the assembly-time dependency check for " + player.getName()
+                            + "; the previous role is kept.", failure);
+            return false;
+        }
+
         if(hasRole(player)) clearRole(player);
 
-        RoleInstance instance = role.createInstance(player, context);
+        //A5 ②：构造异常不得逃逸
+        RoleInstance instance;
+        try {
+            instance = role.createInstance(player, context);
+        } catch (Throwable failure) {
+            context.logger().log(Level.SEVERE,
+                    "Role '" + roleId + "' failed to instantiate for " + player.getName()
+                            + "; the player was left without a role (see the delivery notes).", failure);
+            return false;
+        }
 
         playerRoleMap.put(player.getUniqueId(), instance);
 
@@ -48,10 +81,28 @@ public class RoleManager {
         Role role = roleRegistry.get(roleId);
         if(role == null) return false;
 
+        //同 Player 重载：预检先行（A5 ①）
+        try {
+            role.verifyDependencies();
+        } catch (Throwable failure) {
+            context.logger().log(Level.SEVERE,
+                    "Role '" + roleId + "' failed the assembly-time dependency check for " + uuid
+                            + "; the previous role is kept.", failure);
+            return false;
+        }
+
         if(hasRole(uuid)) clearRole(uuid);
 
 
-        RoleInstance instance = role.createInstance(player, context);
+        RoleInstance instance;
+        try {
+            instance = role.createInstance(player, context);
+        } catch (Throwable failure) {
+            context.logger().log(Level.SEVERE,
+                    "Role '" + roleId + "' failed to instantiate for " + uuid
+                            + "; the player was left without a role (see the delivery notes).", failure);
+            return false;
+        }
 
         playerRoleMap.put(player.getUniqueId(), instance);
 

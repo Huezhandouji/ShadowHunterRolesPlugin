@@ -2,6 +2,11 @@ package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 新侧组件基类（设计 §2 / §4.4）。**只允许出现 `svc` 字段 + 钩子方法 + `getComponent`** ——
  * 任何"顺手加个 helper"都属越界（那属于端口或组件私有方法的职责）。
@@ -120,6 +125,19 @@ public abstract class RoleComponent {
          */
         private String boundId;
 
+        /**
+         * **必需的依赖类型**（阶段 10 · t54）：{@link #requires(Class[])} 写入；装配期由
+         * {@code core/Role#verifyDependencies()} 检查 —— 缺任一 ⇒ 抛 {@link ComponentDependencyException}
+         * ⇒ 该角色**不注册**。
+         */
+        private final List<Class<? extends RoleComponent>> requiredTypes = new ArrayList<>();
+
+        /**
+         * **可选的依赖类型**：{@link #requiresOptional(Class[])} 写入；缺失**不报错**（组件运行期自行处理
+         * 查不到的情况）。可选与必需**不得声明同一个类型**（那是自相矛盾的声明 ⇒ 装配期报错）。
+         */
+        private final List<Class<? extends RoleComponent>> optionalTypes = new ArrayList<>();
+
         protected Specification(String descriptorLabel) {
             if (descriptorLabel == null || descriptorLabel.trim().isEmpty()) {
                 throw new IllegalArgumentException("Component descriptor label cannot be null or empty.");
@@ -130,6 +148,112 @@ public abstract class RoleComponent {
         /** **诊断标签**（只出现在装配期异常文案里；没有任何行为分支读它）。 */
         public final String descriptorLabel() {
             return descriptorLabel;
+        }
+
+        /**
+         * **声明"我需要同角色里还有某个组件"**（阶段 10 · t54 · 用户计划第三条）。
+         * <p><b>按类型声明</b>（不是按 id）：id 属于注册处，类型才是"我需要什么样的能力提供者"。
+         * <p><b>语义</b>：装配期检查时，本组件**自己不算**提供者（用户原话是"检查自己需要的依赖（**其他组件**）"）
+         * ⇒ 至少要有**另一个**组件的"提供类型"可赋值给这里声明的类型，否则视为缺依赖。
+         * <p><b>失败形态</b>：缺任一必需依赖 ⇒ {@code core/Role#verifyDependencies()} 抛
+         * {@link ComponentDependencyException} ⇒ {@code registry/RoleLoader#loadInto} 记 {@code SEVERE}
+         * 并**跳过该角色**（不注册、不进游戏）。
+         * <p><b>声明示例</b>（写在组件自己的嵌套 {@code Specification} 构造器里）：
+         * <pre>{@code
+         * public static final class Specification extends Skill.Specification {
+         *     public Specification() {
+         *         super(Component.text("示例技能"), Component.text("示例描述"), 100, 0, Material.STONE);
+         *         requires(EnergyComponent.class);              // 必需：没有能量组件就不许装配
+         *         requiresOptional(RepaintRequirement.class);   // 可选：没有也不报错，运行期自查
+         *     }
+         *     @Override public ExampleSkill create(String id, ComponentServices services) { ... }
+         * }
+         * }</pre>
+         * <p><b>为什么不在描述符里"顺手查一遍"</b>：描述符是**装配期对象**、拿不到运行期状态；
+         * 依赖是**同角色其它组件**的有无问题 ⇒ 只能由框架在装配期（拿到整张组件表之后）统一检查。
+         * <p><b>声明面的边界（如实申报）</b>：本方法只在**描述符**上；走
+         * {@code Role.Builder#addPassive(id, factory)}（无描述符入口）的组件**没有**声明面。
+         *
+         * @param types 必需依赖的组件类型（可一次给多个；重复声明是幂等的）
+         */
+        @SafeVarargs
+        public final Specification<T> requires(Class<? extends RoleComponent>... types) {
+            addDependencyTypes(requiredTypes, "requires", types);
+            return this;
+        }
+
+        /**
+         * **声明"有的话更好，没有也不报错"的依赖**（可选依赖）：缺失**不**阻止装配。
+         * <p>与 {@link #requires(Class[])} 的唯一差别 = 缺失时的行为：必需 ⇒ 抛异常阻止注册；可选 ⇒ 放行。
+         * <p>同一个类型**不得**既必需又可选择（自相矛盾的声明 ⇒ {@code freeze()} 时抛
+         * {@link IllegalStateException}）。
+         *
+         * @param types 可选依赖的组件类型（可一次给多个；重复声明是幂等的）
+         */
+        @SafeVarargs
+        public final Specification<T> requiresOptional(Class<? extends RoleComponent>... types) {
+            addDependencyTypes(optionalTypes, "requiresOptional", types);
+            return this;
+        }
+
+        /** 本描述符声明的**必需**依赖类型（不可变副本；顺序 = 声明顺序）。 */
+        public final List<Class<? extends RoleComponent>> requiredTypes() {
+            return List.copyOf(requiredTypes);
+        }
+
+        /** 本描述符声明的**可选**依赖类型（不可变副本；顺序 = 声明顺序）。 */
+        public final List<Class<? extends RoleComponent>> optionalTypes() {
+            return List.copyOf(optionalTypes);
+        }
+
+        /**
+         * **本组件提供什么类型**（依赖检查的"供给面"）：默认由**泛型实参**推导 ——
+         * 例如 {@code class EnergyComponent.Specification extends RoleComponent.Specification<EnergyComponent>}
+         * ⇒ 返回 {@code EnergyComponent.class}。
+         * <p><b>为什么要可覆写</b>：三个家族描述符（{@code Skill.Specification} /
+         * {@code MainWeapon.Specification} / {@code PassiveSkill.Specification}）的泛型实参是**家族基类**，
+         * 推导结果因此是族级（{@code Skill.class} 等）；若某个组件希望被"按**具体类**依赖"，
+         * 覆写本方法返回自己的具体类即可（{@code requires(SomeConcreteSkill.class)} 就能命中它）。
+         * <p>推导不到时返回 {@link RoleComponent#getClass()} 的上界 —— 即 {@code RoleComponent.class}
+         * （"我只声明自己是组件"），这**不会**满足任何更具体的依赖声明。
+         */
+        public Class<? extends RoleComponent> providedType() {
+            return deriveProvidedType();
+        }
+
+        /** 泛型实参推导：沿超类链找第一个 `...Specification<X>` 实参（X 必须是组件类型）。 */
+        @SuppressWarnings("unchecked")
+        private Class<? extends RoleComponent> deriveProvidedType() {
+            Class<?> current = getClass();
+            while (current != null && current != Object.class) {
+                Type superType = current.getGenericSuperclass();
+                if (superType instanceof ParameterizedType parameterized) {
+                    Type[] arguments = parameterized.getActualTypeArguments();
+                    if (arguments.length == 1 && arguments[0] instanceof Class<?> raw
+                            && RoleComponent.class.isAssignableFrom(raw)) {
+                        return (Class<? extends RoleComponent>) raw;
+                    }
+                }
+                current = current.getSuperclass();
+            }
+            return RoleComponent.class;
+        }
+
+        /** 声明写入（两处共用）：空值 / null 元素一律抛，重复声明幂等。 */
+        @SafeVarargs
+        private static void addDependencyTypes(List<Class<? extends RoleComponent>> target, String entry,
+                                              Class<? extends RoleComponent>... types) {
+            if (types == null || types.length == 0) {
+                throw new IllegalArgumentException(entry + "(...) needs at least one component type.");
+            }
+            for (Class<? extends RoleComponent> type : types) {
+                if (type == null) {
+                    throw new IllegalArgumentException(entry + "(...) must not contain null types.");
+                }
+                if (!target.contains(type)) {
+                    target.add(type);
+                }
+            }
         }
 
         /** 占不占热键栏；{@code false} = 不占（不进槽位表）。 */
@@ -194,19 +318,29 @@ public abstract class RoleComponent {
         }
 
         /**
-         * **装配期冻结**：返回本描述符的**不可变快照**（栏位（可有可无）+ 工厂），并把本实例置为只读。
+         * **装配期冻结**：返回本描述符的**不可变快照**（栏位（可有可无）+ 工厂 + **依赖声明** + **提供类型**），
+         * 并把本实例置为只读。
          * <p>装配入口 {@code Role.Builder.addComponent(String, Specification)} 只使用这份快照
          * ⇒ 角色模板**不持有描述符对象**，两个角色共用一个描述符实例也互不影响。
          * <p><b>带栏位必填</b>：子类若声明"本类型必须有栏位"（{@link #requiresSlot()}），则未设栏位时
          * **在此抛异常** —— 不占栏位必须由**类型**表达（用无栏位的描述符），不得静默降级。
+         * <p><b>依赖声明的自检</b>（阶段 10 · t54）：同一个类型不得**既必需又可选择** ⇒ 抛
+         * {@link IllegalStateException}（自相矛盾的声明必须在装配期就喊出来，而不是"看哪条先被读到"）。
          */
         public final Snapshot freeze() {
             if (requiresSlot() && slot == null) {
                 throw new IllegalStateException(
                         "A hotbar specification of kind " + descriptorLabel + " must be given a slot (setSlot) before assembly.");
             }
+            for (Class<? extends RoleComponent> type : optionalTypes) {
+                if (requiredTypes.contains(type)) {
+                    throw new IllegalStateException(
+                            "Component specification of kind " + descriptorLabel + " declares '" + type.getName()
+                                    + "' as both required and optional; pick one.");
+                }
+            }
             this.frozen = true;
-            return new Snapshot(descriptorLabel, slot, this::create);
+            return new Snapshot(descriptorLabel, slot, this::create, providedType(), requiredTypes, optionalTypes);
         }
 
         /** 本类型的描述符是否**必须**有栏位（默认 `false`；带栏位分支覆写为 `true`）。 */
@@ -218,7 +352,7 @@ public abstract class RoleComponent {
         public abstract T create(String id, ComponentServices services);
 
         /**
-         * 装配期不可变快照：**装配表唯一持有的形态**（栏位（可有可无）+ 工厂）。
+         * 装配期不可变快照：**装配表唯一持有的形态**（栏位（可有可无）+ 工厂 + 依赖声明 + 提供类型）。
          * 字段全 `final`、无 setter ⇒ 拿不到可变面。
          */
         public static final class Snapshot {
@@ -227,12 +361,24 @@ public abstract class RoleComponent {
             private final String descriptorLabel;
             private final Integer slot;
             private final ComponentFactory<? extends RoleComponent> factory;
+            /** 本组件**提供**的类型（依赖检查的供给面）。 */
+            private final Class<? extends RoleComponent> providedType;
+            /** **必需**依赖（缺任一 ⇒ 抛 {@link ComponentDependencyException}）。 */
+            private final List<Class<? extends RoleComponent>> requiredTypes;
+            /** **可选**依赖（缺失不报错）。 */
+            private final List<Class<? extends RoleComponent>> optionalTypes;
 
             private Snapshot(String descriptorLabel, Integer slot,
-                             ComponentFactory<? extends RoleComponent> factory) {
+                             ComponentFactory<? extends RoleComponent> factory,
+                             Class<? extends RoleComponent> providedType,
+                             List<Class<? extends RoleComponent>> requiredTypes,
+                             List<Class<? extends RoleComponent>> optionalTypes) {
                 this.descriptorLabel = descriptorLabel;
                 this.slot = slot;
                 this.factory = factory;
+                this.providedType = providedType;
+                this.requiredTypes = List.copyOf(requiredTypes);
+                this.optionalTypes = List.copyOf(optionalTypes);
             }
 
             /** **诊断标签**（只出现在装配期异常文案里；没有任何行为分支读它）。 */
@@ -255,6 +401,21 @@ public abstract class RoleComponent {
 
             public ComponentFactory<? extends RoleComponent> getFactory() {
                 return factory;
+            }
+
+            /** 本组件**提供**的类型（依赖检查按它匹配）。 */
+            public Class<? extends RoleComponent> getProvidedType() {
+                return providedType;
+            }
+
+            /** 本组件声明的**必需**依赖类型（不可变副本）。 */
+            public List<Class<? extends RoleComponent>> getRequiredTypes() {
+                return requiredTypes;
+            }
+
+            /** 本组件声明的**可选**依赖类型（不可变副本）。 */
+            public List<Class<? extends RoleComponent>> getOptionalTypes() {
+                return optionalTypes;
             }
         }
     }

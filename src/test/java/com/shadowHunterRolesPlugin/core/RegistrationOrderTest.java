@@ -1,0 +1,107 @@
+package com.shadowHunterRolesPlugin.core;
+
+import com.shadowHunterRolesPlugin.roleComponent.AutoRecoverEnergyPassive;
+import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
+import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * T-4（t50 §4）：锁住**注册序 → 栏位视图**（t50 §1 第 ⑨ 条的纯半边），并且**专门锁 `LinkedHashMap` 的顺序性**。
+ * <p>为什么能单测：装配表是一张纯内存表；{@code getComponents()} / {@code getSlotMap()} /
+ * {@code componentIdAtSlot(int)} 都只读它，不需要实例、不需要 Bukkit ⇒ 离线可跑。
+ * <p>顺序为什么最贵：本项目"注册序 = 渲染序 = 派发序"是冻结面；把表换成 `HashMap` 就会静默乱序。
+ * 本测试因此内置一条**样本判别力守卫**：同一批 id 装进 {@link HashMap} 时的迭代序与登记序**必须不同**
+ * （现算样本 `c_1…c_8` 满足）—— 若哪天 JDK 让两者巧合相同，这条守卫会先红，提示"该换样本了"，
+ * 免得顺序断言在不知情的情况下失去判别力。
+ */
+public class RegistrationOrderTest {
+
+    private static final String[] IDS = {"c_1", "c_2", "c_3", "c_4", "c_5", "c_6", "c_7", "c_8"};
+
+    /** 8 个带栏位条目 + 1 个无栏位条目 ⇒ 遍历序 = 登记序；无栏位者不在 slotMap 里。 */
+    @Test
+    public void componentsKeepRegistrationOrderAndSlotViewSkipsSlotless() {
+        Role.Builder b = new Role.Builder("r");
+        for (int i = 0; i < IDS.length; i++) {
+            b.addComponent(IDS[i], new MeiqiheziBloodySlashSkill.Specification().setSlot(i));
+        }
+        b.addPassive("c_9_no_slot", AutoRecoverEnergyPassive::new);
+        Role role = b.build();
+
+        List<String> actualOrder = new ArrayList<>(role.getComponents().keySet());
+        List<String> expectedOrder = new ArrayList<>(Arrays.asList(IDS));
+        expectedOrder.add("c_9_no_slot");
+        assertEquals("遍历序必须等于登记序（LinkedHashMap 的语义）", expectedOrder, actualOrder);
+
+        Map<Integer, String> slotMap = role.getSlotMap();
+        assertEquals("无栏位者不得进 slotMap", IDS.length, slotMap.size());
+        assertFalse(slotMap.containsValue("c_9_no_slot"));
+        for (int i = 0; i < IDS.length; i++) {
+            assertEquals("栏位 " + i + " 必须指向登记时给出的那个 id", IDS[i], slotMap.get(i));
+            assertEquals(IDS[i], role.componentIdAtSlot(i));
+        }
+        assertEquals("未占用栏位必须返回 null", null, role.componentIdAtSlot(8));
+    }
+
+    /** 栏位 0..8 全覆盖：9 个条目都能各占一格，且反向查表逐格正确。 */
+    @Test
+    public void everySlotCanBeOccupiedExactlyOnce() {
+        Role.Builder b = new Role.Builder("r");
+        for (int i = 0; i <= 8; i++) {
+            b.addComponent("slot_" + i, new MeiqiheziBloodySlashSkill.Specification().setSlot(i));
+        }
+        Role role = b.build();
+        assertEquals(9, role.getSlotMap().size());
+        for (int i = 0; i <= 8; i++) {
+            assertEquals("slot_" + i, role.componentIdAtSlot(i));
+        }
+    }
+
+    /** 顺序**不是**按 id 排序出来的：故意用乱序 id 登记，遍历序仍是登记序。 */
+    @Test
+    public void orderIsInsertionNotAlphabetical() {
+        Role.Builder b = new Role.Builder("r");
+        b.addComponent("zzz", new MeiqiheziBloodySlashSkill.Specification().setSlot(3));
+        b.addComponent("aaa", new MeiqiheziBloodySlashSkill.Specification().setSlot(1));
+        b.addComponent("mmm", new MeiqiheziBloodySlashSkill.Specification().setSlot(2));
+        Role role = b.build();
+        assertEquals("组件表遍历序 = 登记序（不是字母序）",
+                Arrays.asList("zzz", "aaa", "mmm"), new ArrayList<>(role.getComponents().keySet()));
+        // 栏位视图是 `栏位 → id` 的派生表（HashMap），只断言**内容**，不断言它的迭代序（那不是冻结面）
+        assertEquals(3, role.getSlotMap().size());
+        assertEquals("zzz", role.getSlotMap().get(3));
+        assertEquals("aaa", role.getSlotMap().get(1));
+        assertEquals("mmm", role.getSlotMap().get(2));
+        assertEquals("zzz", role.componentIdAtSlot(3));
+        assertEquals("aaa", role.componentIdAtSlot(1));
+        assertEquals("mmm", role.componentIdAtSlot(2));
+    }
+
+    /** 样本判别力守卫：同一批 id 的 {@link HashMap} 迭代序与登记序**不同** ⇒ 上面对顺序的断言不可能是恒真。 */
+    @Test
+    public void sampleHasDiscriminatingPowerAgainstHashMap() {
+        Map<String, String> hashMap = new HashMap<>();
+        Map<String, String> linked = new LinkedHashMap<>();
+        for (String id : IDS) {
+            hashMap.put(id, id);
+            linked.put(id, id);
+        }
+        List<String> insertion = Arrays.asList(IDS);
+        assertEquals("LinkedHashMap 必须保序（这是正向对照）", insertion, new ArrayList<>(linked.keySet()));
+        assertNotEquals("该样本在 HashMap 下必须乱序，否则顺序断言失去判别力（请换样本）",
+                insertion, new ArrayList<>(hashMap.keySet()));
+        assertTrue("HashMap 的键集必须与样本一致（只比顺序，不比内容）",
+                hashMap.keySet().containsAll(insertion));
+    }
+}

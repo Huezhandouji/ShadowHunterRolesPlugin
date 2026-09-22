@@ -92,6 +92,12 @@ public class RoleLoader {
 
     /**
      * 逐条装配并注册。
+     * <p><b>阶段 10 · t54（A2/A6）</b>：在 {@code build()} 与 {@code register()} **之间**插入
+     * {@link Role#verifyDependencies()} —— 依赖不齐（或缺依赖环）的模板在**注册之前**就抛异常，
+     * 由下面的既有 {@code catch (Throwable)} 记一条 {@code SEVERE} 并**跳过该角色**
+     * ⇒ 它**根本不在注册表里**（既不会被 {@code /role set} 选中，也不会走到任何 {@code awake()}）。
+     * 检查时机因此被钉死：**`build()` 之后、任何 `awake()` 之前**（实例化发生在 {@code RoleInstance} 构造期，
+     * 而只有注册过的模板才会被实例化）。
      *
      * @return 成功注册的角色数
      */
@@ -105,6 +111,8 @@ public class RoleLoader {
             try {
                 Role.Builder builder = definition.builder().get();
                 Role role = builder.build();
+                //阶段 10 · t54：装配期依赖检查（缺必需依赖 / 依赖环 ⇒ 抛 ComponentDependencyException）
+                role.verifyDependencies();
                 registry.register(role);
                 registered++;
             } catch (Throwable failure) {

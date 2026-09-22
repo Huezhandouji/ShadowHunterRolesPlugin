@@ -1,55 +1,82 @@
 package com.shadowHunterRolesPlugin.roleComponent.service;
 
+import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.platform.FactionLookup;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.platform.Task;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 
 /**
- * 阵营组件（阶段 10 · t55 · A1）：系统级能力「阵营读写 + 敌对判定」的**组件形态**
+ * 阵营组件（阶段 10 · t63 · A1 改正）：系统级能力「阵营读写 + 敌对判定」的**组件形态**
  * （每角色实例一个，裁定③ / ⑧）。
- * <p><b>薄封装</b>：内部**转调既有端口** {@code FactionPort}；**关系表仍留平台**
- * （{@code FactionLookup} 是静态数据，不随实例复制），本组件只提供"判定入口 + 本实例的当前阵营"。
- * <p><b>使用示例（其他组件内）</b>：
- * <pre>{@code
- * private FactionComponent factions;
- * @Override public void awake() { factions = getComponent(FactionComponent.class); }
- * @Override public void update() { if (factions.hasEnemyInRange(8.0d)) { ... } }
- * }</pre>
- * <p><b>装配示例</b>：{@code builder.addComponent("factions", new FactionComponent.Specification());}（不占栏位）。
- * <p><b>本卡不改任何调用点</b>：既有组件仍走 {@code svc().factions()}；
- * 容器的 {@code getFaction/setFaction/resetFaction}（`RoleAPI` 的四组对外方法）**一字不动**。
+ * <p><b>★ 本组件持有状态与行为</b>：玩家**当前阵营**的真值 {@link #faction}（原 {@code RoleInstance.faction}
+ * 字段搬进本组件）+ 敌对判定的两个入口（{@link #isHostile(Player)} / {@link #hasEnemyInRange(double)}）✓
+ * —— **不再转调任何旧端口** ✗。
+ * <p><b>关系表仍留平台</b>（冻结件 §8）：{@link FactionLookup} 是**静态数据**（未选角色 ⇒ UNKNOWN ⇒ 敌对），
+ * 不随实例复制 —— 属"真正外部的东西"（单例）⇒ 允许依赖 ✓，且它**不进依赖图**。
+ * <p><b>语义逐字保留</b>：{@code faction()} 的"未设 ⇒ 回落角色模板阵营"、{@code hasEnemyInRange} 的
+ * 几何 + "未选角色的玩家也算敌人"、{@code reset()} 的回落语义，全部与既有端口实现逐字一致。
  */
 public class FactionComponent extends RoleComponent {
 
-    public FactionComponent(String id, ComponentServices services) {
+    private final FactionLookup lookup;
+
+    /** 角色模板声明的阵营（构造期由容器给出）—— 回落目标。 */
+    private final Faction defaultFaction;
+
+    /** ★ 真值：玩家当前阵营（唯一持有处；{@code null} ⇒ 回落 {@link #defaultFaction}）。 */
+    private Faction faction;
+
+    public FactionComponent(String id, ComponentServices services, FactionLookup lookup, Faction defaultFaction) {
         super(id, services);
+        this.lookup = lookup;
+        this.defaultFaction = defaultFaction;
+        //与既有 RoleInstance 构造期逐字一致：this.faction = role.getFaction()
+        this.faction = defaultFaction;
+    }
+
+    /** 本实例的当前阵营（未设 ⇒ 角色模板阵营）。 */
+    public Faction faction() {
+        return faction != null ? faction : defaultFaction;
+    }
+
+    /** 写入当前阵营（{@code RoleAPI#setFaction} 的落点）。 */
+    public void setFaction(Faction faction) {
+        this.faction = faction;
+    }
+
+    /** 复位为角色模板阵营（{@code RoleAPI#resetFaction} 的落点）。 */
+    public void reset() {
+        this.faction = defaultFaction;
     }
 
     /** 该玩家是否与**本实例**敌对（未选角色的玩家也算敌人）。 */
-    public boolean isHostile(org.bukkit.entity.Player victim) {
-        return svc().factions().isHostile(victim);
+    public boolean isHostile(Player victim) {
+        return lookup.isHostile(faction(), victim);
     }
 
-    /** 本实例的当前阵营。 */
-    public com.shadowHunterRolesPlugin.core.Faction faction() {
-        return svc().factions().faction();
-    }
-
-    /** 半径内是否有敌人（几何 + 阵营语义逐字沿用既有实现）。 */
+    /**
+     * 半径内是否有敌人（几何 + 阵营语义**逐字**沿用原 {@code SkillUtil.hasEnemyInRange}）：
+     * 以本实例玩家位置为圆心、**未选角色的玩家也算敌人**。
+     */
     public boolean hasEnemyInRange(double radius) {
-        return svc().factions().hasEnemyInRange(radius);
-    }
-
-    /** 装配描述符：**不占栏位**；提供类型 = {@code FactionComponent.class}。 */
-    public static final class Specification extends RoleComponent.Specification<FactionComponent> {
-
-        public Specification() {
-            super("FactionComponent");
+        Location loc = svc().self().player().getLocation();
+        if (loc == null || loc.getWorld() == null) {
+            return false;
         }
 
-        @Override
-        public FactionComponent create(String id, ComponentServices services) {
-            return new FactionComponent(id, services);
+        Faction selfFaction = faction();
+
+        for (Player p : loc.getNearbyPlayers(radius)) {
+            if (p == null) {
+                continue;
+            }
+            //没有选角色的玩家也要算进来（FactionLookup 对未选角色返回敌对）
+            if (lookup.isHostile(selfFaction, p)) {
+                return true;
+            }
         }
+        return false;
     }
 }

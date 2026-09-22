@@ -1,65 +1,100 @@
 package com.shadowHunterRolesPlugin.roleComponent.service;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.platform.Scheduler;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 
 /**
- * 计时组件（阶段 10 · t55 · A1）：系统级能力「组件资源表（任务登记 / 取消）」的**组件形态**
- * （每角色实例一个，裁定③）。
- * <p><b>薄封装</b>：内部**转调既有端口** {@code TimerPort}（= Unity 的 StartCoroutine）——
- * 每个任务在创建时立即登记进**资源表**，组件 {@code stop()} 返回后由框架兜底取消。
- * <p><b>使用示例（其他组件内）</b>：
- * <pre>{@code
- * private TimerComponent timers;
- * @Override public void awake() { timers = getComponent(TimerComponent.class); }
- * @Override public void start() { timers.runLater(20L, () -> { ... }); }
- * }</pre>
- * <p><b>装配示例</b>：{@code builder.addComponent("timers", new TimerComponent.Specification());}（不占栏位）。
- * <p><b>★ 已知限制（如实申报，A4 第 5 条同族）</b>：既有端口 {@code TimerPort} 是**按组件 id 一对一**构造的
- * （资源表按"登记它的那个组件"记账）⇒ 本组件转调的是**它自己那一份**端口 ⇒ 任务登记在
- * **计时组件的资源表**下（生命周期 = 角色实例），**不**随"调用方组件"的 `stop()` 被取消。
- * 与 {@code svc().timers()}（登记在**调用方**名下）存在这一处**归属差异** ⇒
- * 需要"任务随调用方组件停止而取消"的组件，**本卡请继续使用 {@code svc().timers()}**；
- * 归属问题的最小闭合 = 重接卡给本组件加"请求者"形参（或在容器侧提供按请求者登记的口子）。
- * <p><b>本卡不改任何调用点</b>：既有组件仍走 {@code svc().timers()}。
+ * 计时组件（阶段 10 · t63 · A1 改正 + A6 请求者语义）：系统级能力
+ * 「组件资源表（任务登记 / 取消）」的**组件形态**（每角色实例一个，裁定③）。
+ * <p><b>★ 本组件持有行为，并且**归属按请求者**</b>：
+ * <ul>
+ *   <li>任务的**创建**（{@link Scheduler} = Bukkit 调度器 = 允许依赖的"外部东西" ✓）在本组件内完成；</li>
+ *   <li>任务的**登记归属**由本组件按 {@code requester}（请求者组件）决定 —— 这是原先散布在
+ *       {@code core/TimerPortImpl} 里的"按组件 id 解析请求者"逻辑的**唯一新家** ✓；</li>
+ *   <li>资源的**存储**仍落在容器的**每组件资源表**（{@link TaskSink} 注入 = {@code ComponentRegistry#track} /
+ *       {@code #cancelAll}）⇒ <b>既有回收机制一条都不改</b>（{@code clear()} 的 {@code cancelAllAndClear()}、
+ *       运行期删除路径的 {@code cancelAll} 全部照旧生效 ⇒ 不引入新泄漏面 ✓）。</li>
+ * </ul>
+ * <p><b>★ A6：调用方 {@code stop()} ⇒ 其请求的任务全部取消</b>：{@link #cancelAllOf(RoleComponent)}
+ * 是这条语义的入口，容器在 {@code triggerLifecycleStop()} 里**每个组件 {@code stop()} 之后**调用一次
+ * ⇒ "谁请求的计时，谁停止时被取消" ✓（旧实现只在实例 {@code clear()} 的兜底里取消 ⇒ 单独 {@code stop()}
+ * 会漏；本卡把这一点补上，见说明件的偏离留痕）。
+ * <p><b>不再转调任何旧端口</b> ✗（原实现是 {@code svc().timers().…}）。
  */
 public class TimerComponent extends RoleComponent {
 
-    public TimerComponent(String id, ComponentServices services) {
+    /**
+     * 资源表接入口（容器在构造期注入）：**就是** {@code ComponentRegistry} 的每组件资源表
+     * （{@code registry::track} / {@code registry::cancelAll}）。
+     * <p>刻意做成接口而不是直接用 {@code ComponentRegistry}：{@code core/dispatch/**} 不在本卡 inScope，
+     * 且"组件不该反向依赖容器的具体实现类"是组件化的本意 ✓。
+     */
+    public interface TaskSink {
+
+        /** 把句柄登记到 {@code requester} 名下。 */
+        void track(RoleComponent requester, Task task);
+
+        /** 取消并清空 {@code requester} 名下的全部句柄（返回实际取消数）。 */
+        int cancelAll(RoleComponent requester);
+    }
+
+    private final Scheduler scheduler;
+    private final TaskSink sink;
+
+    public TimerComponent(String id, ComponentServices services, Scheduler scheduler, TaskSink sink) {
         super(id, services);
+        this.scheduler = scheduler;
+        this.sink = sink;
     }
 
-    /** 下一 tick 执行一次（登记进资源表）。 */
-    public Task run(Runnable task) {
-        return svc().timers().run(task);
+    /** 下一 tick 执行一次（登记在 {@code requester} 名下）。 */
+    public Task run(RoleComponent requester, Runnable task) {
+        Task handle = scheduler.run(task);
+        sink.track(requesterOf(requester), handle);
+        return handle;
     }
 
-    /** 延迟 {@code delayTicks} 刻执行一次（登记进资源表）。 */
-    public Task runLater(long delayTicks, Runnable task) {
-        return svc().timers().runLater(delayTicks, task);
+    /** 延迟 {@code delayTicks} 刻执行一次（登记在 {@code requester} 名下）。 */
+    public Task runLater(RoleComponent requester, long delayTicks, Runnable task) {
+        Task handle = scheduler.runLater(task, delayTicks);
+        sink.track(requesterOf(requester), handle);
+        return handle;
     }
 
-    /** 周期执行（首次延迟 {@code initialDelayTicks}、周期 {@code periodTicks}；登记进资源表）。 */
-    public Task runRepeating(long initialDelayTicks, long periodTicks, Runnable task) {
-        return svc().timers().runRepeating(initialDelayTicks, periodTicks, task);
+    /** 周期执行（首次延迟 {@code initialDelayTicks}、周期 {@code periodTicks}；登记在 {@code requester} 名下）。 */
+    public Task runRepeating(RoleComponent requester, long initialDelayTicks, long periodTicks, Runnable task) {
+        //initialDelay <= 0 归一为 1：与 BukkitSchedulerAdapter 同值归一（Math.max 幂等 ⇒ 双入口双保险）
+        Task handle = scheduler.runRepeating(task, Math.max(1L, initialDelayTicks), periodTicks);
+        sink.track(requesterOf(requester), handle);
+        return handle;
     }
 
-    /** 把一个**外部创建**的句柄补登记进资源表（与端口同语义）。 */
-    public void track(Task task) {
-        svc().timers().track(task);
-    }
-
-    /** 装配描述符：**不占栏位**；提供类型 = {@code TimerComponent.class}。 */
-    public static final class Specification extends RoleComponent.Specification<TimerComponent> {
-
-        public Specification() {
-            super("TimerComponent");
+    /** 把一个**外部创建**的句柄补登记到 {@code requester} 名下（语义同既有端口）。 */
+    public void track(RoleComponent requester, Task handle) {
+        if (handle == null) {
+            return;
         }
+        sink.track(requesterOf(requester), handle);
+    }
 
-        @Override
-        public TimerComponent create(String id, ComponentServices services) {
-            return new TimerComponent(id, services);
-        }
+    /**
+     * **取消 {@code requester} 请求的全部任务**（A6 的入口）。
+     * <p>容器在每次组件 {@code stop()} 之后调用它（{@code RoleInstance#triggerLifecycleStop()}）⇒
+     * "调用方停止 ⇒ 它的计时全部取消" ✓。
+     *
+     * @return 实际取消的句柄数（无资源 ⇒ 0）
+     */
+    public int cancelAllOf(RoleComponent requester) {
+        return sink.cancelAll(requesterOf(requester));
+    }
+
+    /**
+     * 请求者归一：{@code null} ⇒ **本组件自己**（无请求者信息的句柄仍然可回收 ⇒ 不制造"无人认领的任务"）。
+     * 端口侧永远给出真实请求者（按组件 id 解析），故本分支只在补全路径上生效。
+     */
+    private RoleComponent requesterOf(RoleComponent requester) {
+        return requester != null ? requester : this;
     }
 }

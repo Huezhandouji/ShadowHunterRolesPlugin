@@ -1,26 +1,22 @@
 package com.shadowHunterRolesPlugin.roleComponent.service;
 
+import com.shadowHunterRolesPlugin.core.DamageUtil;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import org.bukkit.entity.LivingEntity;
 
 /**
- * 伤害组件（阶段 10 · t55 · A1）：系统级能力「真伤 / 物伤」的**组件形态**（每角色实例一个；
- * 用户裁定 **D-1 = A 案**：`DamagePort` 移出为伤害组件）。
- * <p><b>薄封装</b>（用户澄清「一个伤害组件，它仍然可以依赖我原来的静态伤害工具」）：内部**转调既有端口**
- * {@code DamagePort} ⇒ 静态 {@code DamageUtil}（含 PDC 副作用）仍是唯一实现，本组件只是它的**可被依赖的
- * 组件面**；静态工具与单例**不进依赖图**（用户澄清第 3 条）。
- * <p><b>使用示例（其他组件内）</b>：
- * <pre>{@code
- * private DamageComponent damage;
- * @Override public void awake() { damage = getComponent(DamageComponent.class); }
- * @Override public void onAttack(AttackSignal signal) {
- *     damage.physicalDamage(signal.victim(), getPlayer(), 6.0d, 0.4d);
- * }
- * }</pre>
- * <p><b>装配示例</b>：{@code builder.addComponent("damage", new DamageComponent.Specification());}（不占栏位）。
- * <p><b>已知限制（申报）</b>：本卡只**新增**组件面，`RoleAPI` 的伤害入口与既有调用点**一字不动**
- * （只增不改）⇒ 对外行为逐项不变；重接由后续卡承接。
+ * 伤害组件（阶段 10 · t63 · A1 改正）：系统级能力「真伤 / 物伤」的**组件形态**
+ * （每角色实例一个；用户裁定 **D-1 = A 案**）。
+ * <p><b>★ 本组件持有行为</b>：四个伤害原语直接落到**静态伤害工具** {@link DamageUtil}
+ * （含 PDC 副作用）—— **不再转调任何框架端口** ✗。
+ * <p><b>为什么这里可以直调静态工具</b>：用户明文裁定「组件的实现设计**不必**不依赖任何外部的东西，
+ * 比如一个伤害组件，它仍然可以**依赖我原来的静态伤害工具**」；队长更正后的口径把
+ * 「薄封装」许可**收窄为"仅限真正外部的东西"**（静态工具 / 单例 / Bukkit API ✓），
+ * **不适用于框架自己的服务端口** ✗ —— {@code DamageUtil} 属**真正外部**（它不依赖
+ * {@code ComponentServices}，也不把"谁提供能力"这件事藏起来）。
+ * <p><b>状态归属</b>：伤害**没有**本组件私有的可变状态（真值 = 服务端的生命值 + PDC 标记），
+ * 本组件只持有"做这件事"的行为 ⇒ 见状态归属表的「无私有状态」一行。
  */
 public class DamageComponent extends RoleComponent {
 
@@ -30,34 +26,21 @@ public class DamageComponent extends RoleComponent {
 
     /** 真实伤害（无视护甲；含既有 PDC 副作用）。 */
     public void trueDamage(LivingEntity victim, LivingEntity source, double amount) {
-        svc().damage().trueDamage(victim, source, amount);
+        DamageUtil.dealtTrueDamage(victim, source, amount);
     }
 
     /** 真实伤害 + 击退强度。 */
     public void trueDamage(LivingEntity victim, LivingEntity source, double amount, double knockbackStrength) {
-        svc().damage().trueDamage(victim, source, amount, knockbackStrength);
+        DamageUtil.dealtTrueDamage(victim, source, amount, knockbackStrength);
     }
 
     /** 物理伤害（走护甲/减伤）。 */
     public void physicalDamage(LivingEntity victim, LivingEntity source, double amount) {
-        svc().damage().physicalDamage(victim, source, amount);
+        DamageUtil.dealtPhysicalDamage(victim, source, amount);
     }
 
     /** 物理伤害 + 击退强度。 */
     public void physicalDamage(LivingEntity victim, LivingEntity source, double amount, double knockbackStrength) {
-        svc().damage().physicalDamage(victim, source, amount, knockbackStrength);
-    }
-
-    /** 装配描述符：**不占栏位**；提供类型 = {@code DamageComponent.class}。 */
-    public static final class Specification extends RoleComponent.Specification<DamageComponent> {
-
-        public Specification() {
-            super("DamageComponent");
-        }
-
-        @Override
-        public DamageComponent create(String id, ComponentServices services) {
-            return new DamageComponent(id, services);
-        }
+        DamageUtil.dealtPhysicalDamage(victim, source, amount, knockbackStrength);
     }
 }

@@ -1,14 +1,14 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.ports.FactionPort;
-import org.bukkit.Location;
+import com.shadowHunterRolesPlugin.roleComponent.service.FactionComponent;
 import org.bukkit.entity.Player;
 
 /**
- * {@link FactionPort} 的独立适配器。
- * {@code hasEnemyInRange} 的几何 + 阵营语义**逐字**沿用原 {@code SkillUtil.hasEnemyInRange}
- * （**未选角色的玩家也算敌人**），以组件自己的玩家位置为圆心（与两个 AutoRecover* 的调用一致）。
- * 阶段 4（B⑤）：原静态方法已删除，逻辑搬到这里 —— 组件侧改调 {@code svc().factions().hasEnemyInRange(r)}。
+ * {@link FactionPort} 的独立适配器（阶段 10 · t63 · A2）：**纯转发**到 {@link FactionComponent} ——
+ * 当前阵营的真值（原 {@code RoleInstance.faction} 字段）与两个判定入口都已搬到组件，本类不持有任何状态 ✗。
+ * <p>关系表仍留平台（{@code platform.factions()}）⇒ 组件依赖它是"外部单例"许可，见组件 javadoc。
+ * <p>第 3 步之前的**临时兼容层**；既有调用点一字未动。
  */
 final class FactionPortImpl implements FactionPort {
 
@@ -18,30 +18,22 @@ final class FactionPortImpl implements FactionPort {
         this.owner = owner;
     }
 
+    private FactionComponent component() {
+        return owner.factionComponent();
+    }
+
     @Override
     public boolean isHostile(Player victim) {
-        return owner.isHostileTo(victim);
+        return component().isHostile(victim);
     }
 
     @Override
     public Faction faction() {
-        return owner.getFaction();
+        return component().faction();
     }
 
     @Override
     public boolean hasEnemyInRange(double radius) {
-        Location loc = owner.getPlayer().getLocation();
-        if(loc == null || loc.getWorld() == null) return false;
-
-        Faction selfFaction = owner.getFaction();
-
-        for(Player p : loc.getNearbyPlayers(radius)){
-            if(p == null) continue;
-            //没有选角色的玩家也要算进来（FactionLookup 对未选角色返回敌对）
-            if(owner.rolesContext().factions().isHostile(selfFaction, p)){
-                return true;
-            }
-        }
-        return false;
+        return component().hasEnemyInRange(radius);
     }
 }

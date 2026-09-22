@@ -4,19 +4,17 @@ import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
 import com.shadowHunterRolesPlugin.core.ports.TimerPort;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.TimerComponent;
 
 /**
- * {@link TimerPort} 的独立适配器（= Unity 的 StartCoroutine）：
- * 每个任务在创建时**立即登记**进本组件的资源表，组件 {@code stop()} 返回后由框架兜底取消。
- * <p>
- * 阶段 4 收尾批⑤（构造期注入）：服务集必须先于组件实例存在，因此本类**不再捕获组件实例**，
- * 改为捕获组件 id、登记时按 id 解析（{@code ComponentRegistry.getById}）。等价性：id 在角色实例内唯一
- * （{@code Role.Builder} 对技能/被动/主武器跨类型去重）⇒ 解析到的就是同一实例、同一资源表键；
- * 解引用只发生在运行期（装配完成且 {@code freeze()} 之后），与旧实现登记的对象一致。
- * <p>
- * {@code null} 分支：{@code getById} 返回 {@code null}（理论上只可能发生在"组件尚未登记/已被注销"的
- * 装配外状态）时**安全跳过**登记，不做任何 substitute —— 与旧实现"不可能为 null"的差异只在该不可能态，
- * 且不静默替换资源表键。
+ * {@link TimerPort} 的独立适配器（阶段 10 · t63 · A2）：**纯转发**到 {@link TimerComponent}
+ * （= Unity 的 StartCoroutine）—— 任务的创建、登记归属、取消入口都在组件里，本类不持有任何状态 ✗。
+ * <p><b>★ 请求者解析仍在唯一一处</b>：本端口是**按组件 id 一对一**构造的
+ * （{@code RoleInstance#createServices(componentId)}）⇒ 调用方组件 = {@code registry.getById(componentId)}，
+ * 由本端口解析后作为 {@code requester} 形参交给组件 ⇒ 任务登记进**调用方**的资源表
+ * （与既有实现逐字一致：既有实现是在 {@code track} 里做同一件事）。
+ * <p><b>⚠ 两处"同名反序"</b>：{@link TimerPort} 的 {@code task} 在**最后**，平台 {@code Scheduler} 的
+ * {@code task} 在**前** —— 交换点在 {@link TimerComponent} 内（本类只做形参透传，不再做任何顺序变换）。
  */
 final class TimerPortImpl implements TimerPort {
 
@@ -30,37 +28,37 @@ final class TimerPortImpl implements TimerPort {
         this.componentId = componentId;
     }
 
+    private TimerComponent component() {
+        return owner.timerComponent();
+    }
+
+    /**
+     * 请求者 = 持有本端口的那一个组件（按 id 解析）。
+     * <p>与既有实现同源：装配完成后 {@code getById} 才合法（组件在 {@code awake()}/{@code start()} 里
+     * 注册任务，均晚于 {@code freeze()}）；返回 {@code null} 的"不可能态"由组件回落到它自己，
+     * **不静默丢登记**（旧实现在该分支直接跳过登记 ⇒ 会留下无人认领的任务，本卡补上）。
+     */
+    private RoleComponent requester() {
+        return registry.getById(componentId);
+    }
+
     @Override
     public Task run(Runnable task) {
-        Task handle = owner.rolesContext().scheduler().run(task);
-        track(handle);
-        return handle;
+        return component().run(requester(), task);
     }
 
     @Override
     public Task runLater(long delayTicks, Runnable task) {
-        Task handle = owner.rolesContext().scheduler().runLater(task, delayTicks);
-        track(handle);
-        return handle;
+        return component().runLater(requester(), delayTicks, task);
     }
 
     @Override
     public Task runRepeating(long initialDelayTicks, long periodTicks, Runnable task) {
-        //⚠ 本行是 TimerPort 与 Scheduler 两个"同名反序"签名之间的**唯一**转调点：此处把 task 从末位挪到首位。
-        //initialDelay <= 0 归一为 1：与 BukkitSchedulerAdapter 同值归一（Math.max 幂等 ⇒ 双入口双保险）。
-        Task handle = owner.rolesContext().scheduler().runRepeating(task, Math.max(1L, initialDelayTicks), periodTicks);
-        track(handle);
-        return handle;
+        return component().runRepeating(requester(), initialDelayTicks, periodTicks, task);
     }
 
     @Override
     public void track(Task task) {
-        if (task == null) {
-            return;
-        }
-        RoleComponent component = registry.getById(componentId);
-        if (component != null) {
-            registry.track(component, task);
-        }
+        component().track(requester(), task);
     }
 }

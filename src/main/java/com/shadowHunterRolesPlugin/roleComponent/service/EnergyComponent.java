@@ -4,62 +4,83 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 
 /**
- * 能量组件（阶段 10 · t55 · A1）：系统级能力「能量」的**组件形态**（每角色实例一个，裁定③）。
- * <p><b>薄封装</b>（用户澄清「组件的实现**不必**不依赖任何外部的东西」）：内部**转调既有端口**
- * {@code EnergyPort} —— 本组件不重新实现能量语义，只把"谁提供这项能力"从
- * {@code ComponentServices.energy} 搬到**一个可以被依赖的组件类型**上：其他组件用
- * {@code requires(EnergyComponent.class)} 声明依赖，装配期检查（{@code Role#verifyDependencies()}）
- * 就会拦住缺它的角色。
- * <p><b>每实例一个</b>：实例由容器在构造期创建（服务集由 {@code ComponentFactory} 注入），
- * 一个角色实例一份 ⇒ 状态天然隔离（能量真值仍在容器实例字段里，见已知限制申报）。
- * <p><b>使用示例（其他组件内）</b>：
- * <pre>{@code
- * public class MySkill extends Skill {
- *     private EnergyComponent energy;
- *     @Override public void awake() { energy = getComponent(EnergyComponent.class); } // 装配期解析
- *     @Override public void start() { energy.gain(10); }        // == svc().energy().gain(10)
- *     @Override public void update() { if (!energy.tryConsume(2)) return; ... }
- * }
- * }</pre>
- * <p><b>装配示例（角色模板内）</b>：{@code builder.addComponent("energy", new EnergyComponent.Specification());}
- * —— 本描述符**不占栏位**（没有 {@code setSlot}），因此不会被渲染进热键栏。
- * <p><b>本卡不改任何调用点</b>（只增不改）：既有 16 组件仍走 {@code svc().energy()}，
- * 重接由后续卡承接。
+ * 能量组件（阶段 10 · t63 · A1 改正）：系统级能力「能量」的**组件形态**（每角色实例一个，裁定③）。
+ * <p><b>★ 本组件持有状态与行为</b>：能量真值 {@code current} 与上限 {@code max} 都在本组件里，
+ * clamp、检查+扣减合一、增加，全部在本组件内实现 —— **不再转调任何旧端口** ✗
+ * （用户口径：{@code ComponentServices} 只保留「玩家实例 + 组件服务」，其他能力做成组件）。
+ * <p><b>与容器的分工</b>：能量变化对外的两件**平台事** —— 热键栏置脏（触点④）与
+ * {@code EnergyChangeEvent} 事件发布 —— 由容器在构造期以 {@link ChangeSink} 注入；
+ * 组件只负责"真值怎么变"，容器只负责"变了之后对平台说什么"。这条分界让组件**不需要**
+ * {@code svc()} 就能完整实现能力语义（唯一的 {@code svc()} 用途 = {@code self()} 取玩家）。
+ * <p><b>状态唯一</b>：容器侧（{@code RoleInstance}）**不再**持有能量字段 ✗ —— 它只保留
+ * {@code getCurrentEnergy()/setCurrentEnergy(...)} 这类**视图**方法（{@code RoleAPI} 的四组对外
+ * 入口一字不动）。
+ * <p><b>每实例一个</b>：由容器在实例构造期直接构造（**不进 {@code Role} 模板** ⇒ 装配表逐格不变），
+ * 并以 id {@code "energy"} 登记进实例容器（可被 {@code svc().components().get(EnergyComponent.class)} 取到）。
  */
 public class EnergyComponent extends RoleComponent {
 
-    public EnergyComponent(String id, ComponentServices services) {
+    /**
+     * 变更通知（容器在构造期注入）：把「置脏 + 事件」这两件平台事留给容器。
+     * <p>注入面**刻意不叫 {@code svc()}**：{@code ComponentServices} 的成员数由冻结件钉死（恰好 10），
+     * 而这两件事也不是"组件服务"（它们不提供服务，而是"容器对平台的反应"）。
+     */
+    public interface ChangeSink {
+
+        /** 能量真值发生变化后调用（**无条件**调用：与既有"无条件置脏 + 无条件事件"逐字一致）。 */
+        void onEnergyChanged(int previous, int current, int max);
+    }
+
+    private final int max;
+    private final ChangeSink sink;
+
+    /** ★ 真值：当前能量（唯一持有处）。 */
+    private int current;
+
+    public EnergyComponent(String id, ComponentServices services, int max, ChangeSink sink) {
         super(id, services);
+        this.max = Math.max(0, max);
+        this.sink = sink != null ? sink : (previous, value, limit) -> { };
+        //与既有 RoleInstance 构造期逐字一致：选角色即满能量
+        this.current = this.max;
     }
 
     /** 当前能量（读口）。 */
     public int current() {
-        return svc().energy().current();
+        return current;
     }
 
-    /** 检查 + 扣减合一；能量不足 ⇒ {@code false} 且不扣。 */
+    /** 能量上限（本组件的状态之一，构造期由容器给出）。 */
+    public int max() {
+        return max;
+    }
+
+    /** 直接写入（组件内 clamp；写后通知容器）。 */
+    public void set(int value) {
+        int previous = current;
+        current = Math.clamp(value, 0, max);
+        sink.onEnergyChanged(previous, current, max);
+    }
+
+    /** 检查 + 扣减合一；能量不足 ⇒ {@code false} 且不扣（阈值语义与既有端口逐字一致）。 */
     public boolean tryConsume(int amount) {
-        return svc().energy().tryConsume(amount);
+        if (amount <= 0) {
+            return true;
+        }
+        if (current < amount) {
+            return false;
+        }
+        set(current - amount);
+        return true;
     }
 
     /** 增加能量（内部按上限 clamp）。 */
     public void gain(int amount) {
-        svc().energy().gain(amount);
+        set(current + amount);
     }
 
-    /**
-     * 装配描述符：**不占栏位**；提供类型由泛型实参推导 = {@code EnergyComponent.class}
-     * （⇒ {@code requires(EnergyComponent.class)} 能命中本组件）。
-     */
-    public static final class Specification extends RoleComponent.Specification<EnergyComponent> {
-
-        public Specification() {
-            super("EnergyComponent");
-        }
-
-        @Override
-        public EnergyComponent create(String id, ComponentServices services) {
-            return new EnergyComponent(id, services);
-        }
+    /** 减少能量（内部按 0 下限 clamp）。 */
+    public void decrease(int amount) {
+        set(current - amount);
     }
 }

@@ -2,18 +2,17 @@ package com.shadowHunterRolesPlugin.roleComponent.service;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.entity.Player;
 
 /**
- * 生命组件（阶段 10 · t55 · A1）：系统级能力「生命 / 治疗」的**组件形态**（每角色实例一个，裁定③）。
- * <p><b>薄封装</b>：内部**转调既有端口** {@code VitalsPort} —— clamp 策略仍只有容器一处实现。
- * <p><b>使用示例（其他组件内）</b>：
- * <pre>{@code
- * private VitalsComponent vitals;
- * @Override public void awake() { vitals = getComponent(VitalsComponent.class); }
- * @Override public void onSanTEChange(int pre, int now) { vitals.heal(2.0d); }
- * }</pre>
- * <p><b>装配示例</b>：{@code builder.addComponent("vitals", new VitalsComponent.Specification());}（不占栏位）。
- * <p><b>本卡不改任何调用点</b>：既有组件仍走 {@code svc().vitals()}。
+ * 生命组件（阶段 10 · t63 · A1 改正）：系统级能力「生命 / 治疗」的**组件形态**（每角色实例一个，裁定③）。
+ * <p><b>★ 本组件持有行为</b>：clamp 策略（{@code min(当前 + amount, Attribute.MAX_HEALTH)}）的**唯一实现**
+ * 从容器搬到这里 —— **不再转调任何旧端口** ✗。
+ * <p><b>状态归属如实申报</b>：生命的真值是 **Bukkit 玩家属性**（{@code player.getHealth()} /
+ * {@code Attribute.MAX_HEALTH}）⇒ 不属"组件内部字段"而是**外部平台状态**（冻结件『〇之八』：
+ * 组件**允许**依赖真正外部的东西 = Bukkit API ✓）。本组件**不复制**一份生命字段 ✗（那会立刻
+ * 与客户端/服务端的真实生命值不同步 ⇒ 属"会撒谎的值"）。
  */
 public class VitalsComponent extends RoleComponent {
 
@@ -21,21 +20,11 @@ public class VitalsComponent extends RoleComponent {
         super(id, services);
     }
 
-    /** 治疗（内部按最大生命 clamp）。 */
+    /** 治疗（内部按最大生命 clamp）—— 与原 {@code RoleInstance#heal} 逐字等价。 */
     public void heal(double amount) {
-        svc().vitals().heal(amount);
-    }
-
-    /** 装配描述符：**不占栏位**；提供类型 = {@code VitalsComponent.class}。 */
-    public static final class Specification extends RoleComponent.Specification<VitalsComponent> {
-
-        public Specification() {
-            super("VitalsComponent");
-        }
-
-        @Override
-        public VitalsComponent create(String id, ComponentServices services) {
-            return new VitalsComponent(id, services);
-        }
+        Player player = svc().self().player();
+        double newHealth = Math.min(player.getHealth() + amount,
+                player.getAttribute(Attribute.MAX_HEALTH).getValue());
+        player.setHealth(newHealth);
     }
 }

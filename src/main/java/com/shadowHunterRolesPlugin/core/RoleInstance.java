@@ -21,6 +21,13 @@ import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.DamageComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.FactionComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -41,15 +48,33 @@ public class RoleInstance {
 
     private final Player player;
     private final Role role;
-    private int currentEnergy;
-    private int currentSanTE;
+
+    // ───────── 阶段 10 · t63（A1 改正）：7 个服务组件**每角色实例一个**，由本容器持有 ─────────
+    //它们**不进 `Role` 模板**（`Role.getComponents()` 与装配表逐格不变 ✓），但会登记进**实例容器**
+    //（`componentRegistry`）⇒ `svc().components().get(EnergyComponent.class)` 与 `RoleInstance#getByType(...)`
+    //都能取到它们；`svc().<旧端口>()` 的每个方法都**转发到它们**（临时兼容层，第 3 步删除）。
+    //★ 状态归属（A3「状态唯一」）：能量 / SanTE / 阵营的真值、buff 记账表、药水账本、计时资源
+    //  **都在组件里** ⇒ 本类**不再持有这些字段** ✗（旧字段已全部移除，见说明件的状态归属表）。
+    private final EnergyComponent energyComponent;
+    private final SanTEComponent santeComponent;
+    private final VitalsComponent vitalsComponent;
+    private final BuffComponent buffComponent;
+    private final TimerComponent timerComponent;
+    private final FactionComponent factionComponent;
+    private final DamageComponent damageComponent;
+
+    /** 7 个服务组件在**实例容器**里的 id（与 {@code ComponentServices} 的成员名同形 ⇒ 便于逐项对照）。 */
+    private static final String SERVICE_ID_ENERGY = "energy";
+    private static final String SERVICE_ID_SANTE = "sante";
+    private static final String SERVICE_ID_VITALS = "vitals";
+    private static final String SERVICE_ID_BUFFS = "buffs";
+    private static final String SERVICE_ID_TIMERS = "timers";
+    private static final String SERVICE_ID_FACTIONS = "factions";
+    private static final String SERVICE_ID_DAMAGE = "damage";
 
 
     //实例是否仍然有效：clear() 之后置为 false，组件里的延时任务用它做"实例已失效"守卫
     private boolean valid = true;
-
-    //药水记账（D6 / O-7）：只记录本系统施加到本实例玩家身上的效果类型，clear() 只回收这些
-    private final Set<PotionEffectType> appliedPotionTypes = new LinkedHashSet<>();
 
     /**
      * **单一冷却命名空间**（阶段 8 前置 · 合并两张表）：`组件 id → 到期游戏刻`。
@@ -68,14 +93,8 @@ public class RoleInstance {
     private final Map<String, Skill> skillMap = new HashMap<>();
     private final Map<String, PassiveSkill> passiveMap = new HashMap<>();
 
-    //阵营信息，构造时将从Role里面复制，方便以后插件可以通过设置这个信息来实现无差别pvp
-    private Faction faction;
-
     //平台上下文（调度/日志/键/阵营查询）
     private final RolesContext platform;
-
-    //buff管理器
-    private final BuffManager buffManager;
 
     //已经上报过update异常的组件，避免每tick刷屏
     private final Set<String> reportedUpdateErrors = new HashSet<>();
@@ -109,18 +128,65 @@ public class RoleInstance {
         this.player = player;
         this.role = role;
         this.platform = platform;
-        this.faction = role.getFaction();
-        this.currentEnergy = role.getMaxEnergy();
-        this.currentSanTE = role.getMaxSanTE();
-
         this.roleHealthModifierKey = platform.keys().of("role_health_modifier");
+
+        // ── 阶段 10 · t63：**服务的持有者先于角色组件存在** ────────────────────────────────
+        //① buff 管理器（原在 freeze() 之后构造）：它对实例的引用只在方法体里使用 ⇒ 提前构造零行为差异；
+        //  它的**持有者**现在是 buff 组件（本类只保留读口 getBuffManager() 供兼容）。
+        BuffManager buffManager = new BuffManager(player, this);
+
+        //② 能量 / SanTE：真值（current）与上限（max，= 角色模板的声明值）都在组件里；
+        //   "置脏 + 事件发布"这两件平台事由容器以 ChangeSink 注入 ⇒ 组件本身不需要任何旧端口。
+        this.energyComponent = new EnergyComponent(SERVICE_ID_ENERGY, createServices(SERVICE_ID_ENERGY),
+                role.getMaxEnergy(),
+                (previous, current, max) -> {
+                    //触点④（能量单一入口）：**无条件**置脏（不做"跨阈值才置脏"的优化 —— 那属阶段 5 性能项）
+                    hotbarRenderer.markDirty();
+                    Bukkit.getPluginManager().callEvent(new EnergyChangeEvent(player, this, previous, current, max));
+                });
+        this.santeComponent = new SanTEComponent(SERVICE_ID_SANTE, createServices(SERVICE_ID_SANTE),
+                role.getMaxSanTE(),
+                (previous, current, max) -> {
+                    Bukkit.getPluginManager().callEvent(new SanTEChangeEvent(player, this, previous, current, max));
+                    //I-15：容器**直派**（不再经 RoleEventListener 转发；上一行的事件发布保持不变）
+                    dispatchSanTEChange(previous, current);
+                });
+
+        //③ 生命：clamp 策略的唯一实现在组件里（状态 = Bukkit 玩家属性，属外部平台状态）
+        this.vitalsComponent = new VitalsComponent(SERVICE_ID_VITALS, createServices(SERVICE_ID_VITALS));
+
+        //④ buff：记账表（BuffManager）与药水账本（原 appliedPotionTypes 字段）都归它持有
+        this.buffComponent = new BuffComponent(SERVICE_ID_BUFFS, createServices(SERVICE_ID_BUFFS), buffManager);
+
+        //⑤ 计时：任务的**创建**在组件里、**登记归属**按请求者；资源**存储**仍是容器的每组件资源表
+        //  （TaskSink 就是 ComponentRegistry#track / #cancelAll ⇒ 既有回收机制一条都不改）
+        this.timerComponent = new TimerComponent(SERVICE_ID_TIMERS, createServices(SERVICE_ID_TIMERS),
+                platform.scheduler(), new TimerComponent.TaskSink() {
+            @Override
+            public void track(RoleComponent requester, Task task) {
+                componentRegistry.track(requester, task);
+            }
+
+            @Override
+            public int cancelAll(RoleComponent requester) {
+                return componentRegistry.cancelAll(requester);
+            }
+        });
+
+        //⑥ 阵营：当前阵营的真值在组件里；关系表仍留平台（静态数据 ⇒ 外部单例许可，不进依赖图）
+        this.factionComponent = new FactionComponent(SERVICE_ID_FACTIONS, createServices(SERVICE_ID_FACTIONS),
+                platform.factions(), role.getFaction());
+
+        //⑦ 伤害：四个原语直接落到静态伤害工具（真正外部 ⇒ 允许依赖）
+        this.damageComponent = new DamageComponent(SERVICE_ID_DAMAGE, createServices(SERVICE_ID_DAMAGE));
 
         initComponents();
 
+        //7 个服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
+        registerServiceComponents();
+
         //装配完成 → 冻结注册表（此后 getComponent 才合法）
         componentRegistry.freeze();
-
-        this.buffManager = new BuffManager(player, this);
 
         //设置生命
         AttributeModifier am = new AttributeModifier(
@@ -156,6 +222,52 @@ public class RoleInstance {
 
     //组件注册表（框架内部：装配、资源兜底、getComponent 查找）
     public ComponentRegistry componentRegistry() { return componentRegistry; }
+
+    // ───────── 阶段 10 · t63：7 个服务组件的读口（端口转发与取证都走这里） ─────────
+    //它们是**每实例一个**的框架服务（不进 Role 模板），登记在实例容器里；这里给出强类型读口，
+    //使 `*PortImpl` 能"纯转发"而**不持有任何状态**（A2/A3）。
+
+    public EnergyComponent energyComponent() { return energyComponent; }
+
+    public SanTEComponent santeComponent() { return santeComponent; }
+
+    public VitalsComponent vitalsComponent() { return vitalsComponent; }
+
+    public BuffComponent buffComponent() { return buffComponent; }
+
+    public TimerComponent timerComponent() { return timerComponent; }
+
+    public FactionComponent factionComponent() { return factionComponent; }
+
+    public DamageComponent damageComponent() { return damageComponent; }
+
+    /**
+     * 把 7 个服务组件登记进**实例容器**（阶段 10 · t63）。
+     * <p><b>不进 {@code Role} 模板</b> ⇒ {@code role.getComponents()} = 装配表 = 冻结 CELLS **逐格不变** ✓；
+     * 登记后它们可被 {@code svc().components().get(EnergyComponent.class)} / {@code getById("energy")} 取到
+     * （= 用户计划里"角色实例 = 组件的容器"的落点）。
+     * <p><b>id 冲突</b>（角色模板里恰好也有同名组件）：角色组件优先（模板是产品内容），服务组件**跳过登记**
+     * 并记一条 WARNING —— 它仍由字段持有、端口仍转发到它 ⇒ **能力不受影响**（只是容器按 id/类型查不到它）。
+     */
+    private void registerServiceComponents() {
+        registerServiceComponent(energyComponent);
+        registerServiceComponent(santeComponent);
+        registerServiceComponent(vitalsComponent);
+        registerServiceComponent(buffComponent);
+        registerServiceComponent(timerComponent);
+        registerServiceComponent(factionComponent);
+        registerServiceComponent(damageComponent);
+    }
+
+    private void registerServiceComponent(RoleComponent component) {
+        if (componentRegistry.declarationOf(component.getId()) != null) {
+            platform.logger().warning("Role '" + role.getId() + "' already has a component with id '"
+                    + component.getId() + "'; the framework service component is kept as an instance field "
+                    + "but is NOT registered in the container (lookup by id/type will not find it).");
+            return;
+        }
+        componentRegistry.register(component);
+    }
 
     /**
      * **按类型取本实例内的组件**（阶段 10 · t55 · 冻结件 §4.6 的"按类型查找"读口；C-04）。
@@ -195,7 +307,8 @@ public class RoleInstance {
                 new CooldownPortImpl(this, componentId),
                 new BuffPortImpl(this),
                 new FactionPortImpl(this),
-                new DamagePortImpl(),
+                //阶段 10 · t63：伤害端口改为**转发到伤害组件** ⇒ 需要容器（旧实现直接调静态工具，无 owner）
+                new DamagePortImpl(this),
                 new TimerPortImpl(this, componentRegistry, componentId),
                 //阶段 10 · t55：组件服务 = 查找 + **动态添加** —— 服务集工厂传进去，运行期新增的组件
                 //与装配期组件走**同一条**构造路径（一对一端口、同一资源表口径）；日志用于 P2 的
@@ -290,7 +403,8 @@ public class RoleInstance {
     }
 
 
-    public BuffManager getBuffManager() { return buffManager; }
+    /** buff 记账表（**持有者 = buff 组件**；本读口保留以兼容既有调用点）。 */
+    public BuffManager getBuffManager() { return buffComponent.manager(); }
 
 
 
@@ -575,8 +689,8 @@ public class RoleInstance {
     }
 
     public void heal(double amount){
-        double newHealth = Math.min(player.getHealth() + amount, player.getAttribute(Attribute.MAX_HEALTH).getValue());
-        player.setHealth(newHealth);
+        //阶段 10 · t63：clamp 策略的唯一实现已搬到生命组件（本方法保留为**视图**，调用点一字未动）
+        vitalsComponent.heal(amount);
     }
 
     public void damage(double amount){
@@ -587,54 +701,41 @@ public class RoleInstance {
     }
 
     public int getMaxEnergy(){
-        return role.getMaxEnergy();
+        //阶段 10 · t63：上限的真值在能量组件里（构造期由本容器从角色模板给出）
+        return energyComponent.max();
     }
 
-    //能量
-    public int getCurrentEnergy() { return currentEnergy; }
+    //能量（**视图**：真值与 clamp/检查扣减的行为都在能量组件里，外部调用点一字未动）
+    public int getCurrentEnergy() { return energyComponent.current(); }
 
     public void setCurrentEnergy(int amount){
-        int preEnergy = currentEnergy;
-
-        this.currentEnergy = Math.clamp(amount, 0, role.getMaxEnergy());
-        //触点④（能量单一入口）：**无条件**置脏（不做"跨阈值才置脏"的优化 —— 那属阶段 5 性能项）
-        hotbarRenderer.markDirty();
-
-        EnergyChangeEvent event = new EnergyChangeEvent(player, this, preEnergy, currentEnergy, role.getMaxEnergy());
-        Bukkit.getPluginManager().callEvent(event);
+        energyComponent.set(amount);
     }
 
     public void decreaseEnergy(int amount){
-        setCurrentEnergy(currentEnergy - amount);
+        energyComponent.decrease(amount);
     }
 
     public void increaseEnergy(int amount){
-        setCurrentEnergy(currentEnergy + amount);
+        energyComponent.gain(amount);
     }
 
-    //SanTE
-    public int getCurrentSanTE() { return currentSanTE; }
+    //SanTE（**视图**：真值与 clamp 都在 SanTE 组件里；事件 + 派发由容器以 ChangeSink 注入）
+    public int getCurrentSanTE() { return santeComponent.current(); }
 
     public void setCurrentSanTE(int amount){
-        int preSanTE = currentSanTE;
-        currentSanTE = Math.clamp(amount, 0, role.getMaxSanTE());
-
-        SanTEChangeEvent event = new SanTEChangeEvent(player, this, preSanTE, currentSanTE, role.getMaxSanTE());
-        Bukkit.getPluginManager().callEvent(event);
-
-        //I-15：容器**直派**（不再经 RoleEventListener 转发；上一行的事件发布保持不变）
-        dispatchSanTEChange(preSanTE, currentSanTE);
+        santeComponent.set(amount);
     }
 
     public void increaseSanTE(int amount){
-        setCurrentSanTE(currentSanTE + amount);
+        santeComponent.gain(amount);
     }
 
     public void decreaseSanTE(int amount){
-        setCurrentSanTE(currentSanTE - amount);
+        santeComponent.decrease(amount);
     }
 
-    public int getMaxSanTE() { return role.getMaxSanTE(); }
+    public int getMaxSanTE() { return santeComponent.max(); }
 
     //实例是否有效：clear() 之后为 false，供组件里的延时任务做失效守卫
     public boolean isValid(){
@@ -642,24 +743,23 @@ public class RoleInstance {
     }
 
     //药水施加入口（记账）：施加到本实例玩家身上的效果记入账本，clear() 时只回收账本里的类型（O-7）
+    //阶段 10 · t63：**账本的持有者 = buff 组件** ⇒ 本方法保留为视图（BuffManager 与端口都走它）。
     public void applyPotionEffect(PotionEffect effect){
-        if(effect == null) return;
-        player.addPotionEffect(effect);
-        appliedPotionTypes.add(effect.getType());
+        buffComponent.applyPotionEffect(effect);
     }
 
-    //faction相关
+    //faction相关（**视图**：当前阵营的真值在阵营组件里）
     public Faction getFaction(){
-        return faction != null ? faction : role.getFaction();
+        return factionComponent.faction();
     }
 
     //重设faction，一般用不到
     public void setFaction(Faction faction){
-        this.faction = faction;
+        factionComponent.setFaction(faction);
     }
 
     public void resetFaction(){
-        this.faction = role.getFaction();
+        factionComponent.reset();
     }
 
     public boolean isHostileTo(RoleInstance other){
@@ -673,8 +773,9 @@ public class RoleInstance {
     }
 
     //阶段 2：不再查 RoleManager 单例，改走注入进来的 FactionLookup（未选角色 → UNKNOWN → 敌对）
+    //阶段 10 · t63：判定入口已搬到阵营组件（关系表仍留平台）
     public boolean isHostileTo(Player other){
-        return platform.factions().isHostile(getFaction(), other);
+        return factionComponent.isHostile(other);
     }
 
     public boolean isHostileTo(Faction otherFaction){
@@ -734,6 +835,11 @@ public class RoleInstance {
         try{
             for(RoleComponent component : componentRegistry.all()){
                 component.stop();
+                //阶段 10 · t63（A6 · 队长裁定②）：**调用方 stop() ⇒ 其请求的计时全部取消** ✓
+                //任务按请求者登记（TimerComponent 的请求者语义）⇒ 这里逐组件回收，堵住
+                //"单独 stop() 不清理 ⇒ 生命周期泄漏"的缺口；clear() 末尾的 cancelAllAndClear()
+                //仍是最后的兜底（两者幂等，重复 cancel 对已取消句柄是 no-op）。
+                timerComponent.cancelAllOf(component);
             }
         }
         finally{
@@ -909,13 +1015,11 @@ public class RoleInstance {
 
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(roleHealthModifierKey);
 
-        //药水记账（O-7 / D6）：只移除本系统记账过的效果，不再无条件清空玩家身上的所有药水效果
-        for(PotionEffectType type : appliedPotionTypes){
-            player.removePotionEffect(type);
-        }
-        appliedPotionTypes.clear();
+        //药水记账（O-7 / D6）：**账本随 buff 组件持有** ⇒ 由它只移除本系统记账过的效果，
+        //不再无条件清空玩家身上的所有药水效果（返回移除的类型数，供诊断）
+        buffComponent.clearAppliedPotionEffects();
 
-        buffManager.clearAll();
+        buffComponent.manager().clearAll();
 
 
         cooldowns.clear();

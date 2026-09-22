@@ -65,6 +65,15 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
 
+// 阶段 10 · t55：`processResources` 的 `expand` **默认用平台默认字符集** ⇒ 守护进程被钉成 GBK 时
+// （t58 为 `:test` 的 argfile 立的前置），UTF-8 的 `plugin.yml` 会被回写成**非 UTF-8** ⇒
+// Paper 报 `Invalid plugin.yml / MalformedInputException` ⇒ **jar 不可加载**（产品级）。
+// 这里把资源过滤的字符集钉死为 UTF-8，与源码编码、守护进程字符集**解耦**（同族第三次：javac 默认源码编码 ·
+// Properties.load(InputStream) · 本处的 expand ⇒ 凡文本 I/O 都要各自钉死）。
+tasks.withType<org.gradle.language.jvm.tasks.ProcessResources>().configureEach {
+    filteringCharset = "UTF-8"
+}
+
 tasks {
     runServer {
         // Configure the Minecraft version for our task.

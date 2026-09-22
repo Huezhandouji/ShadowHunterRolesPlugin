@@ -158,6 +158,19 @@ public class RoleInstance {
     public ComponentRegistry componentRegistry() { return componentRegistry; }
 
     /**
+     * **按类型取本实例内的组件**（阶段 10 · t55 · 冻结件 §4.6 的"按类型查找"读口；C-04）。
+     * <p>与 {@code componentRegistry().getByType(...)} 同源（同一实现点），语义：
+     * 返回**第一个**可赋值给 {@code type} 的组件；未注册 ⇒ {@code null}；
+     * **装配完成之前**调用 ⇒ 抛 {@code IllegalStateException}（既有装配期护栏）。
+     * <p><b>调用点申报</b>：仓内 0 调用点 —— 它是容器的公开读口（与 {@code hotbarItemOf(id)} 同类），
+     * 消费者是**后续卡的依赖注入路径**与仓外探针（组件侧取组件一律走
+     * {@code RoleComponent#getComponent(Class)} ⇒ {@code svc().components().get(...)}）。
+     */
+    public <T extends RoleComponent> T getByType(Class<T> type) {
+        return componentRegistry.getByType(type);
+    }
+
+    /**
      * **临时调试用**（冷却自管理冒烟入口）：取某组件一对一的服务集，使调试命令能调用**同一个**端口实例
      * （如 {@code cooldowns().end()} / {@code cooldowns().start(ticks)}）。
      * 冒烟结束后随调试入口一并删除（见交付报告的删除清单）。
@@ -184,17 +197,23 @@ public class RoleInstance {
                 new FactionPortImpl(this),
                 new DamagePortImpl(),
                 new TimerPortImpl(this, componentRegistry, componentId),
-                new ComponentLookupImpl(componentRegistry)
+                //阶段 10 · t55：组件服务 = 查找 + **动态添加** —— 服务集工厂传进去，运行期新增的组件
+                //与装配期组件走**同一条**构造路径（一对一端口、同一资源表口径）；日志用于 P2 的
+                //"拒绝删除被依赖组件"留痕（点名被删组件 / 阻止者 / 缺的类型）
+                new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger())
         );
     }
 
     /**
      * 组件创建之后的**紧邻登记**（五条件①④）：服务集与组件一对一进表，组件同时进注册表。
      * 服务集是在**构造期**交给组件的（{@code factory.create(id, services)}）⇒ 不存在"创建后尚未注入"的窗口。
+     * <p><b>阶段 10 · t55（P2）</b>：登记时把装配条目里的**依赖声明**（提供类型 + 必需依赖）一并交给注册表
+     * —— 它是"删除前算反向依赖"的唯一数据来源，且**从描述符声明算出**（不手工维护）。
      */
-    private void registerCreated(RoleComponent component, ComponentServices services){
+    private void registerCreated(RoleComponent component, ComponentServices services, Role.ComponentEntry entry){
         componentServices.put(component, services);
-        componentRegistry.register(component);
+        componentRegistry.register(component, new ComponentRegistry.Declaration(
+                component.getId(), entry.getProvidedType(), entry.getRequiredTypes()));
     }
 
     // ───────── 阶段 4：施放 / 攻击管道（新旧路径并存；开关默认旧路径 ⇒ 行为不变） ─────────
@@ -266,7 +285,7 @@ public class RoleInstance {
             if(component instanceof MainWeapon weapon) mainWeaponMap.put(componentId, weapon);
             if(component instanceof PassiveSkill passive) passiveMap.put(componentId, passive);
 
-            registerCreated(component, services);
+            registerCreated(component, services, entry.getValue());
         }
     }
 
@@ -671,8 +690,15 @@ public class RoleInstance {
         //阶段 4（B②-c）：为**注册表内组件**广播新基类钩子 awake()。
         //广播给"全部注册组件"：所有组件的新钩子由各组件自行实现（基类提供默认空实现）；
         //按迁移状态分支会引入第二套判据（与硬约束 §20 删总闸的教训同类）。legacy 生命周期扇出已在 T-1 ④ 删除。
-        for(RoleComponent component : componentRegistry.all()){
-            component.awake();
+        //遍历窗口（阶段 10 · t55）：广播期间**禁止**增/删/插位（注册表在窗口内拒绝写口）
+        componentRegistry.beginIteration();
+        try{
+            for(RoleComponent component : componentRegistry.all()){
+                component.awake();
+            }
+        }
+        finally{
+            componentRegistry.endIteration();
         }
     }
 
@@ -681,8 +707,15 @@ public class RoleInstance {
         if(player == null ) return;
 
         //阶段 4（B②-c）：为注册表内组件广播新基类钩子 start()（顺序 = 注册表顺序；理由同 awake 处注释）
-        for(RoleComponent component : componentRegistry.all()){
-            component.start();
+        //遍历窗口（阶段 10 · t55）：同 awake 处
+        componentRegistry.beginIteration();
+        try{
+            for(RoleComponent component : componentRegistry.all()){
+                component.start();
+            }
+        }
+        finally{
+            componentRegistry.endIteration();
         }
     }
 
@@ -696,8 +729,15 @@ public class RoleInstance {
         //未迁移组件则对基类 stop() 是**默认空实现** ⇒ 任一组件在任一时刻只被"真实逻辑"处理一次。
         //**幂等说明**：若组件在 stop() 里自行取消任务，随后 clear() 的 cancelAllAndClear() 仍会取消其
         //资源表内的同一句柄 ⇒ 重复 cancel 幂等（Task.cancel() 对已取消句柄是 no-op）。
-        for(RoleComponent component : componentRegistry.all()){
-            component.stop();
+        //遍历窗口（阶段 10 · t55）：同 awake 处
+        componentRegistry.beginIteration();
+        try{
+            for(RoleComponent component : componentRegistry.all()){
+                component.stop();
+            }
+        }
+        finally{
+            componentRegistry.endIteration();
         }
     }
 
@@ -756,8 +796,15 @@ public class RoleInstance {
 
     /** 按注册表顺序广播组件侧 {@code onSanTEChange(pre, now)}（顺序与 update()/start()/stop() 同源）。 */
     private void broadcastSanTEChange(int preSanTE, int newSanTE){
-        for(RoleComponent component : componentRegistry.all()){
-            runComponentUpdate("registered", component.getId(), () -> component.onSanTEChange(preSanTE, newSanTE));
+        //遍历窗口（阶段 10 · t55）：可嵌套（update() 广播期间改 SanTE ⇒ 本方法再次进入窗口）
+        componentRegistry.beginIteration();
+        try{
+            for(RoleComponent component : componentRegistry.all()){
+                runComponentUpdate("registered", component.getId(), () -> component.onSanTEChange(preSanTE, newSanTE));
+            }
+        }
+        finally{
+            componentRegistry.endIteration();
         }
     }
 
@@ -768,8 +815,15 @@ public class RoleInstance {
         //**顺序说明**：按**注册表顺序**遍历（legacy 三段扇出已在 T-1 ④ 删除，无先后关系）；
         //所有组件都对基类 update() 自行实现（基类默认空实现）；本批组件均已迁移（T-2 ① 后无迁移标记）
         //**不再实现 legacy 更新接口** ⇒ 只被这一条路径调用，不会双触发；异常隔离复用 runComponentUpdate。
-        for(RoleComponent component : componentRegistry.all()){
-            runComponentUpdate("registered", component.getId(), component::update);
+        //遍历窗口（阶段 10 · t55）：**update() 广播期间禁止增/删/插位**（"禁止遍历中修改"的落点）
+        componentRegistry.beginIteration();
+        try{
+            for(RoleComponent component : componentRegistry.all()){
+                runComponentUpdate("registered", component.getId(), component::update);
+            }
+        }
+        finally{
+            componentRegistry.endIteration();
         }
 
         //阶段 4 追补（冷却自管理 · D2）：到期条目 ⇒ 移除 + 回调（关闭 O-21）；可见刷新改由同 tick 的帧末 flush 承担

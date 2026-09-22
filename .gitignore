@@ -95,3 +95,6 @@ debug-logs/**
 # 其中 debug-logs/回滚快照/jars 的 11 代归档制品是本机唯一副本，请自行备份。
 # 因此：不要再对 debug-logs 执行 git add -f；也不要用 git grep 对 debug-logs 下的文件做判据（未跟踪件恒空）。
 # 证据与台账仍在盘上、仍可 read，但不再与 commit 绑定。
+
+# 构建配置必须随库分发：本工程路径含 CJK，gradle.properties 里的 jvmargs/-Dfile.encoding 是 :test 能跑起来的前提（见 debug-logs/测试记录/阶段9-测试缝环境前置-说明.txt）
+!gradle.properties

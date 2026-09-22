@@ -98,3 +98,8 @@ debug-logs/**
 
 # 构建配置必须随库分发：本工程路径含 CJK，gradle.properties 里的 jvmargs/-Dfile.encoding 是 :test 能跑起来的前提（见 debug-logs/测试记录/阶段9-测试缝环境前置-说明.txt）
 !gradle.properties
+
+# ── 阶段 10 · t59（裁定 P3）：入库默认值 + 本机专属覆盖的**分界** ──────────────────────────
+# gradle.properties 只放可移植项（随库分发 ✓）；本机专属项（服务端 plugins 目录等）写进下面这个文件，
+# 它**不入库**（每台机器不同），构建脚本在它不存在时按 no-op 处理 ⇒ 任务照常可用 ✓
+gradle.local.properties

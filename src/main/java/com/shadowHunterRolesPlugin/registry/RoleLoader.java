@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.roleComponent.AutoRecoverEnergyPassive;
 import com.shadowHunterRolesPlugin.roleComponent.AutoRecoverSanTEHealthPassive;
 import com.shadowHunterRolesPlugin.roleComponent.DefaultSanTEZeroPunishment;
+import com.shadowHunterRolesPlugin.roleComponent.ExampleSelfRefreshingSkill;
 import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
@@ -62,6 +63,9 @@ public class RoleLoader {
     private static final String ID_RED_SANCTIFIED_BLADE = "red_mainWeapon_sanctifiedBlade";
     private static final String ID_RED_SOLITARY_ARROGANCE = "red_solitaryArrogance_skill";
 
+    /** 示例角色里的组件 id（阶段 8 · t46）。 */
+    private static final String ID_EXAMPLE_SELF_REFRESHING = "example_self_refreshing_skill";
+
 
     private final Logger logger;
 
@@ -69,11 +73,16 @@ public class RoleLoader {
         this.logger = logger;
     }
 
-    /** 本插件的两个角色定义（原 {@code RoleRegistry} 静态块内容，逐字迁移）。 */
+    /**
+     * 本插件的角色定义（原 {@code RoleRegistry} 静态块内容，逐字迁移）。
+     * <p>阶段 8 · t46：追加**第三个** = 示例角色（给"组件可请求重绘"这条能力一个生产使用点）。
+     * **既有两个角色的定义一字未动**（组件集合、注册序、表现值都不变）。
+     */
     public List<Definition> defaultDefinitions() {
         return List.of(
                 new Definition("meiqihezi", RoleLoader::meiqiheziBuilder),
-                new Definition("red", RoleLoader::redBuilder)
+                new Definition("red", RoleLoader::redBuilder),
+                new Definition("selfUpdateExample", RoleLoader::selfUpdateExampleBuilder)
         );
     }
 
@@ -162,6 +171,31 @@ public class RoleLoader {
                 .addPassive(ID_RED_EQUIPMENTS, RedEquipmentsPassive::new)
                 .addPassive(ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT, DefaultSanTEZeroPunishment::new)
                 .icon(Material.POPPY);
+    }
+
+    /**
+     * **示例角色**（阶段 8 · t46）：唯一目的 = 给「组件可请求重绘」这条能力一个**生产使用点**
+     * （C-15 配套②：没有使用点的能力 = 未验证的能力）。
+     * <p>它**不改动任何既有角色**：`red` / `meiqihezi` 的组件集合与注册序一字未动
+     * ⇒ 外观取证与帧入口边界读数对本角色完全无感（代际对拍可证）。
+     * <p>它的一个组件 = {@code ExampleSelfRefreshingSkill}（占槽 0），同时演示
+     * 「请求式刷新」与「{@code dependsOnLiveState()==false} ⇒ 不每 tick 重绘」两件事。
+     */
+    private static Role.Builder selfUpdateExampleBuilder() {
+
+        return new Role.Builder("selfUpdateExample")
+                .displayName(Component.text("Self-Update Example"))
+                .description(List.of(
+                        Component.text("示例角色：演示「组件可请求重绘」"),
+                        Component.text("组件只请求、不写：写入仍由框架在帧末 flush 完成")
+                ))
+                .maxHP(20)
+                .baseATK(0)
+                .maxEnergy(0)
+                .maxSanTE(100)
+                .faction(Faction.SHADOW)
+                .addComponent(ID_EXAMPLE_SELF_REFRESHING, new ExampleSelfRefreshingSkill.Specification().setSlot(0))
+                .icon(Material.CLOCK);
     }
 
 }

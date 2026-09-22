@@ -105,6 +105,17 @@ public abstract class Skill extends ActiveComponent implements HotbarItemProvidi
      * 若**键缺失** ⇒ 角色清除时 {@code RoleInstance.clearHotbar()} 扫不到它 ⇒ **物品残留**在背包里。
      * 详见 {@link HotbarItemProviding} 的接口 javadoc。
      */
+    /**
+     * **技能家族的默认画法带 {@code x.xs} 秒数 ⇒ 外观依赖活状态**（阶段 8 · t46 / A8）：
+     * 覆写为 {@code true} ⇒ 只要本组件在冷却中，框架就每 tick 至少刷一次，秒数才会逐刻递减。
+     * <p>这是**能力自报**、不是框架点名具体类：覆写掉秒数外观的子类（见
+     * {@code roleComponent/ExampleSelfRefreshingSkill}）可以把它覆写回 {@code false} ⇒ **不再每 tick 重绘**。
+     */
+    @Override
+    public boolean dependsOnLiveState() {
+        return true;
+    }
+
     @Override
     public ItemStack buildItem() {
         //① 声明数据（全部取自描述符；基础物品可由组件覆写 baseItem 自行给出）

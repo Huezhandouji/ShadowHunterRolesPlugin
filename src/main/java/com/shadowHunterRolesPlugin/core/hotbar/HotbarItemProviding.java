@@ -41,4 +41,26 @@ public interface HotbarItemProviding {
      * 组件**不得**在此方法里写玩家背包（写物品的唯一落点仍是 {@code HotbarRenderer#render()}）。
      */
     ItemStack buildItem();
+
+    /**
+     * **本组件的外观是否依赖"活状态"**（阶段 8 · t46 新增的能力，A8）：{@code true} = 它的外观会在
+     * **没有框架置脏事件**的情况下自己变（例如技能冷却名里的 {@code x.xs} 秒数每刻都在变）
+     * ⇒ 只要它在冷却中，框架就必须**每 tick** 至少刷一次，否则玩家看到的是陈旧外观。
+     * <p>
+     * <b>为什么这是一个能力、而不是框架里的一句 {@code instanceof Skill}</b>（C-15 第三个实例测试）：
+     * 旧判据把「外观含秒数」**写死成具体类** ⇒ ① 第三类"带倒计时外观"的组件加进来时**必须改框架文件** ✗；
+     * ② 覆写 {@link #buildItem()} 去掉秒数外观的 {@code Skill} 子类**仍会被每 tick 重绘**（白写）✗。
+     * 下沉为能力后：新组件**只加新文件**即可（默认 {@code false}，需要就覆写 {@code true}）✓，
+     * 而"覆写掉活状态外观"的子类可以覆写成 {@code false} ⇒ **不再每 tick 重绘** ✓。
+     * <p>
+     * <b>默认值 = {@code false}</b>（不依赖活状态 ⇒ 不驱动每 tick 刷新）：这与"只有技能家族的默认画法
+     * 带秒数"这一既有事实一致 —— {@code core/Skill} 覆写为 {@code true}，主武器与被动保持 {@code false}
+     * ⇒ **既有 16 个组件的接受集逐字不变**。
+     * <p>注意：本能力只回答"**要不要**每刻刷"；"**写不写**"仍由帧末 flush 决定（空闲 tick 零 setItem 不变）。
+     * 外观依赖活状态、但变化**不是每刻**的组件（例如自己按需刷新计数的组件）应返回 {@code false}，
+     * 并在状态真的变了时用 {@link RepaintRequester#requestRepaint()} **主动请求** —— 那才是它的刷新节拍。
+     */
+    default boolean dependsOnLiveState() {
+        return false;
+    }
 }

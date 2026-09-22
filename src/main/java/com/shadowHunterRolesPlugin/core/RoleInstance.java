@@ -9,8 +9,11 @@ import com.shadowHunterRolesPlugin.core.dispatch.HotbarActionable;
 import com.shadowHunterRolesPlugin.core.hotbar.CooldownAware;
 import com.shadowHunterRolesPlugin.core.hotbar.CooldownBearing;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
+import com.shadowHunterRolesPlugin.core.hotbar.HotbarItemProviding;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
+import com.shadowHunterRolesPlugin.core.hotbar.RepaintRequestable;
+import com.shadowHunterRolesPlugin.core.hotbar.RepaintRequester;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
@@ -90,6 +93,14 @@ public class RoleInstance {
      * 它们都**不**额外产生裸直呼点（阶段 5 判据 C-02 的计数守恒：5 处直呼 + 1 处方法引用）。
      */
     private final Runnable markHotbarDirty = hotbarRenderer::markDirty;
+    /**
+     * **组件侧"请求重绘"的唯一入口**（阶段 8 · t46）：交给实现了 {@link RepaintRequestable} 的组件
+     * （见 {@code initComponents} 的绑定点）。它**只置脏**、不写物品 ⇒ 组件**只能请求、不能写**，
+     * 「空闲 tick 零 setItem」与"写入仍由帧末 flush 完成"两条口径逐字不变。
+     * <p>与方法引用同源（同一个 {@code markHotbarDirty}）⇒ 组件请求与框架置脏走的是**同一条路径**，
+     * 不新增第二个置脏机制。
+     */
+    private final RepaintRequester repaintRequester = markHotbarDirty::run;
     private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
 
     //T-2 ①③：迁移标记已删 —— 所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）。
@@ -242,6 +253,13 @@ public class RoleInstance {
             ComponentServices services = createServices(componentId);
             RoleComponent component = role.createComponent(componentId, services);
             if(component == null) continue;
+
+            //阶段 8 · t46：把「请求重绘」入口交给**实现了能力接口**的组件 —— 绑定时机 = 构造之后、
+            //awake()/start() 之前（生命周期在构造器尾部才广播）⇒ 组件在任何钩子里都能安全使用；
+            //未实现者**永远拿不到** requester（opt-in，服务集白名单保持恰好 10 成员）。
+            if(component instanceof RepaintRequestable requestable){
+                requestable.bindRepaintRequester(repaintRequester);
+            }
 
             //旧窄类型视图（供既有公共访问器使用）：按**具体类型**归位，不按任何"种类"猜测
             if(component instanceof Skill skill) skillMap.put(componentId, skill);
@@ -770,24 +788,28 @@ public class RoleInstance {
     }
 
     /**
-     * B-2 谓词（阶段 8 口径；**与冻结口径等价**）：是否存在**外观含秒数**的**占栏位**组件正在冷却。
+     * B-2 谓词（阶段 8 口径；**与冻结口径等价**）：是否存在**外观依赖活状态**的**占栏位**组件正在冷却。
      * <p>作用 = 让"冷却中每刻至少刷一次"成立：技能名里的 {@code x.xs} 才会逐刻递减
      * （装饰搬进组件之后，框架只剩 {@link CooldownBearing#isCooling()} 这条读口）。
-     * <p><b>为什么判据落在 `Skill` 家族上</b>：旧口径是"权威 kind == SKILL"（阶段 8 已把那个枚举删除）；
-     * 它的**语义**是"该组件的外观是否含秒数" —— 那正是**技能家族默认画法**
-     * （{@code Skill#buildItem()} 的 COOLDOWN 分支里那唯一一处秒数格式串，即归属判据 C-13 的同一套事实）
-     * ⇒ 新判据与旧判据的**接受集逐字相同**。
+     * <p><b>阶段 8 · t46（A8）：判据由「{@code instanceof Skill}」下沉为「能力」</b> ——
+     * {@link HotbarItemProviding#dependsOnLiveState()}。理由（C-15 第三个实例测试）：
+     * 旧写法把"外观含秒数"**写死成具体类** ⇒ ① 第三类带倒计时外观的组件加进来**必须改框架文件** ✗；
+     * ② 覆写掉秒数外观的 {@code Skill} 子类**仍被每 tick 重绘** ✗。现在框架**不再点名任何具体组件类**，
+     * 接受集由组件自报 ⇒ 新组件只加新文件（默认 {@code false}，需要就覆写 {@code true}）✓。
+     * <p><b>等价性（与旧判据逐字相同）</b>：{@code core/Skill} 覆写为 {@code true}，主武器与被动保持默认
+     * {@code false} ⇒ 既有 16 个组件的真值表不变（两侧对拍见交付说明）。
      * <p><b>边界（A12）</b>：主武器**不得**让帧入口因它而变 —— {@code core/MainWeapon} 家族的冷却名
-     * **不带**秒数（冻结差异）⇒ 本谓词对它恒 {@code false} ⇒ 主武器冷却不驱动每 tick 刷新，与迁移前一致。
-     * <p>接受集成立性：占栏位组件全是 {@code HotbarPresentable}（⊇ {@link CooldownBearing}）
-     * ⇒ 被本谓词检查到的技能组件一定能回答 {@code isCooling()}。
+     * **不带**秒数（冻结差异）⇒ 能力为 {@code false} ⇒ 本谓词对它恒 {@code false} ⇒ 主武器冷却不驱动
+     * 每 tick 刷新，与迁移前一致。
+     * <p>接受集成立性：占栏位组件全是 {@code HotbarPresentable}（⊇ {@link HotbarItemProviding} ⊇
+     * {@link CooldownBearing}）⇒ 被本谓词检查到的组件一定能回答 {@code dependsOnLiveState()} 与 {@code isCooling()}。
      */
     private boolean hasCoolingTickingComponent(){
         for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
             if(!entry.getValue().hasSlot()) continue;
             RoleComponent component = componentRegistry.getById(entry.getKey());
-            //「外观含秒数」= 技能家族的默认画法（秒数格式串只在那里出现）
-            if(!(component instanceof Skill)) continue;
+            //「外观是否依赖活状态」= 组件自报的能力（框架**不点名**任何具体组件类）
+            if(!(component instanceof HotbarItemProviding providing) || !providing.dependsOnLiveState()) continue;
             if(component instanceof CooldownBearing bearing && bearing.isCooling()) return true;
         }
         return false;

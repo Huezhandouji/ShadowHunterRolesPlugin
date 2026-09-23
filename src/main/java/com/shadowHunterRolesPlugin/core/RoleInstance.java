@@ -77,6 +77,12 @@ public class RoleInstance {
     private boolean valid = true;
 
     /**
+     * **第二相是否已执行**（阶段 10 · t64 · P6 两阶段构造）：构造器只做不可见的事，
+     * 全部玩家可见的副作用在 {@link #activate()} 里，且**至多发生一次**。
+     */
+    private boolean activated = false;
+
+    /**
      * **单一冷却命名空间**（阶段 8 前置 · 合并两张表）：`组件 id → 到期游戏刻`。
      * <p>合并前是 `skillCooldowns` / `mainWeaponCooldowns` 两张表，端口必须在**构造期**绑定 kind 才能选表
      * ⇒ 那是"删 kind 枚举"的硬阻塞。现在**只有这一张表**：组件 id 在全仓本就是**跨类型唯一**的命名空间
@@ -188,7 +194,46 @@ public class RoleInstance {
         //装配完成 → 冻结注册表（此后 getComponent 才合法）
         componentRegistry.freeze();
 
-        //设置生命
+        // ── 第一相到此结束（阶段 10 · t64 · P6 两阶段构造）───────────────────────────────
+        //构造器**只做不可见的事**：装配（组件 / 服务集 / 窄类型视图 / 服务组件登记）+ 注册表冻结
+        //（依赖检查在 `Role#createInstance` 里、本构造器之前，t54 已有）。
+        //**玩家可见**的副作用全部在第二相 {@link #activate()}：写生命修饰符 / 设置生命 / 生命周期广播 /
+        //启动 ticker / 构造期同步首刷；`BuffManager` 的每 tick 更新同样推迟到那一相
+        //（⇒ **构造期不创建任何任务**，构造失败不留下永久运行的 ticker）。
+        //**为什么**：构造失败（含**非依赖类**的组件构造异常）必须在玩家身上**零痕迹**，
+        //`RoleManager#selectRole` 才可能"先构造成功、再清旧角色"（本卡要收口的那条残留）。
+    }
+
+    /**
+     * **第二相：激活**（阶段 10 · t64 · P6 两阶段构造）—— 把原先写在构造器里、**有玩家可见副作用**的
+     * 那一段原样搬到这里：语句、顺序、可见时机与迁移前**逐字一致**，唯一差别是**调用时机**
+     * （由调用方在"新实例已构造成功、旧角色已清理"之后调用）。
+     *
+     * <p><b>为什么必须拆两相</b>：旧写法是"先 {@code clear()} 旧角色、再裸构造新实例"⇒ 构造一旦失败，
+     * 玩家**先丢角色**。而字面意义的"先构造后清理"又会踩 {@code t54} 实测的三条约束 ——
+     * 旧实例的 {@code clear()} 会 ① 按**共享 key** 移除新实例刚加的 {@code role_health_modifier}
+     * （最大生命掉回 20）② 清空新实例刚渲染的热键栏 ③ 移除同类型药水。那三条之所以成立，
+     * 正是因为**旧写法的构造期就已经把这些可见状态写下去了** ✗；拆出本相后，"清旧"发生在
+     * **新实例写任何可见状态之前** ⇒ 三条约束全部落空（逐条对照见交付说明的 A3 一节）✓。
+     *
+     * <p><b>幂等</b>：重复调用只生效一次（{@code activated} 护栏）—— 否则会重复启动 ticker、
+     * 重复广播生命周期（{@code awake()} 约定幂等，但 {@code start()} 不约定）。
+     * 已 {@link #clear()} 的实例（{@code valid == false}）**不得**再激活，直接返回。
+     *
+     * <p><b>异常</b>：本相**可能**抛（组件在 {@code awake()} / {@code start()} 里抛，
+     * 或玩家属性 / 热键栏写入失败）⇒ 调用方**必须**自行 try/catch，见
+     * {@code manager/RoleManager#selectRole} 的"激活失败"分支（该分支的残留已在交付说明里如实申报）。
+     */
+    public void activate(){
+        if(activated) return;
+        if(!valid) return;
+        activated = true;
+
+        //① buff 记账表的每 tick 更新（原在构造期由 `BuffManager` 构造器启动，本卡移到这里）：
+        //  **提交顺序与迁移前相同** —— 先于实例 ticker 提交 ⇒ 同一 tick 内先跑记账、再跑组件 update。
+        buffComponent.manager().startUpdater();
+
+        //② 设置生命
         AttributeModifier am = new AttributeModifier(
                 roleHealthModifierKey,
                 role.getMaxHP() - 20,
@@ -199,7 +244,7 @@ public class RoleInstance {
         player.getAttribute(Attribute.MAX_HEALTH).addModifier(am);
         player.setHealth(getMaxHealth());
 
-        //生命周期时序：全部组件创建完成 -> awake全部 -> start全部 -> 启动ticker -> 渲染热键栏
+        //③ 生命周期时序：全部组件创建完成 -> awake全部 -> start全部 -> 启动ticker -> 渲染热键栏
         triggerLifecycleAwake();
         triggerLifecycleStart();
 
@@ -209,7 +254,7 @@ public class RoleInstance {
                 1L
         );
 
-        //阶段 5 · 4.4：构造期**同步首刷一次**（与迁移前的可见时机逐字一致 = 选角色瞬间热键栏即就绪、零延迟）；
+        //④ 阶段 5 · 4.4：构造期**同步首刷一次**（与迁移前的可见时机逐字一致 = 选角色瞬间热键栏即就绪、零延迟）；
         //首个 tick 因置脏初值为 true 还会再写一次同内容（不可见、且此后空闲 tick 不再写）。
         hotbarRenderer.render();
     }

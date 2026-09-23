@@ -27,16 +27,28 @@ public class RoleManager {
     /**
      * 选择角色。
      * <p><b>阶段 10 · t54（A5 · AR-2 修正）</b>：旧写法是"**先 clear 旧角色、再裸构造新实例**"且全文件
-     * 0 处 try/catch ⇒ 构造一旦失败，玩家**先丢角色、再吃逃逸异常**。现在：
+     * 0 处 try/catch ⇒ 构造一旦失败，玩家**先丢角色、再吃逃逸异常**。
+     * <p><b>阶段 10 · t64（P6 两阶段构造 · 本卡）</b>：t54 只做到"**预检先行**"（依赖不齐这类可预知的失败
+     * 在清理之前被挡下）⇒ **非依赖类**的构造异常（例如某个组件构造器抛）仍发生在 {@code clearRole}
+     * **之后**，玩家照样丢角色 ✗。本卡把 {@code RoleInstance} 拆成两相后，顺序变成：
      * <ol>
-     *   <li><b>预检先行</b>：{@link Role#verifyDependencies()} 放在**清理旧角色之前** ⇒ 依赖不齐这类
-     *       "可预知"的失败**不会**让玩家先丢角色（反例判据：依赖缺失时玩家仍持有原角色）；</li>
-     *   <li><b>异常不逃逸</b>：预检与构造各自包在 try/catch 里，失败只记 {@code SEVERE} 并返回 {@code false}；</li>
-     *   <li><b>如实申报的残留</b>：**非依赖类**的构造异常（例如某个组件构造器抛）发生在 {@code clearRole}
-     *       **之后** ⇒ 此时旧角色已被回收、无法回滚。安全的"先构造后清理"需要 {@code RoleInstance} 的新 API
-     *       （旧实例的 {@code clear()} 会按**共享 key** 移除新实例的属性修饰符、并清空新实例的热键栏/药水）
-     *       ⇒ 不在本卡 inScope，已在交付说明里申报（最小闭合 = 另立卡给 {@code RoleInstance} 加两阶段构造）。</li>
+     *   <li><b>预检先行</b>：{@link Role#verifyDependencies()} 放在**清理旧角色之前**（t54，保留）；</li>
+     *   <li><b>第一相：构造（不可见）</b>：{@link Role#createInstance(Player, RolesContext)} ——
+     *       只做装配 / 注册表冻结 / 服务集 / 依赖检查，**不写任何玩家可见状态、不创建任务**
+     *       ⇒ 失败时**原样返回**，旧角色完好无损 ✓（这是 t54 那条残留的收口点）；</li>
+     *   <li><b>清旧角色</b>：构造**成功之后**才 {@link #clearRole(Player)} —— 此刻新实例**尚未**写入
+     *       生命修饰符 / 热键栏 / 药水 ⇒ 旧实例 {@code clear()} 的三条"按共享 key 误伤"路径全部落空 ✓；</li>
+     *   <li><b>第二相：激活（可见）</b>：{@link RoleInstance#activate()} —— 写生命修饰符 + 设置生命 +
+     *       生命周期广播 + 启动 ticker + 构造期同步首刷；异常同样**不逃逸**（失败面见第 4 条申报）；</li>
+     *   <li><b>换引用</b>：{@code playerRoleMap.put(...)}（唯一写入点，成功路径才发生）。</li>
      * </ol>
+     * <p><b>可见顺序与迁移前逐字一致</b>：旧写法的可见序列 = "旧角色清理的可见效果 → 新实例构造期的
+     * 可见效果"；本写法 = "（构造期不可见）→ 旧角色清理 → 新实例激活" ⇒ 可见序列不变 ✓。
+     * <p><b>如实申报（第 4 条的失败面）</b>：第二相本身也可能抛（组件在 {@code awake()/start()} 里抛）。
+     * 此时旧角色**已经**被释放（第 3 步不可回退）⇒ 该分支下玩家会处于"无角色"状态：本方法记一条
+     * {@code SEVERE}、**释放半激活的实例**（{@code instance.clear()} ⇒ 不泄漏 ticker / 药水 / 热键栏 /
+     * 属性修饰符）并返回 {@code false}，**异常不逃逸**。该分支在现有产品里不可达（无组件在
+     * {@code awake()/start()} 抛），已在交付说明的未覆盖项里申报。
      */
     public boolean selectRole(Player player, String roleId){
         if(!roleRegistry.contains(roleId)) return false;
@@ -55,16 +67,31 @@ public class RoleManager {
             return false;
         }
 
-        if(hasRole(player)) clearRole(player);
-
-        //A5 ②：构造异常不得逃逸
+        //A5 ②（t64 第一相）：**先把新实例构造成功**（构造器只做不可见的事）
+        //⇒ 失败时旧角色原样保留（t54 残留的收口点：非依赖类构造异常不再让玩家丢角色）
         RoleInstance instance;
         try {
             instance = role.createInstance(player, context);
         } catch (Throwable failure) {
             context.logger().log(Level.SEVERE,
                     "Role '" + roleId + "' failed to instantiate for " + player.getName()
-                            + "; the player was left without a role (see the delivery notes).", failure);
+                            + "; the previous role is kept.", failure);
+            return false;
+        }
+
+        //A5 ③：构造**成功之后**才清旧角色 —— 新实例此时尚未写入任何玩家可见状态（生命修饰符 /
+        //热键栏 / 药水），旧实例的 clear() 无从误伤它（t54 实测的三条约束逐条见交付说明 A3）
+        if(hasRole(player)) clearRole(player);
+
+        //A5 ④（t64 第二相）：激活 —— 可见副作用全部在这里，异常不逃逸
+        try {
+            instance.activate();
+        } catch (Throwable failure) {
+            context.logger().log(Level.SEVERE,
+                    "Role '" + roleId + "' failed to activate for " + player.getName()
+                            + "; the previous role was already released, the half-activated instance was cleaned up.",
+                    failure);
+            instance.clear();
             return false;
         }
 
@@ -91,16 +118,29 @@ public class RoleManager {
             return false;
         }
 
-        if(hasRole(uuid)) clearRole(uuid);
-
-
+        //同 Player 重载：第一相（构造，不可见）—— 失败 ⇒ 旧角色原样保留（A5 ②）
         RoleInstance instance;
         try {
             instance = role.createInstance(player, context);
         } catch (Throwable failure) {
             context.logger().log(Level.SEVERE,
                     "Role '" + roleId + "' failed to instantiate for " + uuid
-                            + "; the player was left without a role (see the delivery notes).", failure);
+                            + "; the previous role is kept.", failure);
+            return false;
+        }
+
+        //同 Player 重载：构造成功之后才清旧角色（A5 ③）
+        if(hasRole(uuid)) clearRole(uuid);
+
+        //同 Player 重载：第二相（激活，可见）—— 异常不逃逸（A5 ④）
+        try {
+            instance.activate();
+        } catch (Throwable failure) {
+            context.logger().log(Level.SEVERE,
+                    "Role '" + roleId + "' failed to activate for " + uuid
+                            + "; the previous role was already released, the half-activated instance was cleaned up.",
+                    failure);
+            instance.clear();
             return false;
         }
 

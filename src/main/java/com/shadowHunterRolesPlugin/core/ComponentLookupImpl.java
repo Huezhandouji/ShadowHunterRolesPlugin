@@ -13,18 +13,21 @@ import java.util.logging.Logger;
 /**
  * {@link ComponentLookup} 的独立适配器（包级私有；禁止 {@code RoleInstance} 直接 implements 端口）。
  * 反向引用只存在这里。
- * <p><b>阶段 10 · t55：本类成为"组件服务"的唯一实现点</b> —— 查找三件（类型 / id / 快照）直接转调
- * {@link ComponentRegistry}；动态三件（增 / 插位 / 删）在这里**编排**：
+ * <p><b>阶段 10 · t55：本类成为"组件服务"的唯一实现点</b> —— 查找四件（类型第一个 / 类型全部 / id / 快照）
+ * 直接转调 {@link ComponentRegistry}；动态三件（增 / 插位 / 删）在这里**编排**：
  * <pre>
- * add / insertAt : ① 校验（id 非空、描述符非空、id 未被占用、**不在遍历窗口内**、下标合法）
+ * add / insertAt : ① 校验（id 非空、描述符非空、**不在遍历窗口内**、下标合法）
  *                  ② 描述符 bindId + freeze ⇒ 拿到 (工厂, 提供类型, 必需依赖) 三元组
  *                  ③ **依赖预检**：必需依赖在容器内无人提供 ⇒ 拒绝（消息点名缺的类型）
  *                  ④ 取该 id 的服务集（servicesFactory，与装配期同一个工厂 ⇒ 组件拿到一对一端口）
  *                  ⑤ 构造 → ⑥ 注册/插位（连声明一起登记）→ ⑦ awake() → ⑧ start()
  *                  ⑨ 任一步失败 ⇒ 回滚（stop + 回收资源 + 移出容器）后原样抛出
- * remove         : ① 按 id 找 → ② **反向依赖检查**（P2）：有阻止者 ⇒ 记日志 + 抛异常（拒绝删除）
+ * remove         : ① 按 id 找（**添加顺序第一个**）→ ② **反向依赖检查**（P2）：有阻止者 ⇒ 记日志 + 抛异常
  *                  ③ stop() → ④ 回收该组件资源 → ⑤ 移出容器
  * </pre>
+ * <p><b>阶段 10 · t67（用户新路线图第 1/2 条）</b>：
+ * ① 校验里**删掉了"id 未被占用"那一条** ⇒ **同一 id 可添加多次** ✓（用户第 2 条）；
+ * ② 新增 {@link #getAll(Class)} 转发；③ {@link #get(Class)} 的语义按真实行为（**添加顺序第一个**）写明。
  * <p><b>为什么服务集由工厂注入而不是本类自造</b>：服务集与组件**一对一**（冷却端口按 id 选表、定时器端口
  * 按 id 定位资源表）⇒ 必须与装配期走**同一条**构造路径（{@code RoleInstance#createServices}）。
  * <p><b>为什么删除前必须算反向依赖</b>（队长裁定 P2）：删掉一个被他人 {@code requires} 的组件后，
@@ -48,8 +51,13 @@ final class ComponentLookupImpl implements ComponentLookup {
     }
 
     @Override
-    public <T extends RoleComponent> T get(Class<T> type) {
+    public <T> T get(Class<T> type) {
         return registry.get(type);
+    }
+
+    @Override
+    public <T> List<T> getAll(Class<T> type) {
+        return registry.getAll(type);
     }
 
     @Override
@@ -83,9 +91,9 @@ final class ComponentLookupImpl implements ComponentLookup {
         if (index < 0 || index > registry.size()) {
             throw new IndexOutOfBoundsException("Component index " + index + " is out of range [0, " + registry.size() + "].");
         }
-        if (registry.declarationOf(id) != null) {
-            throw new IllegalArgumentException("Component id already registered: " + id);
-        }
+        //阶段 10 · t67（用户新路线图第 2 条）：**id 唯一性护栏已删除** —— 同一个 id 可以添加多次。
+        //（旧写法在这里抛 "Component id already registered: " + id ✗；只删 ComponentRegistry 里那一条
+        // 是不够的，因为运行期 add 走的是本方法 ⇒ 两处都必须放开 ✓）
 
         //声明来源 = 描述符（与装配期同一个 freeze() 快照）
         specification.bindId(id);
@@ -124,6 +132,8 @@ final class ComponentLookupImpl implements ComponentLookup {
 
     @Override
     public boolean remove(String id) {
+        //阶段 10 · t67：id 可重复 ⇒ 目标是**添加顺序第一个**同 id 者（与 getById 同目标；
+        //反向依赖表也按那一个现算 ⇒ 守卫保护的正是"会被删掉的那一个" ✓），其余同 id 者留在容器里
         RoleComponent component = registry.getById(id);
         if (component == null) {
             return false;

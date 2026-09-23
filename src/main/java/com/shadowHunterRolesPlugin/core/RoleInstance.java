@@ -332,14 +332,29 @@ public class RoleInstance {
     /**
      * **按类型取本实例内的组件**（阶段 10 · t55 · 冻结件 §4.6 的"按类型查找"读口；C-04）。
      * <p>与 {@code componentRegistry().getByType(...)} 同源（同一实现点），语义：
-     * 返回**第一个**可赋值给 {@code type} 的组件；未注册 ⇒ {@code null}；
+     * 返回**添加顺序第一个**可赋值给 {@code type} 的组件（父类/接口查询命中子类实例）；未注册 ⇒ {@code null}；
      * **装配完成之前**调用 ⇒ 抛 {@code IllegalStateException}（既有装配期护栏）。
      * <p><b>调用点申报</b>：仓内 0 调用点 —— 它是容器的公开读口（与 {@code hotbarItemOf(id)} 同类），
      * 消费者是**后续卡的依赖注入路径**与仓外探针（组件侧取组件一律走
      * {@code RoleComponent#getComponent(Class)} ⇒ {@code svc().components().get(...)}）。
+     * <p><b>阶段 10 · t67</b>：本口**只增不改**（语义按真实行为写明 = "添加顺序第一个"）；
+     * 新增的 {@link #getAllByType(Class)} 是它的"全部"版本。
      */
-    public <T extends RoleComponent> T getByType(Class<T> type) {
+    public <T> T getByType(Class<T> type) {
         return componentRegistry.getByType(type);
+    }
+
+    /**
+     * **按类型取本实例内的全部组件**（阶段 10 · t67 · 用户新路线图第 1 条新增的公开读口）：
+     * 返回全部可赋值给 {@code type} 的组件，顺序 = **添加顺序**；无人符合 ⇒ **空列表**（不是 null）。
+     * <p>与 {@link #getByType(Class)} 同一条件、同一顺序 ⇒ 其首元素恒等于 {@code getByType(type)} ✓；
+     * 空列表 ⟺ {@code getByType(type) == null} ✓。
+     * <p>**调用点申报**：仓内 0 调用点（与 {@code getByType} 同类：公开读口，消费者是后续卡与仓外探针）。
+     * **装配完成之前**调用 ⇒ 抛 {@code IllegalStateException}。
+     * <p>类型形参**无上界**（t67）⇒ 支持**接口**查询；返回**不可变**列表。
+     */
+    public <T> java.util.List<T> getAllByType(Class<T> type) {
+        return componentRegistry.getAll(type);
     }
 
     /**
@@ -584,6 +599,8 @@ public class RoleInstance {
      * <p><b>语义收紧（如实申报）</b>：未注册的 id 从"会写表"变为"不写表"（旧口径里
      * {@code componentKindOf} 对未知 id 返回 {@code null}，而 {@code null != PASSIVE} ⇒ 放行）。
      * 仓内唯一的调用方是冷却端口（id 必然已注册）⇒ 无观察差异。
+     * <p><b>阶段 10 · t67（重复 id 的口径，显式读出）</b>：本方法命中**添加顺序第一个**同 id 者即返回
+     * ⇒ 重复 id 下答案取**先加**那个的能力（冷却命名空间本就按 id 建表 ⇒ 与"一个 id 一份冷却"自洽）。
      */
     private boolean hasCooldownNamespace(String componentId){
         for(RoleComponent component : componentRegistry.all()){
@@ -709,6 +726,9 @@ public class RoleInstance {
      * （已申报）。行为分支（技能/主武器）**不再由任何"种类"决定**。
      */
     public HotbarItem hotbarItemOf(String id){
+        //阶段 10 · t67（重复 id 的口径，**显式读出**）：本口按 id 解析 ⇒ 重复 id 下取**添加顺序第一个**同 id 者
+        //（= 与 getById / getByType 同口径）。运行期追加的同 id 副本**不会**顶替先加的那个 ⇒
+        //既有装配表（模板先加）渲染出来的仍是模板那一个 ⇒ 冻结外观逐字不变 ✓。
         RoleComponent component = componentRegistry.getById(id);
         if(component == null) return null;
         if(component instanceof HotbarPresentable presentable) return presentable.asHotbarItem();
@@ -1198,7 +1218,10 @@ public class RoleInstance {
         while (guard++ < 512) {
             RoleComponent pick = null;
             for (RoleComponent component : componentRegistry.all()) {
-                if (componentRegistry.requiredBy(component.getId()).isEmpty()) {
+                //阶段 10 · t67：反向依赖按**实例**现算（旧写法 requiredBy(id) 在重复 id 下算的是"第一个同 id 者"
+                //⇒ 被检查的组件可能不是挑出来的那一个 ✗）。移除仍走动态删除路径（按 id ⇒ 第一个同 id 者）；
+                //若因此被 P2 拒绝，下面的 catch 会记 SEVERE 并强制移除 ⇒ 失败面仍然干净。
+                if (componentRegistry.requiredBy(component).isEmpty()) {
                     pick = component;
                     break;
                 }

@@ -8,10 +8,18 @@ import java.util.List;
  * 组件服务端口（用户计划第一段：`ComponentServices` 只提供「玩家实例」与「**组件服务（组件查找 + 动态组件添加）**」）。
  * <p>本端口就是那"组件服务"的**全部内容**：
  * <ul>
- *   <li><b>查找</b>：{@link #get(Class)}（按类型）· {@link #getById(String)}（按 id）· {@link #all()}（当前序快照）；</li>
+ *   <li><b>查找</b>：{@link #get(Class)}（按类型，**第一个**）· {@link #getAll(Class)}（按类型，**全部**）·
+ *       {@link #getById(String)}（按 id，**第一个**）· {@link #all()}（当前序快照）；</li>
  *   <li><b>动态添加</b>（阶段 10 · t55 · 裁定④"运行期可增 / 可删 / 插位"）：
  *       {@link #add(String, RoleComponent.Specification)} ·
  *       {@link #insertAt(int, String, RoleComponent.Specification)} · {@link #remove(String)}。</li>
+ * </ul>
+ * <p><b>查询语义（阶段 10 · t67 · 用户新路线图第 1 条统一）</b>：类型条件 = **可赋值性**
+ * （父类/接口查询命中子类实例），顺序 = **添加顺序**：
+ * <ul>
+ *   <li>{@link #get(Class)} = 第一个符合条件的（**不是"具体类优先"** —— 旧措辞已按真实语义改正）；</li>
+ *   <li>{@link #getAll(Class)} = 全部符合条件的（添加顺序；无人符合 ⇒ **空列表**）；</li>
+ *   <li>{@link #getById(String)} = 第一个 id 相等的（阶段 10 · t67 起 **id 可重复**）。</li>
  * </ul>
  * <p><b>实现点唯一</b>：{@code core/ComponentLookupImpl}（把 {@code core.dispatch.ComponentRegistry} 与
  * 容器的服务集工厂、日志接起来）。{@link RoleComponent#getComponent(Class)} 走本端口的 {@link #get(Class)}。
@@ -30,14 +38,30 @@ import java.util.List;
 public interface ComponentLookup {
 
     /**
-     * 取本角色实例内的另一个组件（**按类型**，具体类优先）。
-     * 未注册 → {@code null}；**注册表冻结前调用 → 抛 {@code IllegalStateException}**。
+     * 取本角色实例内的另一个组件（**按类型**）：**添加顺序第一个**满足可赋值性者
+     * （父类/接口查询命中子类/实现类实例）。未注册 → {@code null}；**注册表冻结前调用 → 抛 {@code IllegalStateException}**。
+     * <p><b>阶段 10 · t67 语义修正</b>：旧 javadoc 写"具体类优先"，而实现一直是纯线性扫描 ⇒ 那是对行为
+     * 撒谎的值 ⇒ 已按真实语义（**添加顺序第一个**）改写。{@link #getAll(Class)} 的首元素恒等于本方法的结果。
+     * <p><b>类型形参无上界</b>（t67）：旧签名 {@code <T extends RoleComponent>} 让**纯接口**无法作为实参 ✗，
+     * 与用户第 1 条"父类**或接口**查询"冲突 ⇒ 改为无上界 + 匹配时 {@code type.cast(...)}（安全）。
+     * 既有调用点源码级不变 ✓。
      */
-    <T extends RoleComponent> T get(Class<T> type);
+    <T> T get(Class<T> type);
+
+    /**
+     * **取全部符合条件的组件**（阶段 10 · t67 · 用户新路线图第 1 条新增）：类型条件 = 可赋值性，
+     * 顺序 = **添加顺序**；无人符合 ⇒ **空列表**（不是 null）；返回不可变列表。
+     * <p>与 {@link #get(Class)} 同一条件、同一顺序，只是不截断 ⇒ `getAll(T).isEmpty()` ⟺ `get(T) == null`。
+     * 支持**接口**查询（`getAll(Tag.class)` 返回全部实现者）。
+     * 冻结前调用 → 抛 {@code IllegalStateException}；{@code type == null} → 抛 {@code NullPointerException}。
+     */
+    <T> List<T> getAll(Class<T> type);
 
     /**
      * 按**组件 id** 取组件（id 是资源表键与热键栏查表键）。
      * 未注册 → {@code null}；**注册表冻结前调用 → 抛 {@code IllegalStateException}**。
+     * <p><b>阶段 10 · t67</b>：id **可重复** ⇒ 本口返回**添加顺序第一个**同 id 者
+     * （与 {@link #remove(String)} 同目标；要拿全部同 id 者请用 {@link #all()} 自行过滤）。
      */
     RoleComponent getById(String id);
 
@@ -54,11 +78,11 @@ public interface ComponentLookup {
      * 没有描述符的组件（例如经 {@code Role.Builder.addPassive} 装配的被动）**没有**运行期添加入口 ——
      * 与装配期同一分工（要按需添加就先给它补一个嵌套描述符）。
      *
-     * @param id            组件 id（**容器内唯一**；重复 ⇒ {@code IllegalArgumentException}）
+     * @param id            组件 id（**阶段 10 · t67 起可重复**：同一个 id 可以添加多次 ⇒ 容器内会有多个同 id 组件）
      * @param specification 装配期描述符（会被 {@code bindId(id)} 绑定并冻结）
      * @return 新建并已生效的组件实例
      * @throws IllegalStateException 框架正在遍历组件表；或必需依赖无人提供（消息点名缺的类型）
-     * @throws IllegalArgumentException id 已存在 / id 为空 / 描述符为 null
+     * @throws IllegalArgumentException id 为空 / 描述符为 null
      */
     <T extends RoleComponent> T add(String id, RoleComponent.Specification<T> specification);
 
@@ -73,6 +97,9 @@ public interface ComponentLookup {
     /**
      * **运行期动态删除**：先算**反向依赖**（P2）—— 若仍有组件把它声明为必需 ⇒
      * **拒绝删除** + **记日志** + 抛异常；否则 {@code stop()} → 回收该组件资源 → 移出容器。
+     * <p><b>阶段 10 · t67（id 可重复）</b>：本口删的是**添加顺序第一个**同 id 者，
+     * 反向依赖表也**按那一个**现算（见 {@code ComponentRegistry#requiredBy(String)}）；
+     * 其余同 id 者留在容器里。
      *
      * @return 是否确实删除了一个组件（未注册 ⇒ {@code false}，无副作用）
      * @throws IllegalStateException 框架正在遍历组件表；或存在把本组件声明为必需的阻止者

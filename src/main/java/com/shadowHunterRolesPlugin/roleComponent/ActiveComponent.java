@@ -15,7 +15,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
  * {@link HotbarSpecification} 并实现 {@link #specification()}（**唯一实现点**）。表现访问器全部由
  * {@link HotbarPresentable} 的 `default` 方法提供 ⇒ 子类不再需要（也不应）逐个手写委托。
  * <p>
- * <b>阶段 7 · A 步</b>：表现规格类改全拼（`HotbarSpec` → {@link HotbarSpecification}），
+ * <b>阶段 7 · A 步</b>：表现规格类改全拼（`HotbarSpec` → {@link HotbarSpecification}；**旧短名类已于阶段 10 · t71 删除** ✓），
  * 同时把它升格为**装配期描述符**（{@link RoleComponent.Specification}）的"带栏位"分支。
  * 本类持有的这一份是**声明值对象**：它没有栏位（栏位由装配器在描述符上设置），
  * 也从不由装配入口消费 —— 因此这条路径与阶段 6 逐字等价。

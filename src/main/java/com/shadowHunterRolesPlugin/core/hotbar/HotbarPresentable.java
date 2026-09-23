@@ -31,20 +31,13 @@ import org.bukkit.inventory.ItemStack;
  */
 public interface HotbarPresentable extends HotbarItem, CooldownBearing, EnergyCosting, HotbarItemProviding {
 
-    /** **唯一实现点**：表现规格（阶段 7 · A 步改全拼；旧短名 `spec()` 保留为 `@Deprecated` 别名）。 */
+    /**
+     * **唯一实现点**：表现规格（阶段 7 · A 步改全拼）。
+     * 旧短名 `spec()` 的兼容别名**已删除**（阶段 10 · t71）；旧口径原文保留如下：
+     * <i>「旧短名 `spec()` 保留为 `@Deprecated` 别名」</i> —— **该口径已作废**（现以 {@link #specification()} 为唯一入口）。
+     */
     HotbarSpecification<?> specification();
 
-    /**
-     * 旧短名的兼容别名（**只增不改**）：与 {@link #specification()} 是同一个值，**没有**第二套实现。
-     *
-     * @deprecated 改用 {@link #specification()}（新名 = 全拼）。返回类型放宽到父类型
-     *             {@link HotbarSpecification}（旧声明为子类型 {@code HotbarSpec}）——
-     *             实例本就是同一个对象，不需要任何转换代码。
-     */
-    @Deprecated
-    default HotbarSpecification<?> spec() {
-        return specification();
-    }
 
     default String getId() {
         return specification().getId();

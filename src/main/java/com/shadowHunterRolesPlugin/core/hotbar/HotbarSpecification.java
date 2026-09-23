@@ -31,6 +31,8 @@ import java.util.List;
  * <p>
  * 命名沿用工程的 JavaBean 风格（设计 §4.3：不引入 record 风格访问器）；
  * 旧短名 {@code HotbarSpec} 保留为 `@Deprecated` 别名（见该类）。
+ * <p><b>阶段 10 · t71 取代指向</b>：上面的旧口径**已作废** —— 该类（`HotbarSpec`）**已删除** ✗；
+ * 全拼 {@link HotbarSpecification} 是**唯一**入口 ✓。（旧口径原文保留不删，便于回溯。）
  */
 public class HotbarSpecification<T extends RoleComponent>
         extends RoleComponent.Specification<T> implements HotbarItem {

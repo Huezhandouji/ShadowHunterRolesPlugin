@@ -102,7 +102,7 @@ public abstract class RoleComponent {
      * 表现面不再自述种类、行为分支也不再读它（热键栏物品完全由组件的 {@code buildItem()} 控制）。
      * <p>
      * <b>命名</b>：按本工程的 JavaBean 口径（设计 §4.3），不写成 record；访问器名沿用
-     * {@code slot()} / {@code hasSlot()} / {@code descriptorLabel()} 与既有 {@code HotbarSpec.kind()} 的口径。
+     * {@code slot()} / {@code hasSlot()} / {@code descriptorLabel()} 与既有 {@code HotbarSpec.kind()} 的口径（**历史引用**：`HotbarSpec` 类已于阶段 10 · t71 删除 ✓，此处只留作口径回溯）。
      */
     public abstract static class Specification<T extends RoleComponent> {
 

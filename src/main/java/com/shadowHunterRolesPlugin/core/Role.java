@@ -127,7 +127,7 @@ public class Role {
     // ───────────── 阶段 10 · t54：装配期依赖检查（用户计划第三条） ─────────────
 
     /**
-     * **装配期依赖检查**（唯一实现点）：① **必需依赖必须齐**；② **依赖图不得有环**。
+     * **装配期依赖检查**（唯一实现点）：**必需依赖必须齐**。
      * <p><b>时机</b>（A2）：由调用方在 {@code Role.build()} **之后**、**任何 {@code awake()} 之前**调用 ——
      * 框架里有两处：{@code registry/RoleLoader#loadInto}（**注册之前** ⇒ 坏模板根本不进注册表）与
      * {@link #createInstance(Player, RolesContext)}（**实例化之前** ⇒ 任何路径都绕不过去）。
@@ -135,19 +135,25 @@ public class Role {
      * {@code RoleLoader} 记一条 {@code SEVERE} 并**跳过该角色**（其余角色继续装配）。
      * <p><b>匹配规则（写死）</b>：组件 A 的必需类型 R 被满足 ⟺ 存在**另一个**组件 B（B 的 id ≠ A 的 id）
      * 使 {@code R.isAssignableFrom(B.providedType())}。**A 自己不算提供者** —— 用户原话是"检查自己需要的
-     * 依赖（**其他组件**）"，因此"只有自己提供该类型"按**缺依赖**处理（这也是冻结件 §4.3 的"自环"用例：
-     * 它在本实现里落成一条可读的缺依赖错误，而不是一个能被自己满足的假通过）。
+     * 依赖（**其他组件**）"，因此"只有自己提供该类型"按**缺依赖**处理。
      * <p><b>为什么不用反射去"扫"组件实例</b>：装配期**还没有任何实例**（实例化发生在
      * {@code RoleInstance} 的构造期）⇒ 检查只能基于描述符声明的类型，这也是它能在"注册之前"完成的原因。
      * <p><b>不检查什么（如实申报）</b>：可选依赖缺失不报错；提供类型是**族级**的组件（三个家族描述符的
      * 泛型实参是家族基类）无法满足"按具体类"的依赖声明，除非该描述符覆写
      * {@code providedType()}（见 {@code RoleComponent.Specification#providedType()}）。
+     * <p><b>阶段 10 · t68 取代指向（不静默改写）</b>：本方法**曾**同时检查"依赖图不得有环"
+     * （{@code t54} 实现，依据当时的裁定 Q2「禁止依赖循环」）。用户新路线图第三条**明确改为"允许组件环形
+     * 依赖"** ⇒ 环检测的**硬失败已删除**（{@code dependencyCycles()} 与其 DFS 一并移除）。
+     * **只放开环，不动另一半**：「缺必需依赖 ⇒ 抛异常 + 阻止该角色加载注册」**原样保留**（新路线图没有
+     * 推翻它）。因此本方法的失败面**只有一种**：缺必需依赖。
+     * <p><b>运行期初始化顺序（A3）</b>：环存在时，组件 {@code awake()} 的调用顺序 = **容器按插入序**，
+     * 与依赖图**无关** ⇒ 环内"谁先醒"**未定义**（本工程**不承诺**任何依赖驱动或拓扑序）。
+     * 这是**显式申报**，不是遗漏：任何依赖"环内某组件先于另一个 awake"的写法都是**靠巧合**，不得依赖。
      *
-     * @throws ComponentDependencyException 缺必需依赖或依赖图有环（消息里点名角色 / 组件 id / 缺的类型）
+     * @throws ComponentDependencyException 缺必需依赖（消息里点名角色 / 组件 id / 缺的类型）
      */
     public void verifyDependencies(){
         List<String> problems = new ArrayList<>(missingRequiredDependencies());
-        problems.addAll(dependencyCycles());
         if(!problems.isEmpty()){
             throw new ComponentDependencyException(
                     "Role '" + id + "' failed the assembly-time dependency check: " + String.join(" | ", problems));
@@ -182,56 +188,18 @@ public class Role {
         return false;
     }
 
-    /**
-     * **依赖环检测**（冻结件 §4.3 / 裁定②：禁止依赖循环）：把"必需依赖"连成有向图
-     * （A → B ⟺ A 的某个必需类型由 B 提供，B ≠ A），返回可读的环清单（空 = 无环）。
-     * <p>自环（A→A）在**连边阶段就被排除**（自己不算提供者）⇒ 它的可观测形态 = 缺依赖错误；
-     * 互环（A→B→A）与更长的环都在这里被抓到，消息给出**完整路径**（例：{@code a -> b -> a}）。
-     */
-    public List<String> dependencyCycles(){
-        List<String> cycles = new ArrayList<>();
-        Set<String> finished = new LinkedHashSet<>();
-        for(String start : components.keySet()){
-            if(finished.contains(start)) continue;
-            Set<String> onPath = new LinkedHashSet<>();
-            Deque<String> path = new ArrayDeque<>();
-            walkForCycles(start, path, onPath, finished, cycles);
-        }
-        return cycles;
-    }
-
-    private void walkForCycles(String current, Deque<String> path, Set<String> onPath, Set<String> finished,
-                               List<String> cycles){
-        if(onPath.contains(current)){
-            List<String> cycle = new ArrayList<>();
-            boolean collecting = false;
-            for(String node : path){
-                if(node.equals(current)) collecting = true;
-                if(collecting) cycle.add(node);
-            }
-            cycle.add(current);
-            String rendered = "dependency cycle: " + String.join(" -> ", cycle);
-            if(!cycles.contains(rendered)) cycles.add(rendered);
-            return;
-        }
-        if(finished.contains(current)) return;
-        onPath.add(current);
-        path.addLast(current);
-        ComponentEntry entry = components.get(current);
-        if(entry != null){
-            for(Class<? extends RoleComponent> required : entry.getRequiredTypes()){
-                for(Map.Entry<String, ComponentEntry> other : components.entrySet()){
-                    if(other.getKey().equals(current)) continue;
-                    if(required.isAssignableFrom(other.getValue().getProvidedType())){
-                        walkForCycles(other.getKey(), path, onPath, finished, cycles);
-                    }
-                }
-            }
-        }
-        path.removeLast();
-        onPath.remove(current);
-        finished.add(current);
-    }
+    // ───────────── 阶段 10 · t68：环检测已按用户新路线图第三条删除 ─────────────
+    //
+    // 这里**曾**有 `dependencyCycles()` 与它的 DFS 辅助 `walkForCycles()`（t54 实现，依据当时的
+    // 裁定 Q2「禁止依赖循环」）。用户新路线图第三条**改为「允许组件环形依赖」** ⇒ 两者**整段删除**，
+    // 不留死代码（保留一个不再被调用的环检测只会让下一个读者以为环仍被禁止）。
+    //
+    // 删除后**不变**的东西（边界，防止误读）：
+    //   * 自环（A 的某个必需类型由 A 自己提供）：A **不算自己的提供者** ⇒ 仍落成**缺依赖**硬失败。
+    //     这是匹配规则的一部分，**不是**环检测的残留 —— 删环检测**没有**放松它。
+    //   * 互环（A↔B）与更长的环：装配**通过**（这正是本卡要的）。
+    //   * 运行期 awake() 顺序 = 容器按插入序，与依赖图无关 ⇒ 环内"谁先醒"**未定义**（见
+    //     {@link #verifyDependencies()} 的 A3 段）。
 
     /** 旧窄类型入口（保留兼容）：kind 不符时返回 {@code null}（与"该类型未装配"同义）。 */
     public Skill createSkill(String skillId, ComponentServices services){

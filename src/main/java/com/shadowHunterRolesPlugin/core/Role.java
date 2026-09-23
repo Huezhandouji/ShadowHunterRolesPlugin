@@ -8,6 +8,13 @@ import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.roleComponent.ComponentDependencyException;
 import com.shadowHunterRolesPlugin.roleComponent.ComponentFactory;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.DamageComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.FactionComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.service.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -160,9 +167,51 @@ public class Role {
         }
     }
 
+    // ───────────── 阶段 10 · t69：框架必然提供的服务类型（白名单） ─────────────
+
+    /**
+     * <b>「框架必然提供的服务类型」白名单</b>（阶段 10 · t69 · 用户新路线图第 12 / 13 行）。
+     *
+     * <p><b>它解决什么问题</b>（{@code t63} 已申报的缺口）：{@link #verifyDependencies()} 只看
+     * **模板的组件表**；而**框架级服务组件**是**按角色实例**装配的（每实例一个，见
+     * {@code core/RoleInstance} 的 `registerServiceComponents()`）⇒ 模板侧永远看不见它们。
+     * 于是任何组件写 {@code requires(EnergyComponent.class)} 这类声明都会被误报成"缺必需依赖"
+     * ⇒ 该角色**被错误地拒绝注册** ✗。
+     *
+     * <p><b>语义（写死）</b>：列在本集合里的类型 = **框架保证在角色实例上必然提供**的类型
+     * ⇒ 声明它们的组件**不算缺依赖**（检查放行）。它**只影响"供给面"的判定**，不影响任何运行期行为：
+     * 组件仍按 {@code RoleComponent#getComponent(Class)} 自己去取（取不到是另一回事，属运行期）。
+     *
+     * <p><b>清单 = 7 个框架级服务组件</b>（与 {@code ComponentServices} 的 8 个端口成员同族；
+     * 它们是**每角色实例一份**的框架服务，不是角色内容）：能量 / SanTE / 生命 / buff / 计时 /
+     * 阵营 / 伤害。它们**不进 `Role` 模板**（模板组件表逐格不变），因此只能由本白名单在模板侧豁免。
+     *
+     * <p><b>两侧分工（本卡的验收口径）</b>：
+     * <ul>
+     *   <li><b>模板侧</b> = 本白名单：让 {@code requires(这些类型)} **能通过**装配期检查（否则误拒注册）；</li>
+     *   <li><b>实例侧</b> = 框架真的提供了它们：组件在 {@code awake()} 里
+     *       {@code getComponent(EnergyComponent.class)} 等**取得到**（同一份实例）。</li>
+     * </ul>
+     * 两条都给了运行级读数（见交付说明 §4），缺一条就可能是"白名单放行了但实例上根本没有"的假绿 ✗。
+     *
+     * <p><b>边界（如实申报，不静默放宽）</b>：白名单**只**列这 7 个框架级服务组件。角色内容组件
+     * （技能 / 被动 / 主武器）一律不在此列 ⇒ 它们之间的依赖声明照旧按模板组件表判定。
+     */
+    public static final Set<Class<? extends RoleComponent>> FRAMEWORK_PROVIDED_TYPES = Set.of(
+            EnergyComponent.class,
+            SanTEComponent.class,
+            VitalsComponent.class,
+            BuffComponent.class,
+            TimerComponent.class,
+            FactionComponent.class,
+            DamageComponent.class);
+
     /**
      * **缺必需依赖的清单**（诊断用；空 = 齐）。每条都点名：组件 id · 该组件**提供**的类型 · **缺**的类型。
      * <p>{@link #verifyDependencies()} 的异常消息直接由它拼出 ⇒ 消息与清单**同源**，不会各说一套。
+     * <p><b>阶段 10 · t69（A3 白名单）</b>：列在 {@link #FRAMEWORK_PROVIDED_TYPES} 里的类型
+     * （= 框架必然按实例提供的 7 个服务组件）**不算缺** ⇒ 跳过。这是"框架级服务组件在模板里看不见"
+     * 这个缺口的唯一修法。
      */
     public List<String> missingRequiredDependencies(){
         List<String> problems = new ArrayList<>();
@@ -170,6 +219,8 @@ public class Role {
             String componentId = entry.getKey();
             ComponentEntry component = entry.getValue();
             for(Class<? extends RoleComponent> required : component.getRequiredTypes()){
+                //框架必然提供的服务类型（按实例装配、不进模板）⇒ 声明它不算缺依赖（见 FRAMEWORK_PROVIDED_TYPES）
+                if(FRAMEWORK_PROVIDED_TYPES.contains(required)) continue;
                 if(!hasProviderOtherThan(componentId, required)){
                     problems.add("component '" + componentId + "' (provides " + component.getProvidedType().getName()
                             + ") requires missing component type '" + required.getName() + "'");

@@ -9,7 +9,6 @@ import com.shadowHunterRolesPlugin.roleComponent.ComponentDependencyException;
 import com.shadowHunterRolesPlugin.roleComponent.ComponentFactory;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.DamageComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
@@ -203,8 +202,7 @@ public class Role {
             VitalsComponent.class,
             BuffComponent.class,
             TimerComponent.class,
-            FactionComponent.class,
-            DamageComponent.class);
+            FactionComponent.class);
 
     /**
      * **缺必需依赖的清单**（诊断用；空 = 齐）。每条都点名：组件 id · 该组件**提供**的类型 · **缺**的类型。

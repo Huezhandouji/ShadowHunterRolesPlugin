@@ -23,7 +23,6 @@ import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.DamageComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
@@ -62,7 +61,6 @@ public class RoleInstance {
     private final BuffComponent buffComponent;
     private final TimerComponent timerComponent;
     private final FactionComponent factionComponent;
-    private final DamageComponent damageComponent;
 
     /** 7 个服务组件在**实例容器**里的 id（与 {@code ComponentServices} 的成员名同形 ⇒ 便于逐项对照）。 */
     private static final String SERVICE_ID_ENERGY = "energy";
@@ -71,7 +69,8 @@ public class RoleInstance {
     private static final String SERVICE_ID_BUFFS = "buffs";
     private static final String SERVICE_ID_TIMERS = "timers";
     private static final String SERVICE_ID_FACTIONS = "factions";
-    private static final String SERVICE_ID_DAMAGE = "damage";
+    //阶段 10 · t73 Part A：`SERVICE_ID_DAMAGE` 已删除 —— 原 DamageComponent 并入 VitalsComponent
+    //⇒ 框架服务组件由 7 个减为 6 个（`damage` 不再是独立服务组件；`DamagePort` 面不变，转发到生命组件）。
 
 
     //实例是否仍然有效：clear() 之后置为 false，组件里的延时任务用它做"实例已失效"守卫
@@ -195,8 +194,8 @@ public class RoleInstance {
         this.factionComponent = new FactionComponent(SERVICE_ID_FACTIONS, createServices(SERVICE_ID_FACTIONS),
                 platform.factions(), role.getFaction());
 
-        //⑦ 伤害：四个原语直接落到静态伤害工具（真正外部 ⇒ 允许依赖）
-        this.damageComponent = new DamageComponent(SERVICE_ID_DAMAGE, createServices(SERVICE_ID_DAMAGE));
+        //⑦ 伤害：四个原语（阶段 10 · t73 Part A 起由 VitalsComponent 承载 ⇒ 伤害与生命只有一个持有者 ✓）
+        //   —— 原独立 DamageComponent 已删除，不再单独构造。
 
         //裁定④ 的**动态删除路径**入口（隔离时"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + P2 守卫）
         this.componentLookup = new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger());
@@ -299,8 +298,6 @@ public class RoleInstance {
 
     public FactionComponent factionComponent() { return factionComponent; }
 
-    public DamageComponent damageComponent() { return damageComponent; }
-
     /**
      * 把 7 个服务组件登记进**实例容器**（阶段 10 · t63）。
      * <p><b>不进 {@code Role} 模板</b> ⇒ {@code role.getComponents()} = 装配表 = 冻结 CELLS **逐格不变** ✓；
@@ -316,7 +313,6 @@ public class RoleInstance {
         registerServiceComponent(buffComponent);
         registerServiceComponent(timerComponent);
         registerServiceComponent(factionComponent);
-        registerServiceComponent(damageComponent);
     }
 
     private void registerServiceComponent(RoleComponent component) {
@@ -382,7 +378,7 @@ public class RoleInstance {
                 new CooldownPortImpl(this, componentId),
                 new BuffPortImpl(this),
                 new FactionPortImpl(this),
-                //阶段 10 · t63：伤害端口改为**转发到伤害组件** ⇒ 需要容器（旧实现直接调静态工具，无 owner）
+                //阶段 10 · t73 Part A：伤害端口转发到**生命组件**（原独立伤害组件已并入 ⇒ 单一持有者）
                 new DamagePortImpl(this),
                 new TimerPortImpl(this, componentRegistry, componentId),
                 //阶段 10 · t55：组件服务 = 查找 + **动态添加** —— 服务集工厂传进去，运行期新增的组件

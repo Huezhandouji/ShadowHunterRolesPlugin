@@ -61,9 +61,21 @@ public interface ComponentLookup {
      * 按**组件 id** 取组件（id 是资源表键与热键栏查表键）。
      * 未注册 → {@code null}；**注册表冻结前调用 → 抛 {@code IllegalStateException}**。
      * <p><b>阶段 10 · t67</b>：id **可重复** ⇒ 本口返回**添加顺序第一个**同 id 者
-     * （与 {@link #remove(String)} 同目标；要拿全部同 id 者请用 {@link #all()} 自行过滤）。
+     * （与 {@link #remove(String)} 同目标；要拿**全部**同 id 者请用 {@link #getAllById(String)}）。
      */
     RoleComponent getById(String id);
+
+    /**
+     * **按 id 取全部**（阶段 11 · t77 · 用户裁定："`getById()` 返回找到的第一个，新增一个
+     * `getAllById()`，返回符合条件的组件的列表，**和 `get()` 和 `getAll()` 一样**"）。
+     * <p>返回**全部** id 相等的组件，顺序 = **添加顺序**（容器当前序）；无人符合 ⇒ **空列表**（不是 null）；
+     * 返回**不可变**列表。
+     * <p>与 {@link #getById(String)} **同一条件、同一顺序**，只是不截断 ⇒
+     * {@code getAllById(id).isEmpty()} ⟺ {@code getById(id) == null}，且首元素恒等于 {@code getById(id)} ✓
+     * —— 即与「{@link #get(Class)} / {@link #getAll(Class)}」这一对**完全对称** ✓。
+     * <p>{@code id == null} ⇒ **空列表**（与 {@code getById(null) == null} 同口径：都不抛）。
+     */
+    List<RoleComponent> getAllById(String id);
 
     /**
      * 容器内组件的**不可变快照**（顺序 = 容器内当前序 = **动态序** = 渲染序与派发序）。

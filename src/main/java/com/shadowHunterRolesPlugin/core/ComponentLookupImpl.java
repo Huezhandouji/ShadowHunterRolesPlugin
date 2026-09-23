@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -63,6 +64,26 @@ final class ComponentLookupImpl implements ComponentLookup {
     @Override
     public RoleComponent getById(String id) {
         return registry.getById(id);
+    }
+
+    /**
+     * **按 id 取全部**（阶段 11 · t77 · 用户裁定）：与 {@link #getAll(Class)} 对称。
+     * <p><b>实现只用 {@code registry} 的公开读口</b>（{@code all()} 线性过滤）⇒ **不改 {@code core/dispatch/}**
+     * （它在 out of scope）✓；顺序 = 容器当前序 = **添加顺序** ✓；无人符合 ⇒ **空列表** ✓；
+     * {@code id == null} ⇒ 空列表（与 {@code getById(null) == null} 同口径：都不抛）✓。
+     */
+    @Override
+    public List<RoleComponent> getAllById(String id) {
+        if (id == null) {
+            return List.of();
+        }
+        List<RoleComponent> matches = new ArrayList<>();
+        for (RoleComponent component : registry.all()) {
+            if (id.equals(component.getId())) {
+                matches.add(component);
+            }
+        }
+        return List.copyOf(matches);
     }
 
     @Override

@@ -48,7 +48,17 @@ public abstract class RoleComponent {
         return current;
     }
 
-    /** 取本角色实例内的另一个组件（按具体类优先；未注册 → null，冻结前调用 → 抛异常）。 */
+    /**
+     * 取本角色实例内的另一个组件（**按类型**）。
+     * <p><b>语义 = 添加顺序第一个满足可赋值性者</b>（用父类/接口查询会命中子类/实现类实例）；
+     * 未注册 → {@code null}；冻结前调用 → 抛 {@code IllegalStateException}。要拿**全部**符合者请用
+     * {@code svc().components().getAll(type)}（阶段 10 · t67 新增）。
+     * <p>【已作废】旧句原文：「取本角色实例内的另一个组件（**按具体类优先**；未注册 → null，
+     * 冻结前调用 → 抛异常）。」—— 实现一直是**纯线性扫描**（无任何"具体类优先"分支）⇒
+     * 该措辞属**对行为撒谎的值** ✗，已按真实语义改写 ✓。
+     * 取代指向：`t67` 已在 `core/ports/ComponentLookup` 与 `core/dispatch/ComponentRegistry` 改正，
+     * 本处（组件侧**唯一取用入口**）是最后一块（`t71` 亦以同法处理过 `HotbarSpec` 家族的作废措辞）。
+     */
     protected final <T extends RoleComponent> T getComponent(Class<T> type) {
         return svc().components().get(type);
     }

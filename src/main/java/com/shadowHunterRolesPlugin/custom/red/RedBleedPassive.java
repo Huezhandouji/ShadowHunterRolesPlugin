@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.roleComponent.red;
+package com.shadowHunterRolesPlugin.custom.red;
 
 import com.shadowHunterRolesPlugin.core.PassiveSkill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;

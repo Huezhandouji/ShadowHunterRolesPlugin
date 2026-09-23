@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.roleComponent.AutoRecoverEnergyPassive;
-import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
+import com.shadowHunterRolesPlugin.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
 import org.junit.Test;
 
 import java.util.ArrayList;

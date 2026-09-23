@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.ports.EnergyPort;
-import com.shadowHunterRolesPlugin.roleComponent.service.EnergyComponent;
+import com.shadowHunterRolesPlugin.frameworkLevel.EnergyComponent;
 
 /**
  * {@link EnergyPort} 的独立适配器（阶段 10 · t63 · A2）：**纯转发**到 {@link EnergyComponent} ——

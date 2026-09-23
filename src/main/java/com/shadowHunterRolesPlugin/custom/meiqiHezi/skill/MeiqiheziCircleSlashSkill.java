@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill;
+package com.shadowHunterRolesPlugin.custom.meiqiHezi.skill;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.destroystokyo.paper.ParticleBuilder;

@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
-import com.shadowHunterRolesPlugin.roleComponent.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
+import com.shadowHunterRolesPlugin.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

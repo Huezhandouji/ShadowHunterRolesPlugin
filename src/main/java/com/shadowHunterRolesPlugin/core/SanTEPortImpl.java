@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.ports.SanTEPort;
-import com.shadowHunterRolesPlugin.roleComponent.service.SanTEComponent;
+import com.shadowHunterRolesPlugin.frameworkLevel.SanTEComponent;
 
 /**
  * {@link SanTEPort} 的独立适配器（阶段 10 · t63 · A2）：**纯转发**到 {@link SanTEComponent} ——

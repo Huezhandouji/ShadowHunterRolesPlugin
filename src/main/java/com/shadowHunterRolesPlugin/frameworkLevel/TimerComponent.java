@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.roleComponent.service;
+package com.shadowHunterRolesPlugin.frameworkLevel;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.platform.Scheduler;

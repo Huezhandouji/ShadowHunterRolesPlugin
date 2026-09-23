@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.ports.FactionPort;
-import com.shadowHunterRolesPlugin.roleComponent.service.FactionComponent;
+import com.shadowHunterRolesPlugin.frameworkLevel.FactionComponent;
 import org.bukkit.entity.Player;
 
 /**

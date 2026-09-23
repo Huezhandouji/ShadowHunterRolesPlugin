@@ -19,9 +19,22 @@ public class RoleManager {
     //阶段 4（⑤）：RoleRegistry 改为构造注入（D-2 静态桥已删）
     private final RoleRegistry roleRegistry;
 
+    /**
+     * 阶段 10 · t66：故障隔离的**提醒器**（全服简报 + OP 详情 + **限流/去重**）。
+     * 它由管理器持有（而不是 RoleInstance）：提醒是"对全服说一句话"，属管理器职责；
+     * 且限流表需要**跨实例**共享（同一角色反复失败时，N 秒内只播一次 ✓）。
+     */
+    private final QuarantineNotifier quarantineNotifier;
+
     public RoleManager(RolesContext context, RoleRegistry roleRegistry){
         this.context = context;
         this.roleRegistry = roleRegistry;
+        this.quarantineNotifier = new QuarantineNotifier(context);
+    }
+
+    /** 隔离提醒器（诊断/取证读口）。 */
+    public QuarantineNotifier quarantineNotifier(){
+        return quarantineNotifier;
     }
 
     /**
@@ -79,6 +92,9 @@ public class RoleManager {
             return false;
         }
 
+        //阶段 10 · t66：**绑定隔离处置**（必须在 activate() 之前 ⇒ awake()/start() 里的异常也能被隔离）
+        instance.bindQuarantineHandler(this::onInstanceQuarantined);
+
         //A5 ③：构造**成功之后**才清旧角色 —— 新实例此时尚未写入任何玩家可见状态（生命修饰符 /
         //热键栏 / 药水），旧实例的 clear() 无从误伤它（t54 实测的三条约束逐条见交付说明 A3）
         if(hasRole(player)) clearRole(player);
@@ -92,6 +108,12 @@ public class RoleManager {
                             + "; the previous role was already released, the half-activated instance was cleaned up.",
                     failure);
             instance.clear();
+            return false;
+        }
+
+        //阶段 10 · t66：激活期被隔离（组件在 awake()/start() 里抛）⇒ 隔离流程已经记日志 / 提醒 / 清空角色，
+        //这里**不再**把已死的实例写进 map（否则玩家会拿到一个"组件已被全部移除"的空壳角色 ✗）
+        if(instance.isQuarantined()) {
             return false;
         }
 
@@ -129,6 +151,9 @@ public class RoleManager {
             return false;
         }
 
+        //同 Player 重载：绑定隔离处置（t66，必须在 activate() 之前）
+        instance.bindQuarantineHandler(this::onInstanceQuarantined);
+
         //同 Player 重载：构造成功之后才清旧角色（A5 ③）
         if(hasRole(uuid)) clearRole(uuid);
 
@@ -144,9 +169,44 @@ public class RoleManager {
             return false;
         }
 
+        //同 Player 重载：激活期被隔离 ⇒ 不再写入 map（t66）
+        if(instance.isQuarantined()) {
+            return false;
+        }
+
         playerRoleMap.put(player.getUniqueId(), instance);
 
         return true;
+    }
+
+    /**
+     * **故障隔离的对外处置**（阶段 10 · t66 第 ④ 步 + A6）——由 {@link RoleInstance} 在隔离的第 ④ 步回调。
+     *
+     * <ol>
+     *   <li><b>提醒</b>：全服简报 + OP 详情，**经限流器**（同一 {@code role:component} 在窗口内只播一次 ✓）；</li>
+     *   <li><b>清空角色</b>（用户裁定 ①）：**复用既有清理链** {@link #clearRole(UUID)}（= 从表里摘除 +
+     *       {@code instance.clear()}）⇒ 热键栏 / 生命修饰符 / 药水 / 任务全部回收，**不另写一套** ✓。</li>
+     * </ol>
+     * 未入表的实例（构造后、激活期被隔离）⇒ 直接 {@code instance.clear()} 释放半激活实例（不留泄漏面）。
+     */
+    private void onInstanceQuarantined(RoleInstance instance, String componentId, String phase, Throwable failure) {
+        if (instance == null) {
+            return;
+        }
+        Player player = instance.getPlayer();
+        String roleId = instance.getRole() == null ? "<unknown>" : instance.getRole().getId();
+        String playerName = player == null ? "<unknown>" : player.getName();
+        UUID uuid = player == null ? null : player.getUniqueId();
+
+        //④ 提醒：全服简报（所有人）+ OP 详情（含组件名 / 阶段 / 异常 / 栈摘要）+ **限流去重**
+        quarantineNotifier.announce(roleId, playerName, componentId, phase, failure);
+
+        //A6：隔离后角色归属 = 清空（复用既有清理链；玩家变为无角色、可重选）
+        if (uuid != null && playerRoleMap.containsKey(uuid)) {
+            clearRole(uuid);
+        } else {
+            instance.clear();
+        }
     }
 
     //获取玩家的角色实例

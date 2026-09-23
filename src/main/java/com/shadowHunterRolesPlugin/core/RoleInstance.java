@@ -14,6 +14,7 @@ import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.core.hotbar.RepaintRequestable;
 import com.shadowHunterRolesPlugin.core.hotbar.RepaintRequester;
+import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
@@ -102,8 +103,19 @@ public class RoleInstance {
     //平台上下文（调度/日志/键/阵营查询）
     private final RolesContext platform;
 
-    //已经上报过update异常的组件，避免每tick刷屏
-    private final Set<String> reportedUpdateErrors = new HashSet<>();
+    // ───────── 阶段 10 · t66：运行期组件异常的**故障隔离**状态（用户新设计） ─────────
+    //**同实例只隔离一次**（A7）：一旦置 true，后续异常只记日志、不递归隔离；派发循环也就地退出。
+    private volatile boolean quarantined = false;
+    //拆卸中（clear() 起）：此时组件抛异常**只记日志**，不触发隔离 —— 实例本来就在被销毁，
+    //把一次正常清角色里的 stop() 异常播成"某角色已停用"是假警报 ✗。
+    private boolean tearingDown = false;
+    //本次**派发边界内**待执行的隔离请求（首个异常胜出 ⇒ 日志点名的组件稳定）；
+    //真正的四步在遍历窗口**之外**执行（窗口内禁止增删 ⇒ 见 withinIterationWindow）。
+    private QuarantineRequest pendingQuarantine;
+    //隔离的**对外处置**（日志/提醒/清空角色）由 RoleManager 在实例构造成功后绑定（它才知道 map 与玩家归属）
+    private QuarantineHandler quarantineHandler;
+    //裁定④ 的动态删除路径入口（"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + P2 删除守卫）
+    private final ComponentLookup componentLookup;
 
     private Task updateTask;
 
@@ -185,6 +197,9 @@ public class RoleInstance {
 
         //⑦ 伤害：四个原语直接落到静态伤害工具（真正外部 ⇒ 允许依赖）
         this.damageComponent = new DamageComponent(SERVICE_ID_DAMAGE, createServices(SERVICE_ID_DAMAGE));
+
+        //裁定④ 的**动态删除路径**入口（隔离时"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + P2 守卫）
+        this.componentLookup = new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger());
 
         initComponents();
 
@@ -394,7 +409,12 @@ public class RoleInstance {
 
         //冷却自管理（D1）：框架**不再**代启动冷却 —— 组件在施放成功处自行 svc().cooldowns().start(getCooldownTicks())；
         //声明值仍是唯一真值来源（4.7/O-13），启动点与启动值都与旧框架代启动逐字一致 ⇒ 可观察行为不变。
-        active.onCast(new CastSignal(trigger));
+        //阶段 10 · t66：**唯一受保护调用**（施放是框架派发边界之一）⇒ 组件抛异常 = 整实例隔离
+        guardedCall(component, "onCast", () -> active.onCast(new CastSignal(trigger)));
+        //本入口不在遍历窗口内 ⇒ 立即执行待处理的隔离
+        runPendingQuarantine();
+        //**仍返回 true**：本次已由管道"处理"（组件确实被调用过，只是抛了）⇒ 若返回 false，
+        //调用方会回落到旧路径 ⇒ **二次派发**（组件已被隔离，二次派发是新的错误面）✗
         hotbarRenderer.markDirty();
         return true;
     }
@@ -411,7 +431,9 @@ public class RoleInstance {
         if(!(component instanceof CombatHook hook)) return false;
 
         //冷却自管理（D1）：框架不再代启动冷却（同 handleCast）
-        hook.onAttack(new AttackSignal(victim));
+        //阶段 10 · t66：唯一受保护调用（攻击同属派发边界）
+        guardedCall(component, "onAttack", () -> hook.onAttack(new AttackSignal(victim)));
+        runPendingQuarantine();
         hotbarRenderer.markDirty();
         return true;
     }
@@ -628,14 +650,16 @@ public class RoleInstance {
 
     /**
      * 冷却结束回调的唯一派发点（D4）：**先移除条目、再回调** ⇒ 回调内再 {@code end()} 只会得到 {@code false}（不递归重入）；
-     * 异常隔离沿用 {@link #runComponentUpdate}（与 update()/onSanTEChange 同键）。
+     * 异常隔离走 {@link #guardedCall}（阶段 10 · t66 起：**唯一受保护调用** ⇒ 回调抛异常 = 故障隔离）。
      * <p>阶段 6 · 派发面能力化：判据由 {@code ActiveComponent} 改为能力接口 {@link CooldownAware}
      * （{@code ActiveComponent implements CooldownAware} ⇒ 既有组件的接受集逐字不变）。
+     * <p>阶段 10 · t66：本派发点**不在**遍历窗口内 ⇒ 待处理的隔离**立即**执行（仍是同一次派发调用）。
      */
     void dispatchCooldownEnd(String componentId, CooldownAware.CooldownEndReason reason){
         RoleComponent component = componentRegistry.getById(componentId);
         if(component instanceof CooldownAware aware){
-            runComponentUpdate("registered", component.getId(), () -> aware.onCooldownEnd(reason));
+            guardedCall(component, "onCooldownEnd", () -> aware.onCooldownEnd(reason));
+            runPendingQuarantine();
         }
     }
 
@@ -837,15 +861,12 @@ public class RoleInstance {
         //广播给"全部注册组件"：所有组件的新钩子由各组件自行实现（基类提供默认空实现）；
         //按迁移状态分支会引入第二套判据（与硬约束 §20 删总闸的教训同类）。legacy 生命周期扇出已在 T-1 ④ 删除。
         //遍历窗口（阶段 10 · t55）：广播期间**禁止**增/删/插位（注册表在窗口内拒绝写口）
-        componentRegistry.beginIteration();
-        try{
+        //阶段 10 · t66：窗口包装 + **唯一受保护调用**（异常 ⇒ 记下隔离请求，窗口关闭后执行四步）
+        withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
-                component.awake();
+                guardedCall(component, "awake", component::awake);
             }
-        }
-        finally{
-            componentRegistry.endIteration();
-        }
+        });
     }
 
     //start阶段：开始生效，顺序与awake一致（技能/被动/武器）
@@ -853,16 +874,12 @@ public class RoleInstance {
         if(player == null ) return;
 
         //阶段 4（B②-c）：为注册表内组件广播新基类钩子 start()（顺序 = 注册表顺序；理由同 awake 处注释）
-        //遍历窗口（阶段 10 · t55）：同 awake 处
-        componentRegistry.beginIteration();
-        try{
+        //遍历窗口（阶段 10 · t55）：同 awake 处；阶段 10 · t66：同 awake 处（唯一受保护调用）
+        withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
-                component.start();
+                guardedCall(component, "start", component::start);
             }
-        }
-        finally{
-            componentRegistry.endIteration();
-        }
+        });
     }
 
     //stop阶段：停止生效（T-1 ④ 后仅剩新钩子广播，按注册表顺序）
@@ -876,20 +893,18 @@ public class RoleInstance {
         //**幂等说明**：若组件在 stop() 里自行取消任务，随后 clear() 的 cancelAllAndClear() 仍会取消其
         //资源表内的同一句柄 ⇒ 重复 cancel 幂等（Task.cancel() 对已取消句柄是 no-op）。
         //遍历窗口（阶段 10 · t55）：同 awake 处
-        componentRegistry.beginIteration();
-        try{
+        //阶段 10 · t66：唯一受保护调用 —— 但本方法**只**由 clear() 调用（tearingDown=true）⇒ 其中的异常
+        //只记日志、**不**触发隔离（否则一次正常清角色里的 stop() 异常会播成"某角色已停用"= 假警报 ✗）
+        withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
-                component.stop();
+                guardedCall(component, "stop", component::stop);
                 //阶段 10 · t63（A6 · 队长裁定②）：**调用方 stop() ⇒ 其请求的计时全部取消** ✓
                 //任务按请求者登记（TimerComponent 的请求者语义）⇒ 这里逐组件回收，堵住
                 //"单独 stop() 不清理 ⇒ 生命周期泄漏"的缺口；clear() 末尾的 cancelAllAndClear()
                 //仍是最后的兜底（两者幂等，重复 cancel 对已取消句柄是 no-op）。
                 timerComponent.cancelAllOf(component);
             }
-        }
-        finally{
-            componentRegistry.endIteration();
-        }
+        });
     }
 
     //I-14：SanTE 派发的重入护栏状态。哨兵 Integer.MIN_VALUE = 无待发值；
@@ -909,7 +924,7 @@ public class RoleInstance {
      *       （初值 = 本次 {@code newSanTE}；每补发一次更新为 {@code target}）与 {@code target} 比较：
      *       **无重入 ⇒ 不补发（与旧行为逐字一致）**；**有重入 ⇒ 恰好补发末次一次**；
      *       循环退出条件 = {@code sanTEPendingValue == Integer.MIN_VALUE}（哨兵 = 无待发值）；</li>
-     *   <li>异常隔离沿用 {@link #runComponentUpdate}（单个组件抛异常不影响其余组件）。</li>
+     *   <li>异常隔离走 {@link #guardedCall}（阶段 10 · t66 起：**唯一受保护调用** ⇒ 抛异常 = 故障隔离）。</li>
      * </ul>
      * 现存两个实现者（{@code DefaultSanTEZeroPunishment} / {@code RedDeeplySorrowSkill} 的
      * {@code onSanTEChange}）都**不在钩子内同步写 SanTE**（前者只调度任务、后者只起冷却）
@@ -948,34 +963,33 @@ public class RoleInstance {
     /** 按注册表顺序广播组件侧 {@code onSanTEChange(pre, now)}（顺序与 update()/start()/stop() 同源）。 */
     private void broadcastSanTEChange(int preSanTE, int newSanTE){
         //遍历窗口（阶段 10 · t55）：可嵌套（update() 广播期间改 SanTE ⇒ 本方法再次进入窗口）
-        componentRegistry.beginIteration();
-        try{
+        //阶段 10 · t66：唯一受保护调用（异常 ⇒ 窗口关闭后执行隔离四步）
+        withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
-                runComponentUpdate("registered", component.getId(), () -> component.onSanTEChange(preSanTE, newSanTE));
+                guardedCall(component, "onSanTEChange", () -> component.onSanTEChange(preSanTE, newSanTE));
             }
-        }
-        finally{
-            componentRegistry.endIteration();
-        }
+        });
     }
 
     public void triggerUpdate(){
         if(player == null ) return;
+        //阶段 10 · t66：已隔离 ⇒ 本实例已死（组件已全部移除、角色已被清空）⇒ 不再派发
+        if(quarantined) return;
 
         //阶段 4（B⑤）：为**注册表内组件**广播新基类钩子 update()。
         //**顺序说明**：按**注册表顺序**遍历（legacy 三段扇出已在 T-1 ④ 删除，无先后关系）；
         //所有组件都对基类 update() 自行实现（基类默认空实现）；本批组件均已迁移（T-2 ① 后无迁移标记）
-        //**不再实现 legacy 更新接口** ⇒ 只被这一条路径调用，不会双触发；异常隔离复用 runComponentUpdate。
+        //**不再实现 legacy 更新接口** ⇒ 只被这一条路径调用，不会双触发。
         //遍历窗口（阶段 10 · t55）：**update() 广播期间禁止增/删/插位**（"禁止遍历中修改"的落点）
-        componentRegistry.beginIteration();
-        try{
+        //阶段 10 · t66：唯一受保护调用 —— 组件在 update() 里抛 ⇒ 整实例隔离（窗口关闭后执行四步）
+        withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
-                runComponentUpdate("registered", component.getId(), component::update);
+                guardedCall(component, "update", component::update);
             }
-        }
-        finally{
-            componentRegistry.endIteration();
-        }
+        });
+
+        //阶段 10 · t66：本 tick 里刚被隔离 ⇒ 到期扫描与帧末 flush 都不再对已死的实例做
+        if(quarantined) return;
 
         //阶段 4 追补（冷却自管理 · D2）：到期条目 ⇒ 移除 + 回调（关闭 O-21）；可见刷新改由同 tick 的帧末 flush 承担
         scanCooldowns();
@@ -1020,23 +1034,198 @@ public class RoleInstance {
         return false;
     }
 
-    //单个组件抛异常时不能中断这一tick其他组件的更新；同一个组件的异常只上报一次，恢复正常后再提示一次
-    private void runComponentUpdate(String componentType, String componentId, Runnable action){
-        String key = componentType + ":" + componentId;
-        try{
+    // ───────── 阶段 10 · t66：**框架调用组件的唯一受保护入口** + 故障隔离（四步） ─────────
+
+    /**
+     * 隔离的**对外处置**接入口（由 {@code RoleManager} 在实例构造成功后绑定）：日志点名的四件、
+     * 全服/OP 提醒、以及"清空该玩家角色"都在管理器侧（它才知道 {@code playerRoleMap} 与玩家归属）。
+     */
+    public interface QuarantineHandler {
+
+        void onQuarantined(RoleInstance instance, String componentId, String phase, Throwable failure);
+    }
+
+    /** 一条待执行的隔离请求（**首个异常胜出**：同一次派发里的第二个异常只记日志）。 */
+    private record QuarantineRequest(String componentId, String phase, Throwable failure) {
+    }
+
+    /** 绑定隔离处置（{@code RoleManager#selectRole} 在 {@code activate()} 之前调用 ⇒ 生命周期钩子里的异常也能被隔离）。 */
+    public void bindQuarantineHandler(QuarantineHandler handler) {
+        this.quarantineHandler = handler;
+    }
+
+    /** 本实例是否已被隔离（{@code RoleManager} 用它判断"激活期被隔离"的失败面）。 */
+    public boolean isQuarantined() {
+        return quarantined;
+    }
+
+    /**
+     * **框架调用组件的唯一受保护入口**（阶段 10 · t66 · A1）。
+     *
+     * <p>框架在**每一处**调用组件（{@code awake/start/stop/update/onSanTEChange} 广播 ·
+     * {@code onCast}/{@code onAttack} · {@code onCooldownEnd}）都必须经这里 ——
+     * **不在组件内部各自 try** ✗（否则第三个组件又要重写一遍 ⇒ C-15 第三个实例测试不合格 ✗）。
+     *
+     * <p>异常处置分三种：
+     * <ol>
+     *   <li><b>拆卸中 / 已隔离</b> ⇒ **只记日志**（不递归隔离 ✓ A7）；</li>
+     *   <li><b>本次派发里已有隔离请求</b> ⇒ 只记日志（首个异常胜出）；</li>
+     *   <li><b>否则</b> ⇒ 记下隔离请求（真正的四步在遍历窗口之外执行，见 {@link #withinIterationWindow}）。</li>
+     * </ol>
+     */
+    private void guardedCall(RoleComponent component, String phase, Runnable action) {
+        if (component == null || action == null) {
+            return;
+        }
+        try {
             action.run();
-            if(reportedUpdateErrors.remove(key)){
-                platform.logger().info(
-                        "Role '" + role.getId() + "' component [" + key + "] recovered from a previous update error.");
+        } catch (Throwable failure) {
+            if (tearingDown || quarantined || pendingQuarantine != null) {
+                logQuarantineSuppressed(component, phase, failure);
+                return;
             }
+            pendingQuarantine = new QuarantineRequest(component.getId(), phase, failure);
         }
-        catch(Throwable throwable){
-            if(reportedUpdateErrors.add(key)){
+    }
+
+    /** 被抑制的异常：只记日志（**不**递归隔离、**不**再播报）。 */
+    private void logQuarantineSuppressed(RoleComponent component, String phase, Throwable failure) {
+        platform.logger().log(Level.SEVERE,
+                "Role '" + role.getId() + "' component '" + (component == null ? "?" : component.getId())
+                        + "' threw in " + phase + " while the instance was already "
+                        + (quarantined ? "quarantined" : "being torn down")
+                        + "; logged only, no recursive quarantine.", failure);
+    }
+
+    /**
+     * **遍历窗口的唯一包装**（阶段 10 · t66）：窗口关闭后立刻执行待处理的隔离。
+     * <p>为什么隔离不能在窗口**内**执行：容器在遍历窗口内**拒绝写口**（t55 的"禁止遍历中修改"）
+     * ⇒ "移除全部组件"必须等窗口关闭；把四步放在窗口之外**仍属同一次派发调用**（不是延迟到下一 tick）✓。
+     */
+    private void withinIterationWindow(Runnable body) {
+        componentRegistry.beginIteration();
+        try {
+            body.run();
+        } finally {
+            componentRegistry.endIteration();
+            runPendingQuarantine();
+        }
+    }
+
+    /** 若本派发边界内有隔离请求 ⇒ 执行它（**同一实例只隔离一次** ✓）。 */
+    private void runPendingQuarantine() {
+        QuarantineRequest request = pendingQuarantine;
+        if (request == null || quarantined) {
+            return;
+        }
+        pendingQuarantine = null;
+        quarantine(request);
+    }
+
+    /**
+     * **故障隔离四步（顺序不可颠倒 · 用户新设计）**：
+     * <ol>
+     *   <li><b>先尝试执行所有组件的终止方法</b> —— 逐个 try（一个失败不阻断其余 ✓）；</li>
+     *   <li><b>然后将其所有组件移除</b> —— 整实例隔离，走裁定④ 动态删除路径 + P2 删除守卫；</li>
+     *   <li><b>记录 log</b> —— 点名 角色 / 玩家 / 组件 / 异常（含栈）；</li>
+     *   <li><b>给所有人发消息提醒</b> —— 全服简报 + OP 详情 + 限流去重（交给 {@link QuarantineHandler}）。</li>
+     * </ol>
+     * 第 4 步之后由管理器**清空该玩家角色**（A6，复用既有 {@code clearRole} 清理链）。
+     */
+    private void quarantine(QuarantineRequest request) {
+        if (quarantined) {
+            return;
+        }
+        quarantined = true;
+
+        //① 终止：逐个隔离地执行所有组件的 stop()
+        int terminated = terminateAllQuietly();
+        //② 移除：整实例隔离（不是只摘掉出错的那一个）
+        int removed = removeAllComponents();
+        //③ 日志：点名四件 + 栈
+        platform.logger().log(Level.SEVERE,
+                "Role '" + role.getId() + "' (player " + playerName() + ") was QUARANTINED: component '"
+                        + request.componentId() + "' threw in " + request.phase()
+                        + ". Terminated " + terminated + " component(s), removed " + removed
+                        + " component(s); the player's role is cleared.", request.failure());
+        //④ 提醒：全服简报 + OP 详情 + 限流去重
+        if (quarantineHandler != null) {
+            try {
+                quarantineHandler.onQuarantined(this, request.componentId(), request.phase(), request.failure());
+            } catch (Throwable notifierFailure) {
                 platform.logger().log(Level.SEVERE,
-                        "Role '" + role.getId() + "' component [" + key + "] threw an exception in update(), only this component is skipped. "
-                                + "Repeated errors of this component are suppressed until it recovers.", throwable);
+                        "Role '" + role.getId() + "' quarantine notification failed (the isolation itself is complete).",
+                        notifierFailure);
             }
         }
+    }
+
+    /** ①「先尝试执行所有组件的终止方法」：每个组件各自 try + 记日志，一个失败不阻断其余 ✓。 */
+    private int terminateAllQuietly() {
+        int terminated = 0;
+        for (RoleComponent component : componentRegistry.all()) {
+            try {
+                component.stop();
+                terminated++;
+            } catch (Throwable failure) {
+                platform.logger().log(Level.SEVERE,
+                        "Role '" + role.getId() + "' component '" + component.getId()
+                                + "' threw while terminating during quarantine; the remaining components are still terminated.",
+                        failure);
+            }
+            try {
+                timerComponent.cancelAllOf(component);
+            } catch (Throwable ignored) {
+                //终止阶段不得让"回收计时时的异常"打断其余组件的终止
+            }
+        }
+        return terminated;
+    }
+
+    /**
+     * ②「然后将其所有组件移除」（整实例隔离）。
+     * <p><b>顺序策略</b>：每次挑一个"**当前无人声明为必需**"的组件删（装配期已禁止依赖环 ⇒ 一定能删完），
+     * 这样 P2 删除守卫**不会**因为"还有依赖者"而拒绝 ⇒ 级联删除天然按依赖倒序完成 ✓。
+     * <p><b>失败面干净</b>：若某次删除仍被拒绝（守卫拒绝，或该组件的 {@code stop()} 抛），
+     * **显式记一条 SEVERE**，然后**强制移除**（{@code ComponentRegistry#remove}）——
+     * 隔离的目的是"失败面干净"，留残留才是真正的问题 ✓。
+     *
+     * @return 实际移除的组件数
+     */
+    private int removeAllComponents() {
+        int removed = 0;
+        int guard = 0;
+        while (guard++ < 512) {
+            RoleComponent pick = null;
+            for (RoleComponent component : componentRegistry.all()) {
+                if (componentRegistry.requiredBy(component.getId()).isEmpty()) {
+                    pick = component;
+                    break;
+                }
+            }
+            if (pick == null) {
+                break;
+            }
+            try {
+                if (componentLookup.remove(pick.getId())) {
+                    removed++;
+                }
+            } catch (Throwable failure) {
+                platform.logger().log(Level.SEVERE,
+                        "Role '" + role.getId() + "' could not remove component '" + pick.getId()
+                                + "' through the dynamic-removal path during quarantine (P2 delete guard or a throwing stop()); "
+                                + "forcing the removal so that no residue is left.", failure);
+                if (componentRegistry.remove(pick)) {
+                    removed++;
+                }
+            }
+        }
+        return removed;
+    }
+
+    /** 玩家名（日志点名用；离线/空玩家 ⇒ {@code "<unknown>"}）。 */
+    private String playerName() {
+        return player == null || player.getName() == null ? "<unknown>" : player.getName();
     }
 
     //阶段 5 · 4.4：旧的两条每 tick 轮询判定（"检测是否应该更新物品"）已删 ——
@@ -1044,6 +1233,9 @@ public class RoleInstance {
 
     //清除这个实例时使用，重置玩家状态
     public void clear(){
+        //阶段 10 · t66：先进入"拆卸中" ⇒ 之后组件在 stop() 里抛异常**只记日志**、不触发隔离
+        //（实例本来就在被销毁；把正常清角色里的 stop() 异常播成"某角色已停用"是假警报 ✗）
+        tearingDown = true;
         valid = false;
 
         triggerLifecycleStop();

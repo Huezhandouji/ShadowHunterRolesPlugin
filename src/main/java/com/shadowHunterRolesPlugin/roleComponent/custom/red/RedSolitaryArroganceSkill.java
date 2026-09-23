@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.custom.red;
+package com.shadowHunterRolesPlugin.roleComponent.custom.red;
 
 import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;

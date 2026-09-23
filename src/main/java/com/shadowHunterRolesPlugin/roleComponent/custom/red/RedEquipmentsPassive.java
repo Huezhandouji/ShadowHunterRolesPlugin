@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.custom.meiqiHezi.passive;
+package com.shadowHunterRolesPlugin.roleComponent.custom.red;
 
 import com.shadowHunterRolesPlugin.core.PassiveSkill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -11,15 +11,15 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 
-public class MeiqiheziEquipmentsPassive extends PassiveSkill {
+public class RedEquipmentsPassive extends PassiveSkill {
 
-    public MeiqiheziEquipmentsPassive(String id, ComponentServices services) {
+    public RedEquipmentsPassive(String id, ComponentServices services) {
         super(id, services, Component.text("穿戴装备"), Component.text("ccb"));
     }
 
     /**
      * 批次④（B④）迁移：改**无参新钩子**（容器 B②-c 已广播），装备发放逻辑**逐字未动**
-     * （四槽 = IRON_HELMET / LEATHER_CHESTPLATE / IRON_LEGGINGS / LEATHER_BOOTS；
+     * （四槽 = IRON_HELMET / IRON_CHESTPLATE / LEATHER_LEGGINGS / LEATHER_BOOTS；
      * 设置顺序 helmet→chestplate→leggings→boots 不变）。
      */
     @Override
@@ -35,20 +35,20 @@ public class MeiqiheziEquipmentsPassive extends PassiveSkill {
             helmet.setItemMeta(meta);
         }
 
-        ItemStack chestplate = new ItemStack(Material.LEATHER_CHESTPLATE);
+        ItemStack chestplate = new ItemStack(Material.IRON_CHESTPLATE);
         {
             ItemMeta meta = chestplate.getItemMeta();
-            LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) meta;
-            leatherArmorMeta.setColor(Color.fromRGB(139, 0, 0));
             meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
             meta.addEnchant(Enchantment.PROTECTION, 2, false);
             meta.setUnbreakable(true);
             chestplate.setItemMeta(meta);
         }
 
-        ItemStack leggings = new ItemStack(Material.IRON_LEGGINGS);
+        ItemStack leggings = new ItemStack(Material.LEATHER_LEGGINGS);
         {
             ItemMeta meta = leggings.getItemMeta();
+            LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) meta;
+            leatherArmorMeta.setColor(Color.RED);
             meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
             meta.addEnchant(Enchantment.PROTECTION, 1, false);
             meta.addEnchant(Enchantment.FIRE_PROTECTION, 1, false);
@@ -60,7 +60,7 @@ public class MeiqiheziEquipmentsPassive extends PassiveSkill {
         {
             ItemMeta meta = boots.getItemMeta();
             LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) meta;
-            leatherArmorMeta.setColor(Color.GRAY);
+            leatherArmorMeta.setColor(Color.fromRGB(139, 0, 0));
             meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
             meta.addEnchant(Enchantment.PROTECTION, 1, false);
             meta.addEnchant(Enchantment.FEATHER_FALLING, 3, false);

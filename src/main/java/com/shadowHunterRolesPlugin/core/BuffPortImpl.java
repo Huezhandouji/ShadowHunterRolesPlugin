@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.BuffType;
 import com.shadowHunterRolesPlugin.core.ports.BuffPort;
-import com.shadowHunterRolesPlugin.frameworkLevel.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 

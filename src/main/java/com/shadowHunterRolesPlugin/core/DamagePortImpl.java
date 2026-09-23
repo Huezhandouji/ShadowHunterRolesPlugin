@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.ports.DamagePort;
-import com.shadowHunterRolesPlugin.frameworkLevel.DamageComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.DamageComponent;
 import org.bukkit.entity.LivingEntity;
 
 /**

@@ -4,7 +4,7 @@ import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
 import com.shadowHunterRolesPlugin.core.ports.TimerPort;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.frameworkLevel.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
 
 /**
  * {@link TimerPort} 的独立适配器（阶段 10 · t63 · A2）：**纯转发**到 {@link TimerComponent}

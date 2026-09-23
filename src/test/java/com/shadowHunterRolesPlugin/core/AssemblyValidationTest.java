@@ -1,8 +1,8 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.roleComponent.AutoRecoverEnergyPassive;
-import com.shadowHunterRolesPlugin.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
-import com.shadowHunterRolesPlugin.custom.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
 import org.junit.Test;
 
 import java.util.Map;

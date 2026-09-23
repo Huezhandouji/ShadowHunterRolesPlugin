@@ -471,6 +471,10 @@ public class RoleInstance {
                 requestable.bindRepaintRequester(repaintRequester);
             }
 
+            //阶段 11 · t84：**创建后绑定**「持有这对端口的那一个实例」（F-1/F-2/F-3 的修复点）——
+            //时机必须在构造之后、任何钩子（awake/start）之前（组件可能一醒就起冷却 / 登记任务）。
+            bindOwnerPorts(services, component);
+
             //旧窄类型视图（供既有公共访问器使用）：按**具体类型**归位，不按任何"种类"猜测
             if(component instanceof Skill skill) skillMap.put(componentId, skill);
             if(component instanceof MainWeapon weapon) mainWeaponMap.put(componentId, weapon);
@@ -571,12 +575,29 @@ public class RoleInstance {
 
     /**
      * **起冷却**（单一表的规范写法；合并前是 `startSkillCooldown` / `startMainWeaponCooldown` 两支）。
+     * <p><b>阶段 11 · t84（F-1）</b>：本 id 重载只做**回落解析**（`getById` = 添加顺序第一个同 id 者），
+     * 判据与写表都转发给实例口径重载 ⇒ 与改前逐字一致；**同 id 两份实例**的正确判据由端口经
+     * {@link #startCooldown(RoleComponent, String, int)} 传入**绑定实例**得到 ✓。
      *
      * @return 是否**真的写了表**。`false` = 该组件"没有冷却这回事"（今天的定义 = 被动，见
-     *         {@link #hasCooldownNamespace(String)}）⇒ 调用方**不得**因此置脏（无声语义逐字保留）。
+     *         {@link #hasCooldownNamespace(RoleComponent)}）⇒ 调用方**不得**因此置脏（无声语义逐字保留）。
      */
     public boolean startCooldown(String componentId, int ticks){
-        if(!hasCooldownNamespace(componentId)) return false;
+        return startCooldown(resolveComponent(componentId), componentId, ticks);
+    }
+
+    /**
+     * **起冷却（实例口径，阶段 11 · t84 · F-1 的唯一实现点）**：判据 = **这一个实例**有没有冷却这回事
+     * （{@link #hasCooldownNamespace(RoleComponent)}）⇒ 同 id 两份实例不再互相污染 ✓。
+     * <p><b>表键仍取形参 {@code componentId}**（不是 `component.getId()`）：单一冷却命名空间本就
+     * "一个 id 一份冷却"（见 {@link #hasCooldownNamespace(RoleComponent)} 的说明与 `:599` 的原口径）
+     * ⇒ 表按 id、**能力判定按实例** —— 两者分工写死在这里。
+     * <p>{@code component == null}（未绑定且 id 解析不到）⇒ `false`、不写表（与改前的未知 id 口径逐字一致）。
+     *
+     * @return 是否**真的写了表**（false ⇒ 调用方不得置脏）
+     */
+    boolean startCooldown(RoleComponent component, String componentId, int ticks){
+        if(!hasCooldownNamespace(component)) return false;
         cooldowns.put(componentId, Bukkit.getCurrentTick() + ticks);
 
         //冷却到点置脏（方法引用形态，避免新增直呼点）：到点那一 tick 的帧末 flush 完成图标恢复。
@@ -585,26 +606,58 @@ public class RoleInstance {
     }
 
     /**
-     * 该组件**有没有冷却这回事**：合并前由冷却端口在**构造期**按 kind 挡下被动（"被动没有冷却 ⇒
-     * 恒就绪 / 剩余 0 / 不写表 / `end()` 恒 false"）；现在端口不再持有 kind，这一句收在**表这一层**。
-     * <p><b>阶段 8</b>：判据由"权威 kind ≠ PASSIVE"改为**能力接口** {@link CooldownBearing}
-     * —— 没有冷却这回事的组件（今天 = 被动）压根不实现该接口 ⇒ 与迁移前**同一接受集**，
-     * 且不再有任何"种类"概念。**不写表 ⇒ 不派发 ⇒ 不置脏**逐字保留。
-     * <p>用 {@code componentRegistry.all()} 线性扫描而不走 {@code getById}：本方法可能在
-     * **注册表冻结前**被调用（组件构造期若自行起冷却）⇒ 不引入"冻结前调用抛异常"的新前置条件。
-     * <p><b>语义收紧（如实申报）</b>：未注册的 id 从"会写表"变为"不写表"（旧口径里
-     * {@code componentKindOf} 对未知 id 返回 {@code null}，而 {@code null != PASSIVE} ⇒ 放行）。
-     * 仓内唯一的调用方是冷却端口（id 必然已注册）⇒ 无观察差异。
-     * <p><b>阶段 10 · t67（重复 id 的口径，显式读出）</b>：本方法命中**添加顺序第一个**同 id 者即返回
-     * ⇒ 重复 id 下答案取**先加**那个的能力（冷却命名空间本就按 id 建表 ⇒ 与"一个 id 一份冷却"自洽）。
+     * **纯判定：该实例有没有"冷却这回事"**（阶段 11 · t84 · F-1 修复的核心，**唯一实现点**）：
+     * 实现 {@link CooldownBearing} ⇒ 有；{@code null} / 未实现 ⇒ 没有。
+     * <p><b>为什么抽成静态纯函数</b>：它**不读注册表、无副作用** ⇒ 可离线单测（本卡 B3 的双轨离线面），
+     * 也把"按实例"这条口径收进**一个**可复核的落点（而不是散在端口与表两处各判一次）。
+     * <p><b>语义（与迁移前同一接受集）</b>：合并前由冷却端口在**构造期**按 kind 挡下被动（"被动没有冷却 ⇒
+     * 恒就绪 / 剩余 0 / 不写表 / `end()` 恒 false"）；阶段 8 起判据改为能力接口 —— 没有冷却这回事的组件
+     * （今天 = 被动）压根不实现该接口。**不写表 ⇒ 不派发 ⇒ 不置脏**逐字保留。
+     * <p><b>阶段 10 · t67 / 阶段 11 · t84（重复 id 的口径，显式读出）</b>：同 id 可有两份实例（t67 放开）
+     * ⇒ 本判定**只回答"这一份"**；"谁的那一份"由端口经**创建后绑定**（{@code bindOwnerPorts}）传入，
+     * 未绑定时才按 id 回落到**添加顺序第一个**同 id 者（{@link #resolveComponent(String)}）。
      */
-    private boolean hasCooldownNamespace(String componentId){
-        for(RoleComponent component : componentRegistry.all()){
-            if(componentId.equals(component.getId())){
-                return component instanceof CooldownBearing;
-            }
-        }
-        return false;
+    static boolean hasCooldownNamespace(RoleComponent component){
+        return component instanceof CooldownBearing;
+    }
+
+    /**
+     * **按 id 解析实例（回落口径，保留）**：{@code getById} = **添加顺序第一个**同 id 者。
+     * <p><b>阶段 11 · t84</b>：本口径从"主判据"降级为**回落** —— 端口未绑定时（例如框架级服务组件、
+     * 或"构造早于组件"的时刻）仍按它解析，**不得静默丢登记 / 丢派发 / 丢回调** ✗；
+     * 已绑定者一律用绑定实例（{@link #preferBound(RoleComponent, RoleComponent)}）。
+     */
+    RoleComponent resolveComponent(String componentId){
+        return componentRegistry.getById(componentId);
+    }
+
+    /**
+     * **纯判定：状态面"一律按实例"的唯一裁决点**（阶段 11 · t84 · F-1/F-2/F-3）：
+     * 已绑定 ⇒ **绑定实例**；未绑定 ⇒ 按 id 回落的实例（可为 {@code null}）。
+     * <p><b>为什么必须保留回落</b>：端口的构造**早于**组件（`createServices` 在组件构造之前被调用）
+     * ⇒ 框架级服务组件与"尚未绑定"的时刻只能按 id 解析；回落**不得静默丢弃** ✗（B1 的明文口径）。
+     * <p>纯函数（不读注册表、无副作用）⇒ 可离线单测。
+     */
+    static RoleComponent preferBound(RoleComponent bound, RoleComponent fallback){
+        return bound != null ? bound : fallback;
+    }
+
+    /**
+     * **创建后绑定**（阶段 11 · t84）：把"持有这一对端口的那一个组件实例"写进端口。
+     * <p><b>时机</b>：必须在**组件构造之后、任何钩子之前**（{@code awake()} / {@code start()} 里组件可能
+     * 立刻用端口起冷却 / 登记任务）⇒ 两个创建点（装配期 {@link #initComponents()}、
+     * 运行期动态增 {@code ComponentLookupImpl#insertAt}）都在构造返回后**立刻**调用本方法 ✓。
+     * <p><b>为什么要"构造后绑定"</b>：端口由 {@code createServices(componentId)} 在**组件构造之前**造出
+     * ⇒ 那个时刻物理上拿不到实例引用（这正是 F-1/F-2 的根因）；给端口加一个绑定钩子是最小修法。
+     * <p>只绑**冷却**与**计时**两对端口：它们是"状态面按实例"的三处落点（能力判定 / 回调投递 /
+     * 资源登记归属）；其余端口不持 per-instance 状态 ⇒ 不绑。
+     * <p>未绑定时端口一律按 id 回落（{@link #preferBound(RoleComponent, RoleComponent)}）
+     * ⇒ 行为与改前一致，**没有静默丢弃** ✗。
+     */
+    static void bindOwnerPorts(ComponentServices services, RoleComponent component){
+        if(component == null || services == null) return;
+        if(services.cooldowns() instanceof CooldownPortImpl port) port.bind(component);
+        if(services.timers() instanceof TimerPortImpl port) port.bind(component);
     }
 
     /** 冷却是否**正在进行**（条目存在且未到期）。与 {@code isCooldownReady()} 互补：后者对"无条目/已到期"都返回 true。 */
@@ -623,12 +676,24 @@ public class RoleInstance {
     /**
      * 显式结束冷却（S3）：**仅在冷却中生效** ⇒ 移除条目 + 回调 {@code ENDED_BY_COMPONENT} + 一次可见刷新；
      * 不在冷却中 ⇒ 无副作用（幂等）。
+     * <p><b>阶段 11 · t84（F-2）</b>：本 id 重载只做**回落解析**后转发实例口径重载
+     * ⇒ 与改前逐字一致；同 id 两份实例下"回调投给谁"由端口传入的**绑定实例**决定 ✓。
      * @return 是否确实结束了一段冷却
      */
     boolean endCooldown(String componentId){
+        return endCooldown(resolveComponent(componentId), componentId);
+    }
+
+    /**
+     * **显式结束冷却（实例口径，阶段 11 · t84 · F-2 的唯一实现点）**：回调**只投给**
+     * {@code component}，不再回头按 id 取"第一个同 id 者" ⇒ 同 id 两份实例下不会投错对象 ✓。
+     * <p>表操作仍按 id（一个 id 一份冷却）；{@code component == null}（解析不到）⇒ 回调阶段无目标
+     * （静默 no-op，与改前"解析不到就什么都不做"逐字一致），**条目仍按 id 清理** ⇒ 不残留。
+     */
+    boolean endCooldown(RoleComponent component, String componentId){
         if(!isCooling(componentId)) return false;
         cooldowns.remove(componentId);
-        dispatchCooldownEnd(componentId, CooldownAware.CooldownEndReason.ENDED_BY_COMPONENT);
+        dispatchCooldownEnd(component, CooldownAware.CooldownEndReason.ENDED_BY_COMPONENT);
         markHotbarDirty.run();
         return true;
     }
@@ -640,8 +705,11 @@ public class RoleInstance {
     private void scanCooldowns(){
         boolean removed = false;
         for(String componentId : expiredIds(cooldowns)){
+            //阶段 11 · t84（F-2）：**先解析目标实例、再清条目、再派发** —— 派发目标只由这里决定
+            //（本路径由**表**驱动，表按 id ⇒ 只能按 id 回落解析；这是框架侧唯一的 id 驱动派发点）
+            RoleComponent component = resolveComponent(componentId);
             cooldowns.remove(componentId);
-            dispatchCooldownEnd(componentId, CooldownAware.CooldownEndReason.EXPIRED);
+            dispatchCooldownEnd(component, CooldownAware.CooldownEndReason.EXPIRED);
             removed = true;
         }
         if(removed){
@@ -667,9 +735,11 @@ public class RoleInstance {
      * <p>阶段 6 · 派发面能力化：判据由 {@code ActiveComponent} 改为能力接口 {@link CooldownAware}
      * （{@code ActiveComponent implements CooldownAware} ⇒ 既有组件的接受集逐字不变）。
      * <p>阶段 10 · t66：本派发点**不在**遍历窗口内 ⇒ 待处理的隔离**立即**执行（仍是同一次派发调用）。
+     * <p><b>阶段 11 · t84（F-2）</b>：形参由 **id** 改为**实例** —— 派发目标**只由调用方决定**，
+     * 本方法不再按 id 二次解析 ⇒ 同 id 两份实例下不会投错对象 ✓；
+     * {@code null}（解析不到）⇒ 无可投递目标（静默 no-op，与改前的"解析不到就什么都不做"逐字一致）。
      */
-    void dispatchCooldownEnd(String componentId, CooldownAware.CooldownEndReason reason){
-        RoleComponent component = componentRegistry.getById(componentId);
+    void dispatchCooldownEnd(RoleComponent component, CooldownAware.CooldownEndReason reason){
         if(component instanceof CooldownAware aware){
             guardedCall(component, "onCooldownEnd", () -> aware.onCooldownEnd(reason));
             runPendingQuarantine();

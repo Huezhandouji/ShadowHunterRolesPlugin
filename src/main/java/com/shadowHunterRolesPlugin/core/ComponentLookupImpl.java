@@ -133,6 +133,10 @@ final class ComponentLookupImpl implements ComponentLookup {
 
         ComponentServices services = servicesFactory.apply(id);
         T component = create(snapshot, id, services);
+        //阶段 11 · t84：**运行期动态增也做创建后绑定**（与装配期同一个落点 `RoleInstance#bindOwnerPorts`）
+        //⇒ F-1/F-2/F-3 三条"状态面按实例"的口径在**新增组件**上同样成立 ✓。
+        //时机 = 构造返回之后、任何钩子（awake/start）之前 —— 组件可能一醒就起冷却 / 登记任务。
+        RoleInstance.bindOwnerPorts(services, component);
         try {
             registry.insert(index, component, declaration);
             component.awake();

@@ -86,6 +86,8 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new PlayerListener(roleManager), this);
         Bukkit.getPluginManager().registerEvents(new DamageTrackerListener(), this);
         Bukkit.getPluginManager().registerEvents(new RoleEventListener(), this);
+        //阶段 11 · t83：受伤 / 受治疗的**平台事件面**（钩子投递；ignoreCancelled、只读不取消）
+        Bukkit.getPluginManager().registerEvents(new DamageHookListener(roleManager), this);
 
         roleAPI = new RoleAPIImpl(roleManager, roleRegistry);
 

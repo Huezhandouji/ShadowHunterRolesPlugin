@@ -1104,6 +1104,42 @@ public class RoleInstance {
         }
     }
 
+    /**
+     * **承受方钩子的交付口**（阶段 11 · t83 · B-静态半）：平台事件面（{@code EntityDamageEvent} /
+     * {@code EntityRegainHealthEvent}）经它把"受伤 / 受治疗"通知到**本实例**的组件。
+     *
+     * <p><b>★ 为什么必须经这里、而不能从施动方实例直接调目标组件</b>：钩子抛异常时要按
+     * {@link #guardedCall} 的**故障隔离**语义处置（真四步）—— 那套语义只存在于本类 ⇒ 绕过它就等于
+     * 开第二条调用路径 ✗（违反"唯一受保护入口"）。调用方按
+     * {@code instance.getAllByType(Participant.class)} **扇出**后逐个交给本方法 ✓。
+     *
+     * <p><b>为什么外面还要包一层 {@link #withinIterationWindow}</b>：{@code guardedCall} 只把异常**记成**
+     * {@link #pendingQuarantine}，真四步是在窗口的 {@code finally} 里跑的（{@code runPendingQuarantine}）⇒
+     * 若从事件面裸调 {@code guardedCall}，隔离请求会被记下却**永远不执行** ✗ ⇒ 必须自建窗口边界 ✓。
+     * 窗口内禁止增删组件（t55）⇒ 四步照旧落在窗口**之外**执行 ✓。
+     *
+     * <p><b>主线程前提（B-静态半的申报项）</b>：本方法**必须在主线程**调用 —— 钩子会改动玩家状态
+     * （生命 / 回调副作用），而 Bukkit 只允许主线程改动世界状态。非主线程 ⇒ **响亮记 SEVERE 并放弃投递** ✓
+     * （把静默损坏变成可见错误；**不**静默忽略 ✗）。本工程基线是 **Paper**（非 Folia）⇒
+     * {@code isPrimaryThread} 成立 ✓；**若将来要支持 Folia，这套断言与调度都要重审** ✗。
+     *
+     * @param component 用于隔离归因的组件（点名"哪个组件抛的"）
+     * @param phase     阶段名（进日志与隔离消息，如 {@code onDamaged} / {@code onHealed}）
+     * @param action    扇出体（调用方负责遍历 {@code Participant}）
+     */
+    public void deliverHook(RoleComponent component, String phase, Runnable action) {
+        if (component == null || action == null) {
+            return;
+        }
+        if (!Bukkit.isPrimaryThread()) {
+            platform.logger().severe("Role '" + role.getId() + "' received hook '" + phase
+                    + "' OFF the primary thread; delivery SKIPPED (hooks mutate player state and must run "
+                    + "on the main thread). This is a loud failure, not a silent drop.");
+            return;
+        }
+        withinIterationWindow(() -> guardedCall(component, phase, action));
+    }
+
     /** 被抑制的异常：只记日志（**不**递归隔离、**不**再播报）。 */
     private void logQuarantineSuppressed(RoleComponent component, String phase, Throwable failure) {
         platform.logger().log(Level.SEVERE,

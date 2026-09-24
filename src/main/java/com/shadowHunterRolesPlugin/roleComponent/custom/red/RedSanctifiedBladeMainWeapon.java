@@ -15,7 +15,7 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 public class RedSanctifiedBladeMainWeapon extends MainWeapon {
 
     private VitalsComponent vitals;
-    //阶段 13 · t110：**可用性判定下放给子类**（用户裁定：基类不持 buff / energy、不查容器）⇒
+ //**可用性判定下放给子类**（基类不持 buff / energy、不查容器）⇒
     //  本组件自己持 buff 字段（在既有 start() 内一次查好 ✓）。
     private BuffComponent buff;
 
@@ -27,7 +27,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
     }
 
     /**
-     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 图标 / 冷却逐字段一致；
+     * 本组件的**描述符**：表现值默认值 = 原构造实参（名字 / 描述 / 图标 / 冷却逐字段一致；
      * 主武器的能量消耗由类型恒为 0），栏位由装配点 {@code setSlot} 指定。
      */
     public static final class Specification extends MainWeapon.Specification {
@@ -52,7 +52,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
      * 语义与旧 `onAttack(Player, Player, RoleInstance)` **逐条等价**：流血层数经
      * {@code RedBleedPassive.applyStacks(...)} 写入**同一份私有账本**；**拿不到账本时只跳过流血、
      * 继续结算普攻伤害**（原意保留）；伤害 `8` / 击退 `1` 逐字不变；冷却由本组件在施放成功处按声明值启动。
-     * <p>阶段 8：返回类型改 {@code void}（旧的施放结果枚举已删，返回值无消费点）。
+     * <p>返回类型改 {@code void}（施放结果枚举已删，返回值无消费点）。
      */
     @Override
     public void onAttack(AttackSignal signal) {
@@ -82,7 +82,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
     }
 
     /**
-     * **开始生效**（阶段 13 · t107）：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
+     * **开始生效**：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
      * <p>R-4：取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配后冻结 ⇒ 与按需解析恒等 ✓。
      */
     @Override
@@ -92,7 +92,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
     }
 
     /**
-     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     * **闸门放行？**（基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
      */
     @Override
     protected boolean gateOpen(){

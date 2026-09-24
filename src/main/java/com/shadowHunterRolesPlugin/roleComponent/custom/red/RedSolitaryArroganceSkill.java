@@ -24,11 +24,11 @@ public class RedSolitaryArroganceSkill extends Skill {
     private TimerComponent timer;
     private BuffComponent buff;
 
-    //O-5：任务句柄化，stop 时取消（阶段 2 由平台 Scheduler 提供，同时去掉 Folia 全局调度器误用）
+    //任务句柄化：stop 时取消（平台 Scheduler 提供；不再误用 Folia 全局调度器）
     private Task attackTask;
 
-    //阶段 13 · t101（第①批）：生命能力改向**组件本身**取用（R-6），引用缓存在 start()。
-    //旧写法经服务集的白名单端口成员取用；该端口是**纯转发**（同一组件的同一方法）⇒ 逐字等价。
+    //生命能力改向**组件本身**取用，引用缓存在 start()。
+ //既有写法经服务集的白名单端口成员取用；该端口是**纯转发**（同一组件的同一方法）⇒ 逐字等价。
     private VitalsComponent vitals;
 
 
@@ -37,7 +37,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     }
 
     /**
-     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
+     * 本组件的**描述符**：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
      * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
      */
     public static final class Specification extends Skill.Specification {
@@ -56,13 +56,13 @@ public class RedSolitaryArroganceSkill extends Skill {
 
     /**
      * 批次③（B③）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
-     * `canCastSkill` 不满足 → **直接返回**（**旧写法 `:34` 就是直接 return、不启冷却**，已现场核）；
+ * `canCastSkill` 不满足 → **直接返回**（**直接 return、不启冷却**，已现场核）；
      * 循环任务由 `timer.runRepeating(this, 1L, 6, …)` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）；
      * `:57` 射线几何仍用**静态** `SkillUtil.getPlayersInSightLine`（无状态工具，不进端口白名单）；
      * 伤害 8 与回血 4 **逐字不变**；冷却由本组件在施放成功处按声明值 **200** 启动。
      * <p>`isValid()` 守卫按四步等价链删除：任务登记进资源表 ⇒ `clear()` 的 `cancelAllAndClear()` 必取消它 ⇒
      * 延迟体在 `valid=false` 之后不可达。
-     * <p>阶段 8：返回类型改 {@code void}（旧的施放结果枚举已删，返回值无消费点）。
+     * <p>返回类型改 {@code void}（施放结果枚举已删，返回值无消费点）。
      */
     @Override
     public void onCast(CastSignal signal){
@@ -119,11 +119,11 @@ public class RedSolitaryArroganceSkill extends Skill {
     }
 
     /**
-     * **开始生效**（阶段 13 · t101 第①批填实）：把生命组件**一次查好**缓存进字段 ✓。
+     * **开始生效**：把生命组件**一次查好**缓存进字段 ✓。
      * <p>为什么在 {@code start()} 而不是 {@code awake()}：硬规矩 **R-4** 禁止在 {@code awake()} 里
      * 取用其他组件 ✗（awake 只做构造期自检 / 只读自身）；`start()` 相容器已冻结 ⇒ 容器查找合法 ✓。
      * <p>为什么缓存：本技能每 6 tick 结算一次，回血点在循环体内 ⇒ 重复查容器是纯浪费；
-     * 旧的端口引用本身也是**构造期就持有的引用** ⇒ 缓存与旧口径同族 ✓。
+ * 端口引用本身也是**构造期就持有的引用** ⇒ 缓存与既有口径同族 ✓。
      * <p>等价性：该端口是**纯转发**（转发到本实例的同一个生命组件、同一个方法）⇒ 逐字等价 ✓。
      */
     @Override
@@ -134,7 +134,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     }
 
     /**
-     * 新基类（RoleComponent）停止钩子（阶段 4 B③ 同批完成 legacy→新钩子 转换）：容器在 legacy 扇出之后、
+     * 新基类（RoleComponent）停止钩子：容器在 legacy 扇出之后、
      * `cancelAllAndClear()` **之前**广播 ⇒ 与旧 `LifecycleAware.stop(...)` 等价（O-5 的取消）；框架另有兜底（幂等）。
      */
     @Override
@@ -146,7 +146,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     }
 
     /**
-     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     * **闸门放行？**（基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
      */
     @Override
     protected boolean gateOpen(){
@@ -154,8 +154,8 @@ public class RedSolitaryArroganceSkill extends Skill {
     }
 
     /**
-     * **当前能量**（阶段 13 · t110）：本组件**不参与能量维度**（声明耗能 0）⇒ 返回声明值；
-     * 与迁移前**逐字等价**（能量组件内 clamp 到 `[0, max]` ⇒ 原判定 `current() < 0` 恒假）。
+     * **当前能量**：本组件**不参与能量维度**（声明耗能 0）⇒ 返回声明值；
+ * 与既有实现**逐字等价**（能量组件内 clamp 到 `[0, max]` ⇒ 原判定 `current() < 0` 恒假）。
      */
     @Override
     protected int currentEnergy(){

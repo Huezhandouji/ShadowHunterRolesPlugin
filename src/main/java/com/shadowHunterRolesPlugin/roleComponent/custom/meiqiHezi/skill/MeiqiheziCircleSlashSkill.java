@@ -28,7 +28,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     private VitalsComponent vitals;
     private TimerComponent timer;
 
-    //O-4：前摇任务句柄化，stop 时取消（阶段 2 换成平台 Task）
+    //前摇任务句柄化：stop 时取消（平台 Task）
     private Task castTask;
 
 
@@ -37,7 +37,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     }
 
     /**
-     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
+     * 本组件的**描述符**：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
      * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
      */
     public static final class Specification extends Skill.Specification {
@@ -72,9 +72,9 @@ public class MeiqiheziCircleSlashSkill extends Skill {
      * **再**做能量 `tryConsume` —— 不满足 → 直接返回（与旧路径一致、**不启冷却**）；
      * 冷却由本组件在施放成功处按声明值 **200** 启动；
      * 缓慢用 **5 参重载**（`ambient=true, particles=false` 逐字保真，R-1 方法族）；
-     * 前摇任务改由**计时组件**创建（阶段 13 · t102：不再经服务集端口、改为组件本身用，**请求者在首位**；
+     * 前摇任务改由**计时组件**创建（不再经服务集端口、改为组件本身用，**请求者在首位**；
      * **登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
-     * <p>阶段 8：返回类型改 {@code void}（旧的施放结果枚举已删，返回值无消费点 ⇒ 零行为变化）。
+     * <p>返回类型改 {@code void}（施放结果枚举已删，返回值无消费点 ⇒ 零行为变化）。
      */
     @Override
     public void onCast(CastSignal signal){
@@ -82,7 +82,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
         if(!buff.canCastSkill()) return;
         if(!energy.tryConsume(getEnergyCost())) return;
 
-        //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果（标志位与旧写法逐字一致）
+ //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果（标志位逐字一致）
         buff.applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
 
         Location loc = caster.getLocation();
@@ -125,7 +125,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
 
     /**
-     * 新基类（RoleComponent）的停止钩子（阶段 4 B②-c）：容器在 legacy 扇出之后、`cancelAllAndClear()`
+     * 新基类（RoleComponent）的停止钩子：容器在 legacy 扇出之后、`cancelAllAndClear()`
      * **之前**广播 ⇒ 与旧 `LifecycleAware.stop(...)` 的行为等价（O-4 的前摇取消）；框架还会兜底取消本组件
      * 资源表内的任务（重复取消幂等）。
      */
@@ -138,7 +138,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     }
 
     /**
-     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     * **闸门放行？**（基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
      */
     @Override
     protected boolean gateOpen(){
@@ -146,8 +146,8 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     }
 
     /**
-     * **当前能量**（阶段 13 · t110）：本组件**声明耗能 15** ⇒ 必须给出真实能量（否则"能量不足"态不出现 ✗）；
-     * 与迁移前**逐字等价**：同一个能量组件实例（注册表装配期后冻结、同类型实例唯一 ⇒ 字段引用与按需查找恒等 ✓）。
+     * **当前能量**：本组件**声明耗能 15** ⇒ 必须给出真实能量（否则"能量不足"态不出现 ✗）；
+ * 与既有实现**逐字等价**：同一个能量组件实例（注册表装配期后冻结、同类型实例唯一 ⇒ 字段引用与按需查找恒等 ✓）。
      */
     @Override
     protected int currentEnergy(){

@@ -22,7 +22,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
 
     private VitalsComponent vitals;
     private EnergyComponent energy;
-    //阶段 13 · t110：**可用性判定下放给子类**（用户裁定：基类不持 buff / energy、不查容器）⇒
+ //**可用性判定下放给子类**（基类不持 buff / energy、不查容器）⇒
     //  本组件自己持 buff 字段（在既有 start() 内一次查好 ✓）。
     private BuffComponent buff;
 
@@ -32,7 +32,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
     }
 
     /**
-     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 图标 / 冷却逐字段一致；
+     * 本组件的**描述符**：表现值默认值 = 原构造实参（名字 / 描述 / 图标 / 冷却逐字段一致；
      * 主武器的能量消耗由类型恒为 0），栏位由装配点 {@code setSlot} 指定。
      */
     public static final class Specification extends MainWeapon.Specification {
@@ -67,7 +67,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         Player attacker = svc().self().player();
         Player victim = signal.victim();
 
-        //如果能量大于20，则进行范围伤害（旧写法在 onLeftClick 里，由 listener 同帧调用）—— 不能直接 return
+ //如果能量大于20，则进行范围伤害（早先写法在 onLeftClick 里，由 listener 同帧调用）—— 不能直接 return
         if (energy.current() >= 20) {
             castAreaDamage(attacker);
             startCooldown();   //D1：组件自启冷却（框架不再代启动）
@@ -125,7 +125,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
     }
 
     /**
-     * **开始生效**（阶段 13 · t107）：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
+     * **开始生效**：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
      * <p>R-4：取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配后冻结 ⇒ 与按需解析恒等 ✓。
      */
     @Override
@@ -136,7 +136,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
     }
 
     /**
-     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     * **闸门放行？**（基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
      */
     @Override
     protected boolean gateOpen(){

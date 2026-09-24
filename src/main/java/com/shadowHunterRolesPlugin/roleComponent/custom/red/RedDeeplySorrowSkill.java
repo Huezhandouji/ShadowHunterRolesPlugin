@@ -17,11 +17,11 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  * <ul>
  *   <li>去 legacy `UpdateAware` 与 `SanTEChangeAware` ⇒ 改走基类新钩子 {@link #update()} 与
  *       {@link #onSanTEChange(int, int)}（容器对**注册表内组件**广播；SanTE 侧为"真变化才派发"，
- *       由 B⑨ 完成、本卡不新增可见变化）；</li>
- *   <li>旧式聚合根调用端口化：`instance.decreaseSanTE(10)` → **SanTE 组件**的 `decrease(10)`（当时经服务集端口；阶段 13 · t103 起直接用组件）；
+ * 由既有实现完成、不新增可见变化）；</li>
+ *   <li>聚合根调用端口化：`instance.decreaseSanTE(10)` → **SanTE 组件**的 `decrease(10)`（直接用组件）；
  *       `instance.applyPotionEffect(…createEffect(45, 5/2))` → **Buff 组件**的 `applyPotionEffect(type, 45, 5/2)`（同上）
  *       （**同一条已记账路径** O-7）；`instance.startSkillCooldown(getId(), getCooldownTicks())` →
- *       **组件自持冷却**的 `startCooldown()`（阶段 13 · t105：状态归组件实例、框架只**转问** ✗）；</li>
+ *       **组件自持冷却**的 `startCooldown()`（状态归组件实例、框架只**转问** ✗）；</li>
  *   <li>**数值与间隔逐字不变**：冷却 `600` / 能量 `0` / 每秒（`20` tick）一结算 / 扣 `10` 点 SanTE /
  *       生命恢复 `45, 5` 与力量 `45, 2` / 音效 `ENTITY_WITHER_DEATH 2,1` 与 `ENTITY_WITHER_SHOOT 1,1`；</li>
  * </ul>
@@ -54,14 +54,10 @@ public class RedDeeplySorrowSkill extends Skill {
      * <p><b>时机 = {@code start()}</b>（R-4：`awake()` 只做构造期自检 / 只读自身，**不得取用其他组件** ✗），
      * 并与 {@link #stop()} 的移除成对 ✓（`addListener` 幂等 ⇒ 重复 start 不会重复登记 ✓）。
      * <p><b>通知顺序</b> = **添加先后** = 容器 `start()` 广播序（= 组件装配序）。
-     * <b>与 {@code awake()} 是否同序需另证</b>（本卡未做运行级取证）⇒ 不再宣称"awake 序" ✗。
+ * <b>与 {@code awake()} 是否同序需另证</b>（未做运行级取证）⇒ 不再宣称"awake 序" ✗。
      * <p>容器查找（而不是字段注入）⇒ 本组件**不持有** `SanTEComponent` 引用 ✓。
      * <p><b>监听登记实例存进 {@link #santeListener}</b>：{@code Consumer} 无身份标识 ⇒ 必须持有同一实例才能按引用移除 ✓。
-     * <p><b>【已作废】旧口径原文（逐字保留）</b>：
-     * 「时机 = `awake()` ⇒ 通知顺序 = 订阅先后 = 组件装配序 ✓。」
      * —— 订阅已迁到 `start()` ⇒ 该表述**作废** ✗。
-     * <p><b>【已作废】旧口径原文（逐字保留）</b>：「本类 `implements
-     * {@code SanTEComponent.Subscriber}`，并在 `start()` 里 {@code sante.subscribe(this)}」
      * —— 该嵌套接口与 `subscribe` 入口**已删除** ✗（改为 JDK {@code Consumer} 监听器列表）⇒ 该表述**作废** ✗。
      */
     @Override
@@ -74,7 +70,7 @@ public class RedDeeplySorrowSkill extends Skill {
     }
 
     /**
-     * 本组件的**描述符**（阶段 7 · B 步）：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
+     * 本组件的**描述符**：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
      * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
      */
     public static final class Specification extends Skill.Specification {
@@ -139,8 +135,6 @@ public class RedDeeplySorrowSkill extends Skill {
      * <p>框架在拆卸时调用 `stop()`（`cancelAllAndClear()` 兜底回收资源 ⇒ 本方法幂等 ✓；
      * {@code removeListener} 对不在名单里的登记是 no-op 且返回 {@code false} ✓ —— 与旧
      * {@code unsubscribe} 的 no-op 语义逐字一致）。
-     * <p><b>【已作废】旧口径原文（逐字保留）</b>：「{@code sante.unsubscribe(this)}」
-     * —— 该入口**已删除** ✗（{@code Consumer} 无身份标识 ⇒ 改为按引用移除登记实例）⇒ 该表述**作废** ✗。
      */
     @Override
     public void stop() {
@@ -151,7 +145,7 @@ public class RedDeeplySorrowSkill extends Skill {
     }
 
     /**
-     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     * **闸门放行？**（基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
      */
     @Override
     protected boolean gateOpen(){
@@ -159,8 +153,8 @@ public class RedDeeplySorrowSkill extends Skill {
     }
 
     /**
-     * **当前能量**（阶段 13 · t110）：本组件**不参与能量维度**（声明耗能 0）⇒ 返回声明值；
-     * 与迁移前**逐字等价**（能量组件内 clamp 到 `[0, max]` ⇒ 原判定 `current() < 0` 恒假）。
+     * **当前能量**：本组件**不参与能量维度**（声明耗能 0）⇒ 返回声明值；
+ * 与既有实现**逐字等价**（能量组件内 clamp 到 `[0, max]` ⇒ 原判定 `current() < 0` 恒假）。
      */
     @Override
     protected int currentEnergy(){

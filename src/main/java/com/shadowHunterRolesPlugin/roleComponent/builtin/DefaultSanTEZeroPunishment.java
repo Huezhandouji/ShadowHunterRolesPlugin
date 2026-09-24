@@ -97,14 +97,8 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
      * <b>与 {@code awake()} 是否同序需另证</b>（未做运行级取证）⇒ 不宣称"awake 序" ✗。
      * <p><b>取用形态</b>：四个协作组件为**字段 + 在本 `start()` 内赋值** ✓（与全仓统一形态一致）。
      * <p><b>监听登记实例存进 {@link #santeListener}</b>：{@code Consumer} 无身份标识 ⇒ 必须持有同一实例才能按引用移除 ✓。
-     * <p><b>【已作废】旧口径原文（逐字保留）</b>：「用容器查找（`svc().components().get(...)`）
-     * 而不是字段注入 ⇒ 本组件**不持有** `SanTEComponent` 引用，与"组件只通过容器协作"的既有纪律一致 ✓。」
      * —— 该表述**作废** ✗（现已持有字段引用；缓存与按需查找恒等：注册表装配期后冻结 ✓）。
-     * <p><b>【已作废】旧口径原文（逐字保留）</b>：
-     * 「时机 = `awake()`（生命周期里"构造之后、start 之前"）⇒ 与装配序一致：**先 awake 的组件先订阅**
      * ⇒ 通知顺序 = 订阅先后 = 装配序 ✓。」—— 订阅已迁到 `start()` ⇒ 该表述**作废** ✗。
-     * <p><b>【已作废】旧口径原文（逐字保留）</b>：「本类 `implements
-     * {@code SanTEComponent.Subscriber}`，并在 `start()` 里 {@code sante.subscribe(this)}」
      * —— 该嵌套接口与 `subscribe` 入口**已删除** ✗（改为监听器列表）⇒ 该表述**作废** ✗。
      */
     @Override

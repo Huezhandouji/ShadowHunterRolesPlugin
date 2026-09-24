@@ -73,10 +73,6 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
     /**
      * **「这个组件耗能量」的能力接口**：耗能是**能量面**的声明 ⇒ 本接口归能量组件所有
      * （能力各归其家：耗能声明与能量真值同属能量面）。
-     * <p><b>【已作废】旧口径原文（逐字保留）</b>：「这个组件耗能量」的能力接口，
-     * 其**顶层形态位于 `core/hotbar/` 包**（顶层文件已删除 ✗）—— 其后改为**本嵌套形态**，
-     * 原 5 处引用已全部改为嵌套限定名 ✓。
-     * <p>{@code MainWeapon} 的 {@code energyCost ≡ 0} 不变量由本接口承载（构造器第 6 位恒传 0）；
      * 非零能量成本只有两个技能（`MeiqiheziBloodySlashSkill` = 8 / `MeiqiheziCircleSlashSkill` = 15）。
      * <p>实现方式：由 `HotbarRenderComponent.HotbarPresentable` 的 `default` 满足，并由 `ActiveComponent`
      * 显式转发（本组件不实现它，只承载声明面 ✓）。

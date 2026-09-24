@@ -12,10 +12,9 @@ import java.util.function.Consumer;
  * SanTE 组件：系统级能力「SanTE」的**组件形态**（每角色实例一个）。
  * <p><b>★ 本组件持有状态与行为</b>：SanTE 真值 {@code current} 与上限 {@code max} 都在本组件里，
  * clamp 与 increase/decrease/set 的语义全在本组件内实现 —— **不再转调任何旧端口** ✗。
- * <p><b>与容器的分工</b>：写后对平台说两句话 —— 发布 {@code SanTEChangeEvent} 与
- * 向**监听器列表**派发（含重入护栏）—— 前者走**平台侧通道**（容器以本组件名义登记的那一条监听，
- * 见 {@link #set(int)} / {@link #broadcastChange(int, int)}）；
- * 后者由容器在**派发边界**逐个经受保护调用完成；组件只负责真值怎么变。
+ * <p><b>与容器的分工</b>：写后对平台说两句话 —— 先把变更交给**平台侧通道**（容器以本组件名义登记的那一条监听，
+ * 见 {@link #set(int)} / {@link #broadcastChange(int, int)}），再由容器在**派发边界**向
+ * 监听器列表派发（含重入护栏）；组件只负责真值怎么变。
  * <p><b>状态唯一</b>：容器侧**不再**持有 {@code currentSanTE} 字段 ✗（只保留视图方法）。
  * <p><b>归零惩罚的钉 0 语义不变</b>：惩罚组件（{@code DefaultSanTEZeroPunishment}）仍按既有方式
  * 调**组件自身**的 {@code set(0)} 逐 tick 钉 0（协作组件引用在 `start()` 内一次取好、存进字段 ✓）⇒ 走的还是这一条 clamp + 派发路径。
@@ -31,7 +30,7 @@ import java.util.function.Consumer;
  * / R-8 同理）✓。消费者在自己的 {@code start()} 里 {@code sante.addListener(this, change -> …)} ⇒ **不再有任何类
  * 实现本组件的嵌套接口** ✓。
  * <p><b>两条通道</b>（本组件的分工边界 ✓）：名单里 **owner = 本组件自身**的那一条 = **平台侧通道**
- * （容器以本组件名义登记：发布事件 + 触发派发）⇒ 写入路径**直调**它 —— 无变化写入也发布事件 ✓、
+ * （容器以本组件名义登记：触发派发）⇒ 写入路径**直调**它 —— 无变化写入也通知它 ✓、
  * 异常照常上抛 ✓；**其余登记 = 订阅者** ⇒ 由容器在**派发边界**通知（真变化闸门 ·
  * 逐监听器故障隔离 · 重入合并三条都在那里 ✓）⇒ 写入路径**不**直接通知订阅者 ✗。
  * <p><b>载荷取「最小充分类型」</b>：旧方法有两个入参（{@code pre} / {@code now}）⇒ 不能退化成
@@ -88,7 +87,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
      * <p><b>幂等</b>：同一 {@code owner} + 同一 {@code listener} 重复添加**不重复登记** ✓
      * （与旧 {@code subscribe} 的幂等语义逐字一致）。
      * <p><b>{@code owner} = 本组件自身 ⇒ 平台侧登记</b> ✓：写入路径**直调**它
-     * （见 {@link #set(int)} —— 无变化写入也发布事件 ✓、异常照常上抛 ✓）；
+     * （见 {@link #set(int)} —— 无变化写入也通知它 ✓、异常照常上抛 ✓）；
      * 其余 {@code owner} ⇒ **订阅者** ✓（由容器在**派发边界**通知：真变化闸门 + 逐监听器故障隔离 ✓）。
      * <p>{@code owner} 或 {@code listener} 为 {@code null} ⇒ **忽略**（旧 {@code subscribe(null)} 同样是 no-op ✓）。
      * <p><b>返回值</b>：本次登记对应的 {@link Listener} 实例（**调用方存起来** ⇒ 将来用
@@ -208,12 +207,12 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
 
     /**
      * **把变更交给平台侧**（本方法**只**做这一件事 ✓）——
-     * 由容器在**派发边界**调用（`RoleInstance.broadcastSanTEChange` ⇒ 先逐个通知监听器、再发布平台事件 ✓）。
+     * 由容器在**派发边界**调用（`RoleInstance.broadcastSanTEChange` ⇒ 先逐个通知监听器、再走平台侧通道 ✓）。
      * <p><b>调用时机未变</b> ✓：容器在 {@code dispatchSanTEChange} 里已先过 {@code pre == now} 的
      * "真变化"闸门 ⇒ 本方法仍**只在真变化时**被调到（**不是**在每次 {@code set()} 里无条件调 ✗
-     * —— 那会改变"事件何时发布"的既有语义 ✓）。
-     * <p><b>为什么还叫 broadcast</b>：历史名（旧形态里它同时向订阅者广播 + 发布事件 ✗）；
-     * 监听器通知现已归 {@link #forEachListener(Consumer)} ✓ ⇒ 本方法只剩平台事件这一半 ✓。
+     * —— 那会改变"变更何时到达平台侧"的既有语义 ✓）。
+     * <p><b>为什么还叫 broadcast</b>：历史名（旧形态里它同时向订阅者广播 + 走平台侧 ✗）；
+     * 监听器通知现已归 {@link #forEachListener(Consumer)} ✓ ⇒ 本方法只剩平台侧这一半 ✓。
      */
     public void broadcastChange(int pre, int now) {
         notifyPlatform(new Change(pre, now));
@@ -240,7 +239,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
      * </ul>
      * <p><b>三态返回</b>：{@code null} = **未识别 / 拒绝执行**（未知动词 ✓ · 参数缺失/多余 ✓ · 非数字/负数/溢出 ✓ · 空或空白 payload ✓）；
      * 非空串 = **规范化值**（写类回写后值、读类回当前值 ✓）。
-     * <p><b>薄适配纪律</b>：本方法**只调**上述既有方法 ⇒ 不新增平行的状态改动路径 ✗、不绕过既有 clamp / 事件 / 置脏 ✓。
+     * <p><b>薄适配纪律</b>：本方法**只调**上述既有方法 ⇒ 不新增平行的状态改动路径 ✗、不绕过既有 clamp / 通知 / 置脏 ✓。
      */
     @Override
     public String onOperationCommand(String payload) {

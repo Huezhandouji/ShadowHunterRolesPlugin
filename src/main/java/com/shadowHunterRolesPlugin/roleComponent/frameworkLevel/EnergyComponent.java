@@ -13,9 +13,9 @@ import java.util.function.Consumer;
  * <p><b>★ 本组件持有状态与行为</b>：能量真值 {@code current} 与上限 {@code max} 都在本组件里，
  * clamp、检查+扣减合一、增加，全部在本组件内实现 —— **不再转调任何旧端口** ✗
  * （用户口径：{@code ComponentServices} 只保留「玩家实例 + 组件服务」，其他能力做成组件）。
- * <p><b>与容器的分工</b>：能量变化对外的两件**平台事** —— 热键栏置脏（触点④）与
- * {@code EnergyChangeEvent} 事件发布 —— 由容器**注册成监听器**承担；
- * 组件只负责"真值怎么变"，容器只负责"变了之后对平台说什么"。这条分界让组件**不需要**
+ * <p><b>与容器的分工</b>：能量变化之后对外的**平台事**是热键栏置脏（触点④）—— 由容器把一条
+ * 监听器注册进本组件的名单来承担；组件只负责"真值怎么变"，容器只负责"变了之后做什么"。
+ * 这条分界让组件**不需要**
  * {@code svc()} 就能完整实现能力语义（唯一的 {@code svc()} 用途 = {@code self()} 取玩家）。
  *
  * <h2>订阅面：<b>JDK {@code Consumer} 监听器列表</b></h2>
@@ -53,7 +53,7 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
      * <h2>为什么需要它</h2>
      * 一次变更携带三个值（{@code previous} / {@code current} / {@code max}）；本组件的
      * 监听器列表用 JDK {@code Consumer} ⇒ 需要一个**载体**把这三个值一起交出去 ✓。
-     * 取**最小充分类型**：逐字保留旧载荷的三个值 ✓（监听器据此置脏 + 发布事件 ✓）。
+     * 取**最小充分类型**：逐字保留旧载荷的三个值 ✓（监听器据此置脏 ✓）。
      */
     public record Change(int previous, int current, int max) {
     }
@@ -230,7 +230,7 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
      * **未知动词 / 空 payload / 语法错 / 参数不合法 ⇒ {@code null}** ✗（= 未识别或拒绝 ✓）。
      * 注意 {@code consume} 因能量不足而未扣时**仍算已识别** ✓ ⇒ 回**未变**的当前值（如 {@code "100"}）✓
      * 而不是 {@code null} ✓。
-     * <p><b>副作用与置脏</b>：三个写动词一律经本组件的**既有强类型方法** ⇒ 变更通知（置脏 + 事件）由
+     * <p><b>副作用与置脏</b>：三个写动词一律经本组件的**既有强类型方法** ⇒ 变更通知（置脏）由
      * 容器注册的监听器**照常触发** ✓ —— **不新增第二条变更通道** ✗（设计定案 §7.2"一套实现、
      * 两套门面"：字符串面只是**薄适配层** ✓）；{@code current} 无副作用 ✓。
      */

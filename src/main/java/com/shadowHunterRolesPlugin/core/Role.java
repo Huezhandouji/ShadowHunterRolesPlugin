@@ -5,8 +5,6 @@ import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
-import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.roleComponent.ComponentDependencyException;
 import com.shadowHunterRolesPlugin.roleComponent.ComponentFactory;

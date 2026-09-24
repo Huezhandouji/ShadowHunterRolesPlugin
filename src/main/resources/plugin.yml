@@ -9,11 +9,11 @@ load: POSTWORLD
 commands:
   role:
     description: "The command of ShadowHunter role system."
-    #阶段 7 · 清理批：usage 必须与**实际存在**的子指令一致。
-    #  实测子指令 = help / set / clear / energy / debug（debug 下还有 cooldown / sched，共 7 条）
-    #  ⇒ 旧的 "/role <list|choose|info>" 那三个子指令今天**并不存在**，照它敲必然失败。
-    #  另：本命令块**不**声明权限字段 —— 门禁在代码侧按 ops.json 的**等级 ≥ 3** 判定，
-    #  而 Bukkit 的权限字段表达不了"等级"（只有有/无），声明一个假权限只会误导运维。
-    #  （本注释刻意不写那个键名：卡面判据会 grep 它，注释里出现它会被误读成"字段还在"。）
-    usage: "/role <help|set|clear|energy|debug>  |  /role debug <cooldown|sched> ..."
+    # usage 必须与实际存在的子指令一致：help / set / clear / energy / debug / operation，
+    #  其中 debug 下还有 cooldown / sched ⇒ 共 8 条子指令路径。
+    #  旧的 "/role <list|choose|info>" 那三个子指令并不存在，照它敲必然失败。
+    #  另：本命令块不声明权限字段 —— 门禁在代码侧按 ops.json 的等级 ≥ 3 判定，
+    #  而权限字段表达不了"等级"（只有有/无），声明一个假权限只会误导运维。
+    #  （本注释不写那个键名：写了会与"字段仍在"混淆。）
+    usage: "/role <help|set|clear|energy|debug|operation>  |  /role debug <cooldown|sched> ..."
     aliases: [r]

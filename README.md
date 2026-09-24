@@ -37,10 +37,11 @@ $env:GRADLE_USER_HOME = "$PWD\.gradle-work"        # 本地 Gradle 缓存（不�
 
 ## 部署
 
-把 `build/libs/ShadowHunterRolesPlugin-<version>.jar` 放进服务端 `plugins/` 后启动。本插件当前**没有配置文件**，所有数值都写在 Java 里（角色定义与各组件构造器）。
+把 `build/libs/ShadowHunterRolesPlugin-<version>.jar` 放进服务端 `plugins/` 后启动。首次启动会在插件数据目录生成 `config.yml`，其中 `command-permission-level`（整数 0-4，默认 3）是 `/role` 及其全部子指令所需的最低权限等级；改完该字段**无需重启**（最迟约 5 秒生效）。角色的数值与文案仍写在 Java 里（角色定义与各组件构造器）。
 
 ## 文档
 
+- **面向玩家 / 管理员的使用手册：`docs/ai-generated/使用者手册.md`** —— 插件在游戏里做什么、指令表、角色表、机制分节（能量 / SanTE 归零惩罚 / 阵营与敌对 / 冷却 / 快捷栏）、权限节点表、常见问题（含可自检步骤）。
 - **面向 AI 的项目文档：`docs/ai-generated/`**
   - `README.md` —— 索引、阅读顺序、口径说明（含未入库项申报）
   - `架构总览.md` —— 运行时链路、关键设施、分层方向、11 个包职责

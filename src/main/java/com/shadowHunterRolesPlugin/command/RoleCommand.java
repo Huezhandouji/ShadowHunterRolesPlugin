@@ -31,8 +31,8 @@ import java.util.TreeMap;
  *     <li>Tab 补全：第一级补全子指令名，其余交给命中的子指令。</li>
  * </ol>
  * <p>
- * <b>门禁覆盖面（7 条子指令路径一次覆盖）</b>：{@code help} / {@code set} / {@code clear} / {@code energy} /
- * {@code debug} / {@code debug cooldown} / {@code debug sched} —— 它们都必须经本类
+ * <b>门禁覆盖面（子指令路径一次覆盖）</b>：{@code help} / {@code set} / {@code clear} / {@code energy} /
+ * {@code debug} / {@code debug cooldown} / {@code debug sched} / {@code operation} —— 它们都必须经本类
  * {@link #onCommand} 或 {@link #onTabComplete} 的**第一行**才能抵达子指令实现（见 {@link #gate} 的唯一调用形态）。
  * <p>
  * <b>既有顶层命令不迁移 Brigadier</b>：注册方式仍是 `plugin.yml` 的 {@code commands: role:} + 主类

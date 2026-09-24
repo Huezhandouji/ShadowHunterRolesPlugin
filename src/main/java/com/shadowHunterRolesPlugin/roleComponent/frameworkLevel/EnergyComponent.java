@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 
 /**
@@ -17,8 +18,12 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
  * 入口一字不动）。
  * <p><b>每实例一个</b>：由容器在实例构造期直接构造（**不进 {@code Role} 模板** ⇒ 装配表逐格不变），
  * 并以 id {@code "energy"} 登记进实例容器（可被 {@code svc().components().get(EnergyComponent.class)} 取到）。
+ * <p><b>阶段 13 · t120（组件操作面 · 第一片）</b>：本组件**选择实现** {@link OperationProvider} ✓ ——
+ * 外部指令面可把整段 payload 交给 {@link #onOperationCommand(String)} 自解析 ✓；
+ * <b>grammar 与返回值语义写在该方法的 javadoc 里</b> ✓（本组件**不扩**那个接口 ✗：需要更多能力时
+ * 暴露**自己的**方法 ✓ —— 设计定案 §10.2 护栏①）。
  */
-public class EnergyComponent extends RoleComponent {
+public class EnergyComponent extends RoleComponent implements OperationProvider {
 
     /**
      * 变更通知（容器在构造期注入）：把「置脏 + 事件」这两件平台事留给容器。
@@ -96,5 +101,62 @@ public class EnergyComponent extends RoleComponent {
     /** 减少能量（内部按 0 下限 clamp）。 */
     public void decrease(int amount) {
         set(current - amount);
+    }
+
+    // ───────── 阶段 13 · t120：组件操作面（设计定案 §2 / §10.4；本片 = 能量试点） ─────────
+
+    /**
+     * **操作面 grammar**（设计定案 §10.4：首 token 必为操作动词 ✓；本片试点只接这四个 ✓）：
+     * <pre>
+     * add &lt;非负整数&gt;      增能（内部按上限 clamp；等价于 {@link #gain(int)}）
+     * consume &lt;非负整数&gt;  试扣（能量不足 ⇒ 不扣、不产生变更；等价于 {@link #tryConsume(int)}）
+     * set &lt;非负整数&gt;      直接写入（内部按 [0, max] clamp；等价于 {@link #set(int)}）
+     * current             只读：当前能量（**无副作用**；读口 = {@link #current()}）
+     * </pre>
+     * <b>严格规则（逐条可测）</b>：动词**小写**、**大小写敏感** ✓；{@code add}/{@code consume}/{@code set}
+     * **必须**且**只带一个非负整数**（缺参 / 多参 / 非数字 / 负数 / 溢出 ⇒ 拒绝 ✗）；
+     * {@code current} **不得**带参数 ✗；payload 为 {@code null} / 空串 / 纯空白 ⇒ **无动词 ⇒ 未识别** ✗
+     * （本组件把"空 payload"定义为**未识别** ✓ —— 设计定案 §1 允许组件自定该语义 ✓）。
+     * <p><b>返回值语义</b>（与 {@link OperationProvider} 的契约逐字一致）：识别且语法正确 ⇒ {@code true}
+     * —— **不论语义上成功与否** ✓（例：{@code consume} 因能量不足而未扣，仍算"已识别并按语义处理" ✓）；
+     * 未知动词 / 语法错 / 参数不合法 ⇒ {@code false} ✓。
+     * <p><b>副作用与置脏</b>：三个写动词一律经本组件的**既有强类型方法** ⇒ 变更通知（置脏 + 事件）由容器
+     * 注入的 {@link ChangeSink} **照常触发** ✓ —— **不新增第二条变更通道** ✗（设计定案 §7.2"一套实现、
+     * 两套门面"：字符串面只是**薄适配层** ✓）；{@code current} 无副作用 ✓。
+     */
+    @Override
+    public boolean onOperationCommand(String payload) {
+        if (payload == null) return false;
+        String[] tokens = payload.trim().split("\\s+");
+        if (tokens.length == 0 || tokens[0].isEmpty()) return false;   // 空 / 纯空白 payload ⇒ 未识别
+        switch (tokens[0]) {
+            case "current" -> {
+                return tokens.length == 1;                              // 只读动词不得带参数
+            }
+            case "add", "consume", "set" -> {
+                if (tokens.length != 2) return false;                    // 必须且只带一个参数
+                int amount = parseNonNegative(tokens[1]);
+                if (amount < 0) return false;                            // 非数字 / 负数 / 溢出
+                switch (tokens[0]) {
+                    case "add" -> gain(amount);
+                    case "consume" -> tryConsume(amount);
+                    default -> set(amount);
+                }
+                return true;
+            }
+            default -> {
+                return false;                                            // 未知动词 ⇒ 未识别
+            }
+        }
+    }
+
+    /** 非负整数解析：非数字 / 负数 / 溢出 ⇒ {@code -1}（调用方据此拒绝 ✗）。 */
+    private static int parseNonNegative(String token) {
+        try {
+            int value = Integer.parseInt(token);
+            return value >= 0 ? value : -1;
+        } catch (NumberFormatException notANumber) {
+            return -1;
+        }
     }
 }

@@ -71,7 +71,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
      * 判定顺序（2026-09-18 调整）：**先判 `canCastSkill`** —— 不满足 → 直接返回（被禁用，不施放、不扣能量），
      * **再**做能量 `tryConsume` —— 不满足 → 直接返回（与旧路径一致、**不启冷却**）；
      * 冷却由本组件在施放成功处按声明值 **200** 启动；
-     * 缓慢用 **5 参重载**（`ambient=true, particles=false` 逐字保真，R-1 方法族）；
+     * 缓慢用 **5 参重载**（`ambient=true, particles=false` 逐字保真）；
      * 前摇任务改由**计时组件**创建（不再经服务集端口、改为组件本身用，**请求者在首位**；
      * **登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
      * <p>返回类型改 {@code void}（施放结果枚举已删，返回值无消费点 ⇒ 零行为变化）。
@@ -82,7 +82,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
         if(!buff.canCastSkill()) return;
         if(!energy.tryConsume(getEnergyCost())) return;
 
- //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果（标志位逐字一致）
+ //药水记账：经端口施加，clear() 时只回收本系统施加的效果（标志位逐字一致）
         buff.applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
 
         Location loc = caster.getLocation();
@@ -126,7 +126,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
     /**
      * 新基类（RoleComponent）的停止钩子：容器在 legacy 扇出之后、`cancelAllAndClear()`
-     * **之前**广播 ⇒ 与旧 `LifecycleAware.stop(...)` 的行为等价（O-4 的前摇取消）；框架还会兜底取消本组件
+     * **之前**广播 ⇒ 与旧 `LifecycleAware.stop(...)` 的行为等价（前摇取消）；框架还会兜底取消本组件
      * 资源表内的任务（重复取消幂等）。
      */
     @Override

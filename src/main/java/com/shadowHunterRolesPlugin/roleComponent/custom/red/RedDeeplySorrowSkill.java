@@ -42,11 +42,19 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
      * **订阅 SanTE 变更**（阶段 12 · t89 · C2 · 用户裁定 (b)）：**向 {@code SanTEComponent} 订阅** ✓，
      * 而**不是**在类声明上 `implements` 某个能力接口 ✗ —— 后者正是用户点名的方向错误
      * （`SanTE` 早已是组件 ⇒ 硬规矩 R-1：**不得再为它新增能力接口** ✗）。
-     * <p>时机 = `awake()` ⇒ 通知顺序 = 订阅先后 = 组件装配序 ✓。
+     * <p><b>时机 = {@code start()}（阶段 13 · t92a 迁移 —— R-4 修复）</b>：R-4 禁止在 {@code awake()} 里
+     * **取用其他组件** ✗（awake 只做构造期自检 / 只读自身）⇒ 本段**整段**从 {@code awake()} 迁到
+     * {@code start()}，并与**本卡新增的** {@link #stop()} 的退订成对 ✓
+     * （`SanTEComponent#subscribe` 幂等 ⇒ 重复 start 不会重复登记 ✓）。
+     * <p><b>通知顺序</b> = **订阅先后** = 容器 `start()` 广播序（= 组件装配序）。
+     * <b>与 {@code awake()} 是否同序需另证</b>（本卡未做运行级取证）⇒ 不再宣称"awake 序" ✗。
      * <p>容器查找（而不是字段注入）⇒ 本组件**不持有** `SanTEComponent` 引用 ✓。
+     * <p><b>【已作废】旧口径原文（阶段 12 · t89 原文，逐字保留）</b>：
+     * 「时机 = `awake()` ⇒ 通知顺序 = 订阅先后 = 组件装配序 ✓。」
+     * —— 订阅迁到 `start()` 之后该表述**作废** ✗（订阅现在发生在 start 相）。
      */
     @Override
-    public void awake() {
+    public void start() {
         SanTEComponent sante = svc().components().get(SanTEComponent.class);
         if (sante != null) {
             sante.subscribe(this);
@@ -105,6 +113,23 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
         if(now <= 0){
             running = false;
             svc().cooldowns().start(getCooldownTicks());
+        }
+    }
+
+    /**
+     * **退订**（阶段 13 · t92a **新增**）：与 {@link #start()} 的订阅**成对** ✓ —— 拆卸后不再被通知。
+     * <p><b>为什么本卡新增它（如实申报）</b>：卡面 F2 的原话是「`stop()` 的 `unsubscribe` **保留**」，
+     * 但**本类此前并没有 `stop()`** ✗（订阅只进不出 ⇒ 名单里的引用留到实例回收为止）。
+     * 订阅迁到 `start()` 之后**必须成对**，否则这次"迁移"会把一个只进不出的订阅原样留在新时机上 ⇒
+     * 本卡补上退订（最小改动；写法与 `DefaultSanTEZeroPunishment#stop` 的同形段**逐字对齐**）✓。
+     * <p>框架在拆卸时调用 `stop()`（`cancelAllAndClear()` 兜底回收资源 ⇒ 本方法幂等 ✓；
+     * `unsubscribe` 对不在名单里的对象是 no-op ✓）。
+     */
+    @Override
+    public void stop() {
+        SanTEComponent sante = svc().components().get(SanTEComponent.class);
+        if (sante != null) {
+            sante.unsubscribe(this);
         }
     }
 }

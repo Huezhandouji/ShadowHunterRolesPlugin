@@ -26,8 +26,12 @@ import java.time.Duration;
  *       <br>① 原文写的是"改走**基类**新钩子 {@code RoleComponent#onSanTEChange}" —— 该钩子**已从基类迁出** ⇒ 那半句作废 ✗；
  *       <br>② 其后（t87）一度改为"由本类**显式实现某个能力接口**" —— 该做法也**已作废** ✗
  *       （用户硬规矩 **R-1**：SanTE 的家是 {@code SanTEComponent} ⇒ **不得再为它新增能力接口** ✗）；
- *       <br>③ **现行形态**：本类 `implements {@code SanTEComponent.Subscriber}`，并在 `awake()` 里
- *       **向 {@code SanTEComponent} 订阅** ✓（只通知、不可否决 ✓）。旧口径原文保留：<i>「改走基类新钩子
+ *       <br>③ **现行形态**：本类 `implements {@code SanTEComponent.Subscriber}`，并在 `start()` 里
+ *       **向 {@code SanTEComponent} 订阅** ✓（只通知、不可否决 ✓）。
+ *       <br><b>阶段 13 · t92a 口径更正（不静默改写）</b>：上面这半句**曾**写「在 `awake()` 里……订阅」——
+ *       订阅时机**已迁到 `start()`**（硬规矩 **R-4**：`awake()` 只做构造期自检 / 只读自身，
+ *       **不得取用其他组件** ✗）⇒ 该半句**作废** ✗，逐字保留于此：<i>「并在 `awake()` 里向
+ *       {@code SanTEComponent} 订阅」</i>。旧口径原文保留：<i>「改走基类新钩子
  *       {@code RoleComponent#onSanTEChange(int, int)}」</i>。</li>
  *   <li>惩罚状态 `isInSanTEPunishment` 由聚合根搬进**组件私有字段**（该状态本就不该上 `RoleInstance`）；</li>
  *   <li>任务经 `svc().timers()` 登记本组件资源表、Buff 经 `svc().buffs()`、SanTE 经 `svc().sante()`、
@@ -78,13 +82,19 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
     /**
      * **订阅 SanTE 变更**（阶段 12 · t89 · C2 · 用户裁定 (b)）：**向 {@code SanTEComponent} 订阅** ✓，
      * 而**不是**实现某个能力接口 ✗（硬规矩 R-1：SanTE 的家是组件 ⇒ 消费者向**组件本身**取用/订阅 ✓）。
-     * <p>时机 = `awake()`（生命周期里"构造之后、start 之前"）⇒ 与装配序一致：**先 awake 的组件先订阅**
-     * ⇒ 通知顺序 = 订阅先后 = 装配序 ✓。
+     * <p><b>时机 = {@code start()}（阶段 13 · t92a 迁移 —— R-4 修复）</b>：R-4 禁止在 {@code awake()} 里
+     * **取用其他组件** ✗（awake 只做构造期自检 / 只读自身）⇒ 本段**整段**从 {@code awake()} 迁到
+     * {@code start()}；与 {@link #stop()} 的退订**成对** ✓（`subscribe` 本身幂等 ⇒ 重复 start 不会重复登记 ✓）。
+     * <p><b>通知顺序</b> = **订阅先后** = 容器 `start()` 广播序（= 组件装配序，因为 start 也按容器序广播）。
+     * <b>与 {@code awake()} 是否同序需另证</b>（本卡未做运行级取证）⇒ 不再宣称"awake 序" ✗。
      * <p>用容器查找（`svc().components().get(...)`）而不是字段注入 ⇒ 本组件**不持有** `SanTEComponent` 引用，
      * 与"组件只通过容器协作"的既有纪律一致 ✓。
+     * <p><b>【已作废】旧口径原文（阶段 12 · t89 原文，逐字保留）</b>：
+     * 「时机 = `awake()`（生命周期里"构造之后、start 之前"）⇒ 与装配序一致：**先 awake 的组件先订阅**
+     * ⇒ 通知顺序 = 订阅先后 = 装配序 ✓。」—— 订阅迁到 `start()` 之后该表述**作废** ✗（订阅现在发生在 start 相）。
      */
     @Override
-    public void awake() {
+    public void start() {
         SanTEComponent sante = svc().components().get(SanTEComponent.class);
         if (sante != null) {
             sante.subscribe(this);
@@ -242,7 +252,8 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
     public void stop() {
         cancelPunishmentTask();
         inSanTEPunishment = false;
-        //阶段 12 · t89：**退订**（与 awake() 的订阅对称 ⇒ 拆卸后不再被通知 ✓）
+        //阶段 12 · t89：**退订**（阶段 13 · t92a：订阅已迁到 start() ⇒ 本行与 start() 对称 ✓
+        //  ⇒ 拆卸后不再被通知 ✓；旧口径原文「与 awake() 的订阅对称」在迁移后作废 ✗）
         SanTEComponent sante = svc().components().get(SanTEComponent.class);
         if (sante != null) {
             sante.unsubscribe(this);

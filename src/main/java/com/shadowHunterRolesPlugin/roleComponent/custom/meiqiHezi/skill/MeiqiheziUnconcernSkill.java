@@ -59,10 +59,10 @@ public class MeiqiheziUnconcernSkill extends Skill {
     @Override
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
-        if(!buffComponent().canCastSkill()) return;
+        if(!buff.canCastSkill()) return;
 
         //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果
-        buffComponent().applyPotionEffect(PotionEffectType.SPEED, 40, 4);
+        buff.applyPotionEffect(PotionEffectType.SPEED, 40, 4);
 
         caster.getWorld().playSound(
                 caster.getLocation(),

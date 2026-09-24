@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.core;
 
-import com.shadowHunterRolesPlugin.core.hotbar.CooldownBearing;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
@@ -125,7 +125,6 @@ public class StateBindingByInstanceTest {
             super(id, inertServices());
         }
 
-        @Override
         public int getCooldownTicks() {
             return 100;
         }

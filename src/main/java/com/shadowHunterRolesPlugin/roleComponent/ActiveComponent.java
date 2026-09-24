@@ -41,7 +41,7 @@ import org.bukkit.entity.Player;
  * （嵌套类型，见下）—— 与使用它们的组件同处、只由本组件持有 ✓。
  */
 public abstract class ActiveComponent extends RoleComponent
-        implements HotbarItem, HotbarPresentable {
+        implements HotbarItem, HotbarPresentable, RoleComponent.CooldownBearing {
 
     // ───────── 阶段 13 · t108：物品使用入口的词汇（原 core/dispatch/ 的三个类型迁入本组件） ─────────
     //裁定⑤（用户答复）：**施放与攻击由「物品支持类组件」处理** ⇒ 原 `HotbarActionable` / `CombatHook`
@@ -140,7 +140,7 @@ public abstract class ActiveComponent extends RoleComponent
     }
 
     /**
-     * **冷却状态读数**（阶段 8 新增；{@link com.shadowHunterRolesPlugin.core.hotbar.CooldownBearing} 的唯一实现）：
+     * **冷却状态读数**（阶段 8 新增；{@link RoleComponent.CooldownBearing} 的唯一实现）：
      * 逐字等价于 {@link #isCoolingDown()}（阶段 13 · t105：改为读**本组件实例**的状态，不再经任何端口 ✗）。
      * <p>框架的帧末 flush 用它驱动"冷却中每 tick 至少刷一次"（技能名里的秒数才会逐刻递减）——
      * 这条**节拍链**与展示链（{@code %.1f} 秒数）读的是同一份状态 ✓。

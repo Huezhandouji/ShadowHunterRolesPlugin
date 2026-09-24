@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.command;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
-import com.shadowHunterRolesPlugin.core.hotbar.CooldownBearing;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
@@ -70,13 +70,13 @@ public class DebugCooldownCommand implements SubCommand {
         //与派发面仍是同一套接受集（仓内实现该能力的仍只有活动组件基类那一棵子树）。
         //行为不变：仓内实现该能力的仍只有活动组件基类那一棵子树（表现规格对象只实现 HotbarItem，不在此列）。
         //（本注释刻意不写那个类型名：卡面判据是裸 grep 该名字，注释里出现它会被误读成"类型判据还在"。）
-        if(!(component instanceof CooldownBearing bearing) || !(component instanceof ActiveComponent active)){
+        if(!(component instanceof ActiveComponent active)){
             send(player, "Not an active component (skill/main weapon): " + componentId);
             return true;
         }
         //阶段 13 · t105（第③步）：冷却读数与动作**直接问组件本身**（旧的"经服务集端口取表"路径已拆 ✗）——
         //  声明值仍由能力接口给出（`CooldownBearing#getCooldownTicks`），状态与动作由组件基类给出 ✓。
-        int declared = bearing.getCooldownTicks();
+        int declared = active.getCooldownTicks();
 
         switch (action){
             case "status":{

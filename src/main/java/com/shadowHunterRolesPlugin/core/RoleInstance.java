@@ -5,7 +5,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
-import com.shadowHunterRolesPlugin.core.hotbar.CooldownBearing;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItemProviding;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;

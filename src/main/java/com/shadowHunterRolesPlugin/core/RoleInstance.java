@@ -185,13 +185,14 @@ public class RoleInstance {
         BuffManager buffManager = new BuffManager(player, this);
 
  //② 能量 / SanTE：真值（current）与上限（max，= 角色模板的声明值）都在组件里；
- // "置脏 + 事件发布"这两件平台事由容器以 ChangeSink 注入 ⇒ 组件本身不需要任何旧端口。
+ // "置脏 + 事件发布"这两件平台事由容器**注册成监听器**承担 ⇒ 组件本身不需要任何旧端口。
         this.energyComponent = new EnergyComponent(SERVICE_ID_ENERGY, createServices(SERVICE_ID_ENERGY),
                 role.getMaxEnergy(),
-                (previous, current, max) -> {
- //触点④（能量单一入口）：**无条件**置脏（不做"跨阈值才置脏"的优化 —— 那属阶段 5 性能项）
+                change -> {
+ //触点④（能量单一入口）：**无条件**置脏（不做"跨阈值才置脏"的优化 —— 那属性能项）
                     hotbarRenderer.markDirty();
-                    Bukkit.getPluginManager().callEvent(new EnergyChangeEvent(player, this, previous, current, max));
+                    Bukkit.getPluginManager().callEvent(new EnergyChangeEvent(player, this,
+                            change.previous(), change.current(), change.max()));
                 });
         this.santeComponent = new SanTEComponent(SERVICE_ID_SANTE, createServices(SERVICE_ID_SANTE),
                 role.getMaxSanTE(),

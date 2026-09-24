@@ -865,7 +865,7 @@ public class RoleInstance {
  * 「**实现了某个能力接口的组件**」 改为
  * 「**向 {@code SanTEComponent} 订阅过的组件**」 —— 依据用户硬规矩 **R-1**：
  * **凡关注点已是组件 ⇒ 不得再为它新增能力接口** （SanTE 的家就是 `SanTEComponent`）。
- * <p>遍历的是**订阅名单**（`santeComponent.forEachSubscriber`），**不是**容器注册表
+ * <p>遍历的是**监听器名单**（`santeComponent.forEachListener`），**不是**容器注册表
  * ⇒ 「谁关心」由**订阅**表达，不再由接口/继承表达。
  * <p><b>未改的两件</b>（`` 已确立、本卡原样保留）：**逐个**经 {@code guardedCall}
  * （异常 ⇒ 只隔离抛异常的那一个、其余照常收到）· 整段在 {@link #withinIterationWindow} 里
@@ -878,13 +878,13 @@ public class RoleInstance {
  //：唯一受保护调用（异常 ⇒ 窗口关闭后执行隔离四步）
         withinIterationWindow(() -> {
             santeComponent.forEachListener(entry -> {
- //阶段 12 · t89 / 阶段 13 · t142：**监听器判据**（不是接口判据）—— 只通知"订阅过"的组件；
+ //监听器判据（不是接口判据）—— 只通知"订阅过"的组件；
  //归属组件由注册方随监听器一并给出（entry.owner()）⇒ 仍能**逐个**经 guardedCall 做故障隔离 ✓
                 guardedCall(entry.owner(), "onSanTEChange",
                         () -> entry.listener().accept(new SanTEComponent.Change(preSanTE, newSanTE)));
             });
         });
- //平台侧"事件发布"仍归本组件持有的 ChangeSink —— 与迁移前逐字一致（t142：仍由 set() 内的 sink 调用承担）
+ //平台侧"事件发布"仍归本组件持有的 ChangeSink —— 与迁移前逐字一致（仍由 set() 内的 sink 调用承担）
         santeComponent.broadcastChange(preSanTE, newSanTE);
     }
 

@@ -13,6 +13,12 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
  * {@code EnergyChangeEvent} 事件发布 —— 由容器在构造期以 {@link ChangeSink} 注入；
  * 组件只负责"真值怎么变"，容器只负责"变了之后对平台说什么"。这条分界让组件**不需要**
  * {@code svc()} 就能完整实现能力语义（唯一的 {@code svc()} 用途 = {@code self()} 取玩家）。
+ * <p><b>订阅面 · 本组件为什么"不动"（如实申报）</b>：`SanTEComponent` 的嵌套 {@code Subscriber} 接口
+ * 已换成 **JDK {@code Consumer} 监听器列表** ✓；而本组件**没有同类的嵌套订阅接口** ——
+ * 它只有 {@link ChangeSink}，且现算**没有任何类 {@code implements} 它**（唯一实现形态 = 容器构造期传的
+ * lambda ✓；测试传 {@code null}）⇒ 它已经是"一个函数式接口 + 直接传 lambda"的形态 ✓，
+ * 改成 {@code List<Consumer<…>>} 只会把单播变多播、**不解决用户点名的问题**（"其他类实现自己的嵌套接口"）✗
+ * ⇒ 本组件**不改** ✓，判断依据写在此处 ✓（用户原话覆盖的两个组件里，真正有待改造的是 `SanTEComponent` ✓）。
  * <p><b>状态唯一</b>：容器侧（{@code RoleInstance}）**不再**持有能量字段 ✗ —— 它只保留
  * {@code getCurrentEnergy()/setCurrentEnergy(...)} 这类**视图**方法（{@code RoleAPI} 的四组对外
  * 入口一字不动）。

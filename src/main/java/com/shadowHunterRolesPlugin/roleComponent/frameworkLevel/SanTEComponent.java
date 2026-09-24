@@ -4,20 +4,40 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+
 /**
  * SanTE 组件（阶段 10 · t63 · A1 改正）：系统级能力「SanTE」的**组件形态**（每角色实例一个，裁定③）。
  * <p><b>★ 本组件持有状态与行为</b>：SanTE 真值 {@code current} 与上限 {@code max} 都在本组件里，
  * clamp 与 gain/decrease/set 的语义全在本组件内实现 —— **不再转调任何旧端口** ✗。
  * <p><b>与容器的分工</b>：写后对平台说两句话 —— 发布 {@code SanTEChangeEvent} 与
- * 向组件广播 {@code onSanTEChange(pre, now)}（含 I-14 重入护栏）—— 由容器以 {@link ChangeSink}
- * 注入；组件只负责真值怎么变。
+ * 向**监听器列表**派发（含 I-14 重入护栏）—— 前者由容器以 {@link ChangeSink} 注入；组件只负责真值怎么变。
  * <p><b>状态唯一</b>：容器侧**不再**持有 {@code currentSanTE} 字段 ✗（只保留视图方法）。
  * <p><b>归零惩罚的钉 0 语义不变</b>：惩罚组件（{@code DefaultSanTEZeroPunishment}）仍按既有方式
  * 调**组件自身**的 {@code set(0)} 逐 tick 钉 0（阶段 13 · t109：取用形态统一为"字段 + 在 `start()` 内赋值" ✗）⇒ 走的还是这一条 clamp + 派发路径。
+ *
+ * <h2>订阅面：<b>JDK {@code Consumer} 监听器列表</b>（用户裁定 ✓）</h2>
+ * <b>旧形态</b>：本组件曾嵌套一个 {@code public interface Subscriber}（唯一方法
+ * {@code onSanTEChange(int pre, int now)}，带默认空实现）⇒ 消费者必须在**类声明上** {@code implements
+ * SanTEComponent.Subscriber} ✗。用户裁定改为**监听器列表**：「一个函数式接口的列表，其他类只需要添加
+ * {@code Consumer} 即可」✓。
+ * <p><b>新形态</b>：本组件持有 {@code List<Listener>}（{@link Listener} = {@code owner} + {@code Consumer<Change>}
+ * 的**成对**登记，record ✓），对外只暴露 {@link #addListener(RoleComponent, Consumer)} ✓；
+ * ★ **用 JDK 的 {@code Consumer}**（**不新增自定义接口** ✗ —— R-1「凡关注点已是组件 ⇒ 不得再为它新增能力接口」
+ * / R-8 同理）✓。消费者在自己的 {@code start()} 里 {@code sante.addListener(this, change -> …)} ⇒ **不再有任何类
+ * 实现本组件的嵌套接口** ✓。
+ * <p><b>载荷取「最小充分类型」</b>：旧方法有两个入参（{@code pre} / {@code now}）⇒ 不能退化成
+ * {@code Consumer<Integer>} ✗（两个既有消费者都靠 {@code pre} 与 {@code now} 的比较决定动作）⇒ 用一个**小 record**
+ * {@link Change}（**record 不是接口** ⇒ 不违反"不新增接口"✓）。{@code max} **不进载荷** ✗（两个消费者都不用它）。
+ * <p><b>移除语义</b>：{@link #removeListener(Listener)} 按**引用相等**（{@code List.remove(Object)} 的既有语义）
+ * ✓ —— 调用方须持有**同一个** {@link Listener} 实例（{@link #addListener(RoleComponent, Consumer)} **返回**该实例
+ * ⇒ 消费者存进私有字段即可 ✓）。不做"按身份查询"的 {@code unsubscribe(this)} ✗（{@code Consumer} 无身份标识）。
  */
 public class SanTEComponent extends RoleComponent implements OperationProvider {
 
-    /** 变更通知（容器在构造期注入）：事件发布 + {@code onSanTEChange} 派发（含重入护栏）都在容器侧。 */
+    /** 变更通知（容器在构造期注入）：事件发布在容器侧。 */
     public interface ChangeSink {
 
         /** SanTE 真值发生变化后调用（**无条件**调用：与既有"无条件事件 + 无条件派发"逐字一致）。 */
@@ -25,80 +45,117 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
     }
 
     /**
-     * **SanTE 变更的订阅者**（阶段 12 · t89 · C2 的**替代方案 (b)** · 用户裁定 ✓）。
+     * **一次 SanTE 变更的载荷**（**record，不是接口** ✓）。
      *
-     * <h2>为什么是这个形态（而不是能力接口）</h2>
-     * 用户硬规矩 **R-1**：**凡关注点已是组件 ⇒ 一律不得再为它新增能力接口** ✗。
-     * SanTE 的**家**就是本组件（真值 {@code current} + 全部行为都在这里）✓ ⇒
-     * 关心"SanTE 变了"的组件**向本组件订阅** ✓，而**不是**让容器按某个接口去判能力 ✗。
-     * <p>（此前 `t87` 一度让容器按**能力接口**判接受集 —— 那是**接口替代组件** ✗，
-     * 正是用户点名的方向错误 ⇒ 本卡把它回退 ✓。）
+     * <h2>为什么需要它</h2>
+     * 旧 {@code Subscriber#onSanTEChange(int pre, int now)} 有两个入参；用户裁定的监听器列表用 JDK
+     * {@code Consumer} ⇒ 需要一个**载体**把这两个值一起交出去 ✓。取**最小充分类型**：
+     * 只带两个既有消费者真正用到的值 ✓（{@code max} 不进载荷 ✗ —— 它不随"变化"而变）。
      *
-     * <h2>契约</h2>
+     * <h2>为什么不退化成 {@code Consumer<Integer>}</h2>
+     * 两个既有消费者都靠 {@code previous} 与 {@code current} 的**比较**决定动作：
      * <ul>
-     *   <li><b>只通知、不可否决</b> ✗：返回 {@code void} ⇒ 订阅者改不了 SanTE 的写入结果 ✓；</li>
-     *   <li><b>不保证"真变化"</b>：本组件既有口径是 {@code ChangeSink} **无条件**回调 ⇒ 订阅者也**无条件**被通知 ✓
-     *       —— 需要"只在真变化时动作"的订阅者**自己比较 {@code pre}/{@code now}** ✓（两个既有消费者本来就自带守卫 ✓）；</li>
-     *   <li><b>顺序</b>：按**订阅先后** ⇒ 订阅者在 `awake()` 注册 ⇒ 顺序 = **组件装配序** ✓。</li>
+     *   <li>{@code DefaultSanTEZeroPunishment}：{@code now > 0 ⇒ return}（归零才进入惩罚）；</li>
+     *   <li>{@code RedDeeplySorrowSkill}：{@code now <= 0 ⇒ 结束技能 + 起冷却}。</li>
      * </ul>
+     * 若只给新值，消费者就得**自己记住上一次的值** ⇒ 多一份可变状态、多一类时序错误 ✗
+     * ⇒ 载荷必须同时带 {@code previous} ✓。
      *
-     * <h2>为什么给默认空实现</h2>
-     * 与迁移前 {@code RoleComponent} 上那个空实现**逐字等价** ⇒ 订阅者只覆写真正关心的那一个方法 ✓。
+     * <h2>语义与旧形态逐字相同</h2>
+     * 本记录**只承载值**、不带任何行为 ✓；通知仍**无条件**发生（"真变化才动作"由消费者自己比较 ✓）。
      */
-    public interface Subscriber {
-
-        /** SanTE 值发生变化（本组件**无条件**通知，见接口 javadoc）。默认空实现。 */
-        default void onSanTEChange(int pre, int now) {
-        }
-    }
-
-    /** **订阅者名单** —— 顺序 = 订阅先后 ✓（迭代序稳定 ⇒ "按装配序通知"可复现 ✓）。 */
-    private final java.util.List<Subscriber> subscribers = new java.util.ArrayList<>();
-
-    /** **订阅**（订阅者在自己的 {@code awake()} 里调用 ⇒ 时机 = 组件装配序 ✓）。幂等：重复订阅不重复登记 ✓。 */
-    public void subscribe(Subscriber subscriber) {
-        if (subscriber != null && !subscribers.contains(subscriber)) {
-            subscribers.add(subscriber);
-        }
-    }
-
-    /** **退订**（订阅者在自己的 {@code stop()} 里调用 ⇒ 与装配/回收对称 ✓）。 */
-    public void unsubscribe(Subscriber subscriber) {
-        subscribers.remove(subscriber);
-    }
-
-    /** 当前订阅者数（诊断读口；供探针与运行级取证使用）。 */
-    public int subscriberCount() {
-        return subscribers.size();
+    public record Change(int previous, int current) {
     }
 
     /**
-     * **把变更派发给订阅者**（容器在 SanTE 真值写入后调用）——
-     * **取代**原先"按能力接口判接受集"的做法 ✗。
-     * <p>遍历的是**名单**（不是容器注册表）⇒ 「谁关心」由**订阅**表达 ✓，不再由接口/继承表达 ✓。
-     * <p><b>无条件通知</b>：与迁移前 {@code ChangeSink} 的"无条件事件 + 无条件派发"**逐字一致** ✓
-     * （"只在真变化时动作"由订阅者自己比较 {@code pre}/{@code now} ✓）。
+     * **一条监听登记**：{@code owner}（谁订阅）+ {@code listener}（怎么通知）**成对**持有 ✓。
+     *
+     * <h2>为什么把 owner 一起登记</h2>
+     * 容器的派发纪律是「**逐个**经 {@code guardedCall} 调用」⇒ 异常时只隔离**抛异常的那一个**组件、
+     * 其余照常收到 ✓。这条纪律需要**每一条登记都知道自己属于哪个组件** ✓ —— 旧 {@code Subscriber} 形态靠
+     * {@code subscriber instanceof RoleComponent} 反推（接口实现者恰好就是组件 ✓）；改用 {@code Consumer} 后
+     * 闭包**没有身份** ✗ ⇒ 由注册方在 {@link #addListener(RoleComponent, Consumer)} 里**显式给出** ✓。
+     * <p>record 不是接口 ✓（不违反"不新增自定义接口"）。
      */
-    public void broadcastChange(int pre, int now) {
-        for (Subscriber subscriber : subscribers) {
-            subscriber.onSanTEChange(pre, now);
+    public record Listener(RoleComponent owner, Consumer<Change> listener) {
+    }
+
+    /** **监听器名单** —— 顺序 = 添加先后 ✓（迭代序稳定 ⇒ "按装配序通知"可复现 ✓）。 */
+    private final List<Listener> listeners = new ArrayList<>();
+
+    /**
+     * **添加监听器**（**唯一**的订阅入口 ✓）—— 消费者在自己的 {@code start()} 里调用
+     * （⇒ 时机 = 组件装配序 ✓，R-4 ✓），并在 {@code stop()} 里用 {@link #removeListener(Listener)} 成对移除 ✓。
+     * <p><b>幂等</b>：同一 {@code owner} + 同一 {@code listener} 重复添加**不重复登记** ✓
+     * （与旧 {@code subscribe} 的幂等语义逐字一致）。
+     * <p>{@code owner} 或 {@code listener} 为 {@code null} ⇒ **忽略**（旧 {@code subscribe(null)} 同样是 no-op ✓）。
+     * <p><b>返回值</b>：本次登记对应的 {@link Listener} 实例（**调用方存起来** ⇒ 将来用
+     * {@link #removeListener(Listener)} 按引用移除 ✓；被忽略的 {@code null} 入参 ⇒ 回 {@code null} ✓）。
+     */
+    public Listener addListener(RoleComponent owner, Consumer<Change> listener) {
+        if (owner == null || listener == null) {
+            return null;
         }
+        Listener entry = new Listener(owner, listener);
+        if (!listeners.contains(entry)) {
+            listeners.add(entry);
+        }
+        return entry;
     }
 
     /**
-     * **逐个**把订阅者交给调用方（阶段 12 · t89）—— 供容器**保持"逐订阅者故障隔离"** ✓。
-     * <p><b>为什么需要它</b>：`broadcastChange` 是一趟循环 ⇒ 若某个订阅者抛异常，
-     * **排在它后面的订阅者就收不到通知** ✗。容器侧原本用的是"**逐个**经 {@code guardedCall} 调用"
-     * ⇒ 只隔离抛异常的那一个、其余照常收到 ✓ —— `t87` 引入的那条性质**必须保住** ✗。
+     * **移除监听器**（按**引用相等**；不在名单里 ⇒ no-op 且返回 {@code false} ✓）——
+     * 调用方必须持有**同一个** {@code Listener} 实例（把 {@link #addListener} 的返回值存进私有字段即可 ✓）。
+     * <p>与旧 {@code unsubscribe(subscriber)} 的语义**逐字等价**（旧实现也是
+     * {@code List.remove(Object)} ⇒ 不在名单里是 no-op ✓）。
+     */
+    public boolean removeListener(Listener entry) {
+        return entry != null && listeners.remove(entry);
+    }
+
+    /** 当前监听器数（诊断读口；供探针与运行级取证使用）。 */
+    public int listenerCount() {
+        return listeners.size();
+    }
+
+    /**
+     * **逐个**把监听登记交给调用方（"逐监听器故障隔离"的承载面）✓。
+     * <p><b>为什么需要它</b>：若由本组件自己"一趟循环全调"，某个监听器抛异常 ⇒
+     * **排在它后面的监听器就收不到通知** ✗。容器侧用的是"**逐个**经 {@code guardedCall} 调用"
+     * ⇒ 只隔离抛异常的那一个、其余照常收到 ✓ —— 这条性质**必须保住** ✗。
      * <p>所以这里**不**替调用方做派发决策，只提供**遍历**：由容器决定"怎么调、怎么护" ✓。
+     * <p><b>遍历期间增删的安全</b>：本方法对名单取**快照**后再遍历
+     * （{@code List.copyOf}）⇒ 遍历途中 {@link #addListener(RoleComponent, Consumer)} /
+     * {@link #removeListener(Listener)} 不会触发 {@code ConcurrentModificationException}，
+     * 也**不影响本次遍历**（快照语义 = 本次通知的接受集在进入时已定 ✓）。
+     * <p><b>不通知快照之外的新增</b>：本趟已开始 ⇒ 新加的监听器从**下一趟**起收到 ✓（可复现、不随实现漂移 ✓）。
      */
-    public void forEachSubscriber(java.util.function.Consumer<Subscriber> action) {
+    public void forEachListener(Consumer<Listener> action) {
         if (action == null) {
             return;
         }
-        for (Subscriber subscriber : subscribers) {
-            action.accept(subscriber);
+        for (Listener entry : List.copyOf(listeners)) {
+            action.accept(entry);
         }
+    }
+
+    /**
+     * **通知全部监听器**（一趟直调）—— 本方法就是"派发"这件事的**薄实现**：
+     * {@code forEachListener(entry -> entry.listener().accept(change))} ✓。
+     *
+     * <h2>谁在什么时机调它</h2>
+     * <ul>
+     *   <li><b>生产路径</b>：容器（{@code RoleInstance.broadcastSanTEChange}）**不**用本方法 ✗ ——
+     *       它走 {@link #forEachListener(Consumer)} 并**逐个**套 {@code guardedCall} ✓（那是"逐监听器故障隔离"
+     *       的唯一实现点 ✓）；</li>
+     *   <li><b>本方法的存在理由</b>：给"没有容器"的**离线单元测试**一条与生产同源的派发路径 ✓
+     *       （否则测试只能自己写循环，验的就成了测试自己的循环 ✗）。</li>
+     * </ul>
+     * <p><b>不是第二条变更通道</b> ✗：本方法**只**读名单并调监听器，不改真值、不碰 {@code sink} ✓。
+     */
+    public void notifyListeners(int pre, int now) {
+        Change change = new Change(pre, now);
+        forEachListener(entry -> entry.listener().accept(change));
     }
 
     private final int max;
@@ -130,6 +187,19 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
         int previous = current;
         current = Math.clamp(value, 0, max);
         sink.onSanTEChanged(previous, current, max);
+    }
+
+    /**
+     * **把变更交给平台侧**（本方法**只**做这一件事 ✓）——
+     * 由容器在**派发边界**调用（`RoleInstance.broadcastSanTEChange` ⇒ 先逐个通知监听器、再发布平台事件 ✓）。
+     * <p><b>调用时机未变</b> ✓：容器在 {@code dispatchSanTEChange} 里已先过 {@code pre == now} 的
+     * "真变化"闸门 ⇒ 本方法仍**只在真变化时**被调到（**不是**在每次 {@code set()} 里无条件调 ✗
+     * —— 那会改变"事件何时发布"的既有语义 ✓）。
+     * <p><b>为什么还叫 broadcast</b>：历史名（旧形态里它同时向订阅者广播 + 发布事件 ✗）；
+     * 监听器通知现已归 {@link #forEachListener(Consumer)} ✓ ⇒ 本方法只剩平台事件这一半 ✓。
+     */
+    public void broadcastChange(int pre, int now) {
+        sink.onSanTEChanged(pre, now, max);
     }
 
     /** 增加 SanTE（内部按上限 clamp）。 */

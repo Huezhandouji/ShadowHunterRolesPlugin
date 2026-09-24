@@ -32,8 +32,12 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  *       <br>① 原文写的是"改走**基类**新钩子 {@code RoleComponent#onSanTEChange}" —— 该钩子**已从基类迁出** ⇒ 那半句作废 ✗；
  *       <br>② 其后（t87）一度改为"由本类**显式实现某个能力接口**" —— 该做法也**已作废** ✗
  *       （用户硬规矩 **R-1**：SanTE 的家是 {@code SanTEComponent} ⇒ **不得再为它新增能力接口** ✗）；
- *       <br>③ **现行形态**：本类 `implements {@code SanTEComponent.Subscriber}`，并在 `start()` 里
- *       **向 {@code SanTEComponent} 订阅** ✓（只通知、不可否决 ✓）。
+ *       <br>③ **现行形态**：本类在 `start()` 里向 {@code SanTEComponent}
+ *       **添加一条监听**（{@code sante.addListener(this, this::onSanTEChange)} ✓，只通知、不可否决 ✓），
+ *       并在 `stop()` 里按**引用相等**移除该登记 ✓。
+ *       <br><b>【已作废】旧口径原文（逐字保留）</b>：<i>「本类
+ *       `implements {@code SanTEComponent.Subscriber}`，并在 `start()` 里**向 {@code SanTEComponent} 订阅**」</i>
+ *       —— 该嵌套接口与 `subscribe` 入口**已删除** ✗（改为 JDK {@code Consumer} 监听器列表）⇒ 该表述**作废** ✗。
  *       <br><b>阶段 13 · t92a 口径更正（不静默改写）</b>：上面这半句**曾**写「在 `awake()` 里……订阅」——
  *       订阅时机**已迁到 `start()`**（硬规矩 **R-4**：`awake()` 只做构造期自检 / 只读自身，
  *       **不得取用其他组件** ✗）⇒ 该半句**作废** ✗，逐字保留于此：<i>「并在 `awake()` 里向
@@ -70,12 +74,19 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  * 否则标记卡在 {@code true} ⇒ **逐 tick 钉 0 会一直生效、且后续归零永不触发惩罚**（绿灯不报的静默失效）。
  * 五条路径逐条标注为源码里的 {@code (5-①…⑤)}。
  */
-public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEComponent.Subscriber {
+public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
     private TimerComponent timer;
     private VitalsComponent vitals;
     private BuffComponent buff;
     private SanTEComponent sante;
+
+    /**
+     * **本组件在 {@code SanTEComponent} 上的监听登记** —— 由 {@code start()} 里
+     * {@code addListener} 的**返回值**填入，供 {@code stop()} 按**引用相等**移除 ✓
+     * （{@code Consumer} 无身份标识 ⇒ 必须持有同一实例 ✓）。
+     */
+    private SanTEComponent.Listener santeListener;
 
     public DefaultSanTEZeroPunishment(String id, ComponentServices services) {
         super(
@@ -92,21 +103,23 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
     private Task punishmentRestoreTask;
 
     /**
-     * **订阅 SanTE 变更**（阶段 12 · t89 · C2 · 用户裁定 (b)）：**向 {@code SanTEComponent} 订阅** ✓，
+     * **订阅 SanTE 变更**：**向 {@code SanTEComponent} 添加一条监听** ✓，
      * 而**不是**实现某个能力接口 ✗（硬规矩 R-1：SanTE 的家是组件 ⇒ 消费者向**组件本身**取用/订阅 ✓）。
-     * <p><b>时机 = {@code start()}（阶段 13 · t92a 迁移 —— R-4 修复）</b>：R-4 禁止在 {@code awake()} 里
-     * **取用其他组件** ✗（awake 只做构造期自检 / 只读自身）⇒ 本段**整段**从 {@code awake()} 迁到
-     * {@code start()}；与 {@link #stop()} 的退订**成对** ✓（`subscribe` 本身幂等 ⇒ 重复 start 不会重复登记 ✓）。
-     * <p><b>通知顺序</b> = **订阅先后** = 容器 `start()` 广播序（= 组件装配序，因为 start 也按容器序广播）。
+     * <p><b>时机 = {@code start()}</b>（R-4：`awake()` 只做构造期自检 / 只读自身，**不得取用其他组件** ✗）；
+     * 与 {@link #stop()} 的移除**成对** ✓（`addListener` 本身幂等 ⇒ 重复 start 不会重复登记 ✓）。
+     * <p><b>通知顺序</b> = **添加先后** = 容器 `start()` 广播序（= 组件装配序，因为 start 也按容器序广播）。
      * <b>与 {@code awake()} 是否同序需另证</b>（本卡未做运行级取证）⇒ 不再宣称"awake 序" ✗。
-     * <p><b>取用形态（阶段 13 · t109 统一）</b>：四个协作组件改为**字段 + 在本 `start()` 内赋值** ✓
-     * （与全仓统一形态一致）；R-4 只禁 `awake()` ⇒ 在 `start()` 取组件正是它要求的时机 ✓。
-     * <p><b>【已作废】旧口径原文（阶段 12 · t89 原文，逐字保留）</b>：「用容器查找（`svc().components().get(...)`）
+     * <p><b>取用形态</b>：四个协作组件为**字段 + 在本 `start()` 内赋值** ✓（与全仓统一形态一致）。
+     * <p><b>监听登记实例存进 {@link #santeListener}</b>：{@code Consumer} 无身份标识 ⇒ 必须持有同一实例才能按引用移除 ✓。
+     * <p><b>【已作废】旧口径原文（逐字保留）</b>：「用容器查找（`svc().components().get(...)`）
      * 而不是字段注入 ⇒ 本组件**不持有** `SanTEComponent` 引用，与"组件只通过容器协作"的既有纪律一致 ✓。」
-     * —— 阶段 13 · t109 起改为**持有字段引用**（缓存与按需查找恒等：注册表装配期后冻结 ✓）⇒ 该表述**作废** ✗。
-     * <p><b>【已作废】旧口径原文（阶段 12 · t89 原文，逐字保留）</b>：
+     * —— 该表述**作废** ✗（现已持有字段引用；缓存与按需查找恒等：注册表装配期后冻结 ✓）。
+     * <p><b>【已作废】旧口径原文（逐字保留）</b>：
      * 「时机 = `awake()`（生命周期里"构造之后、start 之前"）⇒ 与装配序一致：**先 awake 的组件先订阅**
-     * ⇒ 通知顺序 = 订阅先后 = 装配序 ✓。」—— 订阅迁到 `start()` 之后该表述**作废** ✗（订阅现在发生在 start 相）。
+     * ⇒ 通知顺序 = 订阅先后 = 装配序 ✓。」—— 订阅已迁到 `start()` ⇒ 该表述**作废** ✗。
+     * <p><b>【已作废】旧口径原文（逐字保留）</b>：「本类 `implements
+     * {@code SanTEComponent.Subscriber}`，并在 `start()` 里 {@code sante.subscribe(this)}」
+     * —— 该嵌套接口与 `subscribe` 入口**已删除** ✗（改为监听器列表）⇒ 该表述**作废** ✗。
      */
     @Override
     public void start() {
@@ -115,7 +128,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
         buff = svc().components().get(BuffComponent.class);
         sante = svc().components().get(SanTEComponent.class);
         if (sante != null) {
-            sante.subscribe(this);
+            santeListener = sante.addListener(this, this::onSanTEChange);
         }
     }
 
@@ -139,8 +152,17 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
         }
     }
 
-    @Override
-    public void onSanTEChange(int pre, int now) {
+    /**
+     * **SanTE 变更回调**：入参为载荷 {@link SanTEComponent.Change}（旧形态的两个值
+     * {@code (int pre, int now)} 装在一个 record 里 ✓，语义**逐字保留**）。
+     * <p><b>不再 {@code @Override}</b>：本方法**不再实现任何接口** ✗（旧 {@code SanTEComponent.Subscriber}
+     * 已删除）⇒ 它是本类的**普通方法**，由 {@code start()} 里的方法引用
+     * {@code this::onSanTEChange} 注册进监听器列表 ✓。
+     */
+    public void onSanTEChange(SanTEComponent.Change change) {
+        //载荷里的两个值 = 旧入参（顺序与含义逐字不变 ✓）
+        int pre = change.previous();
+        int now = change.current();
         //(3) 忽略重入（用户裁定）：惩罚进行中直接返回 —— 不取消、不重启、不刷新 count、不重放表现层
         if(inSanTEPunishment) return;
         if(now > 0) return;
@@ -270,10 +292,11 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
     public void stop() {
         cancelPunishmentTask();
         inSanTEPunishment = false;
-        //阶段 12 · t89：**退订**（阶段 13 · t92a：订阅已迁到 start() ⇒ 本行与 start() 对称 ✓
-        //  ⇒ 拆卸后不再被通知 ✓；旧口径原文「与 awake() 的订阅对称」在迁移后作废 ✗）
-        if (sante != null) {
-            sante.unsubscribe(this);
+        //**移除监听**：订阅在 start() 登记 ⇒ 本行与它对称 ✓ ⇒ 拆卸后不再被通知 ✓
+        //按**引用移除监听登记** ✓（对不在名单里的登记是 no-op ⇒ 幂等 ✓）
+        if (sante != null && santeListener != null) {
+            sante.removeListener(santeListener);
+            santeListener = null;
         }
     }
 }

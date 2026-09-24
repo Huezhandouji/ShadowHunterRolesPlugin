@@ -27,6 +27,12 @@ import static org.junit.Assert.assertTrue;
  * <p><b>判据边界（如实申报）</b>：本类**不**覆盖"变更通知是否真的触发置脏/事件"（那由容器在构造期注入的
  * {@link EnergyComponent.ChangeSink} 承担，属运行级装配面 ✗）；也不覆盖指令面/派发器与 {@code RoleAPI}
  * 收口（归后续片 ✗）。
+ *
+ * <p><b>订阅面 · 本类为何仍是"假 sink"而不是"记录型 {@code Consumer}"（如实申报）</b>：
+ * 本组件**没有监听器列表** —— 它只有 {@link EnergyComponent.ChangeSink}（**现算 0 个类 implements 它**；
+ * 唯一实现形态 = 容器构造期传的 lambda）⇒ 这里传 {@code null} 正是"已经用函数式形态"的写法 ✓。
+ * 真正需要改造的 `SanTEComponent` 其假 sink **已改成记录型 {@code Consumer}** ✓
+ * （见 {@code SanTEComponentOperationTest}）。
  */
 public class EnergyComponentOperationTest {
 

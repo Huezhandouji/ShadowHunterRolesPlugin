@@ -26,10 +26,17 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  *       生命恢复 `45, 5` 与力量 `45, 2` / 音效 `ENTITY_WITHER_DEATH 2,1` 与 `ENTITY_WITHER_SHOOT 1,1`；</li>
  * </ul>
  */
-public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscriber {
+public class RedDeeplySorrowSkill extends Skill {
 
     private BuffComponent buff;
     private SanTEComponent sante;
+
+    /**
+     * **本组件在 {@code SanTEComponent} 上的监听登记** —— 由 {@code start()} 里
+     * {@code addListener} 的**返回值**填入，供 {@code stop()} 按**引用相等**移除 ✓
+     * （{@code Consumer} 无身份标识 ⇒ 必须持有同一实例 ✓）。
+     */
+    private SanTEComponent.Listener santeListener;
 
     //该技能是否在执行中
     private boolean running = false;
@@ -41,26 +48,28 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
     }
 
     /**
-     * **订阅 SanTE 变更**（阶段 12 · t89 · C2 · 用户裁定 (b)）：**向 {@code SanTEComponent} 订阅** ✓，
-     * 而**不是**在类声明上 `implements` 某个能力接口 ✗ —— 后者正是用户点名的方向错误
-     * （`SanTE` 早已是组件 ⇒ 硬规矩 R-1：**不得再为它新增能力接口** ✗）。
-     * <p><b>时机 = {@code start()}（阶段 13 · t92a 迁移 —— R-4 修复）</b>：R-4 禁止在 {@code awake()} 里
-     * **取用其他组件** ✗（awake 只做构造期自检 / 只读自身）⇒ 本段**整段**从 {@code awake()} 迁到
-     * {@code start()}，并与**本卡新增的** {@link #stop()} 的退订成对 ✓
-     * （`SanTEComponent#subscribe` 幂等 ⇒ 重复 start 不会重复登记 ✓）。
-     * <p><b>通知顺序</b> = **订阅先后** = 容器 `start()` 广播序（= 组件装配序）。
+     * **订阅 SanTE 变更**：**向 {@code SanTEComponent} 添加一条监听** ✓，而**不是**在类声明上
+     * `implements` 某个接口 ✗ —— 后者正是用户点名的方向错误（`SanTE` 早已是组件 ⇒ 硬规矩 R-1：
+     * **不得再为它新增能力接口** ✗）。
+     * <p><b>时机 = {@code start()}</b>（R-4：`awake()` 只做构造期自检 / 只读自身，**不得取用其他组件** ✗），
+     * 并与 {@link #stop()} 的移除成对 ✓（`addListener` 幂等 ⇒ 重复 start 不会重复登记 ✓）。
+     * <p><b>通知顺序</b> = **添加先后** = 容器 `start()` 广播序（= 组件装配序）。
      * <b>与 {@code awake()} 是否同序需另证</b>（本卡未做运行级取证）⇒ 不再宣称"awake 序" ✗。
      * <p>容器查找（而不是字段注入）⇒ 本组件**不持有** `SanTEComponent` 引用 ✓。
-     * <p><b>【已作废】旧口径原文（阶段 12 · t89 原文，逐字保留）</b>：
+     * <p><b>监听登记实例存进 {@link #santeListener}</b>：{@code Consumer} 无身份标识 ⇒ 必须持有同一实例才能按引用移除 ✓。
+     * <p><b>【已作废】旧口径原文（逐字保留）</b>：
      * 「时机 = `awake()` ⇒ 通知顺序 = 订阅先后 = 组件装配序 ✓。」
-     * —— 订阅迁到 `start()` 之后该表述**作废** ✗（订阅现在发生在 start 相）。
+     * —— 订阅已迁到 `start()` ⇒ 该表述**作废** ✗。
+     * <p><b>【已作废】旧口径原文（逐字保留）</b>：「本类 `implements
+     * {@code SanTEComponent.Subscriber}`，并在 `start()` 里 {@code sante.subscribe(this)}」
+     * —— 该嵌套接口与 `subscribe` 入口**已删除** ✗（改为 JDK {@code Consumer} 监听器列表）⇒ 该表述**作废** ✗。
      */
     @Override
     public void start() {
         buff = svc().components().get(BuffComponent.class);
         sante = svc().components().get(SanTEComponent.class);
         if (sante != null) {
-            sante.subscribe(this);
+            santeListener = sante.addListener(this, this::onSanTEChange);
         }
     }
 
@@ -111,27 +120,33 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
     }
 
-    @Override
-    public void onSanTEChange(int pre, int now) {
-        if(now <= 0){
+    /**
+     * **SanTE 变更回调**：入参为载荷 {@link SanTEComponent.Change}（旧形态的两个值
+     * {@code (int pre, int now)} 装在一个 record 里 ✓，语义**逐字保留**：只看 {@code current <= 0} 那一支 ✓）。
+     * <p><b>不再 {@code @Override}</b>：本方法**不再实现任何接口** ✗（旧 {@code SanTEComponent.Subscriber}
+     * 已删除）⇒ 它是本类的**普通方法**，由 {@code start()} 里的方法引用
+     * {@code this::onSanTEChange} 注册进监听器列表 ✓。
+     */
+    public void onSanTEChange(SanTEComponent.Change change) {
+        if(change.current() <= 0){
             running = false;
             startCooldown();
         }
     }
 
     /**
-     * **退订**（阶段 13 · t92a **新增**）：与 {@link #start()} 的订阅**成对** ✓ —— 拆卸后不再被通知。
-     * <p><b>为什么本卡新增它（如实申报）</b>：卡面 F2 的原话是「`stop()` 的 `unsubscribe` **保留**」，
-     * 但**本类此前并没有 `stop()`** ✗（订阅只进不出 ⇒ 名单里的引用留到实例回收为止）。
-     * 订阅迁到 `start()` 之后**必须成对**，否则这次"迁移"会把一个只进不出的订阅原样留在新时机上 ⇒
-     * 本卡补上退订（最小改动；写法与 `DefaultSanTEZeroPunishment#stop` 的同形段**逐字对齐**）✓。
+     * **移除监听**：与 {@link #start()} 的添加**成对** ✓ —— 拆卸后不再被通知。
      * <p>框架在拆卸时调用 `stop()`（`cancelAllAndClear()` 兜底回收资源 ⇒ 本方法幂等 ✓；
-     * `unsubscribe` 对不在名单里的对象是 no-op ✓）。
+     * {@code removeListener} 对不在名单里的登记是 no-op 且返回 {@code false} ✓ —— 与旧
+     * {@code unsubscribe} 的 no-op 语义逐字一致）。
+     * <p><b>【已作废】旧口径原文（逐字保留）</b>：「{@code sante.unsubscribe(this)}」
+     * —— 该入口**已删除** ✗（{@code Consumer} 无身份标识 ⇒ 改为按引用移除登记实例）⇒ 该表述**作废** ✗。
      */
     @Override
     public void stop() {
-        if (sante != null) {
-            sante.unsubscribe(this);
+        if (sante != null && santeListener != null) {
+            sante.removeListener(santeListener);
+            santeListener = null;
         }
     }
 

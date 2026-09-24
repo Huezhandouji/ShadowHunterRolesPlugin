@@ -11,7 +11,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.hotbar.IconState;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -127,7 +127,7 @@ public abstract class MainWeapon extends ActiveComponent {
      * <p><b>覆写者须知（用户裁定：键与文案均允许覆写，覆写者自负其责）</b>：本方法整体可覆写。
      * 覆写后若**键写错**（与 {@code MainWeaponListener} 闸门读的键不一致）⇒ 点击该物品**无任何反应**；
      * 若**键缺失** ⇒ 角色清除时 {@code RoleInstance.clearHotbar()} 扫不到它 ⇒ **物品残留**在背包里。
-     * 详见 {@link HotbarItemProviding} 的接口 javadoc。
+     * 详见渲染组件 {@link HotbarRenderComponent#buildItemOf} 的读侧契约 javadoc。
      */
     @Override
     public ItemStack buildItem() {

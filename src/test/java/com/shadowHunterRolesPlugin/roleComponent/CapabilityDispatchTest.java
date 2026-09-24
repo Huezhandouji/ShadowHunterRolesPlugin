@@ -7,8 +7,6 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassiv
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
@@ -30,6 +28,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -38,9 +37,12 @@ import static org.junit.Assert.assertTrue;
  * 组件的构造器只把 id / 服务集 / 描述符存起来（**不做副作用**）⇒ 可以用一个**空的 {@code ComponentServices}**
  * 把它们造出来（服务集从不被读：本测试不调 {@code update()} / {@code buildItem()}）。
  * 冻结件 §4 T-5 明写"本例只需手写一个 ComponentServices 空桩"⇒ 这是被冻结件批准的形态，不是绕过。
- * <p>真值表冻结的是**阶段 8 的能力模型**：谁产出物品 = 能力接口；"外观是否依赖活状态" = 组件**自报**的
- * {@code dependsOnLiveState()}（框架不再点名任何具体组件类）。`ExampleSelfRefreshingSkill`（t46 的 A8②
- * 示例）**故意**是"产出物品但外观不依赖活状态"的那一个 —— 它是这个模型存在的理由，本测试把它显式钉住。
+ * <p>真值表冻结的是**能力模型**：谁产出物品 = 主动组件家族（技能 ∪ 主武器）；"外观是否依赖活状态" =
+ * 组件**自报**的 {@code dependsOnLiveState()}（框架不再点名任何具体组件类）。`ExampleSelfRefreshingSkill`
+ * **故意**是"产出物品但外观不依赖活状态"的那一个 —— 它是这个模型存在的理由，本测试把它显式钉住。
+ * <p><b>判据形态</b>：热键栏三件事已由"能力接口"改为"渲染组件按组件读的数据" ✗ ⇒ 本测试的判据是
+ * 「是不是主动组件家族」+「自报的真值」，**不再**问"实现了哪个接口"（那三个接口已删除 ✗）。
+ * 接受集与旧形态**逐字相同**（旧接口的唯一实现者就是主动组件家族）。
  */
 public class CapabilityDispatchTest {
 
@@ -71,7 +73,7 @@ public class CapabilityDispatchTest {
         return out;
     }
 
-    /** 冻结真值表：`产出物品`（= HotbarItemProviding）与 `依赖活状态`（= dependsOnLiveState()）。 */
+    /** 冻结真值表：`产出物品`（= 主动组件家族）与 `依赖活状态`（= dependsOnLiveState()）。 */
     private static final String[][] EXPECTED = {
             // 组件名, 是否产出物品, 是否依赖活状态（"N/A" = 不产出物品 ⇒ 该方法不存在）
             {"MeiqiheziBloodySlashSkill", "true", "true"},
@@ -101,10 +103,10 @@ public class CapabilityDispatchTest {
             String name = row[0];
             assertTrue("冻结表里的组件在仓内不存在：" + name, actual.containsKey(name));
             Object component = actual.get(name);
-            boolean provider = component instanceof HotbarItemProviding;
+            boolean provider = component instanceof ActiveComponent;
             assertEquals(name + " 的『产出物品』能力", Boolean.parseBoolean(row[1]), provider);
             if (provider) {
-                boolean live = ((HotbarItemProviding) component).dependsOnLiveState();
+                boolean live = ((ActiveComponent) component).dependsOnLiveState();
                 assertEquals(name + " 的『外观依赖活状态』能力", Boolean.parseBoolean(row[2]), live);
             } else {
                 assertEquals(name + " 不产出物品 ⇒ 无该能力（冻结表写 N/A）", "N/A", row[2]);
@@ -116,22 +118,22 @@ public class CapabilityDispatchTest {
         }
     }
 
-    /** 产出物品者 = {技能家族} ∪ {主武器家族}（= 实现 `HotbarPresentable` 者）；被动**不在**其内。 */
+    /** 产出物品者 = {技能家族} ∪ {主武器家族}（= 主动组件家族）；被动**不在**其内。 */
     @Test
     public void providersAreExactlyTheActiveComponentFamilies() {
         for (Object component : components().values()) {
-            boolean provider = component instanceof HotbarItemProviding;
+            boolean provider = component instanceof ActiveComponent;
             boolean expected = component instanceof Skill || component instanceof MainWeapon;
             assertEquals("产出物品者的集合必须 = 技能家族 ∪ 主武器家族：" + component.getClass().getSimpleName(),
                     expected, provider);
             if (provider) {
-                assertTrue("产出物品者必须实现 HotbarPresentable（阶段 13 · t115 起能力面已拆解 ⇒ 由实现者逐项显式声明）",
-                        component instanceof HotbarPresentable);
+                assertNotNull("产出物品者必须提供声明面（specification 非 null —— 图标/显示名/描述/冷却/耗能都住在它上面）",
+                        ((ActiveComponent) component).specification());
                 assertTrue("能出现在热键栏的组件必须有冷却能力（isCooling 的接受集）",
                         component instanceof CooldownBearing);
             } else {
-                assertFalse("被动不得进热键栏能力簇：" + component.getClass().getSimpleName(),
-                        component instanceof HotbarPresentable);
+                assertFalse("被动不得进热键栏家族：" + component.getClass().getSimpleName(),
+                        component instanceof ActiveComponent);
             }
         }
     }
@@ -144,8 +146,8 @@ public class CapabilityDispatchTest {
         for (Map.Entry<String, Object> e : components().entrySet()) {
             Object component = e.getValue();
             if (!(component instanceof Skill)) continue;
-            if (!(component instanceof HotbarItemProviding)) continue;
-            if (!((HotbarItemProviding) component).dependsOnLiveState()) exceptions.add(e.getKey());
+            if (!(component instanceof ActiveComponent)) continue;
+            if (!((ActiveComponent) component).dependsOnLiveState()) exceptions.add(e.getKey());
         }
         assertEquals("技能家族里『外观不依赖活状态』的必须恰好是示例那一个（t46 A8②）",
                 java.util.Collections.singletonList("ExampleSelfRefreshingSkill"), exceptions);
@@ -155,8 +157,8 @@ public class CapabilityDispatchTest {
     @Test
     public void skillFamilyDefaultsToLiveStateAndMainWeaponDoesNot() {
         for (Object component : components().values()) {
-            if (!(component instanceof HotbarItemProviding)) continue;
-            boolean live = ((HotbarItemProviding) component).dependsOnLiveState();
+            if (!(component instanceof ActiveComponent)) continue;
+            boolean live = ((ActiveComponent) component).dependsOnLiveState();
             if (component instanceof MainWeapon) {
                 assertFalse("主武器不得声明依赖活状态（A12 边界：冷却名不带秒数）", live);
             }

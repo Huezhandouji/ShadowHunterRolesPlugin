@@ -3,10 +3,6 @@ package com.shadowHunterRolesPlugin.roleComponent;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItem;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarPresentable;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -14,49 +10,44 @@ import org.bukkit.inventory.ItemStack;
 
 /**
  * 主动组件基类（设计 §4.3）：= 原 `Skill` + `MainWeapon` 去重后的并集，不多一个成员。
- * <p>
- * <b>阶段 6 · 统一装配</b>：本类降级为**可选的便利实现** —— 它只做一件事：把构造参数装进
- * {@link HotbarSpecification} 并实现 {@link #specification()}（**唯一实现点**）。表现访问器由
- * {@link HotbarPresentable} 的 `default` 方法提供，本类**显式转发**到它们（阶段 13 · t115 起，
- * 见下）⇒ 子类不再需要（也不应）逐个手写委托。
- * <p>
- * <b>阶段 7 · A 步</b>：表现规格类改全拼（`HotbarSpec` → {@link HotbarSpecification}；**旧短名类已于阶段 10 · t71 删除** ✓），
- * 同时把它升格为**装配期描述符**（{@link RoleComponent.Specification}）的"带栏位"分支。
- * 本类持有的这一份是**声明值对象**：它没有栏位（栏位由装配器在描述符上设置），
- * 也从不由装配入口消费 —— 因此这条路径与阶段 6 逐字等价。
- * <p>
- * <b>阶段 8</b>：
+ *
+ * <h2>本类在装配里的位置</h2>
+ * 本类降级为**可选的便利实现** —— 它只做一件事：把构造参数装进
+ * {@link HotbarSpecification} 并给出 {@link #specification()}（**唯一实现点**）。
+ *
+ * <h2>热键栏能力：由本类**自己声明**，不再是"实现某个能力接口"</h2>
+ * 本类**不实现**任何热键栏能力接口 ✗ —— 那三个接口已随"能力 = 渲染组件读的数据"这一口径整体删除 ✗
+ * （见 {@code HotbarRenderComponent} 的读口 {@code specificationOf} / {@code buildItemOf} /
+ * {@code dependsOnLiveStateOf}）。现在：
  * <ul>
- *   <li>{@link #isCooling()} 在这里给出**唯一实现**（读本组件的冷却实例状态，见下）；
- *       框架的"秒数刷新节拍"读的就是它；</li>
- *   <li>{@code buildItem()}（{@link HotbarPresentable} ⊇ {@link HotbarRenderComponent.HotbarItemProviding}）**在本类保持抽象**：
- *       默认画法由两个**家族基类**给出（`core/Skill` 带秒数、`core/MainWeapon` 不带）——
- *       画物品要读运行期状态，做不到在这里按家族分叉；</li>
- *   <li>旧的 kind 形参构造器（7/8 参 `@Deprecated` 别名）已随 kind 枚举删除；
- *       行为分支不再按种类分叉（无 kind 可言）。</li>
+ *   <li><b>声明数据</b>（图标 / 显示名 / 描述 / 冷却声明值 / 耗能声明值 / 基础物品）住在
+ *       {@link HotbarSpecification}（装配期描述符）✓，本类只把其中**组件侧仍需要的几个**转出去
+ *       （见下：家族基类与外部读数点要用）；</li>
+ *   <li><b>物品产出</b> = {@link #buildItem()}：本类**保持抽象** ✗ —— 默认画法由两个家族基类给出
+ *       （{@code Skill} 带秒数、{@code MainWeapon} 不带）；画物品要读运行期状态，做不到在这里按家族分叉；</li>
+ *   <li><b>外观是否依赖活状态</b> = {@link #dependsOnLiveState()}：默认 {@code false}，
+ *       只有"外观每刻自己变"的家族覆写为 {@code true}。</li>
  * </ul>
- * <p>
- * <b>阶段 13 · t105（用户裁定：组件自持冷却、框架不持有）</b>：冷却的**状态与判断**整体落在本类 ——
- * 每实例一份 `cooldownUntilTick`（同 id 的两个实例**各自独立** ✓），框架既不登记、也不派发、更不落表；
- * 框架侧只在需要读数时**转问组件**（`isCooling()` / 读数口），公开面一条不删 ✓。
- * <p>旧的"冷却结束回调"（原 `CooldownAware#onCooldownEnd`）随该能力接口一并删除 —— 全库**零覆写点**
- * （现算：`onCooldownEnd` 仅剩框架派发点与该接口自身的默认空实现）⇒ 删除**零行为变化** ✓。
- * <p><b>阶段 13 · t108（用户裁定：`dispatch` 下被组件取代者删除 + 入口词汇归位）</b>：
- * 原 `HotbarActionable`（唯一方法 `onCast`）**被本组件吸收** —— 本类本来就声明 `onCast`，那个接口
- * 只是重复声明 ⇒ 整体删除 ✗（派发判据改为按**本组件**判，接受集逐字不变）；
- * 入口的三个类型（`CastTrigger` / `CastSignal` / `AttackSignal`）由 `core/dispatch/` **迁入本类**
- * （嵌套类型，见下）—— 与使用它们的组件同处、只由本组件持有 ✓。
+ *
+ * <h2>表现规格是装配期描述符</h2>
+ * 表现规格**不由构造实参内联**，而是由组件自己的嵌套 `Specification` 声明、经装配入口
+ * {@code Role.Builder.addComponent(id, specification)} 交给容器，容器再经
+ * {@code Specification.create(id, services)} 把它交给本构造器。
+ * <p>本类持有的这一份同时是**基类默认画法的读面**（{@link #specification()}）；它由装配期
+ * {@code freeze()} 置为只读 ⇒ 同一实例被多个玩家实例共享也不会被串改。
+ * <p>表现规格类改全拼（`HotbarSpec` → {@link HotbarSpecification}；旧短名类已删除 ✓）。
+ * 本类持有的这一份是**声明值对象**：它没有栏位（栏位由装配器在描述符上设置），
+ * 也从不由装配入口消费 —— 因此这条路径与更早的形态逐字等价。
+ *
+ * <h2>冷却：状态与判断都在本类</h2>
+ * 每实例一份 {@code cooldownUntilTick}（同 id 的两个实例**各自独立** ✓），框架既不登记、也不派发、
+ * 更不落表；框架侧只在需要读数时**转问组件**（{@link #isCooling()} / 读数口），公开面一条不删 ✓。
+ * <p>旧的"冷却结束回调"随该能力接口一并删除 —— 全库**零覆写点** ⇒ 删除**零行为变化** ✓。
+ * <p>物品使用入口（{@link #onCast(CastSignal)}）与入口词汇（{@link CastTrigger} / {@link CastSignal} /
+ * {@link AttackSignal}）都归本组件：施放与攻击由「物品支持类组件」处理 ✓。
  */
 public abstract class ActiveComponent extends RoleComponent
-        implements HotbarPresentable, HotbarItem, HotbarItemProviding,
-        EnergyComponent.EnergyCosting, RoleComponent.CooldownBearing {
-
-    // ───────── 阶段 13 · t108：物品使用入口的词汇（原 core/dispatch/ 的三个类型迁入本组件） ─────────
-    //裁定⑤（用户答复）：**施放与攻击由「物品支持类组件」处理** ⇒ 原 `HotbarActionable` / `CombatHook`
-    //两个能力接口**已被本组件吸收**（本类本来就声明 `onCast`、其家族基类 `MainWeapon` 声明 `onAttack`）
-    //⇒ 两个接口整体删除 ✗（接受集逐字不变：它们的唯一实现者就是本组件/主武器基类）。
-    //⇒ 入口的三个类型（触发来源 + 两种信号）**按"与使用它的组件同处"改为本组件的嵌套类型** ✓：
-    //   `core/dispatch/` 下不再留共享能力袋；子类**无需 import**（继承的成员类型按简单名可见）。
+        implements EnergyComponent.EnergyCosting, RoleComponent.CooldownBearing {
 
     /** **热键栏触发的三种来源**（listener 只做"事件 → trigger"翻译；`onCast` 入口的输入词汇）。 */
     public enum CastTrigger {
@@ -76,74 +67,82 @@ public abstract class ActiveComponent extends RoleComponent
     private final HotbarSpecification<?> specification;
 
     /**
-     * **冷却实例状态**（阶段 13 · t105 从两个家族基类上提到本类，两份副本合一 ✓）：
-     * 到期刻（`Bukkit.getCurrentTick()` 口径）；`0` = 无冷却 ⇒ 与"从未进过冷却"同义。
+     * **冷却实例状态**：到期刻（{@code Bukkit.getCurrentTick()} 口径）；`0` = 无冷却 ⇒ 与"从未进过冷却"同义。
      * <p>状态**只属于本实例**：同 id 的两个实例各自持有自己的字段 ⇒ 不共享、不串扰 ✓
-     * （用户裁定：组件自己持有冷却与判断，框架不知道冷却）。
+     * （组件自己持有冷却与判断，框架不知道冷却）。
      */
     private int cooldownUntilTick = 0;
 
-    /**
-     * **描述符口径的构造**（阶段 7 · B 步）：表现规格**不再由构造实参内联**，而是由组件自己的
-     * 嵌套 `Specification` 声明、经装配入口 {@code Role.Builder.addComponent(id, specification)}
-     * 交给容器，容器再经 {@code Specification.create(id, services)} 把它交给本构造器。
-     * <p>本类持有的这一份同时是**基类默认画法的读面**（{@link #specification()}）；它由装配期
-     * {@code freeze()} 置为只读 ⇒ 同一实例被多个玩家实例共享也不会被串改。
-     */
     protected ActiveComponent(String id, ComponentServices services, HotbarSpecification<?> specification) {
         super(id, services);
         this.specification = specification;
     }
 
-    /** **唯一实现点**：表现规格（`getDisplayName` / `getIcon` / … 等访问器由接口 default 委托到本方法）。 */
-    @Override
+    /** **唯一实现点**：表现规格（声明数据的读面；组件侧与渲染侧都从这里读）。 */
     public final HotbarSpecification<?> specification() {
         return specification;
     }
 
-    // ───────── 阶段 13 · t115（用户 V3：拆解复合能力袋）：本类**显式声明**它真正具备的能力 ─────────
-    //拆解后 `HotbarPresentable` **不再 extends** 声明面 / 产出面 / 耗能面 ✗ ⇒ "一次 extends 拿全"的旧便利没了：
-    //本类必须**自己**把 `HotbarItem` 的 7 个抽象访问器实现掉（本卡 javac 实测：**无继承关系**的两个接口里
-    //"抽象声明 + 同名 default"并存 ⇒ 实现者必须自己实现 ✗；只有继承关系内的 default 才自动胜出）。
-    //★ 写法 = **纯转发**到那些 default（`HotbarPresentable.super.getX()`）⇒ **零逻辑重复** ✓，
-    //  求值结果与拆解前**逐字相同**（都是 `specification().getX()`）✓。
-    //★ **`getId()` 不在其列**（实测）：`RoleComponent.getId()` 是 **final** ⇒ 它本来就**赢过**接口 default
-    //  （类方法恒胜接口 default ✓）⇒ 拆解前后都走它，**无需也不可**覆写 ✗。
+    // ───────── 热键栏物品的产出面（本类自己声明） ─────────
 
-    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
-    @Override
+    /**
+     * **产出本组件在当前时刻的热键栏物品**（**完整形态**：材质 / 名称 / 后缀 / lore / 识别键都已就位）。
+     * <p>由框架在**帧末 flush** 的写物品段调用（每帧至多一次/组件），并与**注册序**同序遍历；
+     * 组件**不得**在此方法里写玩家背包（写物品的唯一落点仍是渲染器的那一次槽位写入）。
+     * <p>本类**保持抽象** ✗：默认画法由两个家族基类给出（技能侧带 {@code x.xs} 秒数、主武器侧不带）——
+     * 画物品要读运行期状态（冷却剩余刻数 / 闸门 / 当前能量），描述符拿不到这些。
+     */
+    public abstract ItemStack buildItem();
+
+    /**
+     * **本组件的外观是否依赖"活状态"**：{@code true} = 它的外观会在**没有框架置脏事件**的情况下自己变
+     * （例如技能冷却名里的 {@code x.xs} 秒数每刻都在变）⇒ 只要它在冷却中，框架就必须**每 tick** 至少刷一次，
+     * 否则玩家看到的是陈旧外观。
+     * <p><b>为什么这是一个自报值、而不是框架里的一句 {@code instanceof Skill}</b>：旧判据把「外观含秒数」
+     * **写死成具体类** ⇒ ① 第三类"带倒计时外观"的组件加进来时**必须改框架文件** ✗；
+     * ② 覆写 {@link #buildItem()} 去掉秒数外观的子类**仍会被每 tick 重绘**（白写）✗。
+     * 改为自报后：新组件**只加新文件**即可（默认 {@code false}，需要就覆写 {@code true}）✓，
+     * 而"覆写掉活状态外观"的子类可以覆写成 {@code false} ⇒ **不再每 tick 重绘** ✓。
+     * <p><b>默认值 = {@code false}</b>：只有技能家族的默认画法带秒数 ⇒ 该家族覆写为 {@code true}，
+     * 主武器与被动保持 {@code false} ⇒ **既有组件的真值表逐字不变**。
+     * <p>注意：本读数只回答"**要不要**每刻刷"；"**写不写**"仍由帧末 flush 决定（空闲 tick 零 setItem 不变）。
+     * 外观依赖活状态、但变化**不是每刻**的组件应返回 {@code false}，并在状态真的变了时
+     * 用渲染组件的 {@code requestRepaint()} **主动请求** —— 那才是它的刷新节拍。
+     */
+    public boolean dependsOnLiveState() {
+        return false;
+    }
+
+    // ───────── 声明数据的组件侧读数（家族基类与外部读数点用；数据源 = 描述符） ─────────
+    //★ 求值与"接口 default 委托"逐字相同（都是 specification().getX()）⇒ 调用点零改动 ✓。
+
+    /** 显示名（数据源 = 描述符）。 */
     public Component getDisplayName() {
-        return HotbarPresentable.super.getDisplayName();
+        return specification().getDisplayName();
     }
 
-    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
-    @Override
+    /** 描述（数据源 = 描述符）。 */
     public Component getDescription() {
-        return HotbarPresentable.super.getDescription();
+        return specification().getDescription();
     }
 
-    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
-    @Override
-    public Material getIcon() {
-        return HotbarPresentable.super.getIcon();
-    }
-
-    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
-    @Override
+    /** 冷却**声明值**（数据源 = 描述符）—— 唯一真值来源（{@link #startCooldown()} 读它）。 */
     public int getCooldownTicks() {
-        return HotbarPresentable.super.getCooldownTicks();
+        return specification().getCooldownTicks();
     }
 
-    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}（一处同时满足 `HotbarItem` 与 `EnergyCosting` 两处声明）。 */
+    /** 耗能**声明值**（数据源 = 描述符）；同时满足 {@link EnergyComponent.EnergyCosting} 的声明。 */
     @Override
     public int getEnergyCost() {
-        return HotbarPresentable.super.getEnergyCost();
+        return specification().getEnergyCost();
     }
 
-    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
-    @Override
+    /**
+     * **基础物品**（热键栏物品**底稿**：材质 / 显示名 / 描述）—— 委托给描述符的同名方法
+     * ⇒ 需要特殊底稿的组件**在自己的 `Specification` 里覆写**即可。
+     */
     public ItemStack baseItem(String id) {
-        return HotbarPresentable.super.baseItem(id);
+        return specification().baseItem(id);
     }
 
     /**
@@ -159,7 +158,7 @@ public abstract class ActiveComponent extends RoleComponent
     }
 
     /**
-     * **按给定时长开始（或覆盖式重启）冷却**（阶段 13 · t105 新增重载）。
+     * **按给定时长开始（或覆盖式重启）冷却**。
      * <p>语义：从**当前刻**重算到期（覆盖旧值，不做"取较大值"的续期 ✗）—— 与迁移前"以本次调用时刻重算"
      * 的覆盖式重启**逐字等价** ✓。
      * <p>存在理由：兼容薄壳（原冷却端口）与调试命令需要按**显式刻数**驱动冷却（旧端口签名是
@@ -193,8 +192,8 @@ public abstract class ActiveComponent extends RoleComponent
     }
 
     /**
-     * **冷却状态读数**（阶段 8 新增；{@link RoleComponent.CooldownBearing} 的唯一实现）：
-     * 逐字等价于 {@link #isCoolingDown()}（阶段 13 · t105：改为读**本组件实例**的状态，不再经任何端口 ✗）。
+     * **冷却状态读数**（{@link RoleComponent.CooldownBearing} 的唯一实现）：
+     * 逐字等价于 {@link #isCoolingDown()}（改为读**本组件实例**的状态，不再经任何端口 ✗）。
      * <p>框架的帧末 flush 用它驱动"冷却中每 tick 至少刷一次"（技能名里的秒数才会逐刻递减）——
      * 这条**节拍链**与展示链（{@code %.1f} 秒数）读的是同一份状态 ✓。
      * <p>旧的"冷却启动即置脏"动作已随之消失：冷却期间本读数恒为 `true` ⇒ flush 入口条件每 tick 成立
@@ -206,16 +205,15 @@ public abstract class ActiveComponent extends RoleComponent
     }
 
     /**
-     * **物品使用入口（施放）**：默认不做事、也**不**进冷却（与今天 listener 的行为一致：未重写的热键栏
+     * **物品使用入口（施放）**：默认不做事、也**不**进冷却（与 listener 的行为一致：未重写的热键栏
      * 触发只做就绪预检）。
-     * <p>阶段 8：返回值改为 {@code void}（旧的施放结果枚举已删 —— 它今天**没有任何消费点**，
-     * 见交付说明的零行为变化论证）。
-     * <p>阶段 13 · t108：本方法从"覆写能力接口"变成**本组件的声明**（原 `HotbarActionable` 被吸收 ✗）
-     * ⇒ `@Override` 已删（它已无超类型方法可覆写）；方法签名与默认体**逐字未变** ✓。
+     * <p>返回值为 {@code void}（旧的施放结果枚举已删 —— 它**没有任何消费点**）。
+     * <p>本方法**不是**覆写任何接口：它是本组件的**自有声明**（原 `HotbarActionable` 已被吸收 ✗）
+     * ⇒ 无 {@code @Override}；方法签名与默认体**逐字未变** ✓。
      */
     public void onCast(CastSignal signal) {
     }
 
-    //阶段 13 · t105：冷却结束回调（原 CooldownAware）与框架侧派发点已整体删除 ——
+    //冷却结束回调（原 CooldownAware）与框架侧派发点已整体删除 ——
     //  组件自持冷却状态后，"到期/被结束/被重启"都不再由框架通知（框架不持有、也不派发 ✓）。
 }

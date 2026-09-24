@@ -3,7 +3,6 @@ package com.shadowHunterRolesPlugin.core.hotbar;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItem;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
@@ -16,20 +15,20 @@ import java.util.List;
  * 把过去分散在基类里的表现字段收敛成一个不可变值对象，并**同时**承担
  * {@link RoleComponent.Specification} 的"怎么造这个组件"的职责（两者**合一**，不并列）。
  * <p>
- * 分工（阶段 8 冻结）：
+ * 分工：
  * <ul>
- * <li>{@link HotbarRenderComponent.HotbarPresentable#specification()} = **唯一实现点** —— 组件只写这一处；</li>
- * <li>本类自身即 {@link HotbarItem} 的**声明面**（图标 / 显示名 / 描述 / 冷却 / 耗能），
- * 因此 {@link HotbarRenderComponent.HotbarPresentable#asHotbarItem()} 直接返回本对象，无需适配代码；</li>
- * <li><b>纯声明</b>：阶段 8 删掉了 {@code kind} 字段与构造参数 —— 描述符不再自述种类；
- * "物品长什么样（含运行期状态）"由组件基类的 {@link HotbarRenderComponent.HotbarItemProviding#buildItem()} 回答；</li>
+ * <li>组件侧的唯一实现点 = 主动组件基类的 {@code specification()} —— 组件只写这一处；</li>
+ * <li>本类自身即**声明面**（图标 / 显示名 / 描述 / 冷却 / 耗能），
+ * 因此渲染组件的读口 {@code specificationOf(component)} 直接返回本对象，无需适配代码；</li>
+ * <li><b>纯声明</b>：描述符不自述种类；
+ * "物品长什么样（含运行期状态）"由组件基类的 {@code buildItem()} 回答（渲染侧读口 = {@code buildItemOf}）；</li>
  * <li><b>栏位必填</b>：本类型 {@link #requiresSlot()} = {@code true}（不带栏位的组件用另一支描述符）。</li>
  * </ul>
- * <b>栏位（阶段 7 · A 步）</b>：本类型是**带栏位**的那一支 —— 装配器用
+ * <b>栏位</b>：本类型是**带栏位**的那一支 —— 装配器用
  * {@link #setSlot(int)} 指定它在热键栏里的位置，装配期未设栏位则
  * {@link RoleComponent.Specification#freeze()} **抛异常**（绝不静默变成"不占栏位"）。
  * <b>"不占栏位"由类型表达</b>：不带栏位的组件用 {@code PassiveSkill.Specification}（它继承根类型、
- * **没有** {@code setSlot}），或直接实现 {@link HotbarRenderComponent.HotbarPresentable}；本类型内部不再出现 `-1` 哨兵。
+ * **没有** {@code setSlot}）；本类型内部不再出现 `-1` 哨兵。
  * <p>
  * 命名沿用工程的 JavaBean 风格（设计 §4.3：不引入 record 风格访问器）；
  * 旧短名 {@code HotbarSpec} 保留为 `@Deprecated` 别名（见该类）。
@@ -37,7 +36,7 @@ import java.util.List;
  * 全拼 {@link HotbarSpecification} 是**唯一**入口。（旧口径原文保留不删，便于回溯。）
  */
 public class HotbarSpecification<T extends RoleComponent>
-        extends RoleComponent.Specification<T> implements HotbarItem {
+        extends RoleComponent.Specification<T> {
 
  /**
  * **声明的 id**（{@link #of} 传入，可为 {@code null}）。
@@ -92,7 +91,7 @@ public class HotbarSpecification<T extends RoleComponent>
  * **失败关闭（fail-fast）**：本类的默认创建体不造任何组件 —— 具体组件由**组件自己声明的嵌套
  * `Specification`** 覆写本方法给出（阶段 7 · B 步落地）。把裸的 {@link HotbarSpecification}
  * 交给装配入口会立刻在这里抛异常，而不是造出一个语义不明的组件。
- * <p>本类在阶段 7 · A 步的另一半职责是"组件内部的声明值对象"：{@link HotbarRenderComponent.HotbarPresentable#specification()}
+ * <p>本类的另一半职责是"组件内部的声明值对象"：主动组件基类的 {@code specification()}
  * 返回它、基类默认画法读它，那条路径**从不调用本方法**。
  */
     @Override
@@ -109,7 +108,6 @@ public class HotbarSpecification<T extends RoleComponent>
  * 这个字段就会**恒为 null 而仍可被读**⇒ 现在装配入口把注册 id
  * 绑进描述符，字段与注册处**同源同值**。
  */
-    @Override
     public String getId() {
         String bound = boundId();
         return bound != null ? bound : declaredId;
@@ -123,7 +121,6 @@ public class HotbarSpecification<T extends RoleComponent>
  * 由 `core/Skill#buildItem()` 与 `core/MainWeapon#buildItem()` 施加，因此本方法**不碰**这些冻结面。
  * <p>需要特殊底稿的组件：在自己的嵌套 `Specification` 里覆写本方法即可。
  */
-    @Override
     public ItemStack baseItem(String id) {
         ItemStack stack = new ItemStack(icon);
         ItemMeta meta = stack.getItemMeta();
@@ -135,27 +132,22 @@ public class HotbarSpecification<T extends RoleComponent>
         return stack;
     }
 
-    @Override
     public Component getDisplayName() {
         return displayName;
     }
 
-    @Override
     public Component getDescription() {
         return description;
     }
 
-    @Override
     public Material getIcon() {
         return icon;
     }
 
-    @Override
     public int getCooldownTicks() {
         return cooldownTicks;
     }
 
-    @Override
     public int getEnergyCost() {
         return energyCost;
     }

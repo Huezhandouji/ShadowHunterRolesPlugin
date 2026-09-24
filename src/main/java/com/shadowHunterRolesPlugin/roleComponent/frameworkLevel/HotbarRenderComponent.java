@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
@@ -136,194 +137,59 @@ public class HotbarRenderComponent extends RoleComponent {
         void onHotbarRendered();
     }
 
-    // ───────── 阶段 13 · t113：本组件承载的**能力接口**（原顶层 core/hotbar/HotbarItemProviding） ─────────
+    // ───────── 热键栏能力的**读侧契约**：渲染组件按组件读数据（组件不再实现能力接口） ─────────
+    //旧形态：本组件嵌套声明三个能力接口（声明面 / 物品产出面 / 能上热键栏），由主动组件基类实现。
+    //新形态：这三件事都是**数据** —— 组件用**自己的公开方法**表达，本组件提供三个静态读口去读它。
+    //★ 依据 R-8：接口只在"表达的东西不能成为组件"时才有理由；这三件事都能由组件自己的方法表达
+    //  ⇒ 不必是接口（也就不必让每个组件去 implements 一个嵌套类型 ✗）。
+    //★ **不新增任何接口**（R-1 / R-8）：读侧就是下面三个静态方法（本类无实例状态 ⇒ 静态）。
+    //★ **接受集与旧形态逐字相同**：旧接口的唯一实现者是主动组件基类及其子类（技能家族 ∪ 主武器家族）
+    //  ⇒ `instanceof ActiveComponent` 命中**同一个集合**；被动组件（PassiveSkill 及其子类）两侧都不在内 ✓。
 
     /**
-     * 「这个组件自己产出热键栏物品」的能力接口（阶段 8 立 · **阶段 13 · t113 迁入本组件**）：
-     * **唯一实现点是 {@link #buildItem()}**。
-     * <p><b>为什么嵌在本组件里</b>（用户裁定的能力归属原则：与使用它的组件同处、只由它持有 ✓）：
-     * 本组件是**渲染意图面**的拥有者（"要重绘"归它），而本接口是**物品产出面**的声明
-     * （"物品长什么样"归组件自己）—— 两者是同一件事的两半，收在同一个类型里最清楚 ✓；
-     * 顶层文件已删 ✗（`core/hotbar/` 下不再有共享能力袋）。
-     * <p><b>分工（阶段 8 冻结，逐字不变）</b>：组件侧**自己判定状态**并产出**完整已装饰**的物品；框架侧只保留
-     * <b>管道职责</b> —— <b>什么时候写</b>（脏标记 / 帧末 flush）与 <b>写到哪一格</b>
-     * （装配条目里的栏位，见 {@code Role.ComponentEntry#getSlot()}）。
-     * <p><b>为什么默认实现在组件基类而不是描述符</b>：画物品要读<b>运行期状态</b>（冷却剩余刻数 / 闸门 / 当前能量），
-     * 而描述符（{@link HotbarSpecification}）是**装配期对象**、拿不到 {@code svc()} ⇒ 默认画法写在
-     * {@code core/Skill} 与 {@code core/MainWeapon} 这两个**组件基类**里（合成指标：三态材质 · 六条状态文案 ·
-     * 技能带 {@code x.xs} 而主武器不带 · 两个 PDC 键 · 声明数据取自描述符）。描述符只保留**声明数据**
-     * （图标 / 显示名 / 描述 / 冷却 / 耗能）。
-     * <p><b>能力面（阶段 8 收簇 · 阶段 13 · t115 拆簇）</b>：本接口与 {@link HotbarPresentable}（能上热键栏的声明面）
-     * 曾经是"复合能力袋"里的一员 ✗ —— t115 起**拆解**：二者各自独立，由实现者**显式声明**真正具备的能力 ✓
-     * ⇒ 凡"能出现在热键栏"的组件仍必须给出 {@code buildItem()}（实现者集合按构造相同 ✓），
-     * 且 {@code buildItem()} 的语义**必须读**同族状态（冷却读口见 {@code RoleComponent.CooldownBearing} /
-     * {@link EnergyComponent.EnergyCosting#getEnergyCost()} / {@link HotbarItem} 的声明面）
-     * ⇒ 合并判据的**语义**不变，只是归属从"一次 extends"改为"显式 implements" ✓。
-     * 不占热键栏的组件（被动）**不在**本面内，因此不会被强制实现一个永远不会被调用的方法。
-     * <p><b>覆写者须知（用户裁定：PDC 键与六条文案**均允许组件覆写**，覆写者自负其责）</b>：
-     * <ul>
-     *   <li><b>键写错</b>（写入的键与框架读取的键不一致）⇒ 该物品在监听器前置闸门
-     *       （{@code listener/SkillListener} 的 {@code isSkillItem} / {@code listener/MainWeaponListener} 的
-     *       {@code isMainWeapon}）处不被识别 ⇒ <b>点击该物品无任何反应</b>（玩家感知为"技能坏了"）；</li>
-     *   <li><b>键缺失</b>（完全不写键）⇒ 角色清除时 {@code RoleInstance.clearHotbar()} 扫不到它
-     *       ⇒ <b>物品残留在背包/热键栏</b>（可继续拿在手上）。</li>
-     * </ul>
-     * 框架**不再**为此提供保障（不再"写完回读校验"）—— 这两条是**已申报的代价**，不是缺陷。
-     * <p><b>【已作废】旧路径口径逐字保留</b>：「{@code core.hotbar.HotbarItemProviding}`（顶层接口，
-     * {@code core/hotbar/} 下）」—— 那描述的是**共享能力袋**的旧形态 ⇒ 已作废 ✗（现为本组件的嵌套类型）。
+     * **读声明面**（装配期数据：图标 / 显示名 / 描述 / 冷却声明值 / 耗能声明值 / 基础物品）：
+     * 该组件持有的 {@link HotbarSpecification}；没有声明面（不在热键栏家族）⇒ {@code null} ✓。
+     * <p>数据源 = 描述符（装配期对象，`freeze()` 之后只读）；组件侧经它自己的 `specification()` 暴露 ✓。
      */
-    public interface HotbarItemProviding {
-
-        /**
-         * 产出本组件在当前时刻的热键栏物品（**完整形态**：材质 / 名称 / 后缀 / lore / 识别键都已就位）。
-         * <p>
-         * 由框架在**帧末 flush** 的写物品段调用（每帧至多一次/组件），并与**注册序**同序遍历；
-         * 组件**不得**在此方法里写玩家背包（写物品的唯一落点仍是 {@code HotbarRenderer#render()}）。
-         */
-        ItemStack buildItem();
-
-        /**
-         * **本组件的外观是否依赖"活状态"**（阶段 8 · t46 新增的能力，A8）：{@code true} = 它的外观会在
-         * **没有框架置脏事件**的情况下自己变（例如技能冷却名里的 {@code x.xs} 秒数每刻都在变）
-         * ⇒ 只要它在冷却中，框架就必须**每 tick** 至少刷一次，否则玩家看到的是陈旧外观。
-         * <p>
-         * <b>为什么这是一个能力、而不是框架里的一句 {@code instanceof Skill}</b>（C-15 第三个实例测试）：
-         * 旧判据把「外观含秒数」**写死成具体类** ⇒ ① 第三类"带倒计时外观"的组件加进来时**必须改框架文件** ✗；
-         * ② 覆写 {@link #buildItem()} 去掉秒数外观的 {@code Skill} 子类**仍会被每 tick 重绘**（白写）✗。
-         * 下沉为能力后：新组件**只加新文件**即可（默认 {@code false}，需要就覆写 {@code true}）✓，
-         * 而"覆写掉活状态外观"的子类可以覆写成 {@code false} ⇒ **不再每 tick 重绘** ✓。
-         * <p>
-         * <b>默认值 = {@code false}</b>（不依赖活状态 ⇒ 不驱动每 tick 刷新）：这与"只有技能家族的默认画法
-         * 带秒数"这一既有事实一致 —— {@code core/Skill} 覆写为 {@code true}，主武器与被动保持 {@code false}
-         * ⇒ **既有 16 个组件的接受集逐字不变**。
-         * <p>注意：本能力只回答"**要不要**每刻刷"；"**写不写**"仍由帧末 flush 决定（空闲 tick 零 setItem 不变）。
-         * 外观依赖活状态、但变化**不是每刻**的组件（例如自己按需刷新计数的组件）应返回 {@code false}，
-         * 并在状态真的变了时用 {@link HotbarRenderComponent#requestRepaint()} **主动请求**
-         * —— 那才是它的刷新节拍（阶段 12 · t86 起请求走**渲染组件**这一条通道；
-         * 旧的 {@code RepaintRequester} 类型已删除 ✓）。
-         */
-        default boolean dependsOnLiveState() {
-            return false;
-        }
+    public static HotbarSpecification<?> specificationOf(RoleComponent component) {
+        return component instanceof ActiveComponent active ? active.specification() : null;
     }
 
-    // ───────── 阶段 13 · t114：本组件承载的第二个**能力接口**（原顶层 core/hotbar/HotbarItem） ─────────
-
     /**
-     * 热键栏物品的**声明面**（设计 §4.2）：图标 / 显示名 / 描述 / 冷却声明值 / 耗能声明值。
-     * 命名沿用工程的 JavaBean 风格（设计 §4.3 命名约定：不引入 record 风格访问器）。
-     * <p><b>阶段 8</b>：本接口**只陈述声明数据**（由描述符提供），**不再**自述种类
-     * （旧的 {@code getKind()} 已随 kind 枚举一起删除 —— 表现面与行为分支都不再需要它）；
-     * "物品长什么样（含运行期状态）"改由 {@link HotbarItemProviding#buildItem()} 回答，
-     * 默认画法在 `core/Skill` / `core/MainWeapon` 两个**组件基类**里。
-     * <p><b>阶段 13 · t114 迁入本组件</b>：原顶层 `core/hotbar/HotbarItem` 已删 ✗ —— 声明面与产出面
-     * （{@link HotbarItemProviding}）是同一件事的两半，收在**同一个类型**里最清楚 ✓；
-     * 唯一的实现者仍是描述符（{@code HotbarSpecification}，冻结面）及其子类 ✓（只改类型限定名，语义一字未动）。
-     * <p><b>【已作废】旧路径口径逐字保留</b>：「{@code core.hotbar.HotbarItem}`（顶层接口，
-     * {@code core/hotbar/} 下）」—— 那描述的是**共享能力袋**的旧形态 ⇒ 已作废 ✗（现为本组件的嵌套类型）。
+     * **读"本组件这一帧的物品"**（**完整形态**：材质 / 名称 / 后缀 / lore / 识别键都已就位）——
+     * 由框架在**帧末 flush** 的写物品段调用（每帧至多一次/组件），并与**注册序**同序遍历；
+     * 组件**不得**在此方法里写玩家背包（写物品的唯一落点仍是渲染器的那一次槽位写入）。
+     * <p>不产出物品的组件（不在热键栏家族）⇒ {@code null} ✓（渲染器据此跳过该槽位）。
+     * <p><b>为什么默认画法在组件基类而不是描述符</b>：画物品要读<b>运行期状态</b>（冷却剩余刻数 / 闸门 /
+     * 当前能量），而描述符是**装配期对象**、拿不到 {@code svc()} ⇒ 默认画法写在技能与主武器这两个
+     * **组件基类**里（三态材质 · 六条状态文案 · 技能带 {@code x.xs} 而主武器不带 · 两个 PDC 键 ·
+     * 声明数据取自描述符）。
+     * <p><b>覆写者须知</b>（PDC 键与六条文案**均允许组件覆写**，覆写者自负其责）：**键写错** ⇒
+     * 监听器前置闸门识别不到该物品（点击它无任何反应）；**键缺失** ⇒ 角色清除时扫不到它
+     * （物品残留在背包/热键栏里）。框架**不再**为此提供保障（不再"写完回读校验"）—— 这两条是
+     * **已申报的代价**，不是缺陷。
      */
-    public interface HotbarItem {
-
-        String getId();
-
-        Component getDisplayName();
-
-        Component getDescription();
-
-        Material getIcon();
-
-        int getCooldownTicks();
-
-        int getEnergyCost();
-
-        /**
-         * **基础物品**（阶段 7 · C 步）：由描述符给出的热键栏物品**底稿**（材质 / 显示名 / 描述）。
-         * <p>默认实现在 {@link HotbarSpecification#baseItem(String)}（由
-         * {@link #getIcon()} / {@link #getDisplayName()} / {@link #getDescription()} 生成）；
-         * 需要特殊底稿的组件**在自己的 `Specification` 里覆写**即可。
-         * <p><b>阶段 8 起</b>：它不再是"框架施加装饰的输入"，而是**基类默认画法的输入**
-         * （{@code Skill#buildItem()} / {@code MainWeapon#buildItem()} 读它取材质 / 名称 / 描述）。
-         *
-         * @param id 注册处的组件 id（覆写者可用于区分同类的不同实例；默认实现不读它）
-         */
-        ItemStack baseItem(String id);
+    public static ItemStack buildItemOf(RoleComponent component) {
+        return component instanceof ActiveComponent active ? active.buildItem() : null;
     }
 
-    // ───────── 阶段 13 · t115：本组件承载的第三个**能力接口**（原顶层 core/hotbar/HotbarPresentable） ─────────
-
     /**
-     * 「这个组件能出现在热键栏」的能力面（阶段 6 立、阶段 7 · A 步改全拼、**阶段 8 收簇**、
-     * **阶段 13 · t115 拆簇 + 迁入本组件**）：
-     * **唯一实现点是 {@link #specification()}**（声明数据），
-     * 其余访问器都由本接口的 `default` 方法委托给它 ⇒ 新组件**只写 specification()**，不写任何委托。
-     * <p><b>阶段 13 · t115 的两件事（用户 V3：拆解复合能力袋）</b>：
-     * <ol>
-     *   <li><b>迁入</b>：原顶层 `core/hotbar/HotbarPresentable` 已删 ✗ ⇒ 它与声明面 / 产出面
-     *       （{@link HotbarItem} / {@link HotbarItemProviding}）同处本组件 ✓；</li>
-     *   <li><b>拆解</b> ✗：本接口**不再 `extends`** 其余任何能力 —— 旧形态是"一次 extends 把三件事一次拿全"
-     *       的**复合能力袋** ⇒ 实现者改为**显式声明它真正具备的能力** ✓
-     *       （见 {@code roleComponent/ActiveComponent} 的 implements 子句）。</li>
-     * </ol>
-     * <b>拆解后的 Java 代价（本卡实测，写在这里免得后人踩）</b>：本接口的 `default` 与 {@link HotbarItem} 的
-     * **抽象声明**同名，而两者已**无继承关系** ⇒ 同时实现二者的类**必须自己实现**那些方法
-     * （javac 硬拒："未覆盖抽象方法"；**只有继承关系内的 default 才会自动胜出** ✗）——
-     * `ActiveComponent` 因此写了 7 个**纯转发**覆写（{@code HotbarPresentable.super.getX()}，零逻辑重复 ✓）。
-     * <p><b>不占热键栏的组件（被动）不在本面内</b>（{@code PassiveSkill} 只继承 {@code RoleComponent}）：它们
-     * 既不被渲染，也就**不会**被强制实现一个永远不被调用的 {@code buildItem()}。
-     * <p>与继承的关系（阶段 6 冻结 + 阶段 8 不变）：新组件只需 `extends RoleComponent` + 按需实现能力接口，
-     * **不必**继承 `Skill` / `MainWeapon` / `PassiveSkill`；只是"默认画法"这一份便利实现长在那两个基类上。
-     * <p>注意：本接口提供的只是**声明**数据；行为分支（冷却表 / 闸门 / 识别键 / 文案表）一律由组件自己的
-     * {@code buildItem()} 与框架管道决定 —— 阶段 8 起仓内**没有** kind 这个运行期概念。
-     * <p><b>【已作废】旧路径与旧口径逐字保留</b>：「{@code core.hotbar.HotbarPresentable}`（顶层接口，
-     * {@code core/hotbar/} 下）」+「本接口把 {@link HotbarItem}（声明面）· {@link EnergyComponent.EnergyCosting}
-     * （耗能声明）与 {@link HotbarItemProviding}（自己画物品）**四合一**」+ 旧声明
-     * 「{@code HotbarPresentable extends HotbarItem, EnergyComponent.EnergyCosting, HotbarItemProviding}」
-     * —— 那是**复合能力袋**的旧形态 ⇒ 已作废 ✗（现为本组件的嵌套类型，且**不再**是复合接口）。
+     * **读"外观是否依赖活状态"**：{@code true} = 它的外观会在**没有框架置脏事件**的情况下自己变
+     * （例如技能冷却名里的 {@code x.xs} 秒数每刻都在变）⇒ 只要它在冷却中，框架就必须**每 tick**
+     * 至少刷一次，否则玩家看到的是陈旧外观。
+     * <p><b>为什么是自报值、而不是框架里的一句 {@code instanceof Skill}</b>：旧判据把「外观含秒数」
+     * **写死成具体类** ⇒ ① 第三类"带倒计时外观"的组件加进来时**必须改框架文件** ✗；
+     * ② 覆写掉秒数外观的子类**仍会被每 tick 重绘**（白写）✗。改为自报后：新组件**只加新文件**即可
+     * （默认 {@code false}，需要就覆写 {@code true}）✓，而"覆写掉活状态外观"的子类可以覆写成
+     * {@code false} ⇒ **不再每 tick 重绘** ✓。
+     * <p><b>默认值 = {@code false}</b>：只有技能家族的默认画法带秒数 ⇒ 该家族覆写为 {@code true}，
+     * 主武器与被动保持 {@code false} ⇒ **既有组件的真值表逐字不变**。
+     * <p>不产出物品的组件（不在热键栏家族）⇒ {@code false} ✓（与旧形态"接口默认值 false"同义）。
+     * <p>注意：本读数只回答"**要不要**每刻刷"；"**写不写**"仍由帧末 flush 决定（空闲 tick 零 setItem 不变）。
+     * 外观依赖活状态、但变化**不是每刻**的组件应返回 {@code false}，并在状态真的变了时用
+     * {@link #requestRepaint()} **主动请求** —— 那才是它的刷新节拍。
      */
-    public interface HotbarPresentable {
-
-        /**
-         * **唯一实现点**：表现规格（阶段 7 · A 步改全拼）。
-         * 旧短名 `spec()` 的兼容别名**已删除**（阶段 10 · t71）；旧口径原文保留如下：
-         * <i>「旧短名 `spec()` 保留为 `@Deprecated` 别名」</i> —— **该口径已作废**（现以 {@link #specification()} 为唯一入口）。
-         */
-        HotbarSpecification<?> specification();
-
-        default String getId() {
-            return specification().getId();
-        }
-
-        default Component getDisplayName() {
-            return specification().getDisplayName();
-        }
-
-        default Component getDescription() {
-            return specification().getDescription();
-        }
-
-        default Material getIcon() {
-            return specification().getIcon();
-        }
-
-        default int getCooldownTicks() {
-            return specification().getCooldownTicks();
-        }
-
-        default int getEnergyCost() {
-            return specification().getEnergyCost();
-        }
-
-        /** 声明面视图（{@link HotbarItem} 在本批保留，不删）。 */
-        default HotbarItem asHotbarItem() {
-            return specification();
-        }
-
-        /**
-         * **基础物品**（阶段 7 · C 步）：委托给唯一实现点 {@link #specification()} 的同名方法
-         * ⇒ 组件只写一处（描述符），基类默认画法读到的就是它。
-         */
-        default ItemStack baseItem(String id) {
-            return specification().baseItem(id);
-        }
+    public static boolean dependsOnLiveStateOf(RoleComponent component) {
+        return component instanceof ActiveComponent active && active.dependsOnLiveState();
     }
 }

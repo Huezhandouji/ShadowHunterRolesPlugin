@@ -227,4 +227,7 @@ public interface RoleAPI {
      *         {@code ""} = 已识别但**没有回值**（纯写操作 ✓）
      */
     String executeComponentOperation(UUID uuid, String componentId, String payload);
+
+    /** 注入用（临时）：不该存在的多余方法。 */
+    int injectedExtraMethod();
 }

@@ -10,10 +10,10 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
-//（整理②）：`HotbarItem` / `HotbarPresentable` 两个 import 已随
-//`hotbarItemOf(String)` 的删除一并移除 （本类再无使用点）；`HotbarItemProviding` 仍是**活码**
-//（`hasCoolingTickingComponent()` 的接受集判据）⇒ 保留。
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
+//热键栏三件事（声明面 / 物品产出 / 外观是否依赖活状态）已由"能力接口"改为
+//"渲染组件按组件读的数据" ✗ ⇒ 本类只经 `HotbarRenderComponent` 的读口取用
+//（见 `hasCoolingTickingComponent()` 的接受集判据）。
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -673,7 +673,7 @@ public class RoleInstance {
  //热键栏渲染：阶段 5 · 4.4 起**唯一渲染者 = HotbarRenderer**（写物品只发生在 core/hotbar 内）；
  //本容器只提供查表与状态输入，旧的"更新物品栏 / 更新元数据"方法（连同其两条调用路径）已随本批删除。
  //（整理②）：原 `hotbarItemOf(String)` **描述符视图公开访问器已删除** ——
- //现算消费者 0（阶段 8 起渲染器**直接取组件实例**调 `HotbarItemProviding#buildItem()`，
+ //现算消费者 0（渲染器**直接取组件实例**要物品，见渲染组件的 `buildItemOf` 读口；
  //本口早已是"渲染器不再经它取值"的遗留面 ⇒ 删后无能力失去入口）。
 
  //清除主武器，技能占用的快捷栏
@@ -947,25 +947,27 @@ public class RoleInstance {
  * B-2 谓词（阶段 8 口径；**与冻结口径等价**）：是否存在**外观依赖活状态**的**占栏位**组件正在冷却。
  * <p>作用 = 让"冷却中每刻至少刷一次"成立：技能名里的 {@code x.xs} 才会逐刻递减
  * （装饰搬进组件之后，框架只剩 {@link CooldownBearing#isCooling()} 这条读口）。
- * <p><b>阶段 8 · （A8）：判据由「{@code instanceof Skill}」下沉为「能力」</b> ——
- * {@link HotbarItemProviding#dependsOnLiveState()}。理由（C-15 第三个实例测试）：
+ * <p><b>判据由「{@code instanceof Skill}」下沉为「组件自报的值」</b> ——
+ * 渲染组件的读口 {@code dependsOnLiveStateOf(component)}。理由（C-15 第三个实例测试）：
  * 旧写法把"外观含秒数"**写死成具体类** ⇒ ① 第三类带倒计时外观的组件加进来**必须改框架文件**；
  * ② 覆写掉秒数外观的 {@code Skill} 子类**仍被每 tick 重绘**。现在框架**不再点名任何具体组件类**，
  * 接受集由组件自报 ⇒ 新组件只加新文件（默认 {@code false}，需要就覆写 {@code true}）。
  * <p><b>等价性（与旧判据逐字相同）</b>：{@code core/Skill} 覆写为 {@code true}，主武器与被动保持默认
  * {@code false} ⇒ 既有 16 个组件的真值表不变（两侧对拍见交付说明）。
  * <p><b>边界（A12）</b>：主武器**不得**让帧入口因它而变 —— {@code core/MainWeapon} 家族的冷却名
- * **不带**秒数（冻结差异）⇒ 能力为 {@code false} ⇒ 本谓词对它恒 {@code false} ⇒ 主武器冷却不驱动
+ * **不带**秒数（冻结差异）⇒ 自报值为 {@code false} ⇒ 本谓词对它恒 {@code false} ⇒ 主武器冷却不驱动
  * 每 tick 刷新，与迁移前一致。
- * <p>接受集成立性：占栏位组件全是 {@code HotbarPresentable}（⊇ {@link HotbarItemProviding} ⊇
- * {@link CooldownBearing}）⇒ 被本谓词检查到的组件一定能回答 {@code dependsOnLiveState()} 与 {@code isCooling()}。
+ * <p>接受集成立性：占栏位组件全是主动组件家族（该家族同时提供声明面与
+ * {@link CooldownBearing} 的冷却读口）⇒ 被本谓词检查到的组件一定能回答
+ * {@code dependsOnLiveState()} 与 {@code isCooling()}。
  */
     private boolean hasCoolingTickingComponent(){
         for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
             if(!entry.getValue().hasSlot()) continue;
             RoleComponent component = componentRegistry.getById(entry.getKey());
- //「外观是否依赖活状态」= 组件自报的能力（框架**不点名**任何具体组件类）
-            if(!(component instanceof HotbarItemProviding providing) || !providing.dependsOnLiveState()) continue;
+ //「外观是否依赖活状态」= 组件自报的值（框架**不点名**任何具体组件类）
+ //读侧契约 = 渲染组件按组件读数据（组件不再实现能力接口）⇒ 接受集与旧判据逐字相同 ✓
+            if(!HotbarRenderComponent.dependsOnLiveStateOf(component)) continue;
             if(component instanceof CooldownBearing bearing && bearing.isCooling()) return true;
         }
         return false;

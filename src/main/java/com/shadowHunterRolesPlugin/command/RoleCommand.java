@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.command;
 
+import com.shadowHunterRolesPlugin.api.RoleAPI;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import net.kyori.adventure.text.Component;
@@ -40,11 +41,13 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
 
     private final Map<String, SubCommand> subCommands = new TreeMap<>();
 
-    public RoleCommand(RoleManager roleManager, RoleRegistry roleRegistry){
+    public RoleCommand(RoleManager roleManager, RoleRegistry roleRegistry, RoleAPI roleAPI){
         registerSubCommand(new SetRoleCommand(roleManager, roleRegistry));
         registerSubCommand(new ClearRoleCommand(roleManager));
         registerSubCommand(new EnergyCommand(roleManager));
         registerSubCommand(new DebugCommand(roleManager));
+        //阶段 13 · t127：组件操作面（`/role operation …`）—— 派发器**直接调公开 API** ✓（不提权、不加共享入口 ✓）
+        registerSubCommand(new ComponentOperationCommand(roleManager, roleAPI));
         registerSubCommand(new HelpCommand());
     }
 

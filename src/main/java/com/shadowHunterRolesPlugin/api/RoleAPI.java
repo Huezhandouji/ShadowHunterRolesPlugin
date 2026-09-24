@@ -58,16 +58,19 @@ public interface RoleAPI {
     //能量系统
     @Deprecated
     int getPlayerEnergy(Player player);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     int getPlayerEnergy(UUID uuid);
 
     @Deprecated
     int getPlayerMaxEnergy(Player player);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     int getPlayerMaxEnergy(UUID uuid);
 
     @Deprecated
     void setPlayerEnergy(Player player, int amount);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     void setPlayerEnergy(UUID uuid, int amount);
 
@@ -97,7 +100,12 @@ public interface RoleAPI {
      */
     @Deprecated
     int getPlayerSanTE(Player player);
-    /** 同 {@link #getPlayerSanTE(Player)}（UUID 口径）。 */
+    /**
+     * 同 {@link #getPlayerSanTE(Player)}（UUID 口径）。
+     *
+     * @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗ —— 现恒回 {@code 0} ✓；
+     *             替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。
+     */
     @Deprecated
     int getPlayerSanTE(UUID uuid);
 
@@ -105,20 +113,30 @@ public interface RoleAPI {
      * **只增入口**（阶段 7 · 清理批）：当前 SanTE 值；**玩家没有角色时返回空 {@link OptionalInt}**。
      * <p>与 {@link #getPlayerSanTE(UUID)} 的哨兵语义**互补而非取代**：旧方法与旧返回值一字未动，
      * 本方法只是给"没有角色"提供一个**不需要认哨兵**的读法。
+     *
+     * @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗ —— 现恒回**空 {@link OptionalInt}** ✓；
+     *             替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。
      */
     @Deprecated
     OptionalInt getPlayerSanTEOptional(Player player);
-    /** 同 {@link #getPlayerSanTEOptional(Player)}（UUID 口径）。 */
+    /**
+     * 同 {@link #getPlayerSanTEOptional(Player)}（UUID 口径）。
+     *
+     * @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗ —— 现恒回**空 {@link OptionalInt}** ✓；
+     *             替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。
+     */
     @Deprecated
     OptionalInt getPlayerSanTEOptional(UUID uuid);
 
     @Deprecated
     int getPlayerMaxSanTE(Player player);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     int getPlayerMaxSanTE(UUID uuid);
 
     @Deprecated
     void setPlayerSanTE(Player player, int amount);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     void setPlayerSanTE(UUID uuid, int amount);
 
@@ -129,6 +147,7 @@ public interface RoleAPI {
 
     @Deprecated
     void decreaseSanTE(Player player, int amount);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     void decreaseSanTE(UUID uuid, int amount);
 
@@ -136,27 +155,32 @@ public interface RoleAPI {
     //生命值
     @Deprecated
     double getPlayerHealth(Player player);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     double getPlayerHealth(UUID uuid);
 
     @Deprecated
     double getPlayerMaxHealth(Player player);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     double getPlayerMaxHealth(UUID uuid);
 
     @Deprecated
     void healPlayer(Player player, double amount);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     void healPlayer(UUID uuid, double amount);
 
     //技能相关
     @Deprecated
     boolean isSkillReady(Player player, String skillId);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     boolean isSkillReady(UUID uuid, String skillId);
 
     @Deprecated
     int getSkillCooldownTick(Player player, String skillId);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     int getSkillCooldownTick(UUID uuid, String skillId);
 
@@ -178,6 +202,7 @@ public interface RoleAPI {
 
     @Deprecated
     boolean areHostile(Player p1, Player p2);
+    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     boolean areHostile(UUID p1, UUID p2);
 

@@ -79,12 +79,16 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
 
         roleManager = new RoleManager(rolesContext, roleRegistry);
 
+        //阶段 13 · t127：RoleAPI 的**构造**提前到指令注册之前 —— 组件操作面的指令面要**直接调公开 API** ✓
+        //（服务表注册仍在下面原处 ✓，两者顺序对下游无影响 ✓）
+        roleAPI = new RoleAPIImpl(roleManager, roleRegistry);
+
         PluginCommand roleCommand = getCommand("role");
         if(roleCommand == null){
             getLogger().warning("Command 'role' is not declared in plugin.yml; /role is unavailable.");
         }
         else{
-            roleCommand.setExecutor(new RoleCommand(roleManager, roleRegistry));
+            roleCommand.setExecutor(new RoleCommand(roleManager, roleRegistry, roleAPI));
         }
 
         Bukkit.getPluginManager().registerEvents(new SkillListener(roleManager, rolesContext), this);
@@ -97,8 +101,6 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         //阶段 12 · t88：热键栏物品的**不可动保护**（拖拽 / F 键 / 容器搬运 / 合成格 四类真缺口的取消型保护）
         //  ★ 与上一行的**姿态相反**：保护侧必须 setCancelled(true)；读侧只通知（见该类的 javadoc）
         Bukkit.getPluginManager().registerEvents(new HotbarItemProtectionListener(), this);
-
-        roleAPI = new RoleAPIImpl(roleManager, roleRegistry);
 
         Bukkit.getServicesManager().register(RoleAPI.class, roleAPI, this, ServicePriority.Normal);
 

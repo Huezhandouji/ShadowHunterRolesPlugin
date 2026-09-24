@@ -13,7 +13,9 @@ import java.util.function.Consumer;
  * <p><b>★ 本组件持有状态与行为</b>：SanTE 真值 {@code current} 与上限 {@code max} 都在本组件里，
  * clamp 与 increase/decrease/set 的语义全在本组件内实现 —— **不再转调任何旧端口** ✗。
  * <p><b>与容器的分工</b>：写后对平台说两句话 —— 发布 {@code SanTEChangeEvent} 与
- * 向**监听器列表**派发（含 I-14 重入护栏）—— 前者由容器以 {@link ChangeSink} 注入；组件只负责真值怎么变。
+ * 向**监听器列表**派发（含重入护栏）—— 前者走**平台侧通道**（容器以本组件名义登记的那一条监听，
+ * 见 {@link #set(int)} / {@link #broadcastChange(int, int)}）；
+ * 后者由容器在**派发边界**逐个经受保护调用完成；组件只负责真值怎么变。
  * <p><b>状态唯一</b>：容器侧**不再**持有 {@code currentSanTE} 字段 ✗（只保留视图方法）。
  * <p><b>归零惩罚的钉 0 语义不变</b>：惩罚组件（{@code DefaultSanTEZeroPunishment}）仍按既有方式
  * 调**组件自身**的 {@code set(0)} 逐 tick 钉 0（阶段 13 · t109：取用形态统一为"字段 + 在 `start()` 内赋值" ✗）⇒ 走的还是这一条 clamp + 派发路径。
@@ -28,6 +30,10 @@ import java.util.function.Consumer;
  * ★ **用 JDK 的 {@code Consumer}**（**不新增自定义接口** ✗ —— R-1「凡关注点已是组件 ⇒ 不得再为它新增能力接口」
  * / R-8 同理）✓。消费者在自己的 {@code start()} 里 {@code sante.addListener(this, change -> …)} ⇒ **不再有任何类
  * 实现本组件的嵌套接口** ✓。
+ * <p><b>两条通道</b>（本组件的分工边界 ✓）：名单里 **owner = 本组件自身**的那一条 = **平台侧通道**
+ * （容器以本组件名义登记：发布事件 + 触发派发）⇒ 写入路径**直调**它 —— 无变化写入也发布事件 ✓、
+ * 异常照常上抛 ✓；**其余登记 = 订阅者** ⇒ 由容器在**派发边界**通知（真变化闸门 ·
+ * 逐监听器故障隔离 · 重入合并三条都在那里 ✓）⇒ 写入路径**不**直接通知订阅者 ✗。
  * <p><b>载荷取「最小充分类型」</b>：旧方法有两个入参（{@code pre} / {@code now}）⇒ 不能退化成
  * {@code Consumer<Integer>} ✗（两个既有消费者都靠 {@code pre} 与 {@code now} 的比较决定动作）⇒ 用一个**小 record**
  * {@link Change}（**record 不是接口** ⇒ 不违反"不新增接口"✓）。{@code max} **不进载荷** ✗（两个消费者都不用它）。
@@ -36,13 +42,6 @@ import java.util.function.Consumer;
  * ⇒ 消费者存进私有字段即可 ✓）。不做"按身份查询"的 {@code unsubscribe(this)} ✗（{@code Consumer} 无身份标识）。
  */
 public class SanTEComponent extends RoleComponent implements OperationProvider {
-
-    /** 变更通知（容器在构造期注入）：事件发布在容器侧。 */
-    public interface ChangeSink {
-
-        /** SanTE 真值发生变化后调用（**无条件**调用：与既有"无条件事件 + 无条件派发"逐字一致）。 */
-        void onSanTEChanged(int previous, int current, int max);
-    }
 
     /**
      * **一次 SanTE 变更的载荷**（**record，不是接口** ✓）。
@@ -88,6 +87,9 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
      * （⇒ 时机 = 组件装配序 ✓，R-4 ✓），并在 {@code stop()} 里用 {@link #removeListener(Listener)} 成对移除 ✓。
      * <p><b>幂等</b>：同一 {@code owner} + 同一 {@code listener} 重复添加**不重复登记** ✓
      * （与旧 {@code subscribe} 的幂等语义逐字一致）。
+     * <p><b>{@code owner} = 本组件自身 ⇒ 平台侧登记</b> ✓：写入路径**直调**它
+     * （见 {@link #set(int)} —— 无变化写入也发布事件 ✓、异常照常上抛 ✓）；
+     * 其余 {@code owner} ⇒ **订阅者** ✓（由容器在**派发边界**通知：真变化闸门 + 逐监听器故障隔离 ✓）。
      * <p>{@code owner} 或 {@code listener} 为 {@code null} ⇒ **忽略**（旧 {@code subscribe(null)} 同样是 no-op ✓）。
      * <p><b>返回值</b>：本次登记对应的 {@link Listener} 实例（**调用方存起来** ⇒ 将来用
      * {@link #removeListener(Listener)} 按引用移除 ✓；被忽略的 {@code null} 入参 ⇒ 回 {@code null} ✓）。
@@ -151,23 +153,23 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
      *   <li><b>本方法的存在理由</b>：给"没有容器"的**离线单元测试**一条与生产同源的派发路径 ✓
      *       （否则测试只能自己写循环，验的就成了测试自己的循环 ✗）。</li>
      * </ul>
-     * <p><b>不是第二条变更通道</b> ✗：本方法**只**读名单并调监听器，不改真值、不碰 {@code sink} ✓。
+     * <p><b>不是第二条变更通道</b> ✗：本方法**只**读名单并调监听器，不改真值、不碰平台侧通道 ✓。
      */
-    public void notifyListeners(int pre, int now) {
-        Change change = new Change(pre, now);
+    public void notifyListeners(Change change) {
+        if (change == null) {
+            return;
+        }
         forEachListener(entry -> entry.listener().accept(change));
     }
 
     private final int max;
-    private final ChangeSink sink;
 
     /** ★ 真值：当前 SanTE（唯一持有处）。 */
     private int current;
 
-    public SanTEComponent(String id, ComponentServices services, int max, ChangeSink sink) {
+    public SanTEComponent(String id, ComponentServices services, int max) {
         super(id, services);
         this.max = Math.max(0, max);
-        this.sink = sink != null ? sink : (previous, value, limit) -> { };
         //与既有 RoleInstance 构造期逐字一致：选角色即满 SanTE
         this.current = this.max;
     }
@@ -182,11 +184,26 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
         return max;
     }
 
-    /** 直接写入（组件内 clamp；写后通知容器）。 */
+    /** 直接写入（组件内 clamp；写后通知平台侧通道）。 */
     public void set(int value) {
         int previous = current;
         current = Math.clamp(value, 0, max);
-        sink.onSanTEChanged(previous, current, max);
+        notifyPlatform(new Change(previous, current));
+    }
+
+    /**
+     * **只通知平台侧通道**（写入路径专用 ✓）。
+     * <p><b>为什么不走 {@link #notifyListeners(Change)}</b>：订阅者必须在容器的**派发边界**被通知
+     * —— 真变化闸门（无变化写入不派发）、逐监听器故障隔离、重入合并三条都在那里 ✓；
+     * 写入路径直接通知订阅者会绕过这三条 ✗。
+     * <p>本方法**不做**任何隔离：平台侧回调抛异常 ⇒ **照常上抛**（与写入路径的既有语义一致 ✓）。
+     */
+    private void notifyPlatform(Change change) {
+        forEachListener(entry -> {
+            if (entry.owner() == this) {
+                entry.listener().accept(change);
+            }
+        });
     }
 
     /**
@@ -199,7 +216,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
      * 监听器通知现已归 {@link #forEachListener(Consumer)} ✓ ⇒ 本方法只剩平台事件这一半 ✓。
      */
     public void broadcastChange(int pre, int now) {
-        sink.onSanTEChanged(pre, now, max);
+        notifyPlatform(new Change(pre, now));
     }
 
     /** 增加 SanTE（内部按上限 clamp）。 */
@@ -217,7 +234,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
      * <ul>
      *   <li>{@code current} —— 读：回**当前 SanTE**（无参 ✓，越界参数 ⇒ 未识别）；</li>
      *   <li>{@code max} —— 读：回**上限**（无参 ✓）；</li>
-     *   <li>{@code set &lt;int≥0&gt;} —— 写：调既有的 {@link #set(int)}（内部 clamp + ChangeSink 照常 ✓），回**写后值**；</li>
+     *   <li>{@code set &lt;int≥0&gt;} —— 写：调既有的 {@link #set(int)}（内部 clamp + 平台侧通知照常 ✓），回**写后值**；</li>
      *   <li>{@code gain &lt;int≥0&gt;} —— 写：调既有的 {@link #increase(int)} ✓，回**写后值**；</li>
      *   <li>{@code decrease &lt;int≥0&gt;} —— 写：调既有的 {@link #decrease(int)} ✓，回**写后值**（不足则按既有 clamp 语义 ✓）。</li>
      * </ul>

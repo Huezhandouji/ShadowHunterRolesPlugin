@@ -195,12 +195,14 @@ public class RoleInstance {
                             change.previous(), change.current(), change.max()));
                 });
         this.santeComponent = new SanTEComponent(SERVICE_ID_SANTE, createServices(SERVICE_ID_SANTE),
-                role.getMaxSanTE(),
-                (previous, current, max) -> {
-                    Bukkit.getPluginManager().callEvent(new SanTEChangeEvent(player, this, previous, current, max));
+                role.getMaxSanTE());
+ //平台侧通道：以**本组件自身**为 owner 登记 ⇒ 写入路径直调这一条（订阅者仍归下面的派发边界）
+        this.santeComponent.addListener(this.santeComponent, change -> {
+            Bukkit.getPluginManager().callEvent(new SanTEChangeEvent(player, this,
+                    change.previous(), change.current(), role.getMaxSanTE()));
  //I-15：容器**直派**（不再经 RoleEventListener 转发；上一行的事件发布保持不变）
-                    dispatchSanTEChange(previous, current);
-                });
+            dispatchSanTEChange(change.previous(), change.current());
+        });
 
  //③ 生命：clamp 策略的唯一实现在组件里（状态 = Bukkit 玩家属性，属外部平台状态）
         this.vitalsComponent = new VitalsComponent(SERVICE_ID_VITALS, createServices(SERVICE_ID_VITALS));
@@ -726,7 +728,7 @@ public class RoleInstance {
         energyComponent.set(amount);
     }
 
- //SanTE（**视图**：真值与 clamp 都在 SanTE 组件里；事件 + 派发由容器以 ChangeSink 注入）
+ //SanTE（**视图**：真值与 clamp 都在 SanTE 组件里；事件 + 派发由容器**给出的平台侧回调**承担）
  //（整理②）：`getCurrentSanTE` / `setCurrentSanTE` / `increaseSanTE` / `decreaseSanTE` /
  //`getMaxSanTE` 五个转发访问器**已删除** （现算消费者 0；真值与行为都在 `SanTEComponent`）。
 
@@ -872,20 +874,22 @@ public class RoleInstance {
  * （异常 ⇒ 只隔离抛异常的那一个、其余照常收到）· 整段在 {@link #withinIterationWindow} 里
  * （⇒ 真四步在窗口关闭后执行）。
  * <p><b>顺带</b>：派发完再调 {@code broadcastChange} —— 「订阅者派发」与「平台事件发布」都归本组件
- * （后者经它持有的 {@code ChangeSink}）。
+ * （后者经它持有的**平台侧回调**，不是订阅者名单里的一条）。
  */
     private void broadcastSanTEChange(int preSanTE, int newSanTE){
  //遍历窗口（）：可嵌套（update() 广播期间改 SanTE ⇒ 本方法再次进入窗口）
  //：唯一受保护调用（异常 ⇒ 窗口关闭后执行隔离四步）
         withinIterationWindow(() -> {
             santeComponent.forEachListener(entry -> {
+ //平台侧登记（owner = 组件自身）由写入路径直调 ⇒ 不在此列（否则平台事件会多发布一次）
+                if (entry.owner() == santeComponent) return;
  //监听器判据（不是接口判据）—— 只通知"订阅过"的组件；
  //归属组件由注册方随监听器一并给出（entry.owner()）⇒ 仍能**逐个**经 guardedCall 做故障隔离 ✓
                 guardedCall(entry.owner(), "onSanTEChange",
                         () -> entry.listener().accept(new SanTEComponent.Change(preSanTE, newSanTE)));
             });
         });
- //平台侧"事件发布"仍归本组件持有的 ChangeSink —— 与迁移前逐字一致（仍由 set() 内的 sink 调用承担）
+ //平台侧「事件发布」仍归本组件的**平台侧回调** —— 调用点与时机逐字未变（写入路径一次、派发边界一次）
         santeComponent.broadcastChange(preSanTE, newSanTE);
     }
 

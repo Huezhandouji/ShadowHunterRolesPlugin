@@ -19,7 +19,7 @@ import java.util.List;
  * 取值路径改经本适配器持有的容器。
  * <p><b>（欠账 A 后半）</b>：{@code FactionComponent} **已整体删除** ⇒ 上面的
  * "照搬原组件"只作**历史沿革**读：本端口现在是**阵营读取的唯一入口** （{@link #faction()} 读聚合根
- * {@code Role#getFaction()}），且**不带写面** （R-1：写侧在 {@code Role#setFaction/resetFaction}）。
+ * {@code Role#getFaction()}），且**不带写面**（写侧在 {@code Role#setFaction/resetFaction}）。
  */
 final class RoleInfoImpl implements RoleInfo {
 

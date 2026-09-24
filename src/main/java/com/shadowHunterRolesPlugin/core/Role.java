@@ -245,11 +245,6 @@ public class Role {
         return false;
     }
 
- // ─────────────：环检测已按用户新路线图第三条删除 ─────────────
- //
- // 这里**曾**有 `dependencyCycles()` 与它的 DFS 辅助 `walkForCycles()`（ 实现，依据当时的
- // 裁定 Q2「禁止依赖循环」）。用户新路线图第三条**改为「允许组件环形依赖」** ⇒ 两者**整段删除**，
- // 不留死代码（保留一个不再被调用的环检测只会让下一个读者以为环仍被禁止）。
  //
  // 删除后**不变**的东西（边界，防止误读）：
  // * 自环（A 的某个必需类型由 A 自己提供）：A **不算自己的提供者** ⇒ 仍落成**缺依赖**硬失败。
@@ -362,7 +357,7 @@ public class Role {
 
         private final String id;
         private Component displayName;
- //O-11：默认空表，addLineOfDescription 在 description(...) 之前调用时不再 NPE
+ // 默认空表，addLineOfDescription 在 description(...) 之前调用时不再 NPE
         private List<Component> description = new ArrayList<>();
         private double maxHP = 20d;
         private double baseATK = 10d;
@@ -524,7 +519,7 @@ public class Role {
             return this;
         }
 
- //O-10：id 去重必须是跨类型的 —— 技能/被动/主武器共用同一个 id 命名空间，任一重复都抛异常
+ // id 去重必须是跨类型的 —— 技能/被动/主武器共用同一个 id 命名空间，任一重复都抛异常
         private void ensureIdNotRegistered(String descriptorLabel, String id){
             if (components.containsKey(id)) {
                 throw new IllegalArgumentException(descriptorLabel + " already registered: " + id);
@@ -532,7 +527,7 @@ public class Role {
         }
 
  /**
- * O-12：槽位冲突 fail-fast（§10 裁决 1）—— 抛异常、该角色不注册，不再"告警 + 覆盖"。
+ * 槽位冲突 fail-fast —— 抛异常、该角色不注册，不再"告警 + 覆盖"。
  * <p>冲突判定改为**扫组件表里已占栏位的条目**（本类不再另存栏位表），
  * 异常类型与文案**逐字不变**。
  */
@@ -603,7 +598,7 @@ public class Role {
  * **设置本角色的阵营**（faction 迁移收尾的前一半，重建 /-2）。
  * <p>① **管理级 / 模板级**语义：这是**角色模板**上的声明值，不是每玩家状态；
  * ② 影响**该角色的所有实例**（已实例化的玩家实例下一次经 `RoleInfo#faction()` 读取时即生效）；
- * ③ 阵营的**读取唯一入口仍是 `roleInfo` 服务面** ⇒ 外部不直改、组件不直读（R-6）。
+ * ③ 阵营的**读取唯一入口仍是 `roleInfo` 服务面** ⇒ 外部不直改、组件不直读。
  * <p><b>（欠账 A 后半）</b>：本方法即旧
  * `frameworkLevel/FactionComponent#setFaction` 的**唯一接替落点** —— 该组件已整体删除，
  * 写侧经 `RoleInstance#setFaction` 转调到本方法；读侧一律走 `roleInfo` 服务面（不读本字段的裸值）。

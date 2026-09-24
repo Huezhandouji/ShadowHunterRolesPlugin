@@ -50,7 +50,7 @@ public interface RoleAPI {
     List<Component> getRoleDescription(String roleId);
     Material getRoleIcon(String roleId);
 
-    //角色清单（**只增**：既有方法签名一律未动）
+    //角色清单（既有方法签名一律未动）
     //下游用这两个方法自行发现"有哪些角色"，而不是 import 内部类去读注册表
     Set<String> getAllRoleIds();
     List<RoleInfo> getRoles();
@@ -76,18 +76,18 @@ public interface RoleAPI {
 
     @Deprecated
     void increaseEnergy(Player player, int amount);
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void increaseEnergy(UUID uuid, int amount);
 
     @Deprecated
     void decreaseEnergy(Player player, int amount);
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void decreaseEnergy(UUID uuid, int amount);
 
     //sanTE
     /**
      * {@link #getPlayerSanTE(Player)} / {@link #getPlayerSanTE(UUID)} 在**玩家没有角色**时返回的哨兵值。
-     * <p>**只增**：把那个"魔法数"变成有名字、有文档的常量（**值与既有实现逐字相同 = -78**）。
+     * <p>把那个"魔法数"变成有名字、有文档的常量（**值与既有实现逐字相同 = -78**）。
      * 新代码请改用 {@link #getPlayerSanTEOptional(UUID)} —— 它把"没有角色"表达成**空 Optional**，
      * 调用方不必先 {@link #hasRole(UUID)} 再读、也不必认哨兵。
      */
@@ -110,7 +110,7 @@ public interface RoleAPI {
     int getPlayerSanTE(UUID uuid);
 
     /**
-     * **只增入口**：当前 SanTE 值；**玩家没有角色时返回空 {@link OptionalInt}**。
+     * 当前 SanTE 值；**玩家没有角色时返回空 {@link OptionalInt}**。
      * <p>与 {@link #getPlayerSanTE(UUID)} 的哨兵语义**互补而非取代**：旧方法与旧返回值一字未动，
      * 本方法只是给"没有角色"提供一个**不需要认哨兵**的读法。
      *
@@ -142,7 +142,7 @@ public interface RoleAPI {
 
     @Deprecated
     void increaseSanTE(Player player, int amount);
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = SanTEComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = SanTEComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void increaseSanTE(UUID uuid, int amount);
 
     @Deprecated
@@ -187,17 +187,17 @@ public interface RoleAPI {
     //阵营信息
     @Deprecated
     Faction getFaction(Player player);
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo#faction()（组件经角色信息服务取用，唯一入口） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo#faction()（组件经角色信息服务取用，唯一入口） ✓（只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     Faction getFaction(UUID uuid);
 
     @Deprecated
     void setFaction(Player player, Faction faction);
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void setFaction(UUID uuid, Faction faction);
 
     @Deprecated
     void resetFaction(Player player);
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void resetFaction(UUID uuid);
 
     @Deprecated
@@ -216,7 +216,7 @@ public interface RoleAPI {
      * 目标组件**未实现** {@code OperationProvider} ⇒ 回 {@code null} ✗（不支持操作指令）。
      *
      * @param uuid        目标玩家。**参数类型用 UUID** ✓（此后新增 API 一律以 UUID 为玩家参数 ✗
-     *                    不用 {@code Player}）—— 这与"仅在线"裁定不冲突 ✓：**解析不到角色实例即回 {@code null}** ✓
+     *                    不用 {@code Player}）—— 这与"仅在线"不冲突 ✓：**解析不到角色实例即回 {@code null}** ✓
      * @param componentId 组件在实例容器里的登记 id（如 {@code energy}）；**多实例消歧写在 id 字符串里** ✓ ——
      *                    形如 {@code energy#2}（{@code #} 后是 **0 基**下标 ✓）；同 id 命中**多份**而**未给**下标
      *                    ⇒ **拒绝并回 {@code null}** ✓（**绝不静默取第一份** ✗）

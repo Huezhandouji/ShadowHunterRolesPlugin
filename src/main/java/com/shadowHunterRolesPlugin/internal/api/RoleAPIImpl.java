@@ -216,7 +216,7 @@ public class RoleAPIImpl implements RoleAPI {
         return 0;
     }
 
-    /** 只增入口：**已做空** ✗（仍在但不再生效 ✓）⇒ 恒空 Optional ✓。 */
+    /** **已做空** ✗（仍在但不再生效 ✓）⇒ 恒空 Optional ✓。 */
     @Deprecated
     @Override
     public OptionalInt getPlayerSanTEOptional(Player player) {
@@ -358,7 +358,7 @@ public class RoleAPIImpl implements RoleAPI {
     }
 
     //写侧**做空** ✗ —— 那条"转调聚合根"的写视图（`RoleInstance#setFaction/resetFaction`）
-    //已随本片**一并删除** ✗（做空后它再无消费者 ✓）；组件侧要改阵营请走角色服务面，**不要**由外部直改 ✗。
+    //已一并删除 ✗（做空后它再无消费者 ✓）；组件侧要改阵营请走角色服务面，**不要**由外部直改 ✗。
     @Deprecated
     @Override
     public void setFaction(Player player, Faction faction) {
@@ -410,7 +410,7 @@ public class RoleAPIImpl implements RoleAPI {
                 + "替代路径 = executeComponentOperation(uuid, componentId, payload) ✓");
     }
 
-    //枚举已装配的角色 id 与只读快照（RoleAPI **只增**）
+    //枚举已装配的角色 id 与只读快照
     @Override
     public Set<String> getAllRoleIds() {
         return registry.ids();
@@ -438,7 +438,7 @@ public class RoleAPIImpl implements RoleAPI {
     public String executeComponentOperation(UUID uuid, String componentId, String payload) {
         if (uuid == null || componentId == null) return null;
         RoleInstance instance = getRoleInstance(uuid);
-        if (instance == null) return null;                       // 无角色实例 ⇒ 拒绝（"仅在线"裁定 ✓）
+        if (instance == null) return null;                       // 无角色实例 ⇒ 拒绝（"仅在线" ✓）
         return dispatchOperation(instance.componentRegistry().all(), componentId, payload);
     }
 
@@ -447,7 +447,7 @@ public class RoleAPIImpl implements RoleAPI {
      * <p>规则（逐条可测）：id 为空 / `#` 后非数字 / 下标为负 ⇒ {@code null} ✗；命中 **0 份** ⇒ {@code null} ✗；
      * 同 id **多份且未给下标** ⇒ {@code null} ✗（**绝不静默取第一份** ✓）；下标**越界** ⇒ {@code null} ✗；
      * 目标组件**未实现** {@link OperationProvider} ⇒ {@code null} ✗；组件抛异常 ⇒ **捕获**后回 {@code null} ✓。
-     * <p>★ 复用既有只读入口（`componentRegistry().all()` 线性过滤）⇒ **未新增任何查取入口/接口** ✓（R-1/R-6 ✓）。
+     * <p>★ 复用既有只读入口（`componentRegistry().all()` 线性过滤）⇒ **未新增任何查取入口/接口** ✓。
      *
      * @param components  容器内的组件快照（调用方给 `all()` ✓；测试可直接给桩件列表 ✓）
      * @param componentId 组件 id，可带 `#index`（**最后一个** `#` 为分隔符 ✓）

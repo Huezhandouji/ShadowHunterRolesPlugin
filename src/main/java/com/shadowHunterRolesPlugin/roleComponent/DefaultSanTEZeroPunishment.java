@@ -18,9 +18,14 @@ import java.time.Duration;
  * 默认的「SanTE 归零惩罚」被动（组件侧最后一批 B⑨ 迁移）。
  * <p><b>迁移口径</b>：
  * <ul>
- *   <li>去 legacy `SanTEChangeAware` 与 `LifecycleAware` ⇒ 改走基类新钩子
- *       {@link RoleComponent#onSanTEChange(int, int)} 与无参 {@code stop()}（容器按注册表顺序直接派发，
- *       不再经事件总线绕行）；</li>
+ *   <li>去 legacy `SanTEChangeAware` 与 `LifecycleAware` ⇒ 改走能力接口
+ *       {@link SanTEAware#onSanTEChange(int, int)} 与无参 {@code stop()}（容器按注册表顺序直接派发，
+ *       不再经事件总线绕行）；
+ *       <br><b>阶段 12 · t87 口径更正（不静默改写）</b>：本条原文写的是"改走**基类**新钩子
+ *       {@code RoleComponent#onSanTEChange}" —— 该钩子**已从基类迁出** ⇒ 上面那半句**作废** ✗；
+ *       现在它由本类**显式实现能力接口** {@link SanTEAware} 获得（本类声明里可见
+ *       {@code implements SanTEAware}）✓。旧口径原文保留：<i>「改走基类新钩子
+ *       {@code RoleComponent#onSanTEChange(int, int)}」</i>。</li>
  *   <li>惩罚状态 `isInSanTEPunishment` 由聚合根搬进**组件私有字段**（该状态本就不该上 `RoleInstance`）；</li>
  *   <li>任务经 `svc().timers()` 登记本组件资源表、Buff 经 `svc().buffs()`、SanTE 经 `svc().sante()`、
  *       真伤经 `svc().damage()`；**表现层（粒子/标题/音效）与全部数值逐字不变**。</li>
@@ -52,7 +57,7 @@ import java.time.Duration;
  * 否则标记卡在 {@code true} ⇒ **逐 tick 钉 0 会一直生效、且后续归零永不触发惩罚**（绿灯不报的静默失效）。
  * 五条路径逐条标注为源码里的 {@code (5-①…⑤)}。
  */
-public class DefaultSanTEZeroPunishment extends PassiveSkill {
+public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEAware {
     public DefaultSanTEZeroPunishment(String id, ComponentServices services) {
         super(
                 id,

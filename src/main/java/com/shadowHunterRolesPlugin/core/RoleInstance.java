@@ -20,6 +20,7 @@ import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.SanTEAware;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.FactionComponent;
@@ -1077,13 +1078,25 @@ public class RoleInstance {
         }
     }
 
-    /** 按注册表顺序广播组件侧 {@code onSanTEChange(pre, now)}（顺序与 update()/start()/stop() 同源）。 */
+    /**
+     * 按注册表顺序广播组件侧 {@code onSanTEChange(pre, now)}（顺序与 update()/start()/stop() 同源）。
+     * <p><b>阶段 12 · t87（删除链第一批）</b>：派发点从"**所有** RoleComponent 都继承的基类方法"
+     * 改为"**实现了能力接口 {@link SanTEAware} 的组件**" ⇒ 接受集由**能力**决定、不再由继承决定 ✓
+     * （与 {@code dispatchCooldownEnd} / {@code CooldownAware} 的先例同形 ✓）。
+     * <p><b>零行为变化</b>：本仓恰好有 **2 个**实现者（{@code DefaultSanTEZeroPunishment} ·
+     * {@code RedDeeplySorrowSkill}），迁移后它们仍逐个收到 ⇒ 广播**实际到达的组件集合不变** ✓；
+     * 其余组件过去收到的是基类的**空实现**（无副作用）⇒ 不再调用它们**等价于**调用空实现 ✓。
+     * <p>未改的三件：**真变化才派发** ✓ · **按注册表顺序** ✓ · **经 {@code guardedCall}**（异常 ⇒
+     * 窗口关闭后隔离四步）✓。
+     */
     private void broadcastSanTEChange(int preSanTE, int newSanTE){
         //遍历窗口（阶段 10 · t55）：可嵌套（update() 广播期间改 SanTE ⇒ 本方法再次进入窗口）
         //阶段 10 · t66：唯一受保护调用（异常 ⇒ 窗口关闭后执行隔离四步）
         withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
-                guardedCall(component, "onSanTEChange", () -> component.onSanTEChange(preSanTE, newSanTE));
+                //阶段 12 · t87：能力判据（**不是**继承判据）—— 不实现 SanTEAware 的组件不再被调用
+                if(!(component instanceof SanTEAware aware)) continue;
+                guardedCall(component, "onSanTEChange", () -> aware.onSanTEChange(preSanTE, newSanTE));
             }
         });
     }

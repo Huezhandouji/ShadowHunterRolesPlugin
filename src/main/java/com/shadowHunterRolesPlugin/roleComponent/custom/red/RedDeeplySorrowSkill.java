@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.SanTEAware;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -26,7 +27,7 @@ import org.bukkit.potion.PotionEffectType;
  *       生命恢复 `45, 5` 与力量 `45, 2` / 音效 `ENTITY_WITHER_DEATH 2,1` 与 `ENTITY_WITHER_SHOOT 1,1`；</li>
  * </ul>
  */
-public class RedDeeplySorrowSkill extends Skill {
+public class RedDeeplySorrowSkill extends Skill implements SanTEAware {
 
     //该技能是否在执行中
     private boolean running = false;

@@ -7,7 +7,7 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 
 /**
  * 计时组件（**归属按请求者**）：系统级能力
- * 「组件资源表（任务登记 / 取消）」的**组件形态**（每角色实例一个，裁定③）。
+ * 「组件资源表（任务登记 / 取消）」的**组件形态**（每角色实例一个）。
  * <p><b>★ 本组件持有行为，并且**归属按请求者**</b>：
  * <ul>
  *   <li>任务的**创建**（{@link Scheduler} = Bukkit 调度器 = 允许依赖的"外部东西" ✓）在本组件内完成；</li>
@@ -17,7 +17,7 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
  *       {@code #cancelAll}）⇒ <b>既有回收机制一条都不改</b>（{@code clear()} 的 {@code cancelAllAndClear()}、
  *       运行期删除路径的 {@code cancelAll} 全部照旧生效 ⇒ 不引入新泄漏面 ✓）。</li>
  * </ul>
- * <p><b>★ A6：调用方 {@code stop()} ⇒ 其请求的任务全部取消</b>：{@link #cancelAllOf(RoleComponent)}
+ * <p><b>★ 调用方 {@code stop()} ⇒ 其请求的任务全部取消</b>：{@link #cancelAllOf(RoleComponent)}
  * 是这条语义的入口，容器在 {@code triggerLifecycleStop()} 里**每个组件 {@code stop()} 之后**调用一次
  * ⇒ "谁请求的计时，谁停止时被取消" ✓（只在实例 {@code clear()} 的兜底里取消是不够的 ⇒ 单独 {@code stop()}
  * 会漏 ⇒ 本方法把这一点补上）。
@@ -81,7 +81,7 @@ public class TimerComponent extends RoleComponent {
     }
 
     /**
-     * **取消 {@code requester} 请求的全部任务**（A6 的入口）。
+     * **取消 {@code requester} 请求的全部任务**。
      * <p>容器在每次组件 {@code stop()} 之后调用它（{@code RoleInstance#triggerLifecycleStop()}）⇒
      * "调用方停止 ⇒ 它的计时全部取消" ✓。
      *

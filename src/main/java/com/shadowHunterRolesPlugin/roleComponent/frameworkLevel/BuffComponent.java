@@ -14,13 +14,13 @@ import java.util.Set;
 
 /**
  * buff 组件：系统级能力「buff 施加 / 查询 / 闸门 / 药水记账」的
- * **组件形态**（每角色实例一个，裁定③）。
+ * **组件形态**（每角色实例一个）。
  * <p><b>★ 本组件持有状态与行为</b>：
  * <ul>
  *   <li><b>buff 记账表</b> = {@link BuffManager} 实例（容器在构造期创建并交给本组件；该类属
  *       {@code manager/} 包、**不是组件** ⇒ 本组件只持有它、不改它）✓；</li>
  *   <li><b>药水记账**账本**</b> = {@link #appliedPotionTypes}（原 {@code RoleInstance} 的字段搬进本组件）
- *       ⇒ {@code clear()} 时只回收账本内的类型（O-7 语义逐字保留）✓；</li>
+ *       ⇒ {@code clear()} 时只回收账本内的类型（语义逐字保留）✓；</li>
  *   <li><b>施加路径</b> = {@link #applyPotionEffect(PotionEffect)}（{@code player.addPotionEffect} +
  *       记账）：Bukkit API = 允许依赖的"外部东西" ✓。</li>
  * </ul>
@@ -95,7 +95,7 @@ public class BuffComponent extends RoleComponent implements OperationProvider {
 
     /**
      * 回收账本内的全部药水（原 {@code RoleInstance#clear} 的那一段搬到这里）：只移除本系统记账过的类型，
-     * **不**无条件清空玩家身上的所有药水效果（O-7 / D6）。返回移除的类型数。
+     * **不**无条件清空玩家身上的所有药水效果。返回移除的类型数。
      */
     public int clearAppliedPotionEffects() {
         int removed = appliedPotionTypes.size();

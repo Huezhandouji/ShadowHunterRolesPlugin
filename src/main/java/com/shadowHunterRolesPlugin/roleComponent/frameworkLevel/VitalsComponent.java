@@ -10,11 +10,11 @@ import org.bukkit.entity.Player;
 
 /**
  * 生命组件：
- * 系统级能力「生命 / 治疗 / 伤害」的**组件形态**（每角色实例一个，裁定③）。
+ * 系统级能力「生命 / 治疗 / 伤害」的**组件形态**（每角色实例一个）。
  * <p><b>★ 本组件持有行为</b>：clamp 策略（{@code min(当前 + amount, Attribute.MAX_HEALTH)}）的**唯一实现**，
  * 以及**四个伤害原语**（Part A 从原 {@code DamageComponent} 并入 ⇒ 该类**已删除** ✓
  * ⇒ 伤害与生命**只有一个持有者** ✓）。
- * <p><b>状态归属如实申报</b>：生命的真值是 **Bukkit 玩家属性**（{@code player.getHealth()} /
+ * <p><b>状态归属</b>：生命的真值是 **Bukkit 玩家属性**（{@code player.getHealth()} /
  * {@code Attribute.MAX_HEALTH}）⇒ 不属"组件内部字段"而是**外部平台状态**（
  * 组件**允许**依赖真正外部的东西 = Bukkit API ✓）。本组件**不复制**一份生命字段 ✗（那会立刻
  * 与客户端/服务端的真实生命值不同步 ⇒ 属"会撒谎的值"）。
@@ -32,7 +32,7 @@ import org.bukkit.entity.Player;
  *       四个组合入口 ✗ —— 理由是**组合爆炸**：将来加"群体治疗"还要再加方法 ✗</li>
  *   <li>{@code target} 类型 = <b>{@link Player}</b>（**不是** {@code LivingEntity}）：与平台既有惯例一致
  *       （{@code RoleAPI.healPlayer(Player|UUID, …)}）✓，且为 Part B 的**按实例路由**预留了前提
- *       （只有 {@code Player} 能保证找到角色实例）✓；{@code UUID} 重载日后可**只增** ✓</li>
+ *       （只有 {@code Player} 能保证找到角色实例）✓；{@code UUID} 重载日后可**再补** ✓</li>
  * </ul>
  *
  * <h2>★ 本入口的边界（逐条）</h2>

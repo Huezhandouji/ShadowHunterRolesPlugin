@@ -14,7 +14,7 @@ import java.util.function.Consumer;
  * clamp 与 increase/decrease/set 的语义全在本组件内实现 —— **不再转调任何旧端口** ✗。
  * <p><b>与容器的分工</b>：写后对平台说两句话 —— ① 把变更交给**平台侧通道**（容器**以本组件名义**登记的那一条
  * 监听；它是**平台侧通知的唯一入口**，只在写入路径里被调到），② 再由容器在**派发边界**向
- * 监听器列表派发（含真变化闸门 · 逐监听器隔离 · 重入护栏）；组件只负责真值怎么变。
+ * 监听器列表派发（含真变化闸门 · 逐监听器隔离 · 重入）；组件只负责真值怎么变。
  * <p><b>两条通道各通知一次</b>：① 每次写入（含无变化的写入）各一次；② 只在**真变化**时一次
  * ⇒ 同一次真变化对容器侧是"写入路径 1 次 + 派发边界 0 次"（派发边界**不**再回调平台侧）。
  * <p><b>状态唯一</b>：容器侧**不再**持有 {@code currentSanTE} 字段 ✗（只保留视图方法）。
@@ -28,8 +28,8 @@ import java.util.function.Consumer;
  * {@code Consumer} 即可」✓。
  * <p><b>新形态</b>：本组件持有 {@code List<Listener>}（{@link Listener} = {@code owner} + {@code Consumer<Change>}
  * 的**成对**登记，record ✓），对外只暴露 {@link #addListener(RoleComponent, Consumer)} ✓；
- * ★ **用 JDK 的 {@code Consumer}**（**不新增自定义接口** ✗ —— R-1「凡关注点已是组件 ⇒ 不得再为它新增能力接口」
- * / R-8 同理）✓。消费者在自己的 {@code start()} 里 {@code sante.addListener(this, change -> …)} ⇒ **不再有任何类
+ * ★ **用 JDK 的 {@code Consumer}**（**不新增自定义接口** ✗ —— 「凡关注点已是组件 ⇒ 不得再为它新增能力接口」
+ * 同理）✓。消费者在自己的 {@code start()} 里 {@code sante.addListener(this, change -> …)} ⇒ **不再有任何类
  * 实现本组件的嵌套接口** ✓。
  * <p><b>两条通道</b>（本组件的分工边界 ✓）：名单里 **owner = 本组件自身**的那一条 = **平台侧通道**
  * （容器以本组件名义登记：触发派发）⇒ 写入路径**直调**它 —— 无变化写入也通知它 ✓、
@@ -85,7 +85,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
 
     /**
      * **添加监听器**（**唯一**的订阅入口 ✓）—— 消费者在自己的 {@code start()} 里调用
-     * （⇒ 时机 = 组件装配序 ✓，R-4 ✓），并在 {@code stop()} 里用 {@link #removeListener(Listener)} 成对移除 ✓。
+     * （⇒ 时机 = 组件装配序 ✓），并在 {@code stop()} 里用 {@link #removeListener(Listener)} 成对移除 ✓。
      * <p><b>幂等</b>：同一 {@code owner} + 同一 {@code listener} 重复添加**不重复登记** ✓
      * （与旧 {@code subscribe} 的幂等语义逐字一致）。
      * <p><b>{@code owner} = 本组件自身 ⇒ 平台侧登记</b> ✓：写入路径**直调**它

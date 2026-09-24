@@ -10,6 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 /**
  * 黯然销魂（红）：持续扣减红的 SanTE，归零前给自己回血与力量。
@@ -18,8 +19,8 @@ import org.bukkit.potion.PotionEffectType;
  *   <li>去 legacy `UpdateAware` 与 `SanTEChangeAware` ⇒ 改走基类新钩子 {@link #update()} 与
  *       {@link #onSanTEChange(int, int)}（容器对**注册表内组件**广播；SanTE 侧为"真变化才派发"，
  *       由 B⑨ 完成、本卡不新增可见变化）；</li>
- *   <li>旧式聚合根调用端口化：`instance.decreaseSanTE(10)` → `svc().sante().decrease(10)`；
- *       `instance.applyPotionEffect(…createEffect(45, 5/2))` → `svc().buffs().applyPotionEffect(type, 45, 5/2)`
+ *   <li>旧式聚合根调用端口化：`instance.decreaseSanTE(10)` → **SanTE 组件**的 `decrease(10)`（当时经服务集端口；阶段 13 · t103 起直接用组件）；
+ *       `instance.applyPotionEffect(…createEffect(45, 5/2))` → **Buff 组件**的 `applyPotionEffect(type, 45, 5/2)`（同上）
  *       （**同一条已记账路径** O-7）；`instance.startSkillCooldown(getId(), getCooldownTicks())` →
  *       `svc().cooldowns().start(getCooldownTicks())`（`CooldownPortImpl.start` 委托回
  *       `owner.startSkillCooldown(componentId, ticks)` ⇒ **同一张冷却表**）；</li>
@@ -28,6 +29,24 @@ import org.bukkit.potion.PotionEffectType;
  * </ul>
  */
 public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscriber {
+
+    /**
+     * **SanTEComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final SanTEComponent santeComponent(){
+        return svc().components().get(SanTEComponent.class);
+    }
+
+    /**
+     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final BuffComponent buffComponent(){
+        return svc().components().get(BuffComponent.class);
+    }
 
     //该技能是否在执行中
     private boolean running = false;
@@ -82,7 +101,7 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
     @Override
     public void onCast(CastSignal signal) {
         if(signal.trigger() != CastTrigger.RIGHT_CLICK) return;
-        if(!svc().buffs().canCastSkill()) return;
+        if(!buffComponent().canCastSkill()) return;
         running = true;
         svc().self().player().getWorld().playSound(svc().self().player().getLocation().clone(), Sound.ENTITY_WITHER_DEATH, 2, 1);
         //冷却 600 由本组件在施放成功处按声明值启动（T-2 ③ 后所有组件无条件走新管道）
@@ -99,10 +118,10 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
 
         Player caster = svc().self().player();
 
-        svc().sante().decrease(10);
-        //药水记账（O-7）：经 svc().buffs() 走 RoleInstance 的**同一条已记账路径**，clear() 时只回收本系统施加的效果
-        svc().buffs().applyPotionEffect(PotionEffectType.REGENERATION, 45, 5);
-        svc().buffs().applyPotionEffect(PotionEffectType.STRENGTH, 45, 2);
+        santeComponent().decrease(10);
+        //药水记账（O-7）：经 **Buff 组件**的入口（与框架**同一条已记账路径**），clear() 时只回收本系统施加的效果
+        buffComponent().applyPotionEffect(PotionEffectType.REGENERATION, 45, 5);
+        buffComponent().applyPotionEffect(PotionEffectType.STRENGTH, 45, 2);
         svc().cooldowns().start(getCooldownTicks());
 
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);

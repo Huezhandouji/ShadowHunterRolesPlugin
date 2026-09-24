@@ -16,6 +16,7 @@ import org.bukkit.entity.Player;
 import java.time.Duration;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 /**
  * 默认的「SanTE 归零惩罚」被动（组件侧最后一批 B⑨ 迁移）。
@@ -36,7 +37,7 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
  *       {@code SanTEComponent} 订阅」</i>。旧口径原文保留：<i>「改走基类新钩子
  *       {@code RoleComponent#onSanTEChange(int, int)}」</i>。</li>
  *   <li>惩罚状态 `isInSanTEPunishment` 由聚合根搬进**组件私有字段**（该状态本就不该上 `RoleInstance`）；</li>
- *   <li>任务经**计时组件**登记本组件资源表（阶段 13 · t102：不再经服务集端口，改为组件本身用）、Buff 经 `svc().buffs()`、SanTE 经 `svc().sante()`、
+ *   <li>任务经**计时组件**登记本组件资源表（阶段 13 · t102：不再经服务集端口，改为组件本身用）、Buff 经**Buff 组件**、SanTE 经**SanTE 组件**（阶段 13 · t103：均改为组件本身用）、
  *       真伤经**生命组件**的真伤入口（阶段 13 · t102：同上）；**表现层（粒子/标题/音效）与全部数值逐字不变**。</li>
  * </ul>
  * <p><b>⭐ 语义修复（阶段 6 · 本批 t26；用户直接裁定）</b>：{@code inSanTEPunishment} 此前是**纯写不读的死状态**
@@ -45,7 +46,7 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
  *   <li>**进入即标记**：归零判定通过后立即 {@code inSanTEPunishment = true}，**先于**起任务
  *       （消除"起任务与标记之间"的重入窗口）；</li>
  *   <li>**惩罚期间持续钉 SanTE = 0（逐 tick）**：{@link #update()} 里以 {@code inSanTEPunishment} 守卫，
- *       **每一 tick** 执行 {@code svc().sante().set(0)}
+ *       **每一 tick** 执行 {@code santeComponent().set(0)}
  *       （阶段 6 · t27 对齐用户裁定 **Q1 = A**：此前是"任务体每 40 刻钉一次"，整个惩罚只钉 3 次、
  *       两钉点之间可被其它组件抬高（如流血 `+4`）⇒ 现改为逐 tick，**惩罚期间每一 tick 都是 0**）；</li>
  *   <li>**忽略重入**：{@code onSanTEChange} 顶部守卫 {@code if (inSanTEPunishment) return;}
@@ -67,6 +68,24 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
  * 五条路径逐条标注为源码里的 {@code (5-①…⑤)}。
  */
 public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEComponent.Subscriber {
+
+    /**
+     * **SanTEComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final SanTEComponent santeComponent(){
+        return svc().components().get(SanTEComponent.class);
+    }
+
+    /**
+     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final BuffComponent buffComponent(){
+        return svc().components().get(BuffComponent.class);
+    }
 
     /**
      * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
@@ -137,7 +156,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
     @Override
     public void update() {
         if (inSanTEPunishment) {
-            svc().sante().set(0);
+            santeComponent().set(0);
         }
     }
 
@@ -192,7 +211,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
                         Location loc = player.getLocation();
 
                         if (count == 1) {
-                            svc().buffs().add(BuffType.STUN, 100);
+                            buffComponent().add(BuffType.STUN, 100);
 
                             //(4) 回满推迟到 STUN 结束（用户裁定 Q2 = A）：STUN 在本跳施加、持续 100 刻
                             //    ⇒ 自本跳起 100 刻后（= STUN 到期那一刻）清标记并一次性回满。
@@ -202,7 +221,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
                                 if (!inSanTEPunishment) return;
                                 //先清标记：否则同一 tick 的逐 tick 钉 0 会把刚回满的值立刻抹回 0
                                 inSanTEPunishment = false;
-                                svc().sante().set(svc().sante().max());
+                                santeComponent().set(santeComponent().max());
                             });
                             player.playSound(loc, Sound.ITEM_TOTEM_USE, 1f, 1f);
 

@@ -4,8 +4,18 @@ import com.shadowHunterRolesPlugin.core.PassiveSkill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 import net.kyori.adventure.text.Component;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
 
 public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
+
+    /**
+     * **SanTEComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final SanTEComponent santeComponent(){
+        return svc().components().get(SanTEComponent.class);
+    }
 
     private int noEnemySurroundTime = 0;
     private int tickSecondRecord = 0;
@@ -35,7 +45,7 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
      * 批次⑤（B⑤）迁移：旧 `update(Player, RoleInstance)` 的**逐条等价**新写法。
      * 数值/间隔**逐字不变**：半径 `10`、累计上限 `200` tick、每秒判定 `20` tick、`+3` SanTE、`+1` 生命；
      * SanTE 为 0 时提前 return 的短路**保持**。阵营判定走 `svc().roleInfo().hasEnemyInRange(10)`
-     * （语义 = 原 `SkillUtil.hasEnemyInRange`）；SanTE 改走 `svc().sante().gain(3)`、
+     * （语义 = 原 `SkillUtil.hasEnemyInRange`）；SanTE 改走 `santeComponent().gain(3)`、
      * 生命改走**生命组件**的回血入口（阶段 13 · t101 第①批：不再经服务集端口，改为组件本身用）✓。
      * 容器在 tick 里对该组件广播 `update()`（B⑤ 第 1 步，`:802`）。
      */
@@ -50,13 +60,13 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
             }
         }
 
-        if(svc().sante().current() <= 0) return;
+        if(santeComponent().current() <= 0) return;
 
         if(noEnemySurroundTime >= 200){
             tickSecondRecord++;
             if(tickSecondRecord >= 20){
                 tickSecondRecord = 0;
-                svc().sante().gain(3);
+                santeComponent().gain(3);
                 vitals.heal(1);
             }
         }

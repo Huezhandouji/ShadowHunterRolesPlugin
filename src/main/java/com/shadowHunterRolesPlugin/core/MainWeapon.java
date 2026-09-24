@@ -21,6 +21,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import java.util.ArrayList;
 import java.util.List;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 
 /**
@@ -34,6 +35,15 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
  * 识别键 = {@link Utils#MAIN_WEAPON_KEY}。
  */
 public abstract class MainWeapon extends ActiveComponent implements CombatHook, HotbarItemProviding {
+
+    /**
+     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final BuffComponent buffComponent(){
+        return svc().components().get(BuffComponent.class);
+    }
 
     /**
      * **EnergyComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
@@ -126,7 +136,7 @@ public abstract class MainWeapon extends ActiveComponent implements CombatHook, 
         //② 状态判定（读运行期状态）；主武器 energyCost ≡ 0 ⇒ ENERGY_LACK 不可达
         IconState state = IconState.of(
                 svc().cooldowns().isReady(),
-                svc().buffs().canUseMainWeapon(),
+                buffComponent().canUseMainWeapon(),
                 energyComponent().current(),
                 getEnergyCost());
 

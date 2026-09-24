@@ -9,9 +9,19 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 
 public class MeiqiheziUnconcernSkill extends Skill {
+
+    /**
+     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final BuffComponent buffComponent(){
+        return svc().components().get(BuffComponent.class);
+    }
 
     public MeiqiheziUnconcernSkill(String id, ComponentServices services, Specification specification){
         super(id, services, specification);
@@ -41,7 +51,7 @@ public class MeiqiheziUnconcernSkill extends Skill {
 
     /**
      * 批次②（B②）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
-     * 药水经 {@code svc().buffs().applyPotionEffect(...)} 施加 ⇒ **与旧写法同一条已记账路径**
+     * 药水经 {@code buffComponent().applyPotionEffect(...)} 施加 ⇒ **与旧写法同一条已记账路径**
      * （效果类型 SPEED / 时长 40 / 增幅 4 逐字不变；`new PotionEffect(type,40,4,false,true)` 与
      * `type.createEffect(40,4)` 的 ambient=false、particles=true 一致）。
      * `canCastSkill` 不满足时**直接返回**（该路径**不启冷却**）；
@@ -51,10 +61,10 @@ public class MeiqiheziUnconcernSkill extends Skill {
     @Override
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
-        if(!svc().buffs().canCastSkill()) return;
+        if(!buffComponent().canCastSkill()) return;
 
         //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果
-        svc().buffs().applyPotionEffect(PotionEffectType.SPEED, 40, 4);
+        buffComponent().applyPotionEffect(PotionEffectType.SPEED, 40, 4);
 
         caster.getWorld().playSound(
                 caster.getLocation(),

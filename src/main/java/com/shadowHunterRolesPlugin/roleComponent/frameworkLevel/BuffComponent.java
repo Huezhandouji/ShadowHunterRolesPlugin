@@ -23,7 +23,7 @@ import java.util.Set;
  *   <li><b>施加路径</b> = {@link #applyPotionEffect(PotionEffect)}（{@code player.addPotionEffect} +
  *       记账）：Bukkit API = 允许依赖的"外部东西" ✓。</li>
  * </ul>
- * <b>不再转调任何旧端口</b> ✗（原实现是 {@code svc().buffs().…}）。
+ * <b>不再转调任何旧端口</b> ✗（原实现是经服务集端口的转发形态；阶段 13 · t103 起调用点一律**直接用本组件**）。
  */
 public class BuffComponent extends RoleComponent {
 

@@ -8,8 +8,28 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 public class RedEvilShockSkill extends Skill{
+
+    /**
+     * **SanTEComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final SanTEComponent santeComponent(){
+        return svc().components().get(SanTEComponent.class);
+    }
+
+    /**
+     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final BuffComponent buffComponent(){
+        return svc().components().get(BuffComponent.class);
+    }
 
     public RedEvilShockSkill(String id, ComponentServices services, Specification specification) {
         super(id, services, specification);
@@ -42,7 +62,7 @@ public class RedEvilShockSkill extends Skill{
     @Override
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
-        if(!svc().buffs().canCastSkill()) return;
+        if(!buffComponent().canCastSkill()) return;
 
         RedBleedPassive bleed = getComponent(RedBleedPassive.class);
         for(Player p : caster.getLocation().getNearbyPlayers(5)){
@@ -55,7 +75,7 @@ public class RedEvilShockSkill extends Skill{
                 bleed.requestResolve(p.getUniqueId(), 5);
             }
         }
-        svc().sante().gain(10);
+        santeComponent().gain(10);
 
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITCH_CELEBRATE, 1, 1);
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);

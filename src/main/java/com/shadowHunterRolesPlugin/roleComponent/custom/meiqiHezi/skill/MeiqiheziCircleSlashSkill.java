@@ -16,8 +16,18 @@ import java.util.Collection;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 public class MeiqiheziCircleSlashSkill extends Skill {
+
+    /**
+     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final BuffComponent buffComponent(){
+        return svc().components().get(BuffComponent.class);
+    }
 
     /**
      * **EnergyComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
@@ -89,11 +99,11 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     @Override
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
-        if(!svc().buffs().canCastSkill()) return;
+        if(!buffComponent().canCastSkill()) return;
         if(!energyComponent().tryConsume(getEnergyCost())) return;
 
         //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果（标志位与旧写法逐字一致）
-        svc().buffs().applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
+        buffComponent().applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
 
         Location loc = caster.getLocation();
 

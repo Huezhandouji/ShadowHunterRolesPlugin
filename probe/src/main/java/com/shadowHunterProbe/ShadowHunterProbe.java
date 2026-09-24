@@ -91,6 +91,32 @@ public final class ShadowHunterProbe extends JavaPlugin {
                 reply(sender, "inserted " + inserted + " component(s) with id '" + id + "' into " + target.getName()
                         + " (container size=" + instance.componentRegistry().size() + ")");
             }
+            case "async" -> {
+                //阶段 13 · t132（AY2）：**只读**异步触发入口 —— 在**非主线程**调产品公开的 deliverHook，
+                //观察其"非主线程 ⇒ 响亮 SEVERE 并放弃投递"的守卫是否真的生效（本入口**不改任何状态** ✓：
+                //action 只写一行探针日志；产品侧在断言处就放弃投递 ⇒ 零副作用 ✓）。
+                if (args.length < 2) { usage(sender); return true; }
+                Player target = Bukkit.getPlayerExact(args[1]);
+                RoleInstance instance = target == null ? null : instanceOf(target);
+                if (instance == null) { reply(sender, "'" + args[1] + "' has no role instance"); return true; }
+                List<RoleComponent> all = instance.componentRegistry().all();
+                RoleComponent carrier = all.isEmpty() ? null : all.get(all.size() - 1);
+                if (carrier == null) { reply(sender, "empty container"); return true; }
+                final RoleComponent hookCarrier = carrier;
+                final RoleInstance targetInstance = instance;
+                Thread thread = new Thread(() -> {
+                    log("async-trigger", 0, "thread=" + Thread.currentThread().getName()
+                            + " primaryThread=" + Bukkit.isPrimaryThread() + " carrier=" + hookCarrier.getId());
+                    try {
+                        targetInstance.deliverHook(hookCarrier, "probeAsync", () -> log("async-action", 0,
+                                "thread=" + Thread.currentThread().getName() + " (should NOT run if the guard works)"));
+                    } catch (RuntimeException failure) {
+                        log("async-trigger", 0, "threw=" + failure.getClass().getSimpleName() + ": " + failure.getMessage());
+                    }
+                }, "probe-async-thread");
+                thread.start();
+                reply(sender, "async delivery triggered on thread 'probe-async-thread' (carrier=" + hookCarrier.getId() + ")");
+            }
             case "throw" -> {
                 boolean on = args.length >= 2 && args[1].equalsIgnoreCase("on");
                 throwMode = on;

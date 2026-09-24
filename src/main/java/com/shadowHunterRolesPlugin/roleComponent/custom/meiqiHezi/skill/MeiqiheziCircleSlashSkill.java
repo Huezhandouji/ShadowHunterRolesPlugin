@@ -3,7 +3,6 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import net.kyori.adventure.text.Component;
 import org.bukkit.*;

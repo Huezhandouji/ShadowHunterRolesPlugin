@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
 
 import com.shadowHunterRolesPlugin.core.Skill;
-import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;

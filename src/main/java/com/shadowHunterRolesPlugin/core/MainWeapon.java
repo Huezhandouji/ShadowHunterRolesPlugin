@@ -10,8 +10,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
-import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
-import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItemProviding;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.hotbar.IconState;
@@ -33,8 +32,11 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  *   <li>{@code energyCost ≡ 0} 由类型封死 ⇒ {@link IconState#ENERGY_LACK} 对主武器**不可达**。</li>
  * </ul>
  * 识别键 = {@link Utils#MAIN_WEAPON_KEY}。
+ * <p><b>阶段 13 · t108</b>：原 `CombatHook`（唯一方法 {@link #onAttack(AttackSignal)}）**被本类吸收**
+ * —— 本类本来就声明 `onAttack`，那个接口只是重复声明 ⇒ 整体删除 ✗（派发判据改为按**本类**判，
+ * 接受集逐字不变）；{@code AttackSignal} 随之成为 {@code ActiveComponent} 的嵌套类型 ✓。
  */
-public abstract class MainWeapon extends ActiveComponent implements CombatHook, HotbarItemProviding {
+public abstract class MainWeapon extends ActiveComponent implements HotbarItemProviding {
 
     /**
      * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
@@ -113,8 +115,11 @@ public abstract class MainWeapon extends ActiveComponent implements CombatHook, 
         public abstract MainWeapon create(String id, ComponentServices services);
     }
 
-    /** 攻击路径的新契约（阶段 8 起为 {@code void}）：今天 listener 在攻击后**无条件**启动武器冷却。 */
-    @Override
+    /**
+     * **物品使用入口（攻击）的新契约**（阶段 8 起为 {@code void}）：今天 listener 在攻击后**无条件**启动武器冷却。
+     * <p>阶段 13 · t108：本方法从"覆写能力接口"变成**本类的声明**（原 `CombatHook` 被吸收 ✗）
+     * ⇒ `@Override` 已删（它已无超类型方法可覆写）；签名与默认体**逐字未变** ✓。
+     */
     public void onAttack(AttackSignal signal){
     }
 

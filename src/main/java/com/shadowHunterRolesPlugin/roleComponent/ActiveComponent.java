@@ -1,11 +1,10 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
-import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
-import com.shadowHunterRolesPlugin.core.dispatch.HotbarActionable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import org.bukkit.entity.Player;
 
 /**
  * 主动组件基类（设计 §4.3）：= 原 `Skill` + `MainWeapon` 去重后的并集，不多一个成员。
@@ -35,9 +34,36 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
  * 框架侧只在需要读数时**转问组件**（`isCooling()` / 读数口），公开面一条不删 ✓。
  * <p>旧的"冷却结束回调"（原 `CooldownAware#onCooldownEnd`）随该能力接口一并删除 —— 全库**零覆写点**
  * （现算：`onCooldownEnd` 仅剩框架派发点与该接口自身的默认空实现）⇒ 删除**零行为变化** ✓。
+ * <p><b>阶段 13 · t108（用户裁定：`dispatch` 下被组件取代者删除 + 入口词汇归位）</b>：
+ * 原 `HotbarActionable`（唯一方法 `onCast`）**被本组件吸收** —— 本类本来就声明 `onCast`，那个接口
+ * 只是重复声明 ⇒ 整体删除 ✗（派发判据改为按**本组件**判，接受集逐字不变）；
+ * 入口的三个类型（`CastTrigger` / `CastSignal` / `AttackSignal`）由 `core/dispatch/` **迁入本类**
+ * （嵌套类型，见下）—— 与使用它们的组件同处、只由本组件持有 ✓。
  */
 public abstract class ActiveComponent extends RoleComponent
-        implements HotbarItem, HotbarActionable, HotbarPresentable {
+        implements HotbarItem, HotbarPresentable {
+
+    // ───────── 阶段 13 · t108：物品使用入口的词汇（原 core/dispatch/ 的三个类型迁入本组件） ─────────
+    //裁定⑤（用户答复）：**施放与攻击由「物品支持类组件」处理** ⇒ 原 `HotbarActionable` / `CombatHook`
+    //两个能力接口**已被本组件吸收**（本类本来就声明 `onCast`、其家族基类 `MainWeapon` 声明 `onAttack`）
+    //⇒ 两个接口整体删除 ✗（接受集逐字不变：它们的唯一实现者就是本组件/主武器基类）。
+    //⇒ 入口的三个类型（触发来源 + 两种信号）**按"与使用它的组件同处"改为本组件的嵌套类型** ✓：
+    //   `core/dispatch/` 下不再留共享能力袋；子类**无需 import**（继承的成员类型按简单名可见）。
+
+    /** **热键栏触发的三种来源**（listener 只做"事件 → trigger"翻译；`onCast` 入口的输入词汇）。 */
+    public enum CastTrigger {
+        RIGHT_CLICK,
+        LEFT_CLICK,
+        DROP
+    }
+
+    /** **施放信号**：只带这一次的数据（不可变）。施动者永远是 {@code svc().self().player()}。 */
+    public record CastSignal(CastTrigger trigger) {
+    }
+
+    /** **攻击信号**：攻击者永远是自己（{@code svc().self().player()}），这里只带受害者。 */
+    public record AttackSignal(Player victim) {
+    }
 
     private final HotbarSpecification<?> specification;
 
@@ -127,11 +153,13 @@ public abstract class ActiveComponent extends RoleComponent
     }
 
     /**
-     * 默认：不做事、也**不**进冷却（与今天 listener 的行为一致：未重写的热键栏触发只做就绪预检）。
+     * **物品使用入口（施放）**：默认不做事、也**不**进冷却（与今天 listener 的行为一致：未重写的热键栏
+     * 触发只做就绪预检）。
      * <p>阶段 8：返回值改为 {@code void}（旧的施放结果枚举已删 —— 它今天**没有任何消费点**，
      * 见交付说明的零行为变化论证）。
+     * <p>阶段 13 · t108：本方法从"覆写能力接口"变成**本组件的声明**（原 `HotbarActionable` 被吸收 ✗）
+     * ⇒ `@Override` 已删（它已无超类型方法可覆写）；方法签名与默认体**逐字未变** ✓。
      */
-    @Override
     public void onCast(CastSignal signal) {
     }
 

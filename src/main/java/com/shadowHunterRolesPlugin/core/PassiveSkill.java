@@ -9,8 +9,8 @@ import net.kyori.adventure.text.Component;
  * <p>与今天的差别：`id` 与 `getId()` 上移到基类（`RoleComponent.getId()` 是 `final`），
  * 本类只保留 `displayName`/`description`。
  * 阶段 4 收尾批⑤：首位两参 `(id, ComponentServices)` 为**构造期注入**；其后两参**顺序与含义与迁移前逐字一致**。
- * 被动**不实现** `HotbarItem`/`HotbarActionable`/`HotbarPresentable` ⇒ "能不能被施放"与"能不能上热键栏"
- * 仍是编译期事实。
+ * 被动**不实现** `HotbarItem`/`HotbarPresentable`（也不在物品支持组件那一棵子树里）⇒ "能不能被施放"
+ * 与"能不能上热键栏"仍是编译期事实。
  * <p><b>阶段 8</b>：本类**不**在热键栏能力簇内 ⇒ 不会被强制实现 `buildItem()`（被动从不被渲染）；
  * 旧构造里那个历史瑕疵（被动曾误传技能 kind）已随 kind 枚举一并消失。
  */

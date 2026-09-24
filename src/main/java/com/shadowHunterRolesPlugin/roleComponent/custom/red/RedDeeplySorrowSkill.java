@@ -1,8 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
 
 import com.shadowHunterRolesPlugin.core.Skill;
-import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
-import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
 import net.kyori.adventure.text.Component;

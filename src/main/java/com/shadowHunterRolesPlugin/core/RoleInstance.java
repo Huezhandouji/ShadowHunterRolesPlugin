@@ -1,12 +1,10 @@
 package com.shadowHunterRolesPlugin.core;
 
-import com.shadowHunterRolesPlugin.core.dispatch.AttackSignal;
-import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
-import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
-import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
 import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
-import com.shadowHunterRolesPlugin.core.dispatch.HotbarActionable;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.core.hotbar.CooldownBearing;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItemProviding;
@@ -436,8 +434,9 @@ public class RoleInstance {
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
-        //阶段 6 · 派发面能力化：判据由「继承关系」改为「能力接口」——本处只用到 onCast（HotbarActionable 的唯一方法）
-        if(!(component instanceof HotbarActionable active)) return false;
+        //阶段 13 · t108：判据 = **物品支持组件本身**（裁定⑤ 的"吸收"落点）—— 原能力接口已随吸收删除 ✗；
+        //接受集**逐字不变**（那个接口的唯一实现者就是本类），本处只用到 onCast。
+        if(!(component instanceof ActiveComponent active)) return false;
 
         //冷却自管理（D1）：框架**不再**代启动冷却 —— 组件在施放成功处自行 startCooldown()（阶段 13 · t105：状态归组件、框架只转问）；
         //声明值仍是唯一真值来源（4.7/O-13），启动点与启动值都与旧框架代启动逐字一致 ⇒ 可观察行为不变。
@@ -460,7 +459,9 @@ public class RoleInstance {
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
-        if(!(component instanceof CombatHook hook)) return false;
+        //阶段 13 · t108：同 handleCast —— 判据 = **声明 onAttack 的那个组件**（原能力接口已随吸收删除 ✗；
+        //接受集逐字不变：那个接口的唯一实现者就是本类）。
+        if(!(component instanceof MainWeapon hook)) return false;
 
         //冷却自管理（D1）：框架不再代启动冷却（同 handleCast）
         //阶段 10 · t66：唯一受保护调用（攻击同属派发边界）

@@ -65,8 +65,9 @@ public class DebugCooldownCommand implements SubCommand {
         }
         RoleComponent component = instance.componentRegistry().getById(componentId);
         //阶段 7 · 清理批：判据由「继承关系」改为「**能力接口**」——本命令只需要"声明了冷却时长"这一项能力
-        //（`CooldownBearing#getCooldownTicks`）。派发面（handleCast → HotbarActionable、dispatchCooldownEnd →
-        //CooldownAware）早已按能力判 ⇒ 命令面与派发面从此同一套口径，全仓不再有"按类型判"的残留。
+        //（`CooldownBearing#getCooldownTicks`）。阶段 13 · t108：派发面的判据已随"吸收"回到**物品支持组件
+        //本身**（`RoleInstance#handleCast` / `#handleAttack` 判 `ActiveComponent` / `MainWeapon`）⇒ 命令面
+        //与派发面仍是同一套接受集（仓内实现该能力的仍只有活动组件基类那一棵子树）。
         //行为不变：仓内实现该能力的仍只有活动组件基类那一棵子树（表现规格对象只实现 HotbarItem，不在此列）。
         //（本注释刻意不写那个类型名：卡面判据是裸 grep 该名字，注释里出现它会被误读成"类型判据还在"。）
         if(!(component instanceof CooldownBearing bearing) || !(component instanceof ActiveComponent active)){

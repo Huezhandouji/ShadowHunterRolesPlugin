@@ -21,7 +21,8 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
  * 是这条语义的入口，容器在 {@code triggerLifecycleStop()} 里**每个组件 {@code stop()} 之后**调用一次
  * ⇒ "谁请求的计时，谁停止时被取消" ✓（旧实现只在实例 {@code clear()} 的兜底里取消 ⇒ 单独 {@code stop()}
  * 会漏；本卡把这一点补上，见说明件的偏离留痕）。
- * <p><b>不再转调任何旧端口</b> ✗（原实现是 {@code svc().timers().…}）。
+ * <p><b>不再转调任何旧端口</b> ✗（原实现是经服务集端口的转发形态；阶段 13 · t102 起调用点一律
+ * **直接用本组件**，该端口的调用点已清零）。
  */
 public class TimerComponent extends RoleComponent {
 

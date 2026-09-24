@@ -16,8 +16,18 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.List;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
 
 public class RedSolitaryArroganceSkill extends Skill {
+
+    /**
+     * **TimerComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final TimerComponent timerComponent(){
+        return svc().components().get(TimerComponent.class);
+    }
 
     //O-5：任务句柄化，stop 时取消（阶段 2 由平台 Scheduler 提供，同时去掉 Folia 全局调度器误用）
     private Task attackTask;
@@ -52,7 +62,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     /**
      * 批次③（B③）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
      * `canCastSkill` 不满足 → **直接返回**（**旧写法 `:34` 就是直接 return、不启冷却**，已现场核）；
-     * 循环任务由 `svc().timers().runRepeating(1L, 6, …)` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）；
+     * 循环任务由 `timerComponent().runRepeating(this, 1L, 6, …)` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）；
      * `:57` 射线几何仍用**静态** `SkillUtil.getPlayersInSightLine`（无状态工具，不进端口白名单）；
      * 伤害 8 与回血 4 **逐字不变**；冷却由本组件在施放成功处按声明值 **200** 启动。
      * <p>`isValid()` 守卫按四步等价链删除：任务登记进资源表 ⇒ `clear()` 的 `cancelAllAndClear()` 必取消它 ⇒
@@ -63,7 +73,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
         if(!svc().buffs().canCastSkill()) return;
-        attackTask = svc().timers().runRepeating(1L, 6,
+        attackTask = timerComponent().runRepeating(this, 1L, 6,
                 new Runnable() {
                     private Player cas = caster;
                     private int cnt = 0;
@@ -90,7 +100,7 @@ public class RedSolitaryArroganceSkill extends Skill {
                             if(!svc().roleInfo().isHostile(victim)) continue;
 
                             shouldRecoverHealth = true;
-                            svc().damage().physicalDamage(victim, cas, 8);
+                            vitals.physicalDamage(victim, cas, 8);
                         }
 
                         if(shouldRecoverHealth){

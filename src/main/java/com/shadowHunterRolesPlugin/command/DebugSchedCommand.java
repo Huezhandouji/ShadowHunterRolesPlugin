@@ -34,7 +34,7 @@ import java.util.List;
  * {@code run()} / {@code runLater(20)} 与 {@code Task} 句柄取消；
  * ④m **归一化矩阵**：8 组声明值（5 个生产形态 (1,1)/(0,1)/(0,2)/(0,40)/(1,6) + (0,10)/(1,2)/(1,10)）
  *     分别走原生 Bukkit 与适配器，逐组打印首/次触发 tick ⇒ 判据 = 两路径首/次触发逐字相同；
- * ④p **端口链**：走组件侧真入口 {@code svc().timers().runRepeating(0L, 10L, …)}（TimerPort 的 task-在末位签名）
+ * ④p **端口链**：走组件侧真入口（**经服务集端口的转发形态**：`runRepeating(0L, 10L, …)`，请求者在**末位**）
  *     ⇒ 覆盖 TimerPortImpl 的转调 + 双入口归一；与 ④m 的 (0,10)=1/11 比对（无角色时打印 SKIPPED）；
  * ④ {@code ScheduledTask.cancel()} 返回值 / {@code isCancelled()} / {@code getExecutionState()} / 重复 cancel；
  * ⑤ 一句话结论（由本次原始值现算，不只给结论）。
@@ -305,7 +305,7 @@ public class DebugSchedCommand implements SubCommand {
         }, 50L);
 
         //④p **端口链实测**（规格 B③"双入口归一"：TimerPortImpl → Scheduler → 适配器 → GlobalRegionScheduler）：
-        //    走组件侧真入口 `svc().timers().runRepeating(0L, 10L, …)`（TimerPort 的 task-在末位签名）⇒
+        //    走组件侧真入口（**经服务集端口的转发形态**：请求者在**末位**）⇒
         //    与 ④m 的 (0,10) 期望值 **1/11** 比对。**仅当玩家已有角色时可测**（服务集构造期注入）；
         //    无角色 ⇒ 明确打印 SKIPPED（不伪造）
         final int[] portTicks = {-1, -1};

@@ -14,6 +14,8 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 
 import java.time.Duration;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
 
 /**
  * 默认的「SanTE 归零惩罚」被动（组件侧最后一批 B⑨ 迁移）。
@@ -34,8 +36,8 @@ import java.time.Duration;
  *       {@code SanTEComponent} 订阅」</i>。旧口径原文保留：<i>「改走基类新钩子
  *       {@code RoleComponent#onSanTEChange(int, int)}」</i>。</li>
  *   <li>惩罚状态 `isInSanTEPunishment` 由聚合根搬进**组件私有字段**（该状态本就不该上 `RoleInstance`）；</li>
- *   <li>任务经 `svc().timers()` 登记本组件资源表、Buff 经 `svc().buffs()`、SanTE 经 `svc().sante()`、
- *       真伤经 `svc().damage()`；**表现层（粒子/标题/音效）与全部数值逐字不变**。</li>
+ *   <li>任务经**计时组件**登记本组件资源表（阶段 13 · t102：不再经服务集端口，改为组件本身用）、Buff 经 `svc().buffs()`、SanTE 经 `svc().sante()`、
+ *       真伤经**生命组件**的真伤入口（阶段 13 · t102：同上）；**表现层（粒子/标题/音效）与全部数值逐字不变**。</li>
  * </ul>
  * <p><b>⭐ 语义修复（阶段 6 · 本批 t26；用户直接裁定）</b>：{@code inSanTEPunishment} 此前是**纯写不读的死状态**
  * （4 处出现 / **0 处读取**）⇒ 它声称的三件事一件都没做。现已恢复应有语义：
@@ -49,7 +51,7 @@ import java.time.Duration;
  *   <li>**忽略重入**：{@code onSanTEChange} 顶部守卫 {@code if (inSanTEPunishment) return;}
  *       ⇒ 惩罚进行中**不取消、不重启、不刷新 {@code count}、不重放标题/粒子、不重复上 STUN**；</li>
  *   <li>**结束回满（推迟到 STUN 结束）**：在**施加 STUN 的那一跳**（{@code count == 1}）预约
- *       {@code svc().timers().runLater(100L, …)} ⇒ **STUN 100 刻到期那一刻**清标记并把 SanTE 恢复至 {@code max}
+ *       {@code timerComponent().runLater(this, 100L, …)} ⇒ **STUN 100 刻到期那一刻**清标记并把 SanTE 恢复至 {@code max}
  *       （阶段 6 · t27 对齐用户裁定 **Q2 = A**：此前在第 3 跳 ≈4.05 s 就回满、而 STUN 到 5 s 才结束
  *       ⇒ 存在约 1 秒「已回满但仍在眩晕」的窗口 ⇒ 现已消除；回满在**同一处一次性**完成）。</li>
  * </ol>
@@ -65,6 +67,24 @@ import java.time.Duration;
  * 五条路径逐条标注为源码里的 {@code (5-①…⑤)}。
  */
 public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEComponent.Subscriber {
+
+    /**
+     * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final VitalsComponent vitalsComponent(){
+        return svc().components().get(VitalsComponent.class);
+    }
+
+    /**
+     * **TimerComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final TimerComponent timerComponent(){
+        return svc().components().get(TimerComponent.class);
+    }
     public DefaultSanTEZeroPunishment(String id, ComponentServices services) {
         super(
                 id,
@@ -135,7 +155,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
         //(1) 进入即标记：必须先于起任务（消除"起任务与标记之间"的重入窗口）
         inSanTEPunishment = true;
 
-        punishmentTask = svc().timers().runRepeating(0L, 40L, new Runnable() {
+        punishmentTask = timerComponent().runRepeating(this, 0L, 40L, new Runnable() {
 
                     int count = 0;
                     Player player = svc().self().player();
@@ -177,7 +197,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
                             //(4) 回满推迟到 STUN 结束（用户裁定 Q2 = A）：STUN 在本跳施加、持续 100 刻
                             //    ⇒ 自本跳起 100 刻后（= STUN 到期那一刻）清标记并一次性回满。
                             //    ⇒ 惩罚期间 SanTE 全程真正为 0（逐 tick 钉 + 结束后才回满），消除"已回满但仍眩晕"的窗口。
-                            punishmentRestoreTask = svc().timers().runLater(100L, () -> {
+                            punishmentRestoreTask = timerComponent().runLater(DefaultSanTEZeroPunishment.this, 100L, () -> {
                                 //(5-⑤ 正常结束) 若标记已被中止路径复位 ⇒ 不再回满（防越权恢复）
                                 if (!inSanTEPunishment) return;
                                 //先清标记：否则同一 tick 的逐 tick 钉 0 会把刚回满的值立刻抹回 0
@@ -225,7 +245,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
                             Location particleLoc = loc.clone().add(0, 1, 0);
                             particleLoc.getWorld().spawnParticle(Particle.SCULK_SOUL, particleLoc, 30, 0.5d, 0.5d, 0.5d);
                         }
-                        svc().damage().trueDamage(player, null, totalDamageAmount * 0.33333d);
+                        vitalsComponent().trueDamage(player, null, totalDamageAmount * 0.33333d);
                         //(4) 回满**不再**发生在第 3 跳：已推迟到 STUN 结束（见 count == 1 处的回满任务，Q2 = A）
                     }
                 });

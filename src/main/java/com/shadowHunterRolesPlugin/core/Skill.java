@@ -19,6 +19,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 
 
 /**
@@ -30,6 +31,15 @@ import java.util.List;
  * → 状态行 lore → 分隔线 + 描述 → **最后一步**写识别键 {@link Utils#SKILL_KEY}。
  */
 public abstract class Skill extends ActiveComponent implements HotbarItemProviding {
+
+    /**
+     * **EnergyComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final EnergyComponent energyComponent(){
+        return svc().components().get(EnergyComponent.class);
+    }
 
     /**
      * 状态行与描述之间的分隔线（冻结字面量，值一字不变）。本类与 {@link MainWeapon} 各持一份
@@ -132,7 +142,7 @@ public abstract class Skill extends ActiveComponent implements HotbarItemProvidi
         IconState state = IconState.of(
                 svc().cooldowns().isReady(),
                 svc().buffs().canCastSkill(),
-                svc().energy().current(),
+                energyComponent().current(),
                 getEnergyCost());
 
         //③ 三态材质：就绪 = 基础物品材质；禁用 = BARRIER；冷却 / 能量不足 = STRUCTURE_VOID

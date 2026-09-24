@@ -9,8 +9,18 @@ import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 
 public class RedSanctifiedBladeMainWeapon extends MainWeapon {
+
+    /**
+     * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final VitalsComponent vitalsComponent(){
+        return svc().components().get(VitalsComponent.class);
+    }
 
     //每次普攻施加的流血层数
     private static final int BLEED_STACKS_PER_HIT = 15;
@@ -60,7 +70,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
                 bleed.applyStacks(victim.getUniqueId(), BLEED_STACKS_PER_HIT);
             }
 
-            svc().damage().physicalDamage(victim, attacker, 8, 1);
+            vitalsComponent().physicalDamage(victim, attacker, 8, 1);
         }
 
         attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ELDER_GUARDIAN_CURSE, 1, 1.8f);

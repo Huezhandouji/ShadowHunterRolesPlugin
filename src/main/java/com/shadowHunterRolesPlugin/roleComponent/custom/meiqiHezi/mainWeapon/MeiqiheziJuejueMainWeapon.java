@@ -16,8 +16,28 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
 import java.util.Collection;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 
 public class MeiqiheziJuejueMainWeapon extends MainWeapon {
+
+    /**
+     * **EnergyComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final EnergyComponent energyComponent(){
+        return svc().components().get(EnergyComponent.class);
+    }
+
+    /**
+     * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final VitalsComponent vitalsComponent(){
+        return svc().components().get(VitalsComponent.class);
+    }
 
 
     public MeiqiheziJuejueMainWeapon(String id, ComponentServices services, Specification specification) {
@@ -61,14 +81,14 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         Player victim = signal.victim();
 
         //如果能量大于20，则进行范围伤害（旧写法在 onLeftClick 里，由 listener 同帧调用）—— 不能直接 return
-        if (svc().energy().current() >= 20) {
+        if (energyComponent().current() >= 20) {
             castAreaDamage(attacker);
             svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
             return;
         }
 
         if (victim != null) {
-            svc().damage().physicalDamage(victim, attacker, 8, 0.5);
+            vitalsComponent().physicalDamage(victim, attacker, 8, 0.5);
         }
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
     }
@@ -85,7 +105,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         }
 
         Player player = svc().self().player();
-        if (svc().energy().current() < 20) return;
+        if (energyComponent().current() < 20) return;
 
         castAreaDamage(player);
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
@@ -96,7 +116,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
      * 扣能量 `5`；半径 `5` 的粒子圆、粒子数 `50`；半径 `5` 判定圈内敌对目标各 `14` 点物理伤害；末尾音效不变。
      */
     private void castAreaDamage(Player player) {
-        svc().energy().tryConsume(5);
+        energyComponent().tryConsume(5);
 
         Location loc = player.getLocation();
 
@@ -111,7 +131,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
 
         for (Player victim : victims) {
             if (!svc().roleInfo().isHostile(victim)) continue;
-            svc().damage().physicalDamage(victim, player, 14);
+            vitalsComponent().physicalDamage(victim, player, 14);
         }
 
         loc.getWorld().playSound(loc, Sound.ITEM_TRIDENT_THROW, 1f, 0.8f);

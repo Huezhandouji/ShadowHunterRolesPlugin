@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 
 /**
  * 红的流血被动。
@@ -28,6 +29,14 @@ import java.util.UUID;
  * </ul>
  */
 public class RedBleedPassive extends PassiveSkill {
+
+    /**
+     * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合。
+     */
+    private final VitalsComponent vitalsComponent(){
+        return svc().components().get(VitalsComponent.class);
+    }
 
     //最大流血层数
     public static final int MAX_BLEED_STACK = 15;
@@ -153,7 +162,7 @@ public class RedBleedPassive extends PassiveSkill {
 
             //粒子
             player.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
-            svc().damage().trueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
+            vitalsComponent().trueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
             //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 svc().buffs() 走 RoleInstance 的**同一条已记账路径**）
             svc().buffs().applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
             svc().sante().gain(BLEED_SANTE_RECOVER);
@@ -237,7 +246,7 @@ public class RedBleedPassive extends PassiveSkill {
             playerBleedRecord.put(pid, newBleed);
         }
 
-        svc().damage().trueDamage(victim, caster, finalResolveBleedAmount * BLEED_DAMAGE_PER_SECOND);
+        vitalsComponent().trueDamage(victim, caster, finalResolveBleedAmount * BLEED_DAMAGE_PER_SECOND);
 
         //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 svc().buffs() 走 RoleInstance 的**同一条已记账路径**）
         svc().buffs().applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);

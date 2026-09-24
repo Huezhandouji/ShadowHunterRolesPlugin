@@ -13,8 +13,38 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Collection;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
 
 public class MeiqiheziCircleSlashSkill extends Skill {
+
+    /**
+     * **EnergyComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final EnergyComponent energyComponent(){
+        return svc().components().get(EnergyComponent.class);
+    }
+
+    /**
+     * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final VitalsComponent vitalsComponent(){
+        return svc().components().get(VitalsComponent.class);
+    }
+
+    /**
+     * **TimerComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
+     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
+     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     */
+    private final TimerComponent timerComponent(){
+        return svc().components().get(TimerComponent.class);
+    }
 
     //O-4：前摇任务句柄化，stop 时取消（阶段 2 换成平台 Task）
     private Task castTask;
@@ -52,14 +82,15 @@ public class MeiqiheziCircleSlashSkill extends Skill {
      * **再**做能量 `tryConsume` —— 不满足 → 直接返回（与旧路径一致、**不启冷却**）；
      * 冷却由本组件在施放成功处按声明值 **200** 启动；
      * 缓慢用 **5 参重载**（`ambient=true, particles=false` 逐字保真，R-1 方法族）；
-     * 前摇任务改由 `svc().timers()` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
+     * 前摇任务改由**计时组件**创建（阶段 13 · t102：不再经服务集端口、改为组件本身用，**请求者在首位**；
+     * **登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
      * <p>阶段 8：返回类型改 {@code void}（旧的施放结果枚举已删，返回值无消费点 ⇒ 零行为变化）。
      */
     @Override
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
         if(!svc().buffs().canCastSkill()) return;
-        if(!svc().energy().tryConsume(getEnergyCost())) return;
+        if(!energyComponent().tryConsume(getEnergyCost())) return;
 
         //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果（标志位与旧写法逐字一致）
         svc().buffs().applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
@@ -70,7 +101,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
 
 
-        castTask = svc().timers().runLater(20L, new Runnable(){
+        castTask = timerComponent().runLater(this, 20L, new Runnable(){
 
             @Override
             public void run() {
@@ -92,7 +123,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
                 for(Player victim : victims){
                     if (!svc().roleInfo().isHostile(victim)) continue;
-                    svc().damage().trueDamage(victim, caster, 20);
+                    vitalsComponent().trueDamage(victim, caster, 20);
                 }
 
                 loc.getWorld().playSound(loc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1f, 1f);

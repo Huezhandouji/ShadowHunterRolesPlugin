@@ -92,7 +92,7 @@ public final class QuarantineNotifier {
         }
 
         //① 全服简报：所有在线玩家 —— 只说明"某角色已停用"，**不含**组件名/堆栈
-        Component brief = Component.text("[ShadowHunter] Role '" + roleId
+        Component brief = Component.text("[ShadowHunter] " + playerName + "'s role '" + roleId
                 + "' has been disabled after a component failure.", NamedTextColor.RED);
 
         //② OP 详情：组件名 + 阶段 + 异常类型/消息 + 栈摘要

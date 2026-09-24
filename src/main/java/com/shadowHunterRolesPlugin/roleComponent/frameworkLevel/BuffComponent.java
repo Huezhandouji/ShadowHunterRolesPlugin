@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffType;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
+import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -25,7 +26,7 @@ import java.util.Set;
  * </ul>
  * <b>不再转调任何旧端口</b> ✗（原实现是经服务集端口的转发形态；阶段 13 · t103 起调用点一律**直接用本组件**）。
  */
-public class BuffComponent extends RoleComponent {
+public class BuffComponent extends RoleComponent implements OperationProvider {
 
     private final BuffManager buffManager;
 
@@ -104,5 +105,100 @@ public class BuffComponent extends RoleComponent {
         }
         appliedPotionTypes.clear();
         return removed;
+    }
+
+    /**
+     * **组件操作面**：把外部字符串指令**薄适配**到本组件既有强类型方法（零新增状态通道 ✓）。
+     *
+     * <h2>grammar（首 token 必为动词，**大小写敏感**；参数以空白分隔）</h2>
+     * <ul>
+     *   <li>{@code can_cast} —— 读（无参）：技能闸门，回 {@code true}/{@code false}；</li>
+     *   <li>{@code can_weapon} —— 读（无参）：主武器闸门，回 {@code true}/{@code false}；</li>
+     *   <li>{@code has <buffType>} —— 读：是否处于该 buff 下，回 {@code true}/{@code false}；</li>
+     *   <li>{@code remaining <buffType>} —— 读：剩余刻（无该 buff ⇒ {@code 0}）；</li>
+     *   <li>{@code add <buffType> <ticks>} —— 写：调既有的 {@link #add(BuffType, int)}，回**写后**剩余刻；</li>
+     *   <li>{@code count} —— 读（无参）：药水记账账本内的类型数；</li>
+     *   <li>{@code clear} —— 写（无参）：调既有的 {@link #clearAppliedPotionEffects()}，回**写后**账本数。</li>
+     * </ul>
+     * <p><b>{@code <buffType>} 取严格 {@code valueOf}</b>：必须与 {@link BuffType} 的常量名**逐字相同**（全大写 ✓）
+     * ⇒ 未知 id ⇒ 未识别（回 {@code null}）✗。
+     *
+     * <h2>三态返回</h2>
+     * {@code null} = **未识别 / 拒绝执行**（未知动词 ✓ · 参数个数不符 ✓ · 未知 buff id ✓ · 非数字 / 负数 / 溢出 ✓ ·
+     * 空或空白 payload ✓）；非空串 = **规范化值**（读类回当前值、写类回**写后状态** ✓）。
+     *
+     * <p><b>薄适配纪律</b>：本方法**只调**上述既有强类型方法 ⇒ 不新增平行的状态改动路径 ✗、
+     * 不绕过既有的 buff 语义（闸门 / 取最大时长 / 药水记账）✓。
+     */
+    @Override
+    public String onOperationCommand(String payload) {
+        if (payload == null) {
+            return null;
+        }
+        String[] tokens = payload.trim().split("\\s+");
+        if (tokens.length == 0 || tokens[0].isEmpty()) {
+            return null;
+        }
+        String verb = tokens[0];
+        switch (verb) {
+            case "can_cast" -> {
+                return tokens.length == 1 ? Boolean.toString(canCastSkill()) : null;
+            }
+            case "can_weapon" -> {
+                return tokens.length == 1 ? Boolean.toString(canUseMainWeapon()) : null;
+            }
+            case "count" -> {
+                return tokens.length == 1 ? Integer.toString(appliedPotionTypeCount()) : null;
+            }
+            case "clear" -> {
+                if (tokens.length != 1) {
+                    return null;
+                }
+                clearAppliedPotionEffects();
+                return Integer.toString(appliedPotionTypeCount());
+            }
+            case "has" -> {
+                BuffType type = tokens.length == 2 ? buffTypeOf(tokens[1]) : null;
+                return type == null ? null : Boolean.toString(has(type));
+            }
+            case "remaining" -> {
+                BuffType type = tokens.length == 2 ? buffTypeOf(tokens[1]) : null;
+                return type == null ? null : Long.toString(remainingTicks(type));
+            }
+            case "add" -> {
+                if (tokens.length != 3) {
+                    return null;
+                }
+                BuffType type = buffTypeOf(tokens[1]);
+                int ticks = parseNonNegative(tokens[2]);
+                if (type == null || ticks < 0) {
+                    return null;
+                }
+                add(type, ticks);
+                return Long.toString(remainingTicks(type));
+            }
+            default -> {
+                return null;
+            }
+        }
+    }
+
+    /** 严格 {@code valueOf}：未知 / 大小写不符 ⇒ {@code null}（调用方据此回未识别 ✗）。 */
+    private static BuffType buffTypeOf(String token) {
+        try {
+            return BuffType.valueOf(token);
+        } catch (IllegalArgumentException notABuffType) {
+            return null;
+        }
+    }
+
+    /** 非负整数解析：非数字 / 负数 / 溢出 ⇒ {@code -1}（调用方据此拒绝 ✗）。 */
+    private static int parseNonNegative(String token) {
+        try {
+            int value = Integer.parseInt(token);
+            return value >= 0 ? value : -1;
+        } catch (NumberFormatException notANumber) {
+            return -1;
+        }
     }
 }

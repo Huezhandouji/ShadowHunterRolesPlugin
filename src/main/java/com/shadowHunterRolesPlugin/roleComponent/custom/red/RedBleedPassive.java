@@ -21,14 +21,14 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 /**
  * 红的流血被动。
- * <p><b>批次⑦/B⑦（2026-09-17，跟随 /B⑥ 的第二次改动）的迁移口径</b>：
+ * <p><b>迁移口径</b>：
  * <ul>
  *   <li>**删除过渡桥**（两个上下文键常量 + 两处上下文写入）与 **legacy 生命周期接口声明** ——
  *       账本与其唯一外部使用者（`RedSanctifiedBladeMainWeapon`）都已改为经 `getComponent(...)` 读写
  *       **同一份私有账本** ⇒ 桥的最后使用者已消失（§2.0 第 ⑦ 条）。</li>
  *   <li>legacy 的带参 `start/stop` → **无参 `start()/stop()`**（新钩子；`stop()` 仍清空两个账本 Map，
  *       与原 `stop()` 语义一致；`start()` 无需再做任何事 ⇒ 不再覆写）。</li>
- * <li>保留 `update()` 的无参形态与全部端口化（B⑥/ 落地）；**数值/结算节奏/记账路径逐字不变**。</li>
+ * <li>保留 `update()` 的无参形态与全部端口化；**数值/结算节奏/记账路径逐字不变**。</li>
  * </ul>
  */
 public class RedBleedPassive extends PassiveSkill {
@@ -65,7 +65,7 @@ public class RedBleedPassive extends PassiveSkill {
      * **写流血结算请求的唯一公开入口**（跨批 API 前移落地）。
      * <p>语义与旧路径**逐条等价**：写入的是 `start()` 里发布出去的那**同一份** {@code playerBleedResolveRequests}
      * （**不另建并行存储**），键 = 受害者 UUID、值 = 待结算层数；结算时点仍由 {@code update()} 的
-     * {@code resolveRequestedBleed(...)} 决定。批次⑥ 保留本方法并完成账本私有化。
+     * {@code resolveRequestedBleed(...)} 决定。保留本方法并完成账本私有化。
      */
     public void requestResolve(UUID victimId, int stacks) {
         if (victimId == null) {
@@ -75,7 +75,7 @@ public class RedBleedPassive extends PassiveSkill {
     }
 
     /**
-     * **累加流血层数**（批次⑥/B⑥ 冻结的唯一写入口之一；B⑦ 的两个主武器子类只允许调
+     * **累加流血层数**（唯一写入口之一；两个主武器子类只允许调
      * `requestResolve` / `applyStacks` / `stacksOf` 这三个公开入口，不得再碰账本内部结构）。
      * <p>语义：键 = 受害者 `UUID`；累加后 `Math.clamp(…, 0, MAX_BLEED_STACK = 15)`（上限与旧逻辑一致）；
      * 结算时点不变（仍由 {@code update()} 里 `secondCountdown >= BLEED_SETTLE_INTERVAL_TICKS = 20` 后触发）。
@@ -90,7 +90,7 @@ public class RedBleedPassive extends PassiveSkill {
     }
 
     /**
-     * **只读查询某受害者当前流血层数**（B⑥ 冻结的公开入口之一；无副作用）。
+     * **只读查询某受害者当前流血层数**（公开入口之一；无副作用）。
      * <b>一经冻结不得再改。</b>
      */
     public int stacksOf(UUID victimId) {

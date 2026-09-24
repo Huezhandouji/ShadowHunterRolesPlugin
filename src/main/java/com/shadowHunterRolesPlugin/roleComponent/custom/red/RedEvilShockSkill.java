@@ -39,7 +39,7 @@ public class RedEvilShockSkill extends Skill{
     }
 
     /**
-     * 批次①（B①）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
+     * 迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
      * 触发条件/范围/持续时间/增幅/层数/音效均不变；`canCastSkill` 不满足时**直接返回**
      * （该路径**不启冷却**）；冷却由本组件在施放成功处按声明值启动。
      * <p>返回类型改 {@code void}（施放结果枚举已删，返回值无消费点）。

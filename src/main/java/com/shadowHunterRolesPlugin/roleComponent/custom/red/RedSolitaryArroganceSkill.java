@@ -55,7 +55,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     }
 
     /**
-     * 批次③（B③）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
+     * 迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
  * `canCastSkill` 不满足 → **直接返回**（**直接 return、不启冷却**，已现场核）；
      * 循环任务由 `timer.runRepeating(this, 1L, 6, …)` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）；
      * `:57` 射线几何仍用**静态** `SkillUtil.getPlayersInSightLine`（无状态工具，不进端口白名单）；

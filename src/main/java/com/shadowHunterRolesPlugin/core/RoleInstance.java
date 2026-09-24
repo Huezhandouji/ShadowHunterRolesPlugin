@@ -10,9 +10,10 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItem;
+//阶段 13 · t135（整理②）：`HotbarItem` / `HotbarPresentable` 两个 import 已随
+//`hotbarItemOf(String)` 的删除一并移除 ✗（本类再无使用点）；`HotbarItemProviding` 仍是**活码**
+//（`hasCoolingTickingComponent()` 的接受集判据）⇒ 保留 ✓。
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -179,7 +180,8 @@ public class RoleInstance {
 
         // ── 阶段 10 · t63：**服务的持有者先于角色组件存在** ────────────────────────────────
         //① buff 管理器（原在 freeze() 之后构造）：它对实例的引用只在方法体里使用 ⇒ 提前构造零行为差异；
-        //  它的**持有者**现在是 buff 组件（本类只保留读口 getBuffManager() 供兼容）。
+        //  它的**持有者**现在是 buff 组件（阶段 13 · t135 起：聚合根上的 `getBuffManager()` 转发读口
+        //  **已删除** ✗ ⇒ 需要它的人走组件本身 ✓）。
         BuffManager buffManager = new BuffManager(player, this);
 
         //② 能量 / SanTE：真值（current）与上限（max，= 角色模板的声明值）都在组件里；
@@ -305,7 +307,8 @@ public class RoleInstance {
         );
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(am);
         player.getAttribute(Attribute.MAX_HEALTH).addModifier(am);
-        player.setHealth(getMaxHealth());
+        //阶段 13 · t135（整理②）：原 `getMaxHealth()` 视图已删 ✗ ⇒ 就地读属性（**同一读数**，行为逐字不变 ✓）
+        player.setHealth(player.getAttribute(Attribute.MAX_HEALTH).getValue());
 
         //③ 生命周期时序：全部组件创建完成 -> awake全部 -> start全部 -> 启动ticker -> 渲染热键栏
         triggerLifecycleAwake();
@@ -389,9 +392,12 @@ public class RoleInstance {
      * <p>与 {@code componentRegistry().getByType(...)} 同源（同一实现点），语义：
      * 返回**添加顺序第一个**可赋值给 {@code type} 的组件（父类/接口查询命中子类实例）；未注册 ⇒ {@code null}；
      * **装配完成之前**调用 ⇒ 抛 {@code IllegalStateException}（既有装配期护栏）。
-     * <p><b>调用点申报</b>：仓内 0 调用点 —— 它是容器的公开读口（与 {@code hotbarItemOf(id)} 同类），
+     * <p><b>调用点申报</b>：生产侧 0 调用点 —— 它是容器的公开读口（**容器职责**：组件查取入口 ✓），
      * 消费者是**后续卡的依赖注入路径**与仓外探针（组件侧取组件一律走
      * {@code RoleComponent#getComponent(Class)} ⇒ {@code svc().components().get(...)}）。
+     * <p><b>阶段 10 · t67</b>：本口**只增不改**（语义按真实行为写明 = "添加顺序第一个"）；
+     * 新增的 {@link #getAllByType(Class)} 是它的"全部"版本（后者已是**活码**：
+     * {@code listener/hook/DamageHookListener} 的承受方扇出在用 ✓）。
      * <p><b>阶段 10 · t67</b>：本口**只增不改**（语义按真实行为写明 = "添加顺序第一个"）；
      * 新增的 {@link #getAllByType(Class)} 是它的"全部"版本。
      */
@@ -544,26 +550,29 @@ public class RoleInstance {
     }
 
 
-    /** buff 记账表（**持有者 = buff 组件**；本读口保留以兼容既有调用点）。 */
-    public BuffManager getBuffManager() { return buffComponent.manager(); }
+    //阶段 13 · t135（整理②）：原 `getBuffManager()` **转发访问器已删除** ✗ —— 现算消费者 0
+    //（buff 记账表的持有者本来就是 `BuffComponent`；需要它的人走组件本身，不经聚合根转发 ✓）。
 
 
 
 
 
     //技能相关
-    /** 就绪判定（**单一冷却命名空间**的视图）：无条目/已到期 ⇒ {@code true}。 */
+    /**
+     * 就绪判定（**单一冷却命名空间**的视图）：无条目/已到期 ⇒ {@code true}。
+     * <p><b>阶段 13 · t135（整理②）</b>：原实现转调 `isCooldownReady(skillId)` 的**转发访问器已删除** ✗
+     * ⇒ 判定就地转问组件（阶段 13 · t105 口径：框架不持有冷却状态，只转问 ✓）。
+     * 行为**逐字等价**：无冷却能力 ⇒ 恒就绪 ✓。
+     */
     public boolean isSkillReady(String skillId){
-        return isCooldownReady(skillId);
+        RoleComponent component = componentRegistry.getById(skillId);
+        return !(component instanceof ActiveComponent active) || !active.isCoolingDown();
     }
 
-    public int getRemainingSkillCooldownTicks(String skillId){
-        return remainingCooldownTicks(skillId);
-    }
-
-    public float getRemainingSkillCooldownSeconds(String skillId){
-        return getRemainingSkillCooldownTicks(skillId) / 20f;
-    }
+    //阶段 13 · t135（整理②）：冷却**剩余量视图**（技能 2 件 + 主武器 2 件）与它们唯一的下游
+    //`remainingCooldownTicks` / `isCooldownReady` **转发访问器已删除** ✗ —— 现算消费者 0
+    //（冷却状态自 t105 起归 `ActiveComponent`：读侧直接问组件，不经聚合根转发 ✓；
+    //  就绪判定仍由**活码** `isSkillReady` / `isMainWeaponReady` 提供 ⇒ 能力未失去入口 ✓）。
 
 
     //技能释放
@@ -608,29 +617,10 @@ public class RoleInstance {
         return mainWeaponMap.getOrDefault(weaponId, null);
     }
 
+    /** 就绪判定（阶段 13 · t135：同 {@link #isSkillReady(String)} —— 就地转问组件，转发访问器已删 ✗）。 */
     public boolean isMainWeaponReady(String weaponId){
-        return isCooldownReady(weaponId);
-    }
-
-    public int getRemainingMainWeaponCooldownTicks(String weaponId){
-        return remainingCooldownTicks(weaponId);
-    }
-
-    public float getRemainingMainWeaponCooldownSeconds(String weaponId){
-        return getRemainingMainWeaponCooldownTicks(weaponId) / 20f;
-    }
-
-    // ───────── 冷却自管理（阶段 4 追补 D1/D2/D3/D4）· 阶段 8 前置：**单一命名空间** ─────────
-
-    /** 就绪判定（阶段 13 · t105：**转问组件** —— 框架不持有冷却状态 ✓）：无冷却能力 ⇒ 恒就绪 ✓。 */
-    public boolean isCooldownReady(String componentId){
-        RoleComponent component = componentRegistry.getById(componentId);
+        RoleComponent component = componentRegistry.getById(weaponId);
         return !(component instanceof ActiveComponent active) || !active.isCoolingDown();
-    }
-    /** 剩余刻（阶段 13 · t105：**转问组件**）：无冷却能力（无冷却这回事）⇒ {@code 0} ✓。 */
-    public int remainingCooldownTicks(String componentId){
-        RoleComponent component = componentRegistry.getById(componentId);
-        return component instanceof ActiveComponent active ? active.remainingCooldownTicks() : 0;
     }
 
 
@@ -684,37 +674,14 @@ public class RoleInstance {
 
     //热键栏渲染：阶段 5 · 4.4 起**唯一渲染者 = HotbarRenderer**（写物品只发生在 core/hotbar 内）；
     //本容器只提供查表与状态输入，旧的"更新物品栏 / 更新元数据"方法（连同其两条调用路径）已随本批删除。
-
-    /**
-     * 统一渲染器的查表入口：按槽位表里的 id 取可渲染组件（未注册 id ⇒ {@code null}，渲染器跳过该槽位）。
-     * <p>**适配点（阶段 6）**：优先取 {@link HotbarPresentable#asHotbarItem()} 的规格视图 ——
-     * 这样「只 `extends RoleComponent` + 实现 `HotbarPresentable`」的新式组件同样可被渲染；
-     * 旧式实现（自身即 `HotbarRenderComponent.HotbarItem`）原样返回。
-     * <p><b>阶段 8</b>：渲染器**不再经本方法取值**（它直接取组件实例调
-     * {@code HotbarItemProviding#buildItem()}）；本方法保留为描述符视图的公开访问器，仓内 0 调用点
-     * （已申报）。行为分支（技能/主武器）**不再由任何"种类"决定**。
-     */
-    public HotbarItem hotbarItemOf(String id){
-        //阶段 10 · t67（重复 id 的口径，**显式读出**）：本口按 id 解析 ⇒ 重复 id 下取**添加顺序第一个**同 id 者
-        //（= 与 getById / getByType 同口径）。运行期追加的同 id 副本**不会**顶替先加的那个 ⇒
-        //既有装配表（模板先加）渲染出来的仍是模板那一个 ⇒ 冻结外观逐字不变 ✓。
-        RoleComponent component = componentRegistry.getById(id);
-        if(component == null) return null;
-        if(component instanceof HotbarPresentable presentable) return presentable.asHotbarItem();
-        return component instanceof HotbarItem item ? item : null;
-    }
+    //阶段 13 · t135（整理②）：原 `hotbarItemOf(String)` **描述符视图公开访问器已删除** ✗ ——
+    //现算消费者 0（阶段 8 起渲染器**直接取组件实例**调 `HotbarItemProviding#buildItem()`，
+    //本口早已是"渲染器不再经它取值"的遗留面 ⇒ 删后无能力失去入口 ✓）。
 
     //清除主武器，技能占用的快捷栏
-    public void clearHotbar(){
-        Inventory inv = player.getInventory();
-        for(int i = 0; i < 9; i++){
-            ItemStack item = inv.getItem(i);
-            if(Skill.Utils.isSkillItem(item) ||
-                    MainWeapon.Utils.isMainWeapon(item)){
-                inv.setItem(i, null);
-            }
-        }
-    }
+    //阶段 13 · t135（整理②）：**实例版 `clearHotbar()` 已删除** ✗（现算消费者 0；`clear()` 与
+    //`PlayerListener` 走的都是**静态版** `clearHotbar(Player)`）⇒ 本类里那条重复实现一并消失 ✓。
+    //实现点仍**只有一处**（静态版，语义逐字未变）。
 
     public static void clearHotbar(Player player){
         Inventory inv = player.getInventory();
@@ -733,18 +700,9 @@ public class RoleInstance {
 
 
     //生命
-    public double getCurrentHealth(){
-        return player.getHealth();
-    }
-
-    public void setCurrentHealth(double health){
-        double clamped = Math.max(0d, Math.min(health, player.getAttribute(Attribute.MAX_HEALTH).getValue()));
-        player.setHealth(clamped);
-    }
-
-    public double getMaxHealth(){
-        return player.getAttribute(Attribute.MAX_HEALTH).getValue();
-    }
+    //阶段 13 · t135（整理②）：原三个**生命视图转发访问器**（`getCurrentHealth` / `setCurrentHealth` /
+    //`getMaxHealth`）**已删除** ✗ —— 现算消费者 0（生命状态 = Bukkit 玩家属性，持有者是 `VitalsComponent`
+    //⇒ 需要时走组件本身 ✓；`heal(double)` 与 `damage(...)` 仍为**活码**（组件/监听器在用）✓）。
 
     public void heal(double amount){
         //阶段 10 · t63：clamp 策略的唯一实现已搬到生命组件（本方法保留为**视图**，调用点一字未动）
@@ -758,50 +716,28 @@ public class RoleInstance {
         player.damage(amount, source);
     }
 
-    public int getMaxEnergy(){
-        //阶段 10 · t63：上限的真值在能量组件里（构造期由本容器从角色模板给出）
-        return energyComponent.max();
-    }
+    //能量（**视图**：真值与 clamp/检查扣减的行为都在能量组件里）
+    //阶段 13 · t135（整理②）：`getMaxEnergy` / `decreaseEnergy` / `increaseEnergy` 三个转发访问器
+    //**已删除** ✗（现算消费者 0 —— t126 把 `api/` 侧 38 个老方法做空后，原先的
+    //`instance.increaseEnergy(...)` 一类调用已消失 ✓）；`getCurrentEnergy` / `setCurrentEnergy`
+    //仍是**活码**（`command/EnergyCommand` 的读数与设值路径）✓。
 
-    //能量（**视图**：真值与 clamp/检查扣减的行为都在能量组件里，外部调用点一字未动）
     public int getCurrentEnergy() { return energyComponent.current(); }
 
     public void setCurrentEnergy(int amount){
         energyComponent.set(amount);
     }
 
-    public void decreaseEnergy(int amount){
-        energyComponent.decrease(amount);
-    }
-
-    public void increaseEnergy(int amount){
-        energyComponent.gain(amount);
-    }
-
     //SanTE（**视图**：真值与 clamp 都在 SanTE 组件里；事件 + 派发由容器以 ChangeSink 注入）
-    public int getCurrentSanTE() { return santeComponent.current(); }
-
-    public void setCurrentSanTE(int amount){
-        santeComponent.set(amount);
-    }
-
-    public void increaseSanTE(int amount){
-        santeComponent.gain(amount);
-    }
-
-    public void decreaseSanTE(int amount){
-        santeComponent.decrease(amount);
-    }
-
-    public int getMaxSanTE() { return santeComponent.max(); }
+    //阶段 13 · t135（整理②）：`getCurrentSanTE` / `setCurrentSanTE` / `increaseSanTE` / `decreaseSanTE` /
+    //`getMaxSanTE` 五个转发访问器**已删除** ✗（现算消费者 0；真值与行为都在 `SanTEComponent` ✓）。
 
     //实例是否有效：clear() 之后为 false，供组件里的延时任务做失效守卫
-    public boolean isValid(){
-        return valid;
-    }
+    //阶段 13 · t135（整理②）：原 `isValid()` 公开读口**已删除** ✗（现算消费者 0 —— 容器内一律
+    //直接读私有字段 `valid` ✓；字段本身保留：clear() / activate() / 组件隔离守卫都在用它 ✓）。
 
     //药水施加入口（记账）：施加到本实例玩家身上的效果记入账本，clear() 时只回收账本里的类型（O-7）
-    //阶段 10 · t63：**账本的持有者 = buff 组件** ⇒ 本方法保留为视图（BuffManager 与端口都走它）。
+    //阶段 10 · t63：**账本的持有者 = buff 组件** ⇒ 本方法保留为视图（BuffManager 在用 ✓）。
     public void applyPotionEffect(PotionEffect effect){
         buffComponent.applyPotionEffect(effect);
     }
@@ -816,9 +752,11 @@ public class RoleInstance {
     //  原为 `RoleAPI#setFaction/resetFaction` 的落点）⇒ 那两条 API 已**做空、不再生效** ✗ ⇒ 写视图**无消费者** ✓；
     //  真值写入仍在**聚合根**（{@link Role#setFaction} / {@link Role#resetFaction} ✓，**不由外部直改** ✗）。
 
-    //生命周期触发
+    //生命周期触发（阶段 13 · t135 · 整理②：**四个触发口收窄为 private** ✗←✓ —— 现算消费者
+    //**只有容器自己**（`activate()` 调 awake/start、`clear()` 调 stop、构造期 ticker 用 `this::triggerUpdate`）
+    //⇒ 它们不是"直达钩子"而是**容器职责的实现细节** ⇒ 不再对外暴露；语义与调用序逐字未变 ✓）
     //awake阶段：只解析跨组件依赖并缓存引用，必须幂等且不改动玩家可见状态
-    public void triggerLifecycleAwake(){
+    private void triggerLifecycleAwake(){
         if(player == null ) return;
 
         //阶段 4（B②-c）：为**注册表内组件**广播新基类钩子 awake()。
@@ -834,7 +772,7 @@ public class RoleInstance {
     }
 
     //start阶段：开始生效，顺序与awake一致（技能/被动/武器）
-    public void triggerLifecycleStart(){
+    private void triggerLifecycleStart(){
         if(player == null ) return;
 
         //阶段 4（B②-c）：为注册表内组件广播新基类钩子 start()（顺序 = 注册表顺序；理由同 awake 处注释）
@@ -847,7 +785,7 @@ public class RoleInstance {
     }
 
     //stop阶段：停止生效（T-1 ④ 后仅剩新钩子广播，按注册表顺序）
-    public void triggerLifecycleStop(){
+    private void triggerLifecycleStop(){
         if(player == null ) return;
 
         //阶段 4（B②-c）：为注册表内组件广播新基类钩子 stop()。
@@ -953,7 +891,8 @@ public class RoleInstance {
         santeComponent.broadcastChange(preSanTE, newSanTE);
     }
 
-    public void triggerUpdate(){
+    /** 每 tick 派发（阶段 13 · t135：**收窄为 private** ✗←✓ —— 唯一消费者 = 构造期 ticker 的 `this::triggerUpdate`）。 */
+    private void triggerUpdate(){
         if(player == null ) return;
         //阶段 10 · t66：已隔离 ⇒ 本实例已死（组件已全部移除、角色已被清空）⇒ 不再派发
         if(quarantined) return;
@@ -1287,7 +1226,8 @@ public class RoleInstance {
             updateTask = null;
         }
 
-        clearHotbar();
+        //阶段 13 · t135（整理②）：改走**静态实现点**（实例版 `clearHotbar()` 已删 ✗ ⇒ 实现点仍只有一处 ✓）
+        clearHotbar(player);
 
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(roleHealthModifierKey);
 

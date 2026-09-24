@@ -64,7 +64,7 @@ public class VitalsComponent extends RoleComponent {
      * <p>两个方法都是 <b>{@code void}</b> ⇒ **改量与否决在类型上不可表达** ✓
      * （用户裁定：只通知、不可否决）。
      * <p><b>调用者</b>：{@code listener/DamageHookListener}（平台事件面）—— 它按
-     * {@code targetInstance.getAllByType(Participant.class)} **扇出**（`RoleInstance:352` 现成）✓，
+     * {@code targetInstance.getAllByType(Participant.class)} **扇出**（容器的组件查取入口 ✓），
      * 且整段扇出经 {@code RoleInstance.deliverHook} ⇒ 内部走唯一受保护入口 {@code guardedCall} ✓。
      * <p><b>顺序</b>：**先结算、后通知** ✓（量已定、账已结，回调改不了 ✗）。
      */

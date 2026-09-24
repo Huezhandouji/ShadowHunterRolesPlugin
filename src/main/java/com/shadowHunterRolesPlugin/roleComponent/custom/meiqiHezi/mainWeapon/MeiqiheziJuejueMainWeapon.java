@@ -83,14 +83,14 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         //如果能量大于20，则进行范围伤害（旧写法在 onLeftClick 里，由 listener 同帧调用）—— 不能直接 return
         if (energyComponent().current() >= 20) {
             castAreaDamage(attacker);
-            svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
+            startCooldown();   //D1：组件自启冷却（框架不再代启动）
             return;
         }
 
         if (victim != null) {
             vitalsComponent().physicalDamage(victim, attacker, 8, 0.5);
         }
-        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
+        startCooldown();   //D1：组件自启冷却（框架不再代启动）
     }
 
     /**
@@ -108,7 +108,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         if (energyComponent().current() < 20) return;
 
         castAreaDamage(player);
-        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
+        startCooldown();   //D1：组件自启冷却（框架不再代启动）
     }
 
     /**

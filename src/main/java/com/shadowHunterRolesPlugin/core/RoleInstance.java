@@ -6,7 +6,7 @@ import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.dispatch.CombatHook;
 import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
 import com.shadowHunterRolesPlugin.core.dispatch.HotbarActionable;
-import com.shadowHunterRolesPlugin.core.hotbar.CooldownAware;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.core.hotbar.CooldownBearing;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItemProviding;
@@ -89,14 +89,7 @@ public class RoleInstance {
      */
     private boolean activated = false;
 
-    /**
-     * **单一冷却命名空间**（阶段 8 前置 · 合并两张表）：`组件 id → 到期游戏刻`。
-     * <p>合并前是 `skillCooldowns` / `mainWeaponCooldowns` 两张表，端口必须在**构造期**绑定 kind 才能选表
-     * ⇒ 那是"删 kind 枚举"的硬阻塞。现在**只有这一张表**：组件 id 在全仓本就是**跨类型唯一**的命名空间
-     * （`Role.Builder` 的 id 去重是跨类型的）⇒ 一张表足以表达全部冷却，端口构造不再需要 kind。
-     */
-    private final Map<String, Integer> cooldowns = new HashMap<>();
-
+    //阶段 13 · t105：**框架侧冷却表已删除** ✗ —— 冷却状态与判断归组件实例（`ActiveComponent` 的实例字段）；
     //丢弃物品时，mc服务端会发送挥手数据包，这回导致触发左键交互事件，使用这个标记变量阻止按q时触发左键逻辑
     private boolean isDropping = false;
     public boolean isDropping() { return isDropping; }
@@ -451,7 +444,7 @@ public class RoleInstance {
         //阶段 6 · 派发面能力化：判据由「继承关系」改为「能力接口」——本处只用到 onCast（HotbarActionable 的唯一方法）
         if(!(component instanceof HotbarActionable active)) return false;
 
-        //冷却自管理（D1）：框架**不再**代启动冷却 —— 组件在施放成功处自行 svc().cooldowns().start(getCooldownTicks())；
+        //冷却自管理（D1）：框架**不再**代启动冷却 —— 组件在施放成功处自行 startCooldown()（阶段 13 · t105：状态归组件、框架只转问）；
         //声明值仍是唯一真值来源（4.7/O-13），启动点与启动值都与旧框架代启动逐字一致 ⇒ 可观察行为不变。
         //阶段 10 · t66：**唯一受保护调用**（施放是框架派发边界之一）⇒ 组件抛异常 = 整实例隔离
         guardedCall(component, "onCast", () -> active.onCast(new CastSignal(trigger)));
@@ -596,63 +589,18 @@ public class RoleInstance {
 
     // ───────── 冷却自管理（阶段 4 追补 D1/D2/D3/D4）· 阶段 8 前置：**单一命名空间** ─────────
 
-    /** 就绪判定（单一表的规范读法）：无条目/已到期 ⇒ {@code true}。 */
+    /** 就绪判定（阶段 13 · t105：**转问组件** —— 框架不持有冷却状态 ✓）：无冷却能力 ⇒ 恒就绪 ✓。 */
     public boolean isCooldownReady(String componentId){
-        return Bukkit.getCurrentTick() >= cooldowns.getOrDefault(componentId, 0);
+        RoleComponent component = componentRegistry.getById(componentId);
+        return !(component instanceof ActiveComponent active) || !active.isCoolingDown();
     }
-
-    /** 剩余刻（单一表的规范读法）：无条目/已到期 ⇒ {@code 0}。 */
+    /** 剩余刻（阶段 13 · t105：**转问组件**）：无冷却能力（无冷却这回事）⇒ {@code 0} ✓。 */
     public int remainingCooldownTicks(String componentId){
-        return Math.max(0, cooldowns.getOrDefault(componentId, 0) - Bukkit.getCurrentTick());
+        RoleComponent component = componentRegistry.getById(componentId);
+        return component instanceof ActiveComponent active ? active.remainingCooldownTicks() : 0;
     }
 
-    /**
-     * **起冷却**（单一表的规范写法；合并前是 `startSkillCooldown` / `startMainWeaponCooldown` 两支）。
-     * <p><b>阶段 11 · t84（F-1）</b>：本 id 重载只做**回落解析**（`getById` = 添加顺序第一个同 id 者），
-     * 判据与写表都转发给实例口径重载 ⇒ 与改前逐字一致；**同 id 两份实例**的正确判据由端口经
-     * {@link #startCooldown(RoleComponent, String, int)} 传入**绑定实例**得到 ✓。
-     *
-     * @return 是否**真的写了表**。`false` = 该组件"没有冷却这回事"（今天的定义 = 被动，见
-     *         {@link #hasCooldownNamespace(RoleComponent)}）⇒ 调用方**不得**因此置脏（无声语义逐字保留）。
-     */
-    public boolean startCooldown(String componentId, int ticks){
-        return startCooldown(resolveComponent(componentId), componentId, ticks);
-    }
 
-    /**
-     * **起冷却（实例口径，阶段 11 · t84 · F-1 的唯一实现点）**：判据 = **这一个实例**有没有冷却这回事
-     * （{@link #hasCooldownNamespace(RoleComponent)}）⇒ 同 id 两份实例不再互相污染 ✓。
-     * <p><b>表键仍取形参 {@code componentId}**（不是 `component.getId()`）：单一冷却命名空间本就
-     * "一个 id 一份冷却"（见 {@link #hasCooldownNamespace(RoleComponent)} 的说明与 `:599` 的原口径）
-     * ⇒ 表按 id、**能力判定按实例** —— 两者分工写死在这里。
-     * <p>{@code component == null}（未绑定且 id 解析不到）⇒ `false`、不写表（与改前的未知 id 口径逐字一致）。
-     *
-     * @return 是否**真的写了表**（false ⇒ 调用方不得置脏）
-     */
-    boolean startCooldown(RoleComponent component, String componentId, int ticks){
-        if(!hasCooldownNamespace(component)) return false;
-        cooldowns.put(componentId, Bukkit.getCurrentTick() + ticks);
-
-        //冷却到点置脏（方法引用形态，避免新增直呼点）：到点那一 tick 的帧末 flush 完成图标恢复。
-        platform.scheduler().runLater(markHotbarDirty, remainingCooldownTicks(componentId));
-        return true;
-    }
-
-    /**
-     * **纯判定：该实例有没有"冷却这回事"**（阶段 11 · t84 · F-1 修复的核心，**唯一实现点**）：
-     * 实现 {@link CooldownBearing} ⇒ 有；{@code null} / 未实现 ⇒ 没有。
-     * <p><b>为什么抽成静态纯函数</b>：它**不读注册表、无副作用** ⇒ 可离线单测（本卡 B3 的双轨离线面），
-     * 也把"按实例"这条口径收进**一个**可复核的落点（而不是散在端口与表两处各判一次）。
-     * <p><b>语义（与迁移前同一接受集）</b>：合并前由冷却端口在**构造期**按 kind 挡下被动（"被动没有冷却 ⇒
-     * 恒就绪 / 剩余 0 / 不写表 / `end()` 恒 false"）；阶段 8 起判据改为能力接口 —— 没有冷却这回事的组件
-     * （今天 = 被动）压根不实现该接口。**不写表 ⇒ 不派发 ⇒ 不置脏**逐字保留。
-     * <p><b>阶段 10 · t67 / 阶段 11 · t84（重复 id 的口径，显式读出）</b>：同 id 可有两份实例（t67 放开）
-     * ⇒ 本判定**只回答"这一份"**；"谁的那一份"由端口经**创建后绑定**（{@code bindOwnerPorts}）传入，
-     * 未绑定时才按 id 回落到**添加顺序第一个**同 id 者（{@link #resolveComponent(String)}）。
-     */
-    static boolean hasCooldownNamespace(RoleComponent component){
-        return component instanceof CooldownBearing;
-    }
 
     /**
      * **按 id 解析实例（回落口径，保留）**：{@code getById} = **添加顺序第一个**同 id 者。
@@ -680,7 +628,7 @@ public class RoleInstance {
      * <p><b>时机</b>：必须在**组件构造之后、任何钩子之前**（{@code awake()} / {@code start()} 里组件可能
      * 立刻用端口起冷却 / 登记任务）⇒ 两个创建点（装配期 {@link #initComponents()}、
      * 运行期动态增 {@code ComponentLookupImpl#insertAt}）都在构造返回后**立刻**调用本方法 ✓。
-     * <p><b>为什么要"构造后绑定"</b>：端口由 {@code createServices(componentId)} 在**组件构造之前**造出
+     * <p>只绑**计时**那一对端口：它是"状态面按实例"的落点（资源登记归属）；其余端口不持 per-instance 状态 ⇒ 不绑。
      * ⇒ 那个时刻物理上拿不到实例引用（这正是 F-1/F-2 的根因）；给端口加一个绑定钩子是最小修法。
      * <p>只绑**冷却**与**计时**两对端口：它们是"状态面按实例"的三处落点（能力判定 / 回调投递 /
      * 资源登记归属）；其余端口不持 per-instance 状态 ⇒ 不绑。
@@ -689,95 +637,15 @@ public class RoleInstance {
      */
     static void bindOwnerPorts(ComponentServices services, RoleComponent component){
         if(component == null || services == null) return;
-        if(services.cooldowns() instanceof CooldownPortImpl port) port.bind(component);
         if(services.timers() instanceof TimerPortImpl port) port.bind(component);
     }
 
-    /** 冷却是否**正在进行**（条目存在且未到期）。与 {@code isCooldownReady()} 互补：后者对"无条目/已到期"都返回 true。 */
-    boolean isCooling(String componentId){
-        Integer endTick = cooldowns.get(componentId);
-        return endTick != null && Bukkit.getCurrentTick() < endTick;
-    }
 
-    /** 重启顶替（S2）：旧段**未到期** ⇒ 清掉旧条目（调用方随后回调 {@code RESTARTED} 并起新冷却）；返回是否确实顶替了一段冷却。 */
-    boolean clearCooldownForRestart(String componentId){
-        if(!isCooling(componentId)) return false;
-        cooldowns.remove(componentId);
-        return true;
-    }
 
-    /**
-     * 显式结束冷却（S3）：**仅在冷却中生效** ⇒ 移除条目 + 回调 {@code ENDED_BY_COMPONENT} + 一次可见刷新；
-     * 不在冷却中 ⇒ 无副作用（幂等）。
-     * <p><b>阶段 11 · t84（F-2）</b>：本 id 重载只做**回落解析**后转发实例口径重载
-     * ⇒ 与改前逐字一致；同 id 两份实例下"回调投给谁"由端口传入的**绑定实例**决定 ✓。
-     * @return 是否确实结束了一段冷却
-     */
-    boolean endCooldown(String componentId){
-        return endCooldown(resolveComponent(componentId), componentId);
-    }
 
-    /**
-     * **显式结束冷却（实例口径，阶段 11 · t84 · F-2 的唯一实现点）**：回调**只投给**
-     * {@code component}，不再回头按 id 取"第一个同 id 者" ⇒ 同 id 两份实例下不会投错对象 ✓。
-     * <p>表操作仍按 id（一个 id 一份冷却）；{@code component == null}（解析不到）⇒ 回调阶段无目标
-     * （静默 no-op，与改前"解析不到就什么都不做"逐字一致），**条目仍按 id 清理** ⇒ 不残留。
-     */
-    boolean endCooldown(RoleComponent component, String componentId){
-        if(!isCooling(componentId)) return false;
-        cooldowns.remove(componentId);
-        dispatchCooldownEnd(component, CooldownAware.CooldownEndReason.ENDED_BY_COMPONENT);
-        markHotbarDirty.run();
-        return true;
-    }
 
-    /**
-     * 每 tick 扫描**唯一那张**冷却表：**到期 ⇒ 移除条目**（关闭 O-21：条目不再永驻）＋ 回调 {@code EXPIRED} ＋ **一次**可见刷新。
-     * 复用既有每 tick 路径（{@link #triggerUpdate()}），**不新建 ticker**（与 t17 划界）。
-     */
-    private void scanCooldowns(){
-        boolean removed = false;
-        for(String componentId : expiredIds(cooldowns)){
-            //阶段 11 · t84（F-2）：**先解析目标实例、再清条目、再派发** —— 派发目标只由这里决定
-            //（本路径由**表**驱动，表按 id ⇒ 只能按 id 回落解析；这是框架侧唯一的 id 驱动派发点）
-            RoleComponent component = resolveComponent(componentId);
-            cooldowns.remove(componentId);
-            dispatchCooldownEnd(component, CooldownAware.CooldownEndReason.EXPIRED);
-            removed = true;
-        }
-        if(removed){
-            //到期移除后置脏（方法引用形态）：同 tick 的帧末 flush 即完成图标恢复（冷却结束不再有可见延迟）
-            markHotbarDirty.run();
-        }
-    }
 
-    /** 先收集到期 id 再移除（避免边遍历边改表）；只遍历尚未到期的条目，到期即移除 ⇒ 扫描开销有界。 */
-    private List<String> expiredIds(Map<String, Integer> table){
-        List<String> ids = new ArrayList<>();
-        for(Map.Entry<String, Integer> entry : table.entrySet()){
-            if(Bukkit.getCurrentTick() >= entry.getValue()){
-                ids.add(entry.getKey());
-            }
-        }
-        return ids;
-    }
 
-    /**
-     * 冷却结束回调的唯一派发点（D4）：**先移除条目、再回调** ⇒ 回调内再 {@code end()} 只会得到 {@code false}（不递归重入）；
-     * 异常隔离走 {@link #guardedCall}（阶段 10 · t66 起：**唯一受保护调用** ⇒ 回调抛异常 = 故障隔离）。
-     * <p>阶段 6 · 派发面能力化：判据由 {@code ActiveComponent} 改为能力接口 {@link CooldownAware}
-     * （{@code ActiveComponent implements CooldownAware} ⇒ 既有组件的接受集逐字不变）。
-     * <p>阶段 10 · t66：本派发点**不在**遍历窗口内 ⇒ 待处理的隔离**立即**执行（仍是同一次派发调用）。
-     * <p><b>阶段 11 · t84（F-2）</b>：形参由 **id** 改为**实例** —— 派发目标**只由调用方决定**，
-     * 本方法不再按 id 二次解析 ⇒ 同 id 两份实例下不会投错对象 ✓；
-     * {@code null}（解析不到）⇒ 无可投递目标（静默 no-op，与改前的"解析不到就什么都不做"逐字一致）。
-     */
-    void dispatchCooldownEnd(RoleComponent component, CooldownAware.CooldownEndReason reason){
-        if(component instanceof CooldownAware aware){
-            guardedCall(component, "onCooldownEnd", () -> aware.onCooldownEnd(reason));
-            runPendingQuarantine();
-        }
-    }
 
     //释放主武器技能
     public boolean castMainWeaponLeftClick(String weaponId, Player caster){
@@ -1128,8 +996,6 @@ public class RoleInstance {
         //阶段 10 · t66：本 tick 里刚被隔离 ⇒ 到期扫描与帧末 flush 都不再对已死的实例做
         if(quarantined) return;
 
-        //阶段 4 追补（冷却自管理 · D2）：到期条目 ⇒ 移除 + 回调（关闭 O-21）；可见刷新改由同 tick 的帧末 flush 承担
-        scanCooldowns();
 
         //阶段 5 · 4.4 帧末 flush（落点 = tick 末尾，紧接组件更新与到期扫描之后）：
         //① 判脏 → ② 写物品（唯一写点 = HotbarRenderer.render）→ ③ 清脏（此顺序不可交换）
@@ -1220,7 +1086,7 @@ public class RoleInstance {
      * **框架调用组件的唯一受保护入口**（阶段 10 · t66 · A1）。
      *
      * <p>框架在**每一处**调用组件（{@code awake/start/stop/update/onSanTEChange} 广播 ·
-     * {@code onCast}/{@code onAttack} · {@code onCooldownEnd}）都必须经这里 ——
+     * {@code onCast}/{@code onAttack}）都必须经这里 ——
      * **不在组件内部各自 try** ✗（否则第三个组件又要重写一遍 ⇒ C-15 第三个实例测试不合格 ✗）。
      *
      * <p>异常处置分三种：
@@ -1455,7 +1321,6 @@ public class RoleInstance {
         buffComponent.manager().clearAll();
 
 
-        cooldowns.clear();
     }
 
 }

@@ -80,6 +80,6 @@ public class RedEvilShockSkill extends Skill{
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITCH_CELEBRATE, 1, 1);
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
 
-        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
+        startCooldown();   //D1：组件自启冷却（框架不再代启动）
     }
 }

@@ -130,7 +130,7 @@ public class RedSolitaryArroganceSkill extends Skill {
                     }
                 }
         );
-        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
+        startCooldown();   //D1：组件自启冷却（框架不再代启动）
     }
 
     /**

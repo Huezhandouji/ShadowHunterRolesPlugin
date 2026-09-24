@@ -81,7 +81,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
         }
 
         //冷却由框架按 getCooldownTicks() 启动（声明值是唯一真值来源）
-        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
+        startCooldown();   //D1：组件自启冷却（框架不再代启动）
     }
 
 }

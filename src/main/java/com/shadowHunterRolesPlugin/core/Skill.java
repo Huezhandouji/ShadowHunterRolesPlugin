@@ -93,46 +93,9 @@ public abstract class Skill extends ActiveComponent implements HotbarItemProvidi
     // ───────── 冷却：**由本组件实例自持**（阶段 13 · t104 第①步）────────────────────────────
     //用户裁定：主武器 / 技能这两个组件**自己持有冷却和其判断**，并**写开启冷却 / 停止冷却方法供子类使用**；
     //**框架不参与**（本类不向框架登记任何冷却状态、不新增组件、不新增端口）。
-    //⚠ 本步（①）**只加状态与 API**：20 处调用点、`ActiveComponent`/`CooldownBearing`/调试命令、
-    //  框架侧机制与 arity 全部**不动**（归 t105 的第②③④步）⇒ 全树可编译、可独立过闸门。
-
-    /**
-     * **冷却到期刻**（{@code Bukkit.getCurrentTick()} 坐标系）；{@code 到期刻 <= 当前刻} 视为不在冷却。
-     * <p><b>状态归本组件实例</b>（用户裁定）⇒ **同 id 的两个实例各自独立**；框架侧不做任何登记。
-     */
-    private int cooldownUntilTick = 0;
-
-    /**
-     * **开启冷却**（供子类使用）：以 {@link #getCooldownTicks()}（描述符里的**声明值**）为准，
-     * 从**当前刻**重算到期时刻 —— 即"覆盖式重启"，与既有语义一致。
-     *
-     * @return 是否**真的进入了冷却**：声明值 {@code <= 0} ⇒ "没有冷却这回事" ⇒ **不写状态并返回 false**
-     *         （与既有"被动无冷却 ⇒ 不写表"的无声语义一致）
-     */
-    public boolean startCooldown() {
-        int declared = getCooldownTicks();
-        if (declared <= 0) {
-            cooldownUntilTick = 0;
-            return false;
-        }
-        cooldownUntilTick = org.bukkit.Bukkit.getCurrentTick() + declared;
-        return true;
-    }
-
-    /** **停止冷却**（供子类使用）：清状态；**幂等**（不在冷却中 ⇒ 无副作用）。 */
-    public void stopCooldown() {
-        cooldownUntilTick = 0;
-    }
-
-    /** 是否**正在冷却**：{@code 到期刻 > 当前刻}（无冷却 / 已到期 ⇒ {@code false}）。 */
-    public boolean isCoolingDown() {
-        return org.bukkit.Bukkit.getCurrentTick() < cooldownUntilTick;
-    }
-
-    /** **剩余冷却刻**（无冷却 / 已到期 ⇒ {@code 0}）；显示用秒数 = 本值 {@code / 20f}。 */
-    public int remainingCooldownTicks() {
-        return Math.max(0, cooldownUntilTick - org.bukkit.Bukkit.getCurrentTick());
-    }
+    //阶段 13 · t105（第②步）：冷却状态与 API 已**上提到 `ActiveComponent`**（两家族基类合一 ✓）——
+    //  本类不再自带副本；`startCooldown()` / `startCooldown(int ticks)` / `stopCooldown()` /
+    //  `isCoolingDown()` / `remainingCooldownTicks()` 均由父类提供 ✓。
 
     public abstract static class Specification extends HotbarSpecification<Skill> {
 
@@ -194,7 +157,7 @@ public abstract class Skill extends ActiveComponent implements HotbarItemProvidi
 
         //② 状态判定（读运行期状态：冷却表 / 闸门 / 当前能量 —— 描述符拿不到这些）
         IconState state = IconState.of(
-                svc().cooldowns().isReady(),
+                !isCoolingDown(),
                 buffComponent().canCastSkill(),
                 energyComponent().current(),
                 getEnergyCost());
@@ -208,7 +171,7 @@ public abstract class Skill extends ActiveComponent implements HotbarItemProvidi
         switch (state) {
             case COOLDOWN -> {
                 meta.displayName(baseName.color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)
-                        .append(Component.text(" " + String.format("%.1f", svc().cooldowns().remainingTicks() / 20f) + "s")
+                        .append(Component.text(" " + String.format("%.1f", remainingCooldownTicks() / 20f) + "s")
                                 .color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD)));
                 lore.add(Component.text("Skill is on cooldown."));
             }

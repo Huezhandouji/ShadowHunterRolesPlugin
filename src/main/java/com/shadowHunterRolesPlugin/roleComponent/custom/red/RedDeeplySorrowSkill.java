@@ -22,8 +22,7 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  *   <li>旧式聚合根调用端口化：`instance.decreaseSanTE(10)` → **SanTE 组件**的 `decrease(10)`（当时经服务集端口；阶段 13 · t103 起直接用组件）；
  *       `instance.applyPotionEffect(…createEffect(45, 5/2))` → **Buff 组件**的 `applyPotionEffect(type, 45, 5/2)`（同上）
  *       （**同一条已记账路径** O-7）；`instance.startSkillCooldown(getId(), getCooldownTicks())` →
- *       `svc().cooldowns().start(getCooldownTicks())`（`CooldownPortImpl.start` 委托回
- *       `owner.startSkillCooldown(componentId, ticks)` ⇒ **同一张冷却表**）；</li>
+ *       **组件自持冷却**的 `startCooldown()`（阶段 13 · t105：状态归组件实例、框架只**转问** ✗）；</li>
  *   <li>**数值与间隔逐字不变**：冷却 `600` / 能量 `0` / 每秒（`20` tick）一结算 / 扣 `10` 点 SanTE /
  *       生命恢复 `45, 5` 与力量 `45, 2` / 音效 `ENTITY_WITHER_DEATH 2,1` 与 `ENTITY_WITHER_SHOOT 1,1`；</li>
  * </ul>
@@ -105,7 +104,7 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
         running = true;
         svc().self().player().getWorld().playSound(svc().self().player().getLocation().clone(), Sound.ENTITY_WITHER_DEATH, 2, 1);
         //冷却 600 由本组件在施放成功处按声明值启动（T-2 ③ 后所有组件无条件走新管道）
-        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
+        startCooldown();   //D1：组件自启冷却（框架不再代启动）
     }
 
     @Override
@@ -122,7 +121,7 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
         //药水记账（O-7）：经 **Buff 组件**的入口（与框架**同一条已记账路径**），clear() 时只回收本系统施加的效果
         buffComponent().applyPotionEffect(PotionEffectType.REGENERATION, 45, 5);
         buffComponent().applyPotionEffect(PotionEffectType.STRENGTH, 45, 2);
-        svc().cooldowns().start(getCooldownTicks());
+        startCooldown();
 
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
     }
@@ -131,7 +130,7 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
     public void onSanTEChange(int pre, int now) {
         if(now <= 0){
             running = false;
-            svc().cooldowns().start(getCooldownTicks());
+            startCooldown();
         }
     }
 

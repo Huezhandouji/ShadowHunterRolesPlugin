@@ -14,14 +14,7 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 public class MeiqiheziUnconcernSkill extends Skill {
 
-    /**
-     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final BuffComponent buffComponent(){
-        return svc().components().get(BuffComponent.class);
-    }
+    private BuffComponent buff;
 
     public MeiqiheziUnconcernSkill(String id, ComponentServices services, Specification specification){
         super(id, services, specification);
@@ -47,6 +40,11 @@ public class MeiqiheziUnconcernSkill extends Skill {
         public MeiqiheziUnconcernSkill create(String id, ComponentServices services){
             return new MeiqiheziUnconcernSkill(id, services, this);
         }
+    }
+
+    @Override
+    public void start(){
+        buff = svc().components().get(BuffComponent.class);
     }
 
     /**
@@ -75,7 +73,7 @@ public class MeiqiheziUnconcernSkill extends Skill {
 
         caster.getWorld().spawnParticle(Particle.EXPLOSION, caster.getLocation(), 1);
 
-        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
+        startCooldown();   //D1：组件自启冷却（框架不再代启动）
     }
 
 }

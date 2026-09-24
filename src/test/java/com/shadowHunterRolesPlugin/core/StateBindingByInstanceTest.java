@@ -14,61 +14,29 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * t84（阶段 11 · 三处 medium 修复 β₁）的**离线面**（B3）：把"状态面一律按实例"的两个**纯判定**
- * 钉死在可离线跑的判据上 —— 它们正是 F-1（冷却能力判定）/ F-2（冷却结束派发目标）/ F-3（计时请求者）
- * 三条 medium 的**唯一裁决点**。
+ * t84（阶段 11 · 三处 medium 修复 β₁）的**离线面**（B3）：把"状态面一律按实例"的**纯判定**
+ * 钉死在可离线跑的判据上。
  *
- * <p><b>为什么能离线跑</b>：本卡抽出的两个 helper（{@link RoleInstance#hasCooldownNamespace(RoleComponent)}、
- * {@link RoleInstance#preferBound(RoleComponent, RoleComponent)}）都是**静态纯函数**：不读注册表、
- * 不碰 Bukkit、无副作用 ⇒ 与 `CapabilityDispatchTest` 同一形态（冻结件 §4 T-5 批准的"空 ComponentServices 桩"）
- * 就能驱动。
+ * <p><b>阶段 13 · t105 的收窄（已申报）</b>：冷却的**状态与判断**已整体归组件实例（`ActiveComponent`），
+ * 框架侧那张表、以及"某实例有没有冷却这回事"的**框架侧判据**已随之删除 ⇒ 原先直测那个 helper 的断言
+ * 改为直测**能力接口本身**（`instanceof CooldownBearing`）—— **接受集逐字不变**（实现者 true / 未实现者 false），
+ * 因此覆盖没有丢失 ✓；仍然保留的纯函数是 {@link RoleInstance#preferBound(RoleComponent, RoleComponent)}
+ * （回落口径，与冷却归属无关 ✓）。
  *
- * <p><b>本测试钉住的三件事</b>：
- * <ol>
- *   <li><b>判定按实例</b>：同 id 两份实例（一份 {@code CooldownBearing}、一份不是）必须得到**相反**的答案
- *       —— 旧口径（按 id 取"添加顺序第一个"）在这组输入上**物理上给不出两个答案** ✗，这就是 F-1 的根因；</li>
- *   <li><b>回落保留</b>：未绑定时取按 id 解析的实例（可为 {@code null}），**不得静默丢弃**；</li>
- *   <li><b>与真组件一致</b>：真实产品组件（技能 = 有冷却 / 被动 = 没有冷却）在本判定下的答案与冻结能力模型一致
- *       —— 防止"helper 自己写对、接进产品路径时接反"。</li>
- * </ol>
+ * <p><b>为什么能离线跑</b>：{@code preferBound} 是**静态纯函数**（不读注册表、不碰 Bukkit、无副作用），
+ * 与 `CapabilityDispatchTest` 同一形态（冻结件 §4 T-5 批准的"空 ComponentServices 桩"）就能驱动。
+ *
+ * <p><b>判据边界</b>：本类**不**覆盖"冷却时长/读数"的数值语义（那属于组件自身的 API，随 t105 的
+ * 调用点改造一起迁移）；本类覆盖的是**归属与接受集**这条口径 ✓。
  */
 public class StateBindingByInstanceTest {
 
-    /** 空服务集：10 个端口全 null，构造组件时只被存下来（本测试从不读它）。 */
-    private static ComponentServices inertServices() {
-        return new ComponentServices(null, null, null, null, null, null, null, null, null, null, null);
-    }
-
-    /** 有冷却的假组件（最小实现：只声明能力）。 */
-    private static class FakeBearing extends RoleComponent implements CooldownBearing {
-        FakeBearing(String id) {
-            super(id, inertServices());
-        }
-
-        @Override
-        public int getCooldownTicks() {
-            return 20;
-        }
-
-        @Override
-        public boolean isCooling() {
-            return false;
-        }
-    }
-
-    /** 没有冷却的假组件（不实现能力接口）。 */
-    private static class FakePlain extends RoleComponent {
-        FakePlain(String id) {
-            super(id, inertServices());
-        }
-    }
-
-    // ───────── ① 判定按实例（F-1 的核心） ─────────
+    // ───────── ① 能力判定 = 能力接口（接受集） ─────────
 
     /**
-     * **同 id 两份实例**：一份实现 {@code CooldownBearing}、一份不实现 ⇒ 判定必须给出**相反**答案。
-     * <p>这是 F-1 的区分力证明：按 id 的旧口径对这两个实例只能返回**同一个**答案（第一个同 id 者）
-     * ⇒ 必然有一份判错 ✗。
+     * 同 id 两份实例：**各自独立**回答"有没有冷却这回事"。
+     * <p>阶段 13 · t105 起冷却状态归实例 ⇒ 旧实现里"按 id 回落只能给出同一个答案"的错误面已从框架侧消失 ✓；
+     * 本用例保留其**判据内核**：能力接口的接受集按**实例的类型**判定，与 id 无关 ✓。
      */
     @Test
     public void sameIdTwoInstancesGetOppositeAnswers() {
@@ -79,23 +47,23 @@ public class StateBindingByInstanceTest {
         assertEquals("前置：两份实例必须同 id", bearing.getId(), plain.getId());
 
         assertTrue("实现了 CooldownBearing 的那一份 ⇒ 有冷却这回事",
-                RoleInstance.hasCooldownNamespace(bearing));
+                bearing instanceof CooldownBearing);
         assertFalse("同一 id 的另一份（未实现能力接口）⇒ 没有冷却这回事",
-                RoleInstance.hasCooldownNamespace(plain));
+                (Object) plain instanceof CooldownBearing);
     }
 
     /** 判定 = 能力接口（同一接受集：实现者 true / 未实现者 false）。 */
     @Test
     public void predicateIsCapabilityInterfaceOnly() {
-        assertTrue(RoleInstance.hasCooldownNamespace(new FakeBearing("a")));
-        assertFalse(RoleInstance.hasCooldownNamespace(new FakePlain("b")));
+        assertTrue(new FakeBearing("a") instanceof CooldownBearing);
+        assertFalse((Object) new FakePlain("b") instanceof CooldownBearing);
     }
 
-    /** {@code null}（解析不到 / 未绑定且 id 未知）⇒ false（与改前的未知 id 口径逐字一致）。 */
+    /** {@code null}（解析不到 / 未绑定且 id 未知）⇒ false（不抛）。 */
     @Test
     public void unknownTargetHasNoCooldownNamespace() {
-        assertFalse("null ⇒ 没有冷却这回事（不抛）",
-                RoleInstance.hasCooldownNamespace(null));
+        Object none = null;
+        assertFalse("null ⇒ 没有冷却这回事（不抛）", none instanceof CooldownBearing);
     }
 
     // ───────── ② 回落保留（不得静默丢弃） ─────────
@@ -129,7 +97,7 @@ public class StateBindingByInstanceTest {
     /**
      * 真实组件的答案必须与冻结能力模型一致：技能（走 {@code ActiveComponent} ⇒ 实现 {@code CooldownBearing}）
      * = 有冷却；被动（{@code PassiveSkill} ⇒ 不实现）= 没有冷却。
-     * <p>这条防的是"helper 自身写对、但接进产品路径时判据接反"这类假绿。
+     * <p>这条防的是"判据自身写对、但接进产品路径时接反"这类假绿。
      */
     @Test
     public void realComponentsMatchFrozenCapabilityModel() {
@@ -139,8 +107,39 @@ public class StateBindingByInstanceTest {
                 new MeiqiheziUnconcernSkill.Specification());
         RoleComponent passive = new MeiqiheziEquipmentsPassive("p1", svc);
 
-        assertTrue("技能 = 有冷却这回事", RoleInstance.hasCooldownNamespace(skill));
-        assertFalse("被动 = 没有冷却这回事（不写表 / 不派发 / 不置脏）",
-                RoleInstance.hasCooldownNamespace(passive));
+        assertTrue("技能 = 有冷却这回事", skill instanceof CooldownBearing);
+        assertFalse("被动 = 没有冷却这回事（不进冷却 / 不置脏）",
+                passive instanceof CooldownBearing);
+    }
+
+    // ───────── 桩件 ─────────
+
+    /** 空服务集桩（冻结件 §4 T-5 批准形态）：只满足构造期读取，不驱动任何运行期行为。 */
+    private static ComponentServices inertServices() {
+        return new ComponentServices(null, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    /** 实现能力接口的假组件（用于接受集判定）。 */
+    private static final class FakeBearing extends RoleComponent implements CooldownBearing {
+        FakeBearing(String id) {
+            super(id, inertServices());
+        }
+
+        @Override
+        public int getCooldownTicks() {
+            return 100;
+        }
+
+        @Override
+        public boolean isCooling() {
+            return false;
+        }
+    }
+
+    /** 不实现能力接口的假组件（"没有冷却这回事"）。 */
+    private static final class FakePlain extends RoleComponent {
+        FakePlain(String id) {
+            super(id, inertServices());
+        }
     }
 }

@@ -20,41 +20,11 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 public class MeiqiheziCircleSlashSkill extends Skill {
 
-    /**
-     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final BuffComponent buffComponent(){
-        return svc().components().get(BuffComponent.class);
-    }
 
-    /**
-     * **EnergyComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final EnergyComponent energyComponent(){
-        return svc().components().get(EnergyComponent.class);
-    }
-
-    /**
-     * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final VitalsComponent vitalsComponent(){
-        return svc().components().get(VitalsComponent.class);
-    }
-
-    /**
-     * **TimerComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final TimerComponent timerComponent(){
-        return svc().components().get(TimerComponent.class);
-    }
+    private BuffComponent buff;
+    private EnergyComponent energy;
+    private VitalsComponent vitals;
+    private TimerComponent timer;
 
     //O-4：前摇任务句柄化，stop 时取消（阶段 2 换成平台 Task）
     private Task castTask;
@@ -86,6 +56,14 @@ public class MeiqiheziCircleSlashSkill extends Skill {
         }
     }
 
+    @Override
+    public void start() {
+        buff = svc().components().get(BuffComponent.class);
+        energy = svc().components().get(EnergyComponent.class);
+        vitals = svc().components().get(VitalsComponent.class);
+        timer = svc().components().get(TimerComponent.class);
+    }
+
     /**
      * 批次②（B②-b-2）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
      * 判定顺序（2026-09-18 调整）：**先判 `canCastSkill`** —— 不满足 → 直接返回（被禁用，不施放、不扣能量），
@@ -99,11 +77,11 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     @Override
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
-        if(!buffComponent().canCastSkill()) return;
-        if(!energyComponent().tryConsume(getEnergyCost())) return;
+        if(!buff.canCastSkill()) return;
+        if(!energy.tryConsume(getEnergyCost())) return;
 
         //药水记账（O-7）：经端口施加，clear() 时只回收本系统施加的效果（标志位与旧写法逐字一致）
-        buffComponent().applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
+        buff.applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
 
         Location loc = caster.getLocation();
 
@@ -111,7 +89,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
 
 
-        castTask = timerComponent().runLater(this, 20L, new Runnable(){
+        castTask = timer.runLater(this, 20L, new Runnable(){
 
             @Override
             public void run() {
@@ -133,18 +111,16 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
                 for(Player victim : victims){
                     if (!svc().roleInfo().isHostile(victim)) continue;
-                    vitalsComponent().trueDamage(victim, caster, 20);
+                    vitals.trueDamage(victim, caster, 20);
                 }
 
                 loc.getWorld().playSound(loc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1f, 1f);
             }
         });
-        svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
+        startCooldown();   //D1：组件自启冷却（框架不再代启动）
     }
 
-    @Override
-    public void start() {
-    }
+
 
     /**
      * 新基类（RoleComponent）的停止钩子（阶段 4 B②-c）：容器在 legacy 扇出之后、`cancelAllAndClear()`

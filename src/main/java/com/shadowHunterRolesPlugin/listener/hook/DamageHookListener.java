@@ -10,7 +10,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 
 /**
- * **受伤 / 受治疗的平台事件面**（阶段 11 · t83 · B-静态半 · 用户裁定：钩子挂平台事件）。
+ * **受伤 / 受治疗的平台事件面**（钩子挂平台事件）。
  *
  * <h2>为什么挂平台事件而不是挂调用点</h2>
  * 合并后的两个入口 {@code VitalsComponent.damage/heal} 的生产调用点覆盖不全（当时的伤害调用点里
@@ -18,7 +18,7 @@ import org.bukkit.event.entity.EntityRegainHealthEvent;
  * 真实路径**不会**触发回调 ✗。挂平台事件 ⇒ **玩家受到的一切伤害与治疗都触发** ✓，且
  * **不需要改写任何调用点** ✓。
  *
- * <h2>两条口径（队长裁定）</h2>
+ * <h2>两条口径</h2>
  * <ul>
  *   <li><b>{@code ignoreCancelled = true}</b> ✓ —— **被取消的事件没有真的发生** ⇒ 不算"受伤 / 受治疗"
  *       ✗（否则会在"伤害被挡下"时误报回调）。</li>
@@ -35,13 +35,13 @@ import org.bukkit.event.entity.EntityRegainHealthEvent;
  *        → 逐个经 {@link RoleInstance#deliverHook}（内部走唯一受保护入口 {@code guardedCall}）✓
  * </pre>
  *
- * <h2>本卡边界（B-静态半）</h2>
+ * <h2>本类边界</h2>
  * **不起服**、**不跑**跨实例双玩家读数与 {@code was QUARANTINED} 反例 ⇒ 那些属 **B-窗口半**（另立卡）✗。
- * 本卡只保证：挂载点、注册、编译与单测闸门、归档 ✓。
+ * 本类只保证：挂载点、注册、编译与单测闸门 ✓。
  *
  * <h2>非玩家伤害源（如实申报）</h2>
  * {@code EntityDamageEvent} 的 {@code getEntity()} 不是 {@code Player} 时**直接早退** ⇒
- * **不触发**任何钩子（本卡不覆盖非玩家承受方）✗。将来要覆盖 ⇒ 加新重载/新事件面 = **只增** ✓。
+ * **不触发**任何钩子（不覆盖非玩家承受方）✗。将来要覆盖 ⇒ 加新重载/新事件面 = **只增** ✓。
  */
 public class DamageHookListener implements Listener {
 

@@ -7,7 +7,7 @@ import org.bukkit.event.Listener;
  * <ul>
  *   <li><b>SanTE 变更</b>：由组件**直派** —— {@code SanTEComponent} 的写入路径 → 容器构造期登记的
  *       平台侧监听器 → 容器注入的 {@code dispatchSanTEChange}（真变化闸门 / 逐监听器故障隔离 / 重入合并
- *       三条都在那条边界上）。旧措辞点名的 {@code RoleInstance.setCurrentSanTE} 转发视图
+ *       三条都在那条边界上）。{@code RoleInstance.setCurrentSanTE} 转发视图
  *       **已删除** ⇒ 真实路径只剩上面这一条。</li>
  *   <li><b>能量变更</b>：组件侧钩子**无实现者**（F6 死路径）⇒ 转发与容器空壳入口一并删除。</li>
  * </ul>

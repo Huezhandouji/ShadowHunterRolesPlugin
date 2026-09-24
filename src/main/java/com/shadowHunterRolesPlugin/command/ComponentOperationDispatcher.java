@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * **组件操作面的派发器**（阶段 13 · t127 · 设计定案 §4 / §5 / §6）：指令层到组件操作面的**唯一通道** ✓。
+ * **组件操作面的派发器**：指令层到组件操作面的**唯一通道** ✓。
  *
  * <p><b>它做的事</b>（逐条对齐 §4）：① 名称 → UUID（**仅在线** ✓）· ② UUID → {@link RoleInstance}（无实例 ⇒ 回绝 ✓）·
  * ③ 枚举实例的组件 id（**R-6**：只经容器枚举 ✓，不用反射 ✗）· ④ 定位目标组件（`componentId` 可带 `#index`，
@@ -28,9 +28,9 @@ import java.util.Locale;
  * <p><b>它不做的事</b> ✗：**不解析 payload 的 grammar**（那是组件的事 ✓）、**不做细粒度权限**
  * （op 名藏在 payload 里 ⇒ 归组件自查 ✓）、**不使用反射** ✗（§5）。
  *
- * <p><b>与 {@code RoleAPIImpl.dispatchOperation} 的分工</b> ✓：那条是**执行**（t125 起、包私有 ✓），
+ * <p><b>与 {@code RoleAPIImpl.dispatchOperation} 的分工</b> ✓：那条是**执行**（包私有 ✓），
  * 本条是**校验 + 提示 + 审计**（它必须知道"为什么没命中"才能给出 §6 要求的回绝文案 ✓）⇒ 两者各自解析
- * `#index` 而**不共享入口** ✓（用户裁定：派发器**直接调公开 API** ✓ —— 不提权、不加共享入口 ✗）。
+ * `#index` 而**不共享入口** ✓（派发器**直接调公开 API** ✓ —— 不提权、不加共享入口 ✗）。
  *
  * <p><b>八类失败模式全部显式拒绝</b> ✓（§6，绝不静默 ✗）：① 玩家不在线 ② 无角色实例 ③ 组件 id 不存在（列出可用 id）
  * ④ 同 id 多份且无下标（提示 0 基）⑤ payload 语法错（**由组件回绝** ⇒ 本层只能看到 `null` ✓）⑥ 动词与组件能力不符
@@ -138,7 +138,7 @@ public final class ComponentOperationDispatcher {
             return audit(sender, verb, auditTarget, componentId, payload, "denied-by-node:" + node, null, false, echo);
         }
 
-        //⑥ 调**公开** API（用户裁定 ✓）：读写都走它 ✓
+        //⑥ 调**公开** API：读写都走它 ✓
         String returned;
         try {
             returned = roleAPI.executeComponentOperation(target.getUniqueId(), componentId, payload);
@@ -254,7 +254,7 @@ public final class ComponentOperationDispatcher {
         return Bukkit.getPlayerExact(targetToken);
     }
 
-    /** 回绝路径：回显 + 审计（**失败也留痕** ✓ —— §6"全部显式拒绝，绝不静默" ✓）。 */
+    /** 回绝路径：回显 + 审计（**失败也留记录** ✓ —— 全部显式拒绝，绝不静默 ✓）。 */
     private Outcome refuse(CommandSender sender, String verb, String target, String componentId, String payload,
                            String reason, String message) {
         Component echo = Component.text(message);

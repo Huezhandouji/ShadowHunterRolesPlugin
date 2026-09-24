@@ -33,7 +33,7 @@ public class PlayerListener implements Listener {
         HotbarItems.clearFrom(player);
     }
 
-    //阶段1.8（作者最终裁决 §10 第12条 / 设计文档 §9.1）：掉线即销毁角色实例 —— 与死亡同一条 clearRole 路径。
+    //掉线即销毁角色实例 —— 与死亡同一条 clearRole 路径。
     //不挂起、不保留、不引入 config.yml；不预实现 pendingCleanup（仅当实测证明 quit 窗口内的清除未被持久化才补）。
     //效果：该实例的 ticker 与 BuffManager updater 两个 1-tick 任务被取消、playerRoleMap 中不再有条目（O-25）。
     @EventHandler

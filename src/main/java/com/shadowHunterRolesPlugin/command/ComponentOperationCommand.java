@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 子指令 {@code /role operation …} —— **组件操作面的指令面**（阶段 13 · t127 · 设计定案 §1 / §3 / §10.4）。
+ * 子指令 {@code /role operation …} —— **组件操作面的指令面**。
  *
  * <p><b>语法</b> ✓：
  * <pre>

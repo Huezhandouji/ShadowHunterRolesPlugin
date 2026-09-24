@@ -105,7 +105,7 @@ public class SkillListener implements Listener {
     }
 
     //Q扔物品释放技能, 并且实现禁止丢弃技能物品
-    //阶段 12 · t88 · B2：补 ignoreCancelled —— 别的插件已取消该事件时，本处理器**不再**重复 setCancelled，
+    //ignoreCancelled：别的插件已取消该事件时，本处理器**不再**重复 setCancelled，
     //**也不再**触发施法（取消 = 这次丢弃没有真的发生 ⇒ 不该被当成一次技能输入）✓
     @EventHandler(ignoreCancelled = true)
     public void onPlayerQDropSkillItem(PlayerDropItemEvent event){
@@ -144,7 +144,7 @@ public class SkillListener implements Listener {
     }
 
     //禁止玩家拿出技能物品
-    //阶段 12 · t88 · B2：补 ignoreCancelled —— 已取消的点击不重复取消 ✓
+    //ignoreCancelled：已取消的点击不重复取消 ✓
     @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event){
         if(!(event.getWhoClicked() instanceof Player player)) return;

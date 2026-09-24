@@ -13,7 +13,7 @@ import org.bukkit.inventory.ItemStack;
 import java.util.Map;
 
 /**
- * **热键栏物品的"不可动"保护（平台事件面）**（阶段 12 · t88 · `(b)-静态半`）。
+ * **热键栏物品的"不可动"保护（平台事件面）**。
  *
  * <h2>★ 本类与 {@code DamageHookListener} 的**关键不对称**（先看这条，别照抄错形态）</h2>
  * 两个监听器都落在平台事件面上，但**对事件的处理姿态相反**，**不是同一族** ✗：
@@ -24,9 +24,9 @@ import java.util.Map;
  *       若照"只读不取消"写，则**什么都保护不了** ✗ —— 那是**假功能**。</li>
  * </ul>
  * ⇒ 一句话：**"只读不取消"适用于"事件已发生、我只通知"；"取消"适用于"我要阻止事件生效"。**
- * 本卡（`t88`）改向的**全部理由**就在这里 ✓。
+ * 本类改向的**全部理由**就在这里 ✓。
  *
- * <h2>为什么需要本卡（真缺口，现算）</h2>
+ * <h2>为什么需要本类（真缺口）</h2>
  * 既有保护只覆盖两类，且**只覆盖这两类**：
  * <ul>
  *   <li>{@code InventoryClickEvent} —— {@code SkillListener} / {@code MainWeaponListener} 内有 ✓（**会取消** ✓）</li>
@@ -52,9 +52,9 @@ import java.util.Map;
  * 取 {@link InventoryMoveItemEvent#getSource()}（来源）判据 ✓；来源是其它容器（如漏斗自身）时**不动** ✓。
  * <p>{@link PrepareItemCraftEvent} 的 {@code getInventory()} 即**合成矩阵** ⇒ 矩阵里出现受保护物品即取消 ✓。
  *
- * <h2>本卡边界（如实申报）</h2>
+ * <h2>本类边界（如实申报）</h2>
  * **不起服、不进档、不写证据件** ⇒ 上述四个事件在**真实交互**下是否真的被拦（拖拽 / F 键 / 漏斗 / 合成格），
- * 以及"取消是否会影响既有 Q 丢施法链路"，**均无运行级读数** ✗ ⇒ 属**窗口半**（另立卡，依赖本卡）✓。
+ * 以及"取消是否会影响既有 Q 丢施法链路"，**均无运行级读数** ✗ ⇒ 需另立卡取证 ✓。
  */
 public class HotbarItemProtectionListener implements Listener {
 
@@ -103,7 +103,7 @@ public class HotbarItemProtectionListener implements Listener {
      * （该事件的 setter 不算取消 —— 结果可能被重新计算）。
      * <p><b>⇒ 本项只算"尽力而为"，不构成硬保护</b> ✗ —— 真正的硬保护需要
      * ① 在热键栏物品上**禁止**它作为合成材料（配方层面，本工程无自定义配方 ⇒ 不适用），或
-     * ② 监听 {@code CraftItemEvent} 并取消（**该事件可取消** ✓，但本卡未做 ⇒ 列入未覆盖项）。
+     * ② 监听 {@code CraftItemEvent} 并取消（**该事件可取消** ✓，但本类未做 ⇒ 列入未覆盖项）。
      * <p><b>为什么仍然留下这个方法</b>：它把"结果置空"这一手做了（在能被拦截的时机里减少误产出），
      * 且**不谎称**已经拦住 ✗ —— 这比留白更可审计 ✓。
      */

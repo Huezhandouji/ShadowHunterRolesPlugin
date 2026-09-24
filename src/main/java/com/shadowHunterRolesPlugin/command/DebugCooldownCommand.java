@@ -18,7 +18,7 @@ import java.util.List;
  * <p>
  * **op 门控由 {@link DebugCommand} 在调试树入口承担**（原实现是在本段最前面判定，可见行为相同）。
  * 输出文案与既有内联实现**逐字相同**；{@code status|end|restart} 的语义、参数个数不足时的用法提示、
- * 以及"槽位 → 组件 id"的解析规则均未改动（本卡只重组指令结构，不碰冷却语义）。
+ * 以及"槽位 → 组件 id"的解析规则均未改动（本类只做指令面，不碰冷却语义）。
  */
 public class DebugCooldownCommand implements SubCommand {
 
@@ -72,7 +72,7 @@ public class DebugCooldownCommand implements SubCommand {
             send(player, "Not an active component (skill/main weapon): " + componentId);
             return true;
         }
-        //冷却读数与动作**直接问组件本身**（旧的"经服务集端口取表"路径已拆 ✗）——
+        //冷却读数与动作**直接问组件本身**（不经服务集端口取表 ✗）——
         //  声明值由描述符给出（`getCooldownTicks()`），状态与动作由组件基类给出 ✓。
         int declared = active.getCooldownTicks();
 
@@ -129,7 +129,7 @@ public class DebugCooldownCommand implements SubCommand {
     /**
      * 目标解析：纯数字 = 热键栏槽位（走与渲染器**同一趟**组件表遍历：{@code Role.componentIdAtSlot(int)}），
      * 否则按组件 id（须在注册表内）。
-     * <p>阶段 7 · B 步：栏位随组件自己的描述符走 ⇒ 这里**不再**读 `Role.getSlotMap()` 那张派生视图，
+     * <p>栏位随组件自己的描述符走 ⇒ 这里**不再**读 `Role.getSlotMap()` 那张派生视图，
      * 但仍与它同源（都来自条目里的栏位值）⇒ 数字解析不会因栏位来源改变而静默失效。
      */
     private String resolveComponentId(RoleInstance instance, String target){

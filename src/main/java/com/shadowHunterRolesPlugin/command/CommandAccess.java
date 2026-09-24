@@ -22,7 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 指令权限门禁 —— **全插件唯一的权限判定口径**（阶段 6 · t30；用户裁定「给本插件的指令都加上权限等级 ≥ 3 的限制」）。
+ * 指令权限门禁 —— **全插件唯一的权限判定口径**：本插件的指令都要求权限等级 ≥ 3。
  * <p>
  * <b>为什么读 {@code ops.json}</b>：本版 `paper-api`（1.21.11-R0.1-SNAPSHOT）**不提供可读的等级 API**
  * （全 jar 扫 `getOpLevel`/`setOpLevel`/`getPermissionLevel`/`permissionLevel`/`opLevel` 均 0 命中；
@@ -44,7 +44,7 @@ import java.util.Map;
  * <p><b>生效时效</b>：本字段与 {@code ops.json} 等级表**同一套失效机制** —— 数据目录内配置文件的
  * {@value ConfigurationManager#TTL_MILLIS} ms TTL + 文件戳（mtime×长度）变更即失效 ⇒ 改完配置文件**最迟一个 TTL** 内生效，
  * **无需重启或 reload**（文件不存在时回落到 jar 内置默认值）。
- * <p><b>单一读盘口径（阶段 7 · A 步）</b>：本类**不再自己读配置** —— 字段的值一律委托
+ * <p><b>单一读盘口径</b>：本类**不再自己读配置** —— 字段的值一律委托
  * {@link ConfigurationManager}（默认值 / 校验 / 说明集中在 {@link ConfigKey}）。
  * 本类只剩两件事：读 {@code ops.json} 的等级表，以及做这一次判定。
  * <p>
@@ -59,10 +59,10 @@ import java.util.Map;
  */
 final class CommandAccess {
 
-    /** {@code config.yml} 里的要求等级字段名（用户裁定：等级由配置给出，不硬编码）。 */
+    /** {@code config.yml} 里的要求等级字段名（等级由配置给出，不硬编码）。 */
     static final String CONFIG_KEY = ConfigurationManager.COMMAND_PERMISSION_LEVEL.getPath();
 
-    /** 配置缺失/非法时使用的要求等级（= 用户裁定的 3）。 */
+    /** 配置缺失/非法时使用的要求等级（默认 3）。 */
     static final int DEFAULT_REQUIRED_LEVEL = ConfigurationManager.COMMAND_PERMISSION_LEVEL.getDefaultValue();
 
     /** 允许的等级上限（Minecraft 权限等级范围 0-4）。 */
@@ -95,7 +95,7 @@ final class CommandAccess {
         return new File(Bukkit.getWorldContainer(), "ops.json");
     }
 
-    /** 本插件数据目录内的 {@code config.yml}（缺失时回落 jar 内置默认值）；阶段 7 起由配置管理器持有。 */
+    /** 本插件数据目录内的 {@code config.yml}（缺失时回落 jar 内置默认值）；由配置管理器持有。 */
     static File configFile() {
         ConfigurationManager manager = ConfigurationManager.installed();
         return manager != null ? manager.getFile() : null;

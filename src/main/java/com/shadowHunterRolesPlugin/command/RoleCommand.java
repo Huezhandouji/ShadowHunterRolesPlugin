@@ -22,10 +22,10 @@ import java.util.TreeMap;
  * <p>
  * 本类是 {@link SubCommand} 体系的中央分发器（风格对齐 {@code SHDFGamePlugin} 的 {@code ShdfGameCommand}）：
  * <ol>
- *     <li><b>权限门禁（阶段 6 · t30，用户裁定）</b>：单一判定点 {@link CommandAccess#check} ——
+ *     <li><b>权限门禁</b>：单一判定点 {@link CommandAccess#check} ——
  *         <b>等级 ≥ 3 的玩家</b>放行、控制台/RCON 放行、其余一律拒绝；<b>执行与 Tab 补全共用同一道门</b>；</li>
  *     <li>非玩家发送者 → 统一拒绝（既有文案逐字保留）；</li>
- *     <li>无参数 → **静默返回**（既有行为：历史实现的 {@code sendHelp} 调用被注释掉，本卡按"行为等价"逐字保留）；</li>
+ *     <li>无参数 → **静默返回**（不输出任何内容）；</li>
  *     <li>按第一级参数路由到注册的子指令，**参数剥离后**交给该子指令；</li>
  *     <li>未知子指令 → 统一报错文案（既有文案逐字保留）；</li>
  *     <li>Tab 补全：第一级补全子指令名，其余交给命中的子指令。</li>
@@ -47,7 +47,7 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
         registerSubCommand(new ClearRoleCommand(roleManager));
         registerSubCommand(new EnergyCommand(roleManager));
         registerSubCommand(new DebugCommand(roleManager));
-        //阶段 13 · t127：组件操作面（`/role operation …`）—— 派发器**直接调公开 API** ✓（不提权、不加共享入口 ✓）
+        //组件操作面（`/role operation …`）—— 派发器**直接调公开 API** ✓（不提权、不加共享入口 ✓）
         registerSubCommand(new ComponentOperationCommand(roleManager, roleAPI));
         registerSubCommand(new HelpCommand());
     }
@@ -57,7 +57,7 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
     }
 
     /**
-     * **单一门禁点**（阶段 6 · t30）：执行侧与补全侧共用；返回 {@code true} = 放行。
+     * **单一门禁点**：执行侧与补全侧共用；返回 {@code true} = 放行。
      * <p>拒绝时已把玩家侧文案发出（非玩家 sender 不发聊天）；调用方直接 {@code return}。
      */
     private static boolean gate(CommandSender sender, String action){
@@ -68,7 +68,7 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
-        //阶段 6 · t30（用户裁定）：等级 ≥ 3 门禁 —— 在**根入口第一行**，其下 7 条子指令路径全部经过此处
+        //等级 ≥ 3 门禁 —— 在**根入口第一行**，其下全部子指令路径都经过此处
         if(!gate(sender, "/role")){
             return true;
         }
@@ -97,7 +97,7 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
-        //阶段 6 · t30：补全侧与执行侧**同一道门**（不得只拦执行、补全仍泄漏子指令名）
+        //补全侧与执行侧**同一道门**（不得只拦执行、补全仍泄漏子指令名）
         if(!gate(sender, "/role (tab)")){
             return List.of();
         }

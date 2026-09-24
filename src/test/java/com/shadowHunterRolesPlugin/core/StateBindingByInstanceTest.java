@@ -36,7 +36,7 @@ public class StateBindingByInstanceTest {
 
     /** 空服务集：10 个端口全 null，构造组件时只被存下来（本测试从不读它）。 */
     private static ComponentServices inertServices() {
-        return new ComponentServices(null, null, null, null, null, null, null, null, null, null);
+        return new ComponentServices(null, null, null, null, null, null, null, null, null, null, null);
     }
 
     /** 有冷却的假组件（最小实现：只声明能力）。 */

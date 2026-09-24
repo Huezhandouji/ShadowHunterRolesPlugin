@@ -89,7 +89,7 @@ public class ComponentLookupByIdTest {
 
     /** 全 null 的服务集桩：容器读口不需要任何端口（组件也不会调用它们）。 */
     private static final ComponentServices STUB =
-            new ComponentServices(null, null, null, null, null, null, null, null, null, null);
+            new ComponentServices(null, null, null, null, null, null, null, null, null, null, null);
 
     private static ComponentLookupImpl lookupOf(ComponentRegistry registry) {
         return new ComponentLookupImpl(registry, id -> STUB, Logger.getLogger("t77-test"));

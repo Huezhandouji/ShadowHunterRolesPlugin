@@ -415,7 +415,9 @@ public class RoleInstance {
                 //阶段 10 · t55：组件服务 = 查找 + **动态添加** —— 服务集工厂传进去，运行期新增的组件
                 //与装配期组件走**同一条**构造路径（一对一端口、同一资源表口径）；日志用于 P2 的
                 //"拒绝删除被依赖组件"留痕（点名被删组件 / 阻止者 / 缺的类型）
-                new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger())
+                new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger()),
+                //阶段 13 · t90（A2）：角色信息服务（聚合根只读面）—— 构造点仅此一处（现算 1 处）
+                new RoleInfoImpl(this)
         );
     }
 

@@ -32,7 +32,7 @@ import java.util.logging.Logger;
  * <p><b>为什么服务集由工厂注入而不是本类自造</b>：服务集与组件**一对一**（冷却端口按 id 选表、定时器端口
  * 按 id 定位资源表）⇒ 必须与装配期走**同一条**构造路径（{@code RoleInstance#createServices}）。
  * <p><b>为什么删除前必须算反向依赖</b>（ P2）：删掉一个被他人 {@code requires} 的组件后，
- * 运行期 {@code getComponent} 就取不到它 ⇒ "必需"会**静默失效**。反向依赖表**从声明现算**
+ * 运行期 {@code getComponent} 就取不到它 ⇒ "必需"会**静默失效**。反向依赖表**从声明求得**
  * （{@code ComponentRegistry#requiredBy}），不手工维护。
  * <p><b>可测性</b>：本类只依赖 {@code ComponentRegistry} + 一个 {@code String -> ComponentServices} 函数 +
  * 一个 {@link Logger}，**不碰 Bukkit** ⇒ 可以脱离服务器实例化并驱动（探针口径）。
@@ -104,7 +104,7 @@ final class ComponentLookupImpl implements ComponentLookup {
         if (specification == null) {
             throw new NullPointerException("specification");
         }
- //护栏先于构造：遍历窗口内**不做任何构造**（否则会造出一个马上要回滚的实例）
+ //检查先于构造：遍历窗口内**不做任何构造**（否则会造出一个马上要回滚的实例）
         if (registry.isIterating()) {
             throw new IllegalStateException("Cannot add component '" + id + "' while the container is iterating "
                     + "(the framework is broadcasting component hooks); defer it until after the broadcast.");
@@ -112,7 +112,7 @@ final class ComponentLookupImpl implements ComponentLookup {
         if (index < 0 || index > registry.size()) {
             throw new IndexOutOfBoundsException("Component index " + index + " is out of range [0, " + registry.size() + "].");
         }
- //（用户新路线图第 2 条）：**id 唯一性护栏已删除** —— 同一个 id 可以添加多次。
+ //**id 唯一性检查已删除** —— 同一个 id 可以添加多次。
  //（这里抛 "Component id already registered: " + id；只删 ComponentRegistry 里那一条
  // 是不够的，因为运行期 add 走的是本方法 ⇒ 两处都必须放开）
 
@@ -135,7 +135,7 @@ final class ComponentLookupImpl implements ComponentLookup {
         T component = create(snapshot, id, services);
  //：原"创建后绑定"的**运行期落点已整体删除** （它唯一的绑定目标是计时端口，
  //端口面 已清理 ⇒ 该调用早已是 no-op）。组件侧改为各自在 `start()` 解析并持有强类型组件
- //引用（R-4）；此处**不再有**任何绑定动作。
+ //引用；此处**不再有**任何绑定动作。
         try {
             registry.insert(index, component, declaration);
             component.awake();
@@ -157,12 +157,12 @@ final class ComponentLookupImpl implements ComponentLookup {
     @Override
     public boolean remove(String id) {
  //：id 可重复 ⇒ 目标是**添加顺序第一个**同 id 者（与 getById 同目标；
- //反向依赖表也按那一个现算 ⇒ 守卫保护的正是"会被删掉的那一个"），其余同 id 者留在容器里
+ //反向依赖表也按那一个实例计算 ⇒ 守卫保护的正是"会被删掉的那一个"），其余同 id 者留在容器里
         RoleComponent component = registry.getById(id);
         if (component == null) {
             return false;
         }
- //P2：删除前先算反向依赖（从声明现算）—— 有阻止者 ⇒ 记日志 + 拒绝（不删、不留半态）
+ //删除前先算反向依赖（从声明求得）—— 有阻止者 ⇒ 记日志 + 拒绝（不删、不留半态）
         Map<String, Class<? extends RoleComponent>> blockers = registry.requiredBy(id);
         if (!blockers.isEmpty()) {
             StringBuilder detail = new StringBuilder();

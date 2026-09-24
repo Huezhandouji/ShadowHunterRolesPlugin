@@ -24,8 +24,8 @@ import java.util.Map;
  * <li><b>读</b>（{@link #get} / {@link #getByType} / {@link #getAll} / {@link #getById} / {@link #all}）：
  * 在**装配完成（{@link #freeze()}）之后始终可用**，含运行期增删**之后** —— 读口都返回
  * **完整集合**（新加的组件立刻可见、被删的立刻不可见）。
- * <b>装配期（{@code frozen=false}）仍禁止跨组件查找</b>：这是 立下的既有护栏
- * （组件在构造期只应拿到服务集，不得读到"还在一半"的组件表），本次**不放宽**（口径见说明件）。</li>
+ * <b>装配期（{@code frozen=false}）仍禁止跨组件查找</b>：这是既有的约束
+ * （组件在构造期只应拿到服务集，不得读到"还在一半"的组件表），本次**不放宽**。</li>
  * </ul>
  * <p><b>查询语义（ 按用户新路线图第 1 条统一）</b>：类型条件 = **可赋值性**
  * （{@code type.isInstance(component)} ⇒ 父类/接口查询命中子类实例），顺序 = **添加顺序**
@@ -37,7 +37,7 @@ import java.util.Map;
  * </ul>
  * <p><b>顺序语义</b>：{@link #all()} 的返回顺序 = **容器内当前序**（装配序 + 运行期追加/插位的实际位置）
  * ⇒ 它就是**渲染序与派发序**（动态序）。{@link #all()} 返回**不可变快照**
- * （写时复制），因此框架遍历期间即使有并发修改请求（会被窗口护栏拒绝）也不会破坏本次遍历。
+ * （写时复制），因此框架遍历期间即使有并发修改请求（会被窗口拒绝）也不会破坏本次遍历。
  */
 public final class ComponentRegistry {
 
@@ -78,10 +78,10 @@ public final class ComponentRegistry {
 
  /**
  * **在指定下标插入**一个组件并登记其依赖声明（运行期"插位"；{@code index == size()} 等价于追加）。
- * <p>护栏（按序检查，失败即拒）：① null ⇒ {@code NullPointerException}；
+ * <p>检查项（按序检查，失败即拒）：① null ⇒ {@code NullPointerException}；
  * ② **遍历窗口内** ⇒ {@code IllegalStateException}；③ 下标越界 ⇒ {@code IndexOutOfBoundsException}。
  * <p><b>（用户新路线图第 2 条）：id 唯一性已放开</b> —— 同一个 id **可以**在容器内出现多次
- * （旧护栏 ④"id 已存在 ⇒ {@code IllegalArgumentException}" 已删除）。随之而来的两条口径：
+ * （原先的 ④"id 已存在 ⇒ {@code IllegalArgumentException}" 已删除）。随之而来的两条口径：
  * <ul>
  * <li>{@link #getById(String)} / {@link #removeById(String)} 取/删的都是**添加顺序第一个**同 id 者
  * ⇒ 与 {@link #get(Class)} 的"第一个"同口径；</li>
@@ -180,7 +180,7 @@ public final class ComponentRegistry {
     }
 
  /**
- * **反向依赖表（现算）**：谁把 {@code id} 提供的类型声明为**必需**依赖 ⇒ 返回
+ * **反向依赖表**：谁把 {@code id} 提供的类型声明为**必需**依赖 ⇒ 返回
  * `阻止者 id → 它需要的类型`（保持容器序；空 = 无人必需它）。
  * <p>口径与装配期检查一致：**自己不算提供者**；匹配规则 = {@code required.isAssignableFrom(目标提供类型)}。
  * <p><b>（id 可重复）</b>：本重载的**目标** = 添加顺序第一个同 id 者
@@ -194,7 +194,7 @@ public final class ComponentRegistry {
     }
 
  /**
- * **反向依赖表（现算）· 按实例**：谁把 {@code target} 提供的类型声明为**必需**依赖。
+ * **反向依赖表 · 按实例**：谁把 {@code target} 提供的类型声明为**必需**依赖。
  * <p><b>实质修正</b>：既有实现"自己不算提供者"是**按 id 排除**的
  * （{@code if (id.equals(component.getId())) continue;}）⇒ id 可重复之后，它会**把另一个同 id 的
  * 依赖者也一并跳过** ⇒ 反向依赖表**漏掉真正的阻止者** ⇒ 删除守卫误判"无人依赖"。
@@ -240,7 +240,7 @@ public final class ComponentRegistry {
     }
 
  /**
- * **候选声明的缺必需依赖清单（现算）**：{@code 缺的类型全名 → 该类型}（空 = 齐）。
+ * **候选声明的缺必需依赖清单**：{@code 缺的类型全名 → 该类型}（空 = 齐）。
  * <p>口径与装配期同源：候选**自己不算提供者**。
  * <p><b>id 可重复的实质修正</b>：既有实现把"自己不算提供者"写成
  * {@code if (candidate.id().equals(component.getId())) continue;} —— 而候选此刻**还不在容器里**
@@ -270,7 +270,7 @@ public final class ComponentRegistry {
         return missing;
     }
 
- // ───────────── 遍历窗口（"禁止遍历中修改"的护栏） ─────────────
+ // ───────────── 遍历窗口（"禁止遍历中修改"） ─────────────
 
  /**
  * 进入**遍历窗口**（框架在广播组件钩子前调用）：窗口内 {@link #insert} / {@link #remove} /

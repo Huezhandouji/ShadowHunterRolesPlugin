@@ -4,12 +4,14 @@ package com.shadowHunterRolesPlugin.roleComponent;
  * **组件操作面**（阶段 13 · t120 · 设计定案 §2 / §10）：让**外部指令面**（管理员 / 调试面）能按
  * 「玩家 + 组件 id」操作任意组件状态 —— 组件**自行选择实现**本接口 ✓；没实现的组件**不支持**操作指令 ✗。
  *
- * <h2>契约（只有一个方法）</h2>
+ * <h2>契约（只有一个方法 · 返回 <b>字符串</b>）</h2>
  * <ul>
- *   <li>{@code true} = **已识别并已按其语义处理** —— **不论语义上成功与否** ✓（例：{@code consume} 因能量不足
- *       而未扣，仍算"已识别并按语义处理"：组件内部把"不扣、不产生变更"当作该语义的结果 ✓）；</li>
- *   <li>{@code false} = **未识别**（未知动词 / 空 payload）或**拒绝执行**（语法错 / 参数不合法）。</li>
+ *   <li>{@code null} = **未识别**（未知动词 / 空 payload）或**拒绝执行**（语法错 / 参数不合法）✗；</li>
+ *   <li>{@code ""}（空串）= **已识别、但没有回值**（纯写操作）✓；</li>
+ *   <li><b>非空串</b> = **规范化值**（读操作回值；写操作可回"写后状态" ✓）—— 格式由组件自定 ✓。</li>
  * </ul>
+ * ★ <b>与 {@code RoleAPI#executeComponentOperation(UUID, String, String)} 的 {@code String} 返回逐字对齐</b> ✓
+ * （用户裁定：**布尔换成字符串** ⇒ 组件终于**能把值交出来** ⇒ 读缺口关闭 ✓；读写都走**唯一**这一个操作入口 ✓）。
  * 参数 = **整段 payload 字符串**（v2 定案：op 与 args **合并**后交给组件自解析 ✓）—— 本接口**不解析**它 ✗。
  *
  * <h2>★ 三条护栏（防先例 · 设计定案 §10.2）</h2>
@@ -37,7 +39,8 @@ package com.shadowHunterRolesPlugin.roleComponent;
  *
  * <h2>本片范围（如实申报）</h2>
  * 本接口 + **能量组件试点** = 阶段 13 的第一片 ✓；**指令面 / 派发器 / {@code RoleAPI} 收口**不在本片 ✗
- * （分别归后续卡 ✓）。
+ * （分别归后续卡 ✓）。<b>阶段 13 · t124</b>：返回类型由 {@code boolean} 改为 {@code String} ✓
+ * （用户裁定；契约见上，形状护栏不变 ✓）。
  */
 public interface OperationProvider {
 
@@ -46,8 +49,9 @@ public interface OperationProvider {
      *
      * @param payload 整段剩余文本（**可含空格**）；{@code null} / 空串 / 纯空白 的语义**由组件自行定义** ✓
      *                （但必须写进该组件的 javadoc ✓）
-     * @return {@code true} = 已识别并已按其语义处理（**不论语义上成功与否** ✓）；
-     *         {@code false} = 未识别（未知动词 / 空 payload）或拒绝执行（语法错 / 参数不合法）
+     * @return {@code null} = 未识别（未知动词 / 空 payload）或拒绝执行（语法错 / 参数不合法）✗；
+     *         {@code ""} = 已识别但**没有回值**（纯写操作）✓；
+     *         **非空串** = 规范化值（读操作回值 / 写操作回"写后状态" ✓）
      */
-    boolean onOperationCommand(String payload);
+    String onOperationCommand(String payload);
 }

@@ -12,11 +12,13 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * 阶段 13 · t120（**组件操作面 · 第一片**）的试点单测：只测**能量组件的 payload 解析与返回值语义** ✓。
+ * 阶段 13 · t120（**组件操作面 · 第一片**）的试点单测：只测**能量组件的 payload 解析与返回值语义** ✓；
+ * **阶段 13 · t124** 起随接口迁移：返回类型 {@code boolean → String} ⇒ 本类断言同步改为**字符串断言** ✓。
  *
  * <p><b>判据来源</b>：设计定案 {@code debug-logs/测试记录/阶段13-组件操作面-设计定案.md}
- * §2（接口契约：{@code true} = 已识别并按其语义处理、**不论语义上成功与否**）·
- * §10.2 护栏①（**冻结为单方法**）· §10.4（首 token 必为动词 · grammar 写进组件 javadoc ✓）。
+ * §2（接口契约）· §10.2 护栏①（**冻结为单方法**）· §10.4（首 token 必为动词 · grammar 写进组件 javadoc ✓）；
+ * **t124 的返回约定**（用户裁定"布尔换成字符串"）：{@code null} = 未识别/拒绝 ✗ · {@code ""} = 已识别无回值 ✓ ·
+ * **非空串** = 规范化值 ✓ ⇒ 能量组件一律回"写后/当前值"（它总有一个可回的值，**从不**回空串 ✓）。
  *
  * <p><b>为什么能离线跑</b>：能量组件是**纯状态组件** —— 构造期只要一个**空服务集桩**（冻结件 §4 T-5
  * 批准的形态，与 {@code CapabilityDispatchTest} / {@code StateBindingByInstanceTest} 同一做法 ✓）
@@ -36,110 +38,114 @@ public class EnergyComponentOperationTest {
         return new EnergyComponent("energy", new ComponentServices(null, null, null), MAX, null);
     }
 
-    // ───────── ① 四个已识别动词（add / consume / set / current） ─────────
+    // ───────── ① 四个已识别动词（add / consume / set / current）—— 一律回"写后/当前值" ─────────
 
-    /** {@code add 5} ⇒ 识别 + 增能（**先把能量压到 50** ⇒ 加后 55，不触上限、可直接观测 ✓）。 */
+    /** {@code add 5} ⇒ 回**写后值**（先把能量压到 50 ⇒ 加后 55，不触上限、可直接观测 ✓）。 */
     @Test
     public void addIncreasesEnergy() {
         EnergyComponent energy = energy();
-        assertTrue("前置：set 50", energy.onOperationCommand("set 50"));
-        assertTrue("add 5 必须被识别", energy.onOperationCommand("add 5"));
+        assertEquals("前置 set 50 ⇒ 回写后值", "50", energy.onOperationCommand("set 50"));
+        assertEquals("add 5 ⇒ 回写后值", "55", energy.onOperationCommand("add 5"));
         assertEquals("add 5 后当前能量", 55, energy.current());
     }
 
-    /** {@code consume 30} ⇒ 识别 + 扣减（100 ⇒ 70）。 */
+    /** {@code consume 30} ⇒ 回**写后值**（100 ⇒ 70）。 */
     @Test
     public void consumeDecreasesEnergy() {
         EnergyComponent energy = energy();
-        assertTrue("consume 30 必须被识别", energy.onOperationCommand("consume 30"));
+        assertEquals("consume 30 ⇒ 回写后值", "70", energy.onOperationCommand("consume 30"));
         assertEquals("consume 30 后当前能量", 70, energy.current());
     }
 
-    /** {@code set 42} ⇒ 识别 + 精确写入。 */
+    /** {@code set 42} ⇒ 回**写后值**（精确写入）。 */
     @Test
     public void setWritesExactValue() {
         EnergyComponent energy = energy();
-        assertTrue("set 42 必须被识别", energy.onOperationCommand("set 42"));
+        assertEquals("set 42 ⇒ 回写后值", "42", energy.onOperationCommand("set 42"));
         assertEquals("set 42 后当前能量", 42, energy.current());
     }
 
-    /** {@code current} ⇒ 识别 + **只读**（无副作用）。 */
+    /** {@code current} ⇒ 回**当前值**（读操作；**无副作用** ✓）。 */
     @Test
     public void currentIsReadOnly() {
         EnergyComponent energy = energy();
-        assertTrue("current 必须被识别", energy.onOperationCommand("current"));
+        assertEquals("current ⇒ 回当前值", "100", energy.onOperationCommand("current"));
         assertEquals("只读动词不得改动状态", MAX, energy.current());
     }
 
-    // ───────── ② 拒绝面：未识别 / 语法错 / 参数不合法（一律 false 且无副作用） ─────────
+    // ───────── ② 拒绝面：未识别 / 语法错 / 参数不合法（一律 null 且无副作用） ─────────
 
-    /** 未知动词 / 大小写不符 ⇒ 未识别。 */
+    /** 未知动词 / 大小写不符 ⇒ **{@code null}**（未识别）。 */
     @Test
     public void unknownVerbIsRejected() {
         EnergyComponent energy = energy();
-        assertFalse("未知动词必须拒绝", energy.onOperationCommand("frobnicate 1"));
-        assertFalse("本片试点只接四个动词 ⇒ max 未识别", energy.onOperationCommand("max"));
-        assertFalse("动词大小写敏感 ⇒ Add 未识别", energy.onOperationCommand("Add 5"));
+        assertNull("未知动词必须拒绝（null）", energy.onOperationCommand("frobnicate 1"));
+        assertNull("本片试点只接四个动词 ⇒ max 未识别（null）", energy.onOperationCommand("max"));
+        assertNull("动词大小写敏感 ⇒ Add 未识别（null）", energy.onOperationCommand("Add 5"));
         assertEquals("拒绝路径不得改动状态", MAX, energy.current());
     }
 
-    /** 空 payload（{@code null} / 空串 / 纯空白）⇒ 未识别（本组件自定的语义 ✓）。 */
+    /** 空 payload（{@code null} / 空串 / 纯空白）⇒ **{@code null}**（本组件自定的语义 ✓）。 */
     @Test
     public void emptyPayloadIsRejected() {
         EnergyComponent energy = energy();
-        assertFalse("null ⇒ 未识别", energy.onOperationCommand(null));
-        assertFalse("空串 ⇒ 未识别", energy.onOperationCommand(""));
-        assertFalse("纯空白 ⇒ 未识别", energy.onOperationCommand("   "));
+        assertNull("null ⇒ 未识别（null）", energy.onOperationCommand(null));
+        assertNull("空串 ⇒ 未识别（null）", energy.onOperationCommand(""));
+        assertNull("纯空白 ⇒ 未识别（null）", energy.onOperationCommand("   "));
         assertEquals("拒绝路径不得改动状态", MAX, energy.current());
     }
 
-    /** 语法错：缺参 / 多参 / 非数字 / 负数 / 只读动词带参 ⇒ 拒绝。 */
+    /** 语法错：缺参 / 多参 / 非数字 / 负数 / 只读动词带参 ⇒ **{@code null}**。 */
     @Test
     public void malformedArgumentsAreRejected() {
         EnergyComponent energy = energy();
-        assertFalse("缺参", energy.onOperationCommand("add"));
-        assertFalse("非数字", energy.onOperationCommand("add abc"));
-        assertFalse("多参", energy.onOperationCommand("add 1 2"));
-        assertFalse("负数", energy.onOperationCommand("add -1"));
-        assertFalse("只读动词带参", energy.onOperationCommand("current 5"));
-        assertFalse("set 缺参", energy.onOperationCommand("set"));
+        assertNull("缺参", energy.onOperationCommand("add"));
+        assertNull("非数字", energy.onOperationCommand("add abc"));
+        assertNull("多参", energy.onOperationCommand("add 1 2"));
+        assertNull("负数", energy.onOperationCommand("add -1"));
+        assertNull("只读动词带参", energy.onOperationCommand("current 5"));
+        assertNull("set 缺参", energy.onOperationCommand("set"));
         assertEquals("拒绝路径不得改动状态", MAX, energy.current());
     }
 
-    /** 整数溢出（超出 {@code int}）⇒ 拒绝（不得静默截断 ✗）。 */
+    /** 整数溢出（超出 {@code int}）⇒ **{@code null}**（不得静默截断 ✗）。 */
     @Test
     public void numericOverflowIsRejected() {
         EnergyComponent energy = energy();
-        assertFalse("溢出必须拒绝", energy.onOperationCommand("add 99999999999"));
+        assertNull("溢出必须拒绝（null）", energy.onOperationCommand("add 99999999999"));
         assertEquals("拒绝路径不得改动状态", MAX, energy.current());
     }
 
     // ───────── ③ 边界与返回值语义 ─────────
 
-    /** 写动词的 clamp **仍由组件承担**（字符串面只是薄适配层 ✓）。 */
+    /** 写动词的 clamp **仍由组件承担**（字符串面只是薄适配层 ✓）⇒ 回值即 clamp 后的值 ✓。 */
     @Test
     public void writesAreClampedByComponent() {
         EnergyComponent energy = energy();
-        assertTrue(energy.onOperationCommand("set 999"));
+        assertEquals("set 超上限 ⇒ 回 clamp 后的值", "100", energy.onOperationCommand("set 999"));
         assertEquals("set 超上限 ⇒ clamp 到 max", MAX, energy.current());
-        assertTrue(energy.onOperationCommand("add 999"));
+        assertEquals("add 超上限 ⇒ 回 clamp 后的值", "100", energy.onOperationCommand("add 999"));
         assertEquals("add 超上限 ⇒ clamp 到 max", MAX, energy.current());
     }
 
-    /** {@code consume} 能量不足 ⇒ **已识别但语义未达成** ⇒ 仍返回 {@code true}（设计定案 §2 ✓），且无变更 ✓。 */
+    /**
+     * {@code consume} 能量不足 ⇒ **已识别但语义未达成** ⇒ 回**未变的当前值**（**不是 {@code null}** ✓），
+     * 且状态无变更 ✓ —— 这正是 t124"回写后值"约定对"语义未达成"的处置 ✓。
+     */
     @Test
     public void insufficientConsumeIsRecognizedButChangesNothing() {
         EnergyComponent energy = energy();
-        assertTrue("已识别的动词即使语义未达成也返回 true（§2：不论语义上成功与否）",
-                energy.onOperationCommand("consume 999"));
+        assertEquals("已识别 ⇒ 回未变的当前值（非 null）",
+                "100", energy.onOperationCommand("consume 999"));
         assertEquals("能量不足 ⇒ 不扣、不产生变更", MAX, energy.current());
     }
 
-    // ───────── ④ 接口形状护栏（AK1①：独立顶层接口 + 冻结为单方法） ─────────
+    // ───────── ④ 接口形状护栏（AK1①：独立顶层接口 + 冻结为单方法；AO2：返回类型钉死） ─────────
 
     /**
      * 把设计定案 §2 / §10.2 护栏①**钉成可执行的判据**：
-     * 独立顶层接口（不内嵌 ✗）· 冻结为单方法（不得再加方法/默认实现 ✗）· 唯一方法签名 · 能量组件选择实现 ✓。
+     * 独立顶层接口（不内嵌 ✗）· 冻结为单方法（不得再加方法/默认实现 ✗）· 唯一方法签名
+     * （**阶段 13 · t124 起返回类型 = {@code String.class}** ✓）· 能量组件选择实现 ✓。
      */
     @Test
     public void operationProviderIsTopLevelAndFrozenAsSingleMethod() {
@@ -148,7 +154,8 @@ public class EnergyComponentOperationTest {
 
         Method[] declared = OperationProvider.class.getDeclaredMethods();
         assertEquals("**冻结为单方法**：不得再加方法 / 默认实现", 1, declared.length);
-        assertEquals("返回类型", "boolean", declared[0].getReturnType().getName());
+        assertEquals("返回类型（阶段 13 · t124：布尔换成字符串 ⇒ 组件能把值交出来）",
+                String.class, declared[0].getReturnType());
         assertEquals("方法名", "onOperationCommand", declared[0].getName());
         assertEquals("参数个数（v2 定案：只有一个 payload 字符串）", 1, declared[0].getParameterCount());
         assertEquals("参数类型", "java.lang.String", declared[0].getParameterTypes()[0].getName());

@@ -117,35 +117,38 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
      * **必须**且**只带一个非负整数**（缺参 / 多参 / 非数字 / 负数 / 溢出 ⇒ 拒绝 ✗）；
      * {@code current} **不得**带参数 ✗；payload 为 {@code null} / 空串 / 纯空白 ⇒ **无动词 ⇒ 未识别** ✗
      * （本组件把"空 payload"定义为**未识别** ✓ —— 设计定案 §1 允许组件自定该语义 ✓）。
-     * <p><b>返回值语义</b>（与 {@link OperationProvider} 的契约逐字一致）：识别且语法正确 ⇒ {@code true}
-     * —— **不论语义上成功与否** ✓（例：{@code consume} 因能量不足而未扣，仍算"已识别并按语义处理" ✓）；
-     * 未知动词 / 语法错 / 参数不合法 ⇒ {@code false} ✓。
+     * <p><b>返回值语义</b>（与 {@link OperationProvider} 的契约逐字一致；**阶段 13 · t124 起返回字符串** ✓）：
+     * **四个动词一律回"写后 / 当前的能量值"**（规范化十进制字符串，如 {@code "55"} ✓）—— 本组件**从不**返回空串
+     * （它总有一个可回的值 ✓）；**未知动词 / 空 payload / 语法错 / 参数不合法 ⇒ {@code null}** ✗
+     * （= 未识别或拒绝 ✓）。注意 {@code consume} 因能量不足而未扣时**仍算已识别** ✓ ⇒ 回**未变**的当前值
+     * （如 {@code "100"}）✓ 而不是 {@code null} ✓。
      * <p><b>副作用与置脏</b>：三个写动词一律经本组件的**既有强类型方法** ⇒ 变更通知（置脏 + 事件）由容器
      * 注入的 {@link ChangeSink} **照常触发** ✓ —— **不新增第二条变更通道** ✗（设计定案 §7.2"一套实现、
      * 两套门面"：字符串面只是**薄适配层** ✓）；{@code current} 无副作用 ✓。
      */
     @Override
-    public boolean onOperationCommand(String payload) {
-        if (payload == null) return false;
+    public String onOperationCommand(String payload) {
+        if (payload == null) return null;
         String[] tokens = payload.trim().split("\\s+");
-        if (tokens.length == 0 || tokens[0].isEmpty()) return false;   // 空 / 纯空白 payload ⇒ 未识别
+        if (tokens.length == 0 || tokens[0].isEmpty()) return null;   // 空 / 纯空白 payload ⇒ 未识别
         switch (tokens[0]) {
             case "current" -> {
-                return tokens.length == 1;                              // 只读动词不得带参数
+                if (tokens.length != 1) return null;                     // 只读动词不得带参数
+                return Integer.toString(current);                        // 回当前值（无副作用 ✓）
             }
             case "add", "consume", "set" -> {
-                if (tokens.length != 2) return false;                    // 必须且只带一个参数
+                if (tokens.length != 2) return null;                     // 必须且只带一个参数
                 int amount = parseNonNegative(tokens[1]);
-                if (amount < 0) return false;                            // 非数字 / 负数 / 溢出
+                if (amount < 0) return null;                             // 非数字 / 负数 / 溢出
                 switch (tokens[0]) {
                     case "add" -> gain(amount);
                     case "consume" -> tryConsume(amount);
                     default -> set(amount);
                 }
-                return true;
+                return Integer.toString(current);                        // 一律回"写后值"（含"不足未扣"⇒ 未变值 ✓）
             }
             default -> {
-                return false;                                            // 未知动词 ⇒ 未识别
+                return null;                                             // 未知动词 ⇒ 未识别
             }
         }
     }

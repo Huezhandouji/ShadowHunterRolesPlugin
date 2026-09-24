@@ -1132,8 +1132,28 @@ public class RoleInstance {
         if(hotbarRenderer.isDirty() || hasCoolingTickingComponent()){
             hotbarRenderer.render();
             hotbarRenderer.clearDirty();
+            //阶段 12 · t88 · B3：**渲染回调**（读侧、只通知）—— 触发点 = 上面"真正完成一次刷新之后" ✓
+            //★ 变化判据：只有**本帧真的改了东西**才回调（consumeChanged 一次性读取并清除）⇒ 无变化的那一帧 **0 次** ✗
+            //★ 派发：按能力接口扇出，**逐个**经 deliverHook（内含 guardedCall + 外裹 withinIterationWindow）✓
+            //  —— 不在此处裸调组件方法（否则抛异常时隔离四步不会被安排 ✗）
+            if(hotbarRenderer.consumeChanged()){
+                dispatchHotbarRendered();
+            }
         }
 
+    }
+
+    /**
+     * **热键栏"本帧真的变了"的通知**（阶段 12 · t88 · B3）：按
+     * {@link HotbarRenderComponent.RenderCallback} **扇出**，逐个经 {@link #deliverHook} 调用 ✓。
+     * <p><b>只通知、不可否决</b> ✗：回调返回 {@code void} ⇒ 改不了这一帧的渲染结果 ✓。
+     * <p><b>为何逐个 deliverHook 而不是把整个循环塞进一次调用</b>：那样首个异常会让"本次派发"里
+     * 排在其后的组件**收不到通知** ✗；逐个 ⇒ 只隔离抛异常的那个，其余照常收到 ✓。
+     */
+    private void dispatchHotbarRendered(){
+        for(HotbarRenderComponent.RenderCallback callback : getAllByType(HotbarRenderComponent.RenderCallback.class)){
+            deliverHook((RoleComponent) callback, "onHotbarRendered", callback::onHotbarRendered);
+        }
     }
 
     /**

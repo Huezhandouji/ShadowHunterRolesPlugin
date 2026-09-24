@@ -17,7 +17,7 @@ public class RoleManager {
     //去掉静态单例，改由主类在 onEnable 构造并注入平台上下文
     private final RolesContext context;
 
-    //RoleRegistry 改为构造注入（D-2 静态桥已删）
+    //RoleRegistry 改为构造注入（静态桥已删）
     private final RoleRegistry roleRegistry;
 
     /**
@@ -263,7 +263,7 @@ public class RoleManager {
 
 
     //插件禁用/重载时：走 instance.clear() 逐个回收（属性修饰符、记账内的药水、热键栏、任务），
-    //不再只把 map 清空（O-8）
+    //不再只把 map 清空
     public void clearAllPlayersRole(){
         for(RoleInstance instance : new ArrayList<>(playerRoleMap.values())){
             instance.clear();

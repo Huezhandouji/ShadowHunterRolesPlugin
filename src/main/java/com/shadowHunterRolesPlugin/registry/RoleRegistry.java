@@ -54,7 +54,7 @@ public class RoleRegistry {
         return roles.isEmpty();
     }
 
-    // **D-2 静态兼容桥已删除** —— 原 `install/active/hasRole/getRole/isValidRoleId`
+    // **静态兼容桥已删除** —— 原 `install/active/hasRole/getRole/isValidRoleId`
     // 的静态形式调用方（`command/RoleCommand`、`manager/RoleManager`）已改为**构造注入**本容器的实例 API。
     // 因此本类现在只有实例成员：没有静态 Map、没有 static{}、也没有任何静态状态。
 

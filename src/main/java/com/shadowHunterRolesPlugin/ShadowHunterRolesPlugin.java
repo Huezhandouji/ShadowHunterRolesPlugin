@@ -74,7 +74,7 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         RoleRegistry roleRegistry = new RoleRegistry();
         RoleLoader roleLoader = new RoleLoader(getLogger());
         int loadedRoles = roleLoader.loadInto(roleRegistry);
-        //D-2 静态兼容桥已删除 —— 容器改为**构造注入**给 RoleManager 与 RoleCommand
+        // 静态兼容桥已删除 —— 容器改为**构造注入**给 RoleManager 与 RoleCommand
         if (loadedRoles == 0) {
             getLogger().severe("No role templates were registered; /role and SHDF role selection will be unavailable.");
         }

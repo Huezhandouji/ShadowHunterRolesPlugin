@@ -45,7 +45,7 @@ public class MainWeaponListener implements Listener {
 
         //取消原版事件
         event.setCancelled(true);
-        //新管道（T-1 ④ 后**旧派发入口已删**）：武器由框架统一处理并在 SUCCEED 时启动冷却（无双启动）。
+        //新管道（**旧派发入口已删**）：武器由框架统一处理并在 SUCCEED 时启动冷却（无双启动）。
         instance.handleAttack(victim, attacker);
     }
 

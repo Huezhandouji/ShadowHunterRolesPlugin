@@ -15,14 +15,13 @@ public enum IconState {
     ENERGY_LACK,
     READY;
 
-    /**
-     * **状态判定（顺序冻结）**：冷却 → 禁用 → 能量不足 → 就绪。
-     *
-     * @param ready      冷却是否就绪（{@code false} ⇒ 冷却中）
-     * @param canCast    闸门是否放行（技能 = 非 STUN 且非 SILENCE；主武器 = 非 STUN）
-     * @param energy     当前能量
-     * @param energyCost 声明耗能（主武器恒 {@code 0} ⇒ {@link #ENERGY_LACK} 对它不可达）
-     */
+ /**
+ * **状态判定（顺序冻结）**：冷却 → 禁用 → 能量不足 → 就绪。
+ * @param ready 冷却是否就绪（{@code false} ⇒ 冷却中）
+ * @param canCast 是否放行（技能 = 非 STUN 且非 SILENCE；主武器 = 非 STUN）
+ * @param energy 当前能量
+ * @param energyCost 声明耗能（主武器恒 {@code 0} ⇒ {@link #ENERGY_LACK} 对它不可达）
+ */
     public static IconState of(boolean ready, boolean canCast, int energy, int energyCost) {
         if (!ready) {
             return IconState.COOLDOWN;
@@ -36,10 +35,10 @@ public enum IconState {
         return IconState.READY;
     }
 
-    /**
-     * **三态材质映射（冻结）**：就绪态沿用基础物品的材质；禁用 = {@link Material#BARRIER}；
-     * 冷却与能量不足**共用** {@link Material#STRUCTURE_VOID}（接管前即如此）。
-     */
+ /**
+ * **三态材质映射（冻结）**：就绪态沿用基础物品的材质；禁用 = {@link Material#BARRIER}；
+ * 冷却与能量不足**共用** {@link Material#STRUCTURE_VOID}（接管前即如此）。
+ */
     public Material material(Material readyMaterial) {
         return switch (this) {
             case READY -> readyMaterial;

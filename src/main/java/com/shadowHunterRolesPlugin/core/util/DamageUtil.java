@@ -14,7 +14,7 @@ import java.util.UUID;
 
 public class DamageUtil {
 
-    //小于这个水平距离平方时不计算击退，避免向量归一化得到NaN
+ //小于这个水平距离平方时不计算击退，避免向量归一化得到NaN
     private static final double MIN_KNOCKBACK_LENGTH_SQUARED = 1.0E-6;
 
     public static final NamespacedKey LAST_DAMAGER_KEY = KeyFactory.Registry.of(
@@ -27,7 +27,7 @@ public class DamageUtil {
         return UUID.fromString(uuidString);
     }
 
-    //真伤
+ //真伤
     public static void dealtTrueDamage(LivingEntity victim, LivingEntity damager, double amount){
         if(victim == null || victim.isDead()) return;
         if(damager != null && victim instanceof Player player){
@@ -38,7 +38,7 @@ public class DamageUtil {
         }
         victim.setHealth(Math.max(0, victim.getHealth() - amount));
     }
-    //带有击退的重载，简化后续代码
+ //带有击退的重载，简化后续代码
     public static void dealtTrueDamage(LivingEntity victim, LivingEntity damager, double amount, double knockbackStrength){
         if(victim == null || victim.isDead()) return;
         dealtTrueDamage(victim, damager, amount);
@@ -46,11 +46,11 @@ public class DamageUtil {
         applyKnockback(victim, damager.getLocation(), knockbackStrength);
     }
 
-    //物理伤害
+ //物理伤害
     public static void dealtPhysicalDamage(LivingEntity victim, LivingEntity damager, double amount){
         if(victim == null || victim.isDead()) return;
 
-        //在pdc中记录最后伤害者
+ //在pdc中记录最后伤害者
         if(damager != null && victim instanceof Player) {
             victim.getPersistentDataContainer().set(
                     DamageUtil.LAST_DAMAGER_KEY,
@@ -58,11 +58,11 @@ public class DamageUtil {
                     damager.getUniqueId().toString()
             );
         }
-        //造成伤害，绕过被玩家伤害事件
+ //造成伤害，绕过被玩家伤害事件
         victim.setNoDamageTicks(0);
         victim.damage(amount);
     }
-    //带有击退的重载
+ //带有击退的重载
     public static void dealtPhysicalDamage(LivingEntity victim, LivingEntity damager, double amount, double knockbackStrength){
         if(victim == null || victim.isDead()) return;
         dealtPhysicalDamage(victim, damager, amount);
@@ -79,7 +79,7 @@ public class DamageUtil {
         Vector dir = target.getLocation().toVector().subtract(source.toVector());
         dir.setY(0);
 
-        //两个实体站在同一个方块里时水平向量长度为0，normalize() 会算出 NaN，setVelocity 会抛 "x not finite"
+ //两个实体站在同一个方块里时水平向量长度为0，normalize() 会算出 NaN，setVelocity 会抛 "x not finite"
         if(dir.lengthSquared() < MIN_KNOCKBACK_LENGTH_SQUARED) return;
 
         dir.normalize();

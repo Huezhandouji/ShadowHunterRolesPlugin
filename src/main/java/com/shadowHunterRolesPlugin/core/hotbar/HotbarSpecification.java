@@ -18,12 +18,12 @@ import java.util.List;
  * <p>
  * 分工（阶段 8 冻结）：
  * <ul>
- *   <li>{@link HotbarRenderComponent.HotbarPresentable#specification()} = **唯一实现点** —— 组件只写这一处；</li>
- *   <li>本类自身即 {@link HotbarItem} 的**声明面**（图标 / 显示名 / 描述 / 冷却 / 耗能），
- *       因此 {@link HotbarRenderComponent.HotbarPresentable#asHotbarItem()} 直接返回本对象，无需适配代码；</li>
- *   <li><b>纯声明</b>：阶段 8 删掉了 {@code kind} 字段与构造参数 —— 描述符不再自述种类；
- *       "物品长什么样（含运行期状态）"由组件基类的 {@link HotbarRenderComponent.HotbarItemProviding#buildItem()} 回答；</li>
- *   <li><b>栏位必填</b>：本类型 {@link #requiresSlot()} = {@code true}（不带栏位的组件用另一支描述符）。</li>
+ * <li>{@link HotbarRenderComponent.HotbarPresentable#specification()} = **唯一实现点** —— 组件只写这一处；</li>
+ * <li>本类自身即 {@link HotbarItem} 的**声明面**（图标 / 显示名 / 描述 / 冷却 / 耗能），
+ * 因此 {@link HotbarRenderComponent.HotbarPresentable#asHotbarItem()} 直接返回本对象，无需适配代码；</li>
+ * <li><b>纯声明</b>：阶段 8 删掉了 {@code kind} 字段与构造参数 —— 描述符不再自述种类；
+ * "物品长什么样（含运行期状态）"由组件基类的 {@link HotbarRenderComponent.HotbarItemProviding#buildItem()} 回答；</li>
+ * <li><b>栏位必填</b>：本类型 {@link #requiresSlot()} = {@code true}（不带栏位的组件用另一支描述符）。</li>
  * </ul>
  * <b>栏位（阶段 7 · A 步）</b>：本类型是**带栏位**的那一支 —— 装配器用
  * {@link #setSlot(int)} 指定它在热键栏里的位置，装配期未设栏位则
@@ -33,18 +33,18 @@ import java.util.List;
  * <p>
  * 命名沿用工程的 JavaBean 风格（设计 §4.3：不引入 record 风格访问器）；
  * 旧短名 {@code HotbarSpec} 保留为 `@Deprecated` 别名（见该类）。
- * <p><b>阶段 10 · t71 取代指向</b>：上面的旧口径**已作废** —— 该类（`HotbarSpec`）**已删除** ✗；
- * 全拼 {@link HotbarSpecification} 是**唯一**入口 ✓。（旧口径原文保留不删，便于回溯。）
+ * <p><b> 说明</b>：上面的旧口径**** —— 该类（`HotbarSpec`）**已删除**；
+ * 全拼 {@link HotbarSpecification} 是**唯一**入口。（旧口径原文保留不删，便于回溯。）
  */
 public class HotbarSpecification<T extends RoleComponent>
         extends RoleComponent.Specification<T> implements HotbarItem {
 
-    /**
-     * **声明的 id**（{@link #of} 传入，可为 {@code null}）。
-     * <p>阶段 7 · C 步起：{@link #getId()} **优先**返回**装配期绑定的注册 id**
-     * （{@link RoleComponent.Specification#bindId(String)}，由装配入口写入）；只有未经装配的描述符
-     * （例如探针直接构造的）才回落到这里 ⇒ **字段不再撒谎**。
-     */
+ /**
+ * **声明的 id**（{@link #of} 传入，可为 {@code null}）。
+ * <p>阶段 7 · C 步起：{@link #getId()} **优先**返回**装配期绑定的注册 id**
+ * （{@link RoleComponent.Specification#bindId(String)}，由装配入口写入）；只有未经装配的描述符
+ * （例如探针直接构造的）才回落到这里 ⇒ **字段不再撒谎**。
+ */
     private final String declaredId;
     private final Component displayName;
     private final Component description;
@@ -63,39 +63,38 @@ public class HotbarSpecification<T extends RoleComponent>
         this.energyCost = energyCost;
     }
 
-    /**
-     * 唯一的构造入口（不可变 ⇒ 组件可在构造期一次建好）。
-     *
-     * @param descriptorLabel 诊断标签（**不是行为分支**；只出现在装配期异常的文案里，取值如 "Skill"）
-     */
+ /**
+ * 唯一的构造入口（不可变 ⇒ 组件可在构造期一次建好）。
+ * @param descriptorLabel 诊断标签（**不是行为分支**；只出现在装配期异常的文案里，取值如 "Skill"）
+ */
     public static <T extends RoleComponent> HotbarSpecification<T> of(String descriptorLabel, String id,
                                                                      Component displayName, Component description,
                                                                      Material icon, int cooldownTicks, int energyCost) {
         return new HotbarSpecification<>(descriptorLabel, id, displayName, description, icon, cooldownTicks, energyCost);
     }
 
-    /** 本类型**必须**有栏位：见 {@link RoleComponent.Specification#freeze()} 的 fail-fast。 */
+ /** 本类型**必须**有栏位：见 {@link RoleComponent.Specification#freeze()} 的 fail-fast。 */
     @Override
     protected boolean requiresSlot() {
         return true;
     }
 
-    /**
-     * **装配器设置栏位**（这一支唯一会在装配期写入的参数；其余表现字段由组件自己的描述符声明默认值）。
-     * 冻结后调用、重复改成别的位置、越界（非 0..8）一律抛异常。
-     */
+ /**
+ * **装配器设置栏位**（这一支唯一会在装配期写入的参数；其余表现字段由组件自己的描述符声明默认值）。
+ * 冻结后调用、重复改成别的位置、越界（非 0..8）一律抛异常。
+ */
     public final HotbarSpecification<T> setSlot(int slot) {
         assignSlot(slot);
         return this;
     }
 
-    /**
-     * **失败关闭（fail-fast）**：本类的默认创建体不造任何组件 —— 具体组件由**组件自己声明的嵌套
-     * `Specification`** 覆写本方法给出（阶段 7 · B 步落地）。把裸的 {@link HotbarSpecification}
-     * 交给装配入口会立刻在这里抛异常，而不是造出一个语义不明的组件。
-     * <p>本类在阶段 7 · A 步的另一半职责是"组件内部的声明值对象"：{@link HotbarRenderComponent.HotbarPresentable#specification()}
-     * 返回它、基类默认画法读它，那条路径**从不调用本方法**。
-     */
+ /**
+ * **失败关闭（fail-fast）**：本类的默认创建体不造任何组件 —— 具体组件由**组件自己声明的嵌套
+ * `Specification`** 覆写本方法给出（阶段 7 · B 步落地）。把裸的 {@link HotbarSpecification}
+ * 交给装配入口会立刻在这里抛异常，而不是造出一个语义不明的组件。
+ * <p>本类在阶段 7 · A 步的另一半职责是"组件内部的声明值对象"：{@link HotbarRenderComponent.HotbarPresentable#specification()}
+ * 返回它、基类默认画法读它，那条路径**从不调用本方法**。
+ */
     @Override
     public T create(String id, ComponentServices services) {
         throw new UnsupportedOperationException(
@@ -103,27 +102,27 @@ public class HotbarSpecification<T extends RoleComponent>
                         + "declare a component-nested Specification and override create(String, ComponentServices).");
     }
 
-    /**
-     * 组件 id：**优先**取装配期绑定的注册 id（{@link RoleComponent.Specification#bindId(String)}），
-     * 未绑定时才回落到 {@link #of} 传入的声明 id。
-     * <p>阶段 7 · C 步的修法（A7 · 选 (a)）：B 步后组件自带的描述符一律走"不带 id 的构造"，若只留声明 id，
-     * 这个字段就会**恒为 null 而仍可被读**（t34 第一轮的真实回归正是它导致的）⇒ 现在装配入口把注册 id
-     * 绑进描述符，字段与注册处**同源同值**。
-     */
+ /**
+ * 组件 id：**优先**取装配期绑定的注册 id（{@link RoleComponent.Specification#bindId(String)}），
+ * 未绑定时才回落到 {@link #of} 传入的声明 id。
+ * <p>阶段 7 · C 步的修法（A7 · 选 (a)）：B 步后组件自带的描述符一律走"不带 id 的构造"，若只留声明 id，
+ * 这个字段就会**恒为 null 而仍可被读**⇒ 现在装配入口把注册 id
+ * 绑进描述符，字段与注册处**同源同值**。
+ */
     @Override
     public String getId() {
         String bound = boundId();
         return bound != null ? bound : declaredId;
     }
 
-    /**
-     * **基础物品**（阶段 7 · C 步 · 默认实现）：由图标 / 显示名 / 描述生成热键栏物品底稿 ——
-     * 材质 = {@link #getIcon()}、显示名 = {@link #getDisplayName()}、lore = 单行 {@link #getDescription()}。
-     * <p><b>阶段 8 起</b>：它只提供**底稿**（材质 / 名称 / 描述），状态装饰
-     * （三态材质覆盖 / 名称颜色与加粗 / 冷却秒数或后缀 / 状态行 lore / 分隔线 / 两个 PDC 键）
-     * 由 `core/Skill#buildItem()` 与 `core/MainWeapon#buildItem()` 施加，因此本方法**不碰**这些冻结面。
-     * <p>需要特殊底稿的组件：在自己的嵌套 `Specification` 里覆写本方法即可。
-     */
+ /**
+ * **基础物品**（阶段 7 · C 步 · 默认实现）：由图标 / 显示名 / 描述生成热键栏物品底稿 ——
+ * 材质 = {@link #getIcon()}、显示名 = {@link #getDisplayName()}、lore = 单行 {@link #getDescription()}。
+ * <p><b>阶段 8 起</b>：它只提供**底稿**（材质 / 名称 / 描述），状态装饰
+ * （三态材质覆盖 / 名称颜色与加粗 / 冷却秒数或后缀 / 状态行 lore / 分隔线 / 两个 PDC 键）
+ * 由 `core/Skill#buildItem()` 与 `core/MainWeapon#buildItem()` 施加，因此本方法**不碰**这些冻结面。
+ * <p>需要特殊底稿的组件：在自己的嵌套 `Specification` 里覆写本方法即可。
+ */
     @Override
     public ItemStack baseItem(String id) {
         ItemStack stack = new ItemStack(icon);

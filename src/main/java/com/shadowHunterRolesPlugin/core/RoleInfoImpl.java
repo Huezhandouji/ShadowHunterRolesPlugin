@@ -10,19 +10,18 @@ import org.bukkit.entity.Player;
 import java.util.List;
 
 /**
- * {@link RoleInfo} 的独立适配器（阶段 13 · t90 · A1）：**持 {@code RoleInstance}**，与
- * {@code *PortImpl} 家族同形 ✓。
- *
- * <p><b>取值一律经聚合根</b>：{@link #faction()} 读 {@code Role#getFaction()} ✓
- * （**不是**读某个组件实例的字段 ⇒ 阵营"一个角色一份、全局静态" ✓）。
+ * {@link RoleInfo} 的独立适配器（ · A1）：**持 {@code RoleInstance}**，与
+ * {@code *PortImpl} 家族同形。
+ * <p><b>取值一律经聚合根</b>：{@link #faction()} 读 {@code Role#getFaction()}
+ * （**不是**读某个组件实例的字段 ⇒ 阵营"一个角色一份、全局静态"）。
  * <p><b>两个行为照搬原阵营组件</b>（{@code frameworkLevel/FactionComponent} 的
  * {@code isHostile} / {@code hasEnemyInRange}）—— 逐字等价，只把"自己的阵营"与"自己的位置"的
- * 取值路径改经本适配器持有的容器 ✓。
- * <p><b>阶段 13 · t123（欠账 A 后半）</b>：{@code FactionComponent} **已整体删除** ✗ ⇒ 上面的
- * "照搬原组件"只作**历史沿革**读：本端口现在是**阵营读取的唯一入口** ✓（{@link #faction()} 读聚合根
- * {@code Role#getFaction()}），且**不带写面** ✗（R-1：写侧在 {@code Role#setFaction/resetFaction}）。
- * <p><b>【已作废】旧口径原文</b>（阶段 13 · t90 原文，逐字保留）：「本卡纯加性：不删任何既有成员 /
- * 组件 / 端口」✗ —— 删除的那一半已由 t123 落地（另一个旧原件见 {@link RoleInfo} 的 javadoc）。
+ * 取值路径改经本适配器持有的容器。
+ * <p><b>（欠账 A 后半）</b>：{@code FactionComponent} **已整体删除** ⇒ 上面的
+ * "照搬原组件"只作**历史沿革**读：本端口现在是**阵营读取的唯一入口** （{@link #faction()} 读聚合根
+ * {@code Role#getFaction()}），且**不带写面** （R-1：写侧在 {@code Role#setFaction/resetFaction}）。
+ * <p><b>旧口径原文</b>：「本卡纯加性：不删任何既有成员 /
+ * 组件 / 端口」 —— 删除的那一半已由 落地（另一个旧原件见 {@link RoleInfo} 的 javadoc）。
  */
 final class RoleInfoImpl implements RoleInfo {
 
@@ -82,7 +81,7 @@ final class RoleInfoImpl implements RoleInfo {
             if (p == null) {
                 continue;
             }
-            //没有选角色的玩家也要算进来（FactionLookup 对未选角色返回敌对）
+ //没有选角色的玩家也要算进来（FactionLookup 对未选角色返回敌对）
             if (lookup().isHostile(selfFaction, p)) {
                 return true;
             }
@@ -90,7 +89,7 @@ final class RoleInfoImpl implements RoleInfo {
         return false;
     }
 
-    /** 关系表（平台侧静态数据；不随实例复制 ✓）。 */
+ /** 关系表（平台侧静态数据；不随实例复制）。 */
     private FactionLookup lookup() {
         return owner.rolesContext().factions();
     }

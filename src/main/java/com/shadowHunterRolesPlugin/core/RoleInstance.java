@@ -492,10 +492,8 @@ public class RoleInstance {
             //⇒ 框架侧（markHotbarDirty）与组件侧**收敛到同一条通道**（禁两套并存 ✓）；
             //  旧 `RepaintRequestable` / `RepaintRequester` 两条通道**已删除** ✓。
             //绑定时机的纪律不变：渲染组件本身在构造器里就已 bindRepaintSink（早于任何 awake/start）✓。
-
-            //阶段 11 · t84：**创建后绑定**（F-1/F-2/F-3 的修复点）—— 时机必须在构造之后、任何钩子
-            //（awake/start）之前。阶段 13 · t106 起端口面已清理 ⇒ 该落点**已无绑定目标**（见 bindOwnerPorts）。
-            bindOwnerPorts(services, component);
+            //阶段 13 · t118：原"创建后绑定"的**装配期落点已整体删除** ✗（它唯一的绑定目标是计时端口，
+            //  端口面 t106 起已清理 ⇒ 该调用早已是 no-op）—— 状态一律归**组件实例本身**，不需要任何绑定动作。
 
             //旧窄类型视图（供既有公共访问器使用）：按**具体类型**归位，不按任何"种类"猜测
             if(component instanceof Skill skill) skillMap.put(componentId, skill);
@@ -598,41 +596,12 @@ public class RoleInstance {
 
 
 
-    /**
-     * **按 id 解析实例（回落口径，保留）**：{@code getById} = **添加顺序第一个**同 id 者。
-     * <p><b>阶段 11 · t84</b>：本口径从"主判据"降级为**回落** —— 端口未绑定时（例如框架级服务组件、
-     * 或"构造早于组件"的时刻）仍按它解析，**不得静默丢登记 / 丢派发 / 丢回调** ✗；
-     * 已绑定者一律用绑定实例（{@link #preferBound(RoleComponent, RoleComponent)}）。
-     */
-    RoleComponent resolveComponent(String componentId){
-        return componentRegistry.getById(componentId);
-    }
-
-    /**
-     * **纯判定：状态面"一律按实例"的唯一裁决点**（阶段 11 · t84 · F-1/F-2/F-3）：
-     * 已绑定 ⇒ **绑定实例**；未绑定 ⇒ 按 id 回落的实例（可为 {@code null}）。
-     * <p><b>为什么必须保留回落</b>：端口的构造**早于**组件（`createServices` 在组件构造之前被调用）
-     * ⇒ 框架级服务组件与"尚未绑定"的时刻只能按 id 解析；回落**不得静默丢弃** ✗（B1 的明文口径）。
-     * <p>纯函数（不读注册表、无副作用）⇒ 可离线单测。
-     */
-    static RoleComponent preferBound(RoleComponent bound, RoleComponent fallback){
-        return bound != null ? bound : fallback;
-    }
-
-    /**
-     * **创建后绑定（历史落点；阶段 13 · t106 起无绑定目标）**。
-     * <p><b>它原来做什么</b>（阶段 11 · t84）：把"持有那一对端口的那一个组件实例"写进端口 —— 端口在构造期
-     * 造出（早于组件构造），那个时刻物理上拿不到实例引用（这正是 F-1/F-2 的根因）；给端口加绑定钩子是最小修法，
-     * 落点是"状态面按实例"的三处（能力判定 / 回调投递 / 资源登记归属）。
-     * <p><b>现状</b> ✗：端口面已清理 ⇒ 状态一律归**组件实例本身**（冷却状态是组件字段、计时资源由组件按请求者
-     * 登记）⇒ 本方法**没有任何绑定目标**；保留签名只为不改动两个调用点的形状（装配期 {@link #initComponents()}、
-     * 运行期动态增 {@code ComponentLookupImpl#insertAt}）。
-     * <p>⇒ 行为 = **无操作**；不存在"静默丢弃"：没有端口再持有 per-instance 状态，
-     * {@link #preferBound(RoleComponent, RoleComponent)} 的回落口径也随之不再被端口用到。
-     */
-    static void bindOwnerPorts(ComponentServices services, RoleComponent component){
-        //无绑定目标（见 javadoc）：形参保留，以维持两个调用点的签名不变。
-    }
+    //阶段 13 · t118（代码卫生）：原先这里的三个成员 —— 按 id 解析的**回落入口**、那条口径的
+    //  **纯判定函数**（t84 的 F-1/F-2/F-3 修复点）、以及"创建后绑定"的**空转落点** —— 已**整体删除** ✗。
+    //理由（逐条现算）：① 三者的生产消费者 **0 个**（端口面 t106 清理后，"端口按 id 回落"这条口径再无使用者）；
+    //  ② 绑定落点自 t106 起就是 **no-op**（唯一绑定目标 = 计时端口，已删）；
+    //  ③ 留着它们会让"状态面按实例"看起来仍由框架兜底 —— 而事实是**状态一律归组件实例本身** ✓。
+    //★ 唯一仍在的同类语义 = 组件自己的 `start()` 里**按需/一次解析强类型组件**（R-4 ✓），与本处无关。
 
 
 

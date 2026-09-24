@@ -133,10 +133,9 @@ final class ComponentLookupImpl implements ComponentLookup {
 
         ComponentServices services = servicesFactory.apply(id);
         T component = create(snapshot, id, services);
-        //此处保留为**创建后钩子点**：当前没有"需要按所有者绑定的端口"（组件侧改为各自在 start() 解析
-        //并持有强类型组件引用）⇒ 本调用目前**不产生任何绑定动作**（no-op），仅维持与装配期同一落点的调用形状；
-        //时机仍是：构造返回之后、任何钩子（awake/start）之前 —— 组件可能一醒就起冷却 / 登记任务。
-        RoleInstance.bindOwnerPorts(services, component);
+        //阶段 13 · t118：原"创建后绑定"的**运行期落点已整体删除** ✗（它唯一的绑定目标是计时端口，
+        //端口面 t106 起已清理 ⇒ 该调用早已是 no-op）。组件侧改为各自在 `start()` 解析并持有强类型组件
+        //引用（R-4 ✓）；此处**不再有**任何绑定动作。
         try {
             registry.insert(index, component, declaration);
             component.awake();

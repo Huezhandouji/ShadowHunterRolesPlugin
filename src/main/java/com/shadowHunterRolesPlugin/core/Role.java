@@ -582,7 +582,7 @@ public class Role {
     /**
      * 按 id 取**描述符类型**（阶段 8）：仅供"三个 id 视图的归类"等装配期用途；
      * 组件的**行为分支不再读任何种类**（旧的 {@code componentKindOf} 已随 kind 枚举删除，
-     * 它的两个消费者改为按**能力接口**判定：{@code CooldownBearing} / 占栏位组件）。
+     * 它的两个消费者改为按**能力接口**判定：{@code roleComponent.RoleComponent.CooldownBearing} / 占栏位组件）。
      * 未注册 ⇒ {@code null}。
      */
     public Class<?> descriptorTypeOf(String id){

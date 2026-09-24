@@ -9,8 +9,6 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -20,10 +18,13 @@ import static org.junit.Assert.assertTrue;
  * <p><b>阶段 13 · t105 的收窄（已申报）</b>：冷却的**状态与判断**已整体归组件实例（`ActiveComponent`），
  * 框架侧那张表、以及"某实例有没有冷却这回事"的**框架侧判据**已随之删除 ⇒ 原先直测那个 helper 的断言
  * 改为直测**能力接口本身**（`instanceof CooldownBearing`）—— **接受集逐字不变**（实现者 true / 未实现者 false），
- * 因此覆盖没有丢失 ✓；仍然保留的纯函数是 {@link RoleInstance#preferBound(RoleComponent, RoleComponent)}
- * （回落口径，与冷却归属无关 ✓）。
+ * 因此覆盖没有丢失 ✓。
  *
- * <p><b>为什么能离线跑</b>：{@code preferBound} 是**静态纯函数**（不读注册表、不碰 Bukkit、无副作用），
+ * <p><b>阶段 13 · t118 的再收窄（已申报）</b>：那条"按 id 回落"口径的**纯判定函数与其入口**已随代码卫生
+ * 删除 ✗（生产消费者 **0 个**）⇒ 原先直测它们的 3 个用例**一并删除**（用例数 **66 → 63**，理由见交付说明）；
+ * 本类此后只覆盖**仍然活着**的那条口径：能力接口的接受集按**实例的类型**判定 ✓。
+ *
+ * <p><b>为什么能离线跑</b>：全部断言只用 `instanceof` 与组件构造（不读注册表、不碰 Bukkit、无副作用），
  * 与 `CapabilityDispatchTest` 同一形态（冻结件 §4 T-5 批准的"空 ComponentServices 桩"）就能驱动。
  *
  * <p><b>判据边界</b>：本类**不**覆盖"冷却时长/读数"的数值语义（那属于组件自身的 API，随 t105 的
@@ -66,33 +67,7 @@ public class StateBindingByInstanceTest {
         assertFalse("null ⇒ 没有冷却这回事（不抛）", none instanceof CooldownBearing);
     }
 
-    // ───────── ② 回落保留（不得静默丢弃） ─────────
-
-    /** 已绑定 ⇒ **绑定实例**胜出（哪怕按 id 回落到的是另一个同 id 实例）。 */
-    @Test
-    public void boundInstanceWinsOverIdFallback() {
-        FakeBearing bound = new FakeBearing("dup_id");
-        FakePlain byId = new FakePlain("dup_id");
-
-        assertSame("绑定实例优先（F-1/F-2/F-3 的唯一裁决点）",
-                bound, RoleInstance.preferBound(bound, byId));
-    }
-
-    /** 未绑定（{@code null}）⇒ 按 id 回落的实例（**保留回落口径**：纯函数的唯一裁决点，本类直测它）。 */
-    @Test
-    public void unboundFallsBackToIdResolution() {
-        FakePlain byId = new FakePlain("energy");
-        assertSame("未绑定 ⇒ 回落实例（不静默丢弃）",
-                byId, RoleInstance.preferBound(null, byId));
-    }
-
-    /** 两边都没有 ⇒ {@code null}（下游按"解析不到就什么都不做"处理，不抛）。 */
-    @Test
-    public void nothingToResolveYieldsNull() {
-        assertNull(RoleInstance.preferBound(null, null));
-    }
-
-    // ───────── ③ 与真产品组件一致（防"接反"） ─────────
+    // ───────── ② 与真产品组件一致（防"接反"） ─────────
 
     /**
      * 真实组件的答案必须与冻结能力模型一致：技能（走 {@code ActiveComponent} ⇒ 实现 {@code CooldownBearing}）

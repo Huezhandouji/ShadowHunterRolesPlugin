@@ -48,7 +48,7 @@ public class MeiqiheziUnconcernSkill extends Skill {
 
     /**
      * 批次②（B②）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
-     * 药水经 {@code buffComponent().applyPotionEffect(...)} 施加 ⇒ **与旧写法同一条已记账路径**
+     * 药水经**本组件的 buff 字段**（{@code buff.applyPotionEffect(...)}）施加 ⇒ **与旧写法同一条已记账路径**
      * （效果类型 SPEED / 时长 40 / 增幅 4 逐字不变；`new PotionEffect(type,40,4,false,true)` 与
      * `type.createEffect(40,4)` 的 ambient=false、particles=true 一致）。
      * `canCastSkill` 不满足时**直接返回**（该路径**不启冷却**）；

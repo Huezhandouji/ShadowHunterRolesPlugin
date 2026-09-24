@@ -43,6 +43,8 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 public class RoleInstance {
@@ -51,32 +53,15 @@ public class RoleInstance {
     private final Player player;
     private final Role role;
 
- // ───────── （A1 改正）：服务组件**每角色实例一个**，由本容器持有 ─────────
- //它们**不进 `Role` 模板**（`Role.getComponents()` 与装配表逐格不变），但会登记进**实例容器**
- //（`componentRegistry`）⇒ `svc().components().get(EnergyComponent.class)` 与 `RoleInstance#getByType(...)`
- //都能取到它们；**组件侧一律直接用组件本身**（ 起服务集不再转发这八件事）。
- //★ 状态归属（A3「状态唯一」）：能量 / SanTE 的真值、buff 记账表、药水账本、计时资源
- // **都在组件里** ⇒ 本类**不再持有这些字段** （旧字段已全部移除，见说明件的状态归属表）。
- // **原口径**：该清单里还有「阵营」一项 ——
- // （欠账 A 后半）把 `FactionComponent` 整体删除 ⇒ **阵营的真值改住聚合根
- // `core/Role` 的 `faction` 字段** （读 = `roleInfo` 服务面，写 = `Role#setFaction/resetFaction`）。
-    private final EnergyComponent energyComponent;
-    private final SanTEComponent santeComponent;
-    private final VitalsComponent vitalsComponent;
-    private final BuffComponent buffComponent;
-    private final TimerComponent timerComponent;
- /**
- * **物品渲染组件** —— 渲染**意图面**（意图登记 + 置脏）与渲染器（唯一写点）的**唯一归属点**。
- * <p><b>唯一写点未变</b>：物品仍只在**帧末 flush** 里写一次（渲染组件自己持有的那个渲染器）；
- * 本类**不持有**渲染器、也不经手 Bukkit 库存写入面 ⇒ 只跟组件打交道
- * （置脏走 {@link HotbarRenderComponent#markDirty()} / {@code requestRepaint()}，
- * 帧末走 {@link HotbarRenderComponent#flush()} / {@link HotbarRenderComponent#firstFlush()}）。
- * <p><b>（欠账 A 后半 · 本字段上方的那一项已不存在）</b>：原
- * `frameworkLevel.FactionComponent` 的**每实例持有已删除** —— 阵营不再是"每实例一个组件"的状态，
- * 而是**聚合根**（{@link Role}）上的一个声明值 ⇒ 读侧一律经 {@code roleInfo} 服务面
- * （{@link #roleInfo()}）、写侧经 {@link #setFaction} / {@link #resetFaction}（两者都转调到聚合根）。
- */
-    private final HotbarRenderComponent hotbarRenderComponent;
+ // ───────── 服务组件**每角色实例一个**，但本类**不持有**它们 ─────────
+ //它们**不进 `Role` 模板**（`Role.getComponents()` 与装配表逐格不变），但登记进**实例容器**
+ //（`componentRegistry`）⇒ 本类与组件侧都经**容器查取入口**取它们
+ //（框架侧 = {@link #pick(String)}，组件侧 = `svc().components().get(...)`）。
+ //★ 状态归属（「状态唯一」）：能量 / SanTE 的真值、buff 记账表、药水账本、计时资源
+ // **都在组件里** ⇒ 本类既不持有这些状态，也**不持有组件本身**：
+ // 构造期用局部变量装配（局部 ≠ 持有），此后一律按 id 现取。
+ // **保留的是查取机制本身的字段**：{@code componentRegistry} / {@code componentLookup} /{@code componentServices}
+ // —— 它们是**容器基础设施**，不是组件。
 
  /** 服务组件在**实例容器**里的 id（与 {@code ComponentServices} 的成员名同形 ⇒ 便于逐项对照）。 */
     private static final String SERVICE_ID_ENERGY = "energy";
@@ -178,35 +163,32 @@ public class RoleInstance {
 
  //② 物品渲染：**意图面**与渲染器（唯一写点）都归渲染组件 ⇒ 本类不经手渲染器本身
  // 「组件只能请求、不能写」逐字保留（帧末 flush 归渲染组件的 flush()）。
- // ★ 构造顺序：它必须**先于**任何要置脏的组件（能量构造期的回调就会置脏）——否则读取未初始化的 final 字段。
-        this.hotbarRenderComponent = new HotbarRenderComponent(SERVICE_ID_HOTBAR_RENDER,
+ // ★ 装配顺序：渲染组件必须**先于**任何要置脏的组件（能量构造期的回调就会置脏）。
+        HotbarRenderComponent hotbarRender = new HotbarRenderComponent(SERVICE_ID_HOTBAR_RENDER,
                 createServices(SERVICE_ID_HOTBAR_RENDER));
-        this.hotbarRenderComponent.bindRepaintSink(this.hotbarRenderComponent::markDirty);
+        hotbarRender.bindRepaintSink(hotbarRender::markDirty);
 
  //③ 能量 / SanTE：真值（current）与上限（max，= 角色模板的声明值）都在组件里；
  // "置脏"这件平台事由容器**注册成监听器**承担 ⇒ 组件本身不需要任何旧端口。
-        this.energyComponent = new EnergyComponent(SERVICE_ID_ENERGY, createServices(SERVICE_ID_ENERGY),
+        EnergyComponent energy = new EnergyComponent(SERVICE_ID_ENERGY, createServices(SERVICE_ID_ENERGY),
                 role.getMaxEnergy(),
-                change -> {
- //触点④（能量单一入口）：**无条件**置脏（不做"跨阈值才置脏"的优化 —— 那属性能项）
-                    hotbarRenderComponent.markDirty();
-                });
-        this.santeComponent = new SanTEComponent(SERVICE_ID_SANTE, createServices(SERVICE_ID_SANTE),
+                change -> pickApply(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, HotbarRenderComponent::markDirty));
+        SanTEComponent sante = new SanTEComponent(SERVICE_ID_SANTE, createServices(SERVICE_ID_SANTE),
                 role.getMaxSanTE());
  //平台侧通道：以**本组件自身**为 owner 登记 ⇒ 写入路径直调这一条（订阅者仍归下面的派发边界）
-        this.santeComponent.addListener(this.santeComponent, change ->
- //容器**直派**：组件只管真值怎么变；"变了之后通知谁"这条边界在容器里（不再经 RoleEventListener 转发）
+        sante.addListener(sante, change ->
+ //容器**直派**：组件只管真值怎么变；"变了之后通知谁"这条边界在容器里
                 dispatchSanTEChange(change.previous(), change.current()));
 
  //④ 生命：clamp 策略的唯一实现在组件里（状态 = Bukkit 玩家属性，属外部平台状态）
-        this.vitalsComponent = new VitalsComponent(SERVICE_ID_VITALS, createServices(SERVICE_ID_VITALS));
+        VitalsComponent vitals = new VitalsComponent(SERVICE_ID_VITALS, createServices(SERVICE_ID_VITALS));
 
- //⑤ buff：记账表（BuffManager）与药水账本（原 appliedPotionTypes 字段）都归它持有
-        this.buffComponent = new BuffComponent(SERVICE_ID_BUFFS, createServices(SERVICE_ID_BUFFS), buffManager);
+ //⑤ buff：记账表（BuffManager）与药水账本都归它持有
+        BuffComponent buffs = new BuffComponent(SERVICE_ID_BUFFS, createServices(SERVICE_ID_BUFFS), buffManager);
 
  //⑥ 计时：任务的**创建**在组件里、**登记归属**按请求者；资源**存储**仍是容器的每组件资源表
  // （TaskSink 就是 ComponentRegistry#track / #cancelAll ⇒ 既有回收机制一条都不改）
-        this.timerComponent = new TimerComponent(SERVICE_ID_TIMERS, createServices(SERVICE_ID_TIMERS),
+        TimerComponent timers = new TimerComponent(SERVICE_ID_TIMERS, createServices(SERVICE_ID_TIMERS),
                 platform.scheduler(), new TimerComponent.TaskSink() {
             @Override
             public void track(RoleComponent requester, Task task) {
@@ -232,13 +214,13 @@ public class RoleInstance {
 
         initComponents();
 
- //服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
- //（ 起为 7 个：6 个原服务组件 + 物品渲染组件；
- // 起为 **6 个**：原"阵营"一项已随 FactionComponent 删除）
-        registerServiceComponents();
-
- //装配完成 → 冻结注册表（此后 getComponent 才合法）
+ //装配完成 → 冻结注册表（此后按 id / 按类型查取才合法）
         componentRegistry.freeze();
+
+ //服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
+ //登记在冻结点**之后**：登记按 id 调用查取入口（本类不保留任何组件字段）
+        registerServiceComponents(SERVICE_ID_ENERGY, SERVICE_ID_SANTE, SERVICE_ID_VITALS,
+                SERVICE_ID_BUFFS, SERVICE_ID_TIMERS, SERVICE_ID_HOTBAR_RENDER);
 
  // ── 第一相到此结束（ · P6 两阶段构造）───────────────────────────────
  //构造器**只做不可见的事**：装配（组件 / 服务集 / 窄类型视图 / 服务组件登记）+ 注册表冻结
@@ -257,7 +239,7 @@ public class RoleInstance {
  * 尚未在构造器里赋值的 final 字段（Java 的 definite-assignment 规则）⇒ 方法引用把读取推迟到调用时。
  */
     private void requestHotbarRepaint() {
-        hotbarRenderComponent.requestRepaint();
+        pickApply(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, HotbarRenderComponent::requestRepaint);
     }
 
  /**
@@ -284,7 +266,7 @@ public class RoleInstance {
 
  //① buff 记账表的每 tick 更新（原在构造期由 `BuffManager` 构造器启动，现移到这里）：
  // **提交顺序与既有实现相同** —— 先于实例 ticker 提交 ⇒ 同一 tick 内先跑记账、再跑组件 update。
-        buffComponent.manager().startUpdater();
+        pickApply(SERVICE_ID_BUFFS, BuffComponent.class, component -> component.manager().startUpdater());
 
  //② 设置生命
         AttributeModifier am = new AttributeModifier(
@@ -310,7 +292,7 @@ public class RoleInstance {
 
  //④ 构造期**同步首刷一次**（可见时机与既有实现逐字一致 = 选角色瞬间热键栏即就绪、零延迟）；
  //首个 tick 因置脏初值为 true 还会再写一次同内容（不可见、且此后空闲 tick 不再写）。
-        hotbarRenderComponent.firstFlush();
+        pickApply(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, HotbarRenderComponent::firstFlush);
     }
 
  //平台上下文：组件取用入口（逐批收窄后服务集只剩三个成员）
@@ -328,32 +310,22 @@ public class RoleInstance {
     public RoleInfo roleInfo() { return roleInfo; }
 
  /**
- * 把**框架级服务组件**登记进**实例容器**（）。
+ * 把**框架级服务组件**登记进**实例容器**（按 **id** —— 调用方只需给出 id，不必持有实例）。
  * <p><b>不进 {@code Role} 模板</b> ⇒ {@code role.getComponents()} = 装配表 = 冻结 CELLS **逐格不变**；
- * 登记后它们可被 {@code svc().components().get(EnergyComponent.class)} / {@code getId} 取到
- * （= 用户计划里"角色实例 = 组件的容器"的落点）。
- * <p><b></b>：清单为 **6 个**（能量 / SanTE / 生命 / buff / 计时 / 物品渲染）——
- * 原"阵营"一项**已删除** （阵营 = 聚合根上的声明值，不是容器里的服务组件）。
- * <p><b>id 冲突</b>（角色模板里恰好也有同名组件）：角色组件优先（模板是产品内容），服务组件**跳过登记**
- * 并记一条 WARNING —— 它仍由字段持有、强类型读口仍能取到它 ⇒ **能力不受影响**（只是容器按 id/类型查不到它）。
+ * 登记后它们可被 {@code svc().components().get(EnergyComponent.class)} / 按 id 取到
+ * （= "角色实例 = 组件的容器"的落点）。
+ * <p>清单为 **6 个**（能量 / SanTE / 生命 / buff / 计时 / 物品渲染）；原"阵营"一项**已删除**
+ * （阵营 = 聚合根上的声明值，不是容器里的服务组件）。
+ * <p><b>顺序</b>：登记在 {@link #initComponents()} **之后**、{@link ComponentRegistry#freeze()} **之前**
+ * ⇒ 容器序 = 模板组件在前、服务组件在后（逐格不变）。
  */
-    private void registerServiceComponents() {
-        registerServiceComponent(energyComponent);
-        registerServiceComponent(santeComponent);
-        registerServiceComponent(vitalsComponent);
-        registerServiceComponent(buffComponent);
-        registerServiceComponent(timerComponent);
-        registerServiceComponent(hotbarRenderComponent);
-    }
-
-    private void registerServiceComponent(RoleComponent component) {
-        if (componentRegistry.declarationOf(component.getId()) != null) {
-            platform.logger().warning("Role '" + role.getId() + "' already has a component with id '"
-                    + component.getId() + "'; the framework service component is kept as an instance field "
-                    + "but is NOT registered in the container (lookup by id/type will not find it).");
-            return;
+    private void registerServiceComponents(String... serviceIds) {
+        for (String serviceId : serviceIds) {
+            RoleComponent component = resolve(serviceId);
+            if (component != null) {
+                componentRegistry.register(component);
+            }
         }
-        componentRegistry.register(component);
     }
 
  /**
@@ -433,6 +405,44 @@ public class RoleInstance {
                 component.getId(), entry.getProvidedType(), entry.getRequiredTypes()));
     }
 
+ // ───────── 组件取用：一律经**容器查取入口**（本类不持有任何组件） ─────────
+
+ /**
+ * 按 **id** 在容器里取组件；**未登记 ⇒ {@code null}**（不抛）。
+ * <p>与 {@link #getByType(Class)} 同一实现点（同一注册表、同一"添加顺序第一个同 id 者"口径），
+ * 取到的是**容器里那一个实例**（同一引用）。
+ */
+    private RoleComponent resolve(String id) {
+        return componentRegistry.getById(id);
+    }
+
+ /**
+ * **按 id 取组件并调用它的一个方法**（取不到 / 类型不符 ⇒ **静默跳过**）。
+ * <p>两种形态都能用它：① 组件在容器里（**唯一可达态**）⇒ 与"持有它再直接调"逐字等价；
+ * ② 组件已从容器移除（**只有整实例隔离时的清理路径**会走到）⇒ 只跳过 ——
+ * 那种情况下组件已被 `stop()` 且其登记的资源已被回收 ⇒ 这些调用本就是**多余的二次清理**。
+ * @param id 组件 id
+ * @param type 期望的组件类型（类型不符 ⇒ 同样跳过，不抛）
+ * @param action 要调用的方法（方法引用；在**容器里那一个实例**上求值）
+ */
+    private <T extends RoleComponent> void pickApply(String id, Class<T> type, Consumer<T> action) {
+        RoleComponent component = resolve(id);
+        if (type.isInstance(component)) {
+            action.accept(type.cast(component));
+        }
+    }
+
+ /**
+ * **按 id 取组件并把它的一个方法返回值交回**（取不到 / 类型不符 ⇒ 回 {@code fallback}）。
+ * <p>语义同 {@link #pickApply(String, Class, Consumer)}：唯一可达态下与"持有它再直接读"逐字等价。
+ * <p>读口一律用**提取函数**（{@code component -> component.read()}）而不是方法引用 ——
+ * 组件类型与 `RoleComponent` 无继承关系，写不出通用的方法引用形态。
+ */
+    private <T extends RoleComponent, R> R pickValue(String id, Class<T> type, Function<T, R> read, R fallback) {
+        RoleComponent component = resolve(id);
+        return type.isInstance(component) ? read.apply(type.cast(component)) : fallback;
+    }
+
  // ───────── 施放 / 攻击管道（单一入口 = handleCast/handleAttack） ─────────
 
  /**
@@ -462,7 +472,7 @@ public class RoleInstance {
  //调用方会回落到旧路径 ⇒ **二次派发**（组件已被隔离，二次派发是新的错误面）
  //施放后**无条件**置脏一次（与既有实现逐字一致：这次置脏**不在**帧末入口条件里
  // ⇒ 即使本次施放没有可见变化，也照旧请求一次重绘）
-        hotbarRenderComponent.markDirty();
+        pickApply(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, HotbarRenderComponent::markDirty);
         return true;
     }
 
@@ -484,7 +494,7 @@ public class RoleInstance {
         guardedCall(component, "onAttack", () -> hook.onAttack(new AttackSignal(victim)));
         runPendingQuarantine();
  //同 handleCast：攻击后**无条件**置脏一次（这次置脏不在帧末入口条件里）
-        hotbarRenderComponent.markDirty();
+        pickApply(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, HotbarRenderComponent::markDirty);
         return true;
     }
 
@@ -659,7 +669,7 @@ public class RoleInstance {
 
     public void heal(double amount){
  //：clamp 策略的唯一实现已搬到生命组件（本方法保留为**视图**，调用点一字未动）
-        vitalsComponent.heal(amount);
+        pickApply(SERVICE_ID_VITALS, VitalsComponent.class, component -> component.heal(amount));
     }
 
     public void damage(double amount){
@@ -675,10 +685,10 @@ public class RoleInstance {
  //`instance.increaseEnergy(...)` 一类调用已消失）；`getCurrentEnergy` / `setCurrentEnergy`
  //仍是**活码**（`command/EnergyCommand` 的读数与设值路径）。
 
-    public int getCurrentEnergy() { return energyComponent.current(); }
+    public int getCurrentEnergy() { return pickValue(SERVICE_ID_ENERGY, EnergyComponent.class, component -> component.current(), 0); }
 
     public void setCurrentEnergy(int amount){
-        energyComponent.set(amount);
+        pickApply(SERVICE_ID_ENERGY, EnergyComponent.class, component -> component.set(amount));
     }
 
  //SanTE（**视图**：真值与 clamp 都在 SanTE 组件里；派发边界由容器**给出的平台侧监听**触发）
@@ -692,7 +702,7 @@ public class RoleInstance {
  //药水施加入口（记账）：施加到本实例玩家身上的效果记入账本，clear() 时只回收账本里的类型（O-7）
  //：**账本的持有者 = buff 组件** ⇒ 本方法保留为视图（BuffManager 在用）。
     public void applyPotionEffect(PotionEffect effect){
-        buffComponent.applyPotionEffect(effect);
+        pickApply(SERVICE_ID_BUFFS, BuffComponent.class, component -> component.applyPotionEffect(effect));
     }
 
  // ───────── 阵营（ · 欠账 A 后半）：**读侧视图已删除** / 写侧视图保留 ─────────
@@ -757,7 +767,7 @@ public class RoleInstance {
  //任务按请求者登记（TimerComponent 的请求者语义）⇒ 这里逐组件回收，堵住
  //"单独 stop() 不清理 ⇒ 生命周期泄漏"的缺口；clear() 末尾的 cancelAllAndClear()
  //仍是最后的兜底（两者幂等，重复 cancel 对已取消句柄是 no-op）。
-                timerComponent.cancelAllOf(component);
+                pickApply(SERVICE_ID_TIMERS, TimerComponent.class, service -> service.cancelAllOf(component));
             }
         });
     }
@@ -821,7 +831,7 @@ public class RoleInstance {
  * 「**实现了某个能力接口的组件**」 改为
  * 「**向 {@code SanTEComponent} 订阅过的组件**」 —— 依据用户硬规矩 **R-1**：
  * **凡关注点已是组件 ⇒ 不得再为它新增能力接口** （SanTE 的家就是 `SanTEComponent`）。
- * <p>遍历的是**监听器名单**（`santeComponent.forEachListener`），**不是**容器注册表
+ * <p>遍历的是**监听器名单**（{@code SanTEComponent#forEachListener}），**不是**容器注册表
  * ⇒ 「谁关心」由**订阅**表达，不再由接口/继承表达。
  * <p><b>未改的两件</b>（已确立、原样保留）：**逐个**经 {@code guardedCall}
  * （异常 ⇒ 只隔离抛异常的那一个、其余照常收到）· 整段在 {@link #withinIterationWindow} 里
@@ -830,12 +840,16 @@ public class RoleInstance {
  * （后者经它持有的**平台侧监听**，不是订阅者名单里的一条）。
  */
     private void broadcastSanTEChange(int preSanTE, int newSanTE){
+        SanTEComponent sante = (SanTEComponent) resolve(SERVICE_ID_SANTE);
+        if (sante == null) {
+            return;
+        }
  //遍历窗口（）：可嵌套（update() 广播期间改 SanTE ⇒ 本方法再次进入窗口）
  //：唯一受保护调用（异常 ⇒ 窗口关闭后执行隔离四步）
         withinIterationWindow(() -> {
-            santeComponent.forEachListener(entry -> {
+            sante.forEachListener(entry -> {
  //平台侧登记（owner = 组件自身）由写入路径直调 ⇒ 不在此列（否则平台侧会多收一次）
-                if (entry.owner() == santeComponent) return;
+                if (entry.owner() == sante) return;
  //监听器判据（不是接口判据）—— 只通知"订阅过"的组件；
  //归属组件由注册方随监听器一并给出（entry.owner()）⇒ 仍能**逐个**经 guardedCall 做故障隔离 ✓
                 guardedCall(entry.owner(), "onSanTEChange",
@@ -843,7 +857,7 @@ public class RoleInstance {
             });
         });
  //平台侧通道仍归本组件的**平台侧监听** —— 调用点与时机逐字未变（写入路径一次、派发边界一次）
-        santeComponent.broadcastChange(preSanTE, newSanTE);
+        sante.broadcastChange(preSanTE, newSanTE);
     }
 
  /** 每 tick 派发（：**收窄为 private** ← —— 唯一消费者 = 构造期 ticker 的 `this::triggerUpdate`）。 */
@@ -872,12 +886,12 @@ public class RoleInstance {
  //渲染组件自己判定"要不要刷"（判脏 → 写物品 → 清脏 → 取变更，**顺序不可交换**）——
  //入口条件与写物品段都在它内部，本类只转问它一个问题："本帧真的改了东西吗？"
  //**主武器不让入口因它而变**（冷却名不带秒数 ⇒ 冻结差异；判据同样在组件内部）。
-        hotbarRenderComponent.flush();
+        pickApply(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, HotbarRenderComponent::flush);
  //渲染回调（读侧、只通知）—— 触发点 = 上面"真正完成一次刷新之后"
  //★ 变化判据：只有**本帧真的改了东西**才回调（consumeChanged 一次性读取并清除）⇒ 无变化的那一帧 **0 次**
  //★ 派发：按能力接口扇出，**逐个**经 deliverHook（内含 guardedCall + 外裹 withinIterationWindow）
  // —— 不在此处裸调组件方法（否则抛异常时隔离四步不会被安排）
-        if(hotbarRenderComponent.consumeChanged()){
+        if(pickValue(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, component -> component.consumeChanged(), false)){
             dispatchHotbarRendered();
         }
 
@@ -1067,7 +1081,7 @@ public class RoleInstance {
                         failure);
             }
             try {
-                timerComponent.cancelAllOf(component);
+                pickApply(SERVICE_ID_TIMERS, TimerComponent.class, service -> service.cancelAllOf(component));
             } catch (Throwable ignored) {
  //终止阶段不得让"回收计时时的异常"打断其余组件的终止
             }
@@ -1150,9 +1164,9 @@ public class RoleInstance {
 
  //药水记账（O-7 / D6）：**账本随 buff 组件持有** ⇒ 由它只移除本系统记账过的效果，
  //不再无条件清空玩家身上的所有药水效果（返回移除的类型数，供诊断）
-        buffComponent.clearAppliedPotionEffects();
+        pickApply(SERVICE_ID_BUFFS, BuffComponent.class, BuffComponent::clearAppliedPotionEffects);
 
-        buffComponent.manager().clearAll();
+        pickApply(SERVICE_ID_BUFFS, BuffComponent.class, service -> service.manager().clearAll());
 
 
     }

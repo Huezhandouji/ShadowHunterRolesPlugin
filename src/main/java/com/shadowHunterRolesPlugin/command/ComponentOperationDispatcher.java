@@ -19,7 +19,7 @@ import java.util.Locale;
  * **组件操作面的派发器**：指令层到组件操作面的**唯一通道** ✓。
  *
  * <p><b>它做的事</b>（逐条对齐 §4）：① 名称 → UUID（**仅在线** ✓）· ② UUID → {@link RoleInstance}（无实例 ⇒ 回绝 ✓）·
- * ③ 枚举实例的组件 id（**R-6**：只经容器枚举 ✓，不用反射 ✗）· ④ 定位目标组件（`componentId` 可带 `#index`，
+ * ③ 枚举实例的组件 id（只经容器枚举 ✓，不用反射 ✗）· ④ 定位目标组件（`componentId` 可带 `#index`，
  * **0 基** ✓）—— **命中 0 份** ⇒ 回绝 + 列出可用 id ✓；**同 id 多份且未给下标** ⇒ 回绝 + 提示 0 基序号 ✓
  * （**绝不静默取第一份** ✗）· ⑤ **粗粒度权限** ✓ · ⑥ **调公开的 {@link RoleAPI#executeComponentOperation}** ✓
  * 并据返回值回显 ✓ · ⑦ **审计** ✓（执行者 / 时间 / 目标 / 组件 id + 0 基下标 / **原始 payload** / 返回值 ✓）；
@@ -44,7 +44,7 @@ public final class ComponentOperationDispatcher {
     /** 审计行前缀（与既有 `[command-access]` 同一风格 ✓）。 */
     private static final String AUDIT_PREFIX = "[component-operation]";
 
-    /** 表示"执行者自己"的记号（设计定案 §1 的例子用的是 `@s` ✓）。 */
+    /** 表示"执行者自己"的记号（例子用的是 `@s` ✓）。 */
     public static final String SELF_TOKEN = "@s";
 
     private final RoleManager roleManager;

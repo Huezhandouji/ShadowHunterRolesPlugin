@@ -30,10 +30,10 @@ import java.util.Locale;
  * <p><b>payload 一律原样交给组件**自解析**</b> ✓（首 token 必为操作动词 ✓；本类**不解释**它 ✗）。
  *
  * <p><b>注册</b> ✓：本子指令由主指令 {@link RoleCommand} 在构造期登记（`/role` 根命令仍走 `plugin.yml` + `setExecutor` ✓，
- * **未新增根命令** ⇒ 无需改 `plugin.yml` ✓；设计定案 §9.1 的"root 用现有根还是新根"在此取**现有根** ✓）。
+ * **未新增根命令** ⇒ 无需改 `plugin.yml` ✓；"root 用现有根还是新根"在此取**现有根** ✓）。
  *
  * <p><b>Tab 补全</b> ✓：第 1 段补 {@code query|modify} ✓；第 2 段补**在线玩家名 + 自己的组件 id** ✓；
- * 第 3 段补目标的组件 id ✓。★ **op 名与参数不可补** ✗ —— 设计定案 §2 的"无自报清单"取舍所致
+ * 第 3 段补目标的组件 id ✓。★ **op 名与参数不可补** ✗ —— "无自报清单"取舍所致
  * （组件不自报可用操作 ⇒ 只能补到 {@code componentId} ✓，op 与参数需**手写文档** ✓）；补全同样受根门禁约束 ✓。
  *
  * <p><b>文本</b>：一律 Adventure {@link Component} ✓（**不用 {@code ChatColor}** ✗）。
@@ -106,7 +106,7 @@ public class ComponentOperationCommand implements SubCommand {
                 : String.join(" ", Arrays.copyOfRange(args, payloadFrom, args.length));
 
         //§6.6 在 v2 定案下**可实现的**那一半 ✓：modify 没有 payload ⇒ 没有可写的东西 ⇒ 回绝
-        //（"query 却调写操作"无法在派发器侧判定 ✗ —— payload 里没有 query/modify 信息、组件也无自报清单 ✗ ⇒ 已申报）
+        //（"query 却调写操作"无法在派发器侧判定 ✗ —— payload 里没有 query/modify 信息、组件也无自报清单 ✗）
         if (verb.equals(VERB_MODIFY) && payload.isBlank()) {
             player.sendMessage(Component.text("modify needs an operation payload,"
                     + " e.g. /role operation modify " + componentId + " set 50"));
@@ -151,7 +151,7 @@ public class ComponentOperationCommand implements SubCommand {
                 || Bukkit.getPlayerExact(token) != null;
     }
 
-    /** 某玩家实例上的组件 id（无实例 ⇒ 空表 ✓；R-6：只经容器枚举 ✓）。 */
+    /** 某玩家实例上的组件 id（无实例 ⇒ 空表 ✓；只经容器枚举 ✓）。 */
     private List<String> componentIdsOf(Player player) {
         RoleInstance instance = roleManager.getRoleInstance(player);
         if (instance == null) {

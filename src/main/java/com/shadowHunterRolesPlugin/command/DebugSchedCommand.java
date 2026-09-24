@@ -40,7 +40,7 @@ import java.util.List;
  *     请求者在**首位**）⇒ 覆盖 计时组件 → Scheduler → 适配器 这条链；与 ④m 的 (0,10)=1/11 比对
  *     （无角色时打印 SKIPPED）。**输出键沿用历史名**（`portLeg` / `portFirstSecond`）= 既有证据的引用锚；
  * ④ {@code ScheduledTask.cancel()} 返回值 / {@code isCancelled()} / {@code getExecutionState()} / 重复 cancel；
- * ⑤ 一句话结论（由本次原始值现算，不只给结论）。
+ * ⑤ 一句话结论（由本次原始值导出，不只给结论）。
  * <p>
  * <b>关键输出行是既有证据的引用锚</b>（如 {@code [sched] ⑤ verdict | …} 里的 {@code matrixAllPairsMatch=}、
  * {@code portLegEquivalent=}、{@code CONCLUSION=}），迁移时**逐字保留**，不得改写键名或措辞。
@@ -364,7 +364,7 @@ public class DebugSchedCommand implements SubCommand {
             }
         }
 
-        //⑤ 结论：70 tick 后（全部周期任务均已自取消）以本次原始值现算"能否直切"
+        //⑤ 结论：70 tick 后（全部周期任务均已自取消）以本次原始值给出"能否直切"
         grs.runDelayed(plugin, task -> {
             int globalPeriod = (tick[1] >= 0 && tick[3] >= 0) ? tick[3] - tick[1] : -1;
             int bukkitPeriod = (tick[4] >= 0 && tick[6] >= 0) ? tick[6] - tick[4] : -1;

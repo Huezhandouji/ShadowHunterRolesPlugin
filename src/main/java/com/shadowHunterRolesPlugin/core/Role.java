@@ -64,7 +64,7 @@ public class Role {
      */
     private final Map<Integer, String> slotMap;
 
-    private final Faction faction;
+    private Faction faction;
 
     private final Material icon;
 
@@ -193,7 +193,7 @@ public class Role {
      * </ul>
      * 两条都给了运行级读数（见交付说明 §4），缺一条就可能是"白名单放行了但实例上根本没有"的假绿 ✗。
      *
-     * <p><b>边界（如实申报，不静默放宽）</b>：白名单**只**列这 7 个框架级服务组件。角色内容组件
+     * <p><b>边界（如实申报，不静默放宽）</b>：白名单**只**列这 **5** 个框架级服务组件（阶段 13 · t121：`FactionComponent` 条目已移除 ⇒ **6 → 5** ✓，与 faction 迁移收尾同趟 ✓）；
      * （技能 / 被动 / 主武器）一律不在此列 ⇒ 它们之间的依赖声明照旧按模板组件表判定。
      */
     public static final Set<Class<? extends RoleComponent>> FRAMEWORK_PROVIDED_TYPES = Set.of(
@@ -201,14 +201,13 @@ public class Role {
             SanTEComponent.class,
             VitalsComponent.class,
             BuffComponent.class,
-            TimerComponent.class,
-            FactionComponent.class);
+            TimerComponent.class);
 
     /**
      * **缺必需依赖的清单**（诊断用；空 = 齐）。每条都点名：组件 id · 该组件**提供**的类型 · **缺**的类型。
      * <p>{@link #verifyDependencies()} 的异常消息直接由它拼出 ⇒ 消息与清单**同源**，不会各说一套。
      * <p><b>阶段 10 · t69（A3 白名单）</b>：列在 {@link #FRAMEWORK_PROVIDED_TYPES} 里的类型
-     * （= 框架必然按实例提供的 7 个服务组件）**不算缺** ⇒ 跳过。这是"框架级服务组件在模板里看不见"
+     * （= 框架必然按实例提供的 **5** 个服务组件 —— 阶段 13 · t121 起 faction 不在其中 ✓）**不算缺** ⇒ 跳过。这是"框架级服务组件在模板里看不见"
      * 这个缺口的唯一修法。
      */
     public List<String> missingRequiredDependencies(){
@@ -591,6 +590,15 @@ public class Role {
     }
 
     public Faction getFaction() { return faction; }
+
+    /**
+     * **设置本角色的阵营**（阶段 13 · t121：faction 迁移收尾的前一半，重建 t96/t90-2 ✓）。
+     * <p>① **管理级 / 模板级**语义：这是**角色模板**上的声明值，不是每玩家状态 ✗；
+     * ② 影响**该角色的所有实例**（已实例化的玩家实例下一次经 `RoleInfo#faction()` 读取时即生效 ✓）；
+     * ③ 阵营的**读取唯一入口仍是 `roleInfo` 服务面** ✓ ⇒ 外部不直改、组件不直读（R-6 ✓）。
+     * <p><b>【已作废】旧口径原文</b>（阶段 10 · t90 原文，逐字保留）：「faction 为 final ⇒ 仅构造期由描述符写入」✗。
+     */
+    public void setFaction(Faction faction){ this.faction = faction; }
 
     /**
      * 栏位视图（**派生**，阶段 7 · B 步）：`栏位 → 组件 id`，由构造期一次性从组件表派生。

@@ -187,6 +187,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.increaseEnergy(amount);
     }
     @Override
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void increaseEnergy(UUID uuid, int amount) {
         RoleInstance instance = getRoleInstance(uuid);
         if(instance == null) return;
@@ -201,6 +202,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.decreaseEnergy(amount);
     }
     @Override
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void decreaseEnergy(UUID uuid, int amount) {
         RoleInstance instance = getRoleInstance(uuid);
         if(instance == null) return;
@@ -267,6 +269,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.increaseSanTE(amount);
     }
     @Override
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = SanTEComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void increaseSanTE(UUID uuid, int amount) {
         RoleInstance instance = getRoleInstance(uuid);
         if(instance == null) return;
@@ -363,6 +366,7 @@ public class RoleAPIImpl implements RoleAPI {
         return instance != null ? instance.getFaction() : Faction.UNKNOWN;
     }
     @Override
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo#faction()（组件经角色信息服务取用，t90 唯一入口） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public Faction getFaction(UUID uuid) {
         RoleInstance instance = getRoleInstance(uuid);
         return instance != null ? instance.getFaction() : Faction.UNKNOWN;
@@ -376,6 +380,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.setFaction(faction);
     }
     @Override
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void setFaction(UUID uuid, Faction faction) {
         RoleInstance instance = getRoleInstance(uuid);
         if(instance == null) return;
@@ -390,6 +395,7 @@ public class RoleAPIImpl implements RoleAPI {
         instance.resetFaction();
     }
     @Override
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void resetFaction(UUID uuid) {
         RoleInstance instance = getRoleInstance(uuid);
         if(instance == null) return;

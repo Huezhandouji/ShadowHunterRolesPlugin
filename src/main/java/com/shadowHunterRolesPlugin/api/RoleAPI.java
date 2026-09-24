@@ -70,10 +70,12 @@ public interface RoleAPI {
 
     @Deprecated
     void increaseEnergy(Player player, int amount);
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void increaseEnergy(UUID uuid, int amount);
 
     @Deprecated
     void decreaseEnergy(Player player, int amount);
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void decreaseEnergy(UUID uuid, int amount);
 
     //sanTE
@@ -114,6 +116,7 @@ public interface RoleAPI {
 
     @Deprecated
     void increaseSanTE(Player player, int amount);
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = SanTEComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void increaseSanTE(UUID uuid, int amount);
 
     @Deprecated
@@ -146,14 +149,17 @@ public interface RoleAPI {
     //阵营信息
     @Deprecated
     Faction getFaction(Player player);
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo#faction()（组件经角色信息服务取用，t90 唯一入口） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     Faction getFaction(UUID uuid);
 
     @Deprecated
     void setFaction(Player player, Faction faction);
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void setFaction(UUID uuid, Faction faction);
 
     @Deprecated
     void resetFaction(Player player);
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     void resetFaction(UUID uuid);
 
     @Deprecated

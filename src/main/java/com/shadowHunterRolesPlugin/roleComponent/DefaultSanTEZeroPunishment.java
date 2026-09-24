@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent;
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -18,13 +19,15 @@ import java.time.Duration;
  * 默认的「SanTE 归零惩罚」被动（组件侧最后一批 B⑨ 迁移）。
  * <p><b>迁移口径</b>：
  * <ul>
- *   <li>去 legacy `SanTEChangeAware` 与 `LifecycleAware` ⇒ 改走能力接口
- *       {@link SanTEAware#onSanTEChange(int, int)} 与无参 {@code stop()}（容器按注册表顺序直接派发，
+ *   <li>去 legacy `SanTEChangeAware` 与 `LifecycleAware` ⇒ 改走组件钩子
+ *       {@code onSanTEChange(int, int)} 与无参 {@code stop()}（容器直接派发，
  *       不再经事件总线绕行）；
- *       <br><b>阶段 12 · t87 口径更正（不静默改写）</b>：本条原文写的是"改走**基类**新钩子
- *       {@code RoleComponent#onSanTEChange}" —— 该钩子**已从基类迁出** ⇒ 上面那半句**作废** ✗；
- *       现在它由本类**显式实现能力接口** {@link SanTEAware} 获得（本类声明里可见
- *       {@code implements SanTEAware}）✓。旧口径原文保留：<i>「改走基类新钩子
+ *       <br><b>阶段 12 · t89 口径更正（不静默改写）</b>：本条经历两次更正 ——
+ *       <br>① 原文写的是"改走**基类**新钩子 {@code RoleComponent#onSanTEChange}" —— 该钩子**已从基类迁出** ⇒ 那半句作废 ✗；
+ *       <br>② 其后（t87）一度改为"由本类**显式实现某个能力接口**" —— 该做法也**已作废** ✗
+ *       （用户硬规矩 **R-1**：SanTE 的家是 {@code SanTEComponent} ⇒ **不得再为它新增能力接口** ✗）；
+ *       <br>③ **现行形态**：本类 `implements {@code SanTEComponent.Subscriber}`，并在 `awake()` 里
+ *       **向 {@code SanTEComponent} 订阅** ✓（只通知、不可否决 ✓）。旧口径原文保留：<i>「改走基类新钩子
  *       {@code RoleComponent#onSanTEChange(int, int)}」</i>。</li>
  *   <li>惩罚状态 `isInSanTEPunishment` 由聚合根搬进**组件私有字段**（该状态本就不该上 `RoleInstance`）；</li>
  *   <li>任务经 `svc().timers()` 登记本组件资源表、Buff 经 `svc().buffs()`、SanTE 经 `svc().sante()`、
@@ -57,7 +60,7 @@ import java.time.Duration;
  * 否则标记卡在 {@code true} ⇒ **逐 tick 钉 0 会一直生效、且后续归零永不触发惩罚**（绿灯不报的静默失效）。
  * 五条路径逐条标注为源码里的 {@code (5-①…⑤)}。
  */
-public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEAware {
+public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEComponent.Subscriber {
     public DefaultSanTEZeroPunishment(String id, ComponentServices services) {
         super(
                 id,
@@ -71,6 +74,22 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEAwa
     private Task punishmentTask;
     //回满任务句柄（Q2 = A：STUN 100 刻结束时一次性回满；与上面同属本组件资源表）
     private Task punishmentRestoreTask;
+
+    /**
+     * **订阅 SanTE 变更**（阶段 12 · t89 · C2 · 用户裁定 (b)）：**向 {@code SanTEComponent} 订阅** ✓，
+     * 而**不是**实现某个能力接口 ✗（硬规矩 R-1：SanTE 的家是组件 ⇒ 消费者向**组件本身**取用/订阅 ✓）。
+     * <p>时机 = `awake()`（生命周期里"构造之后、start 之前"）⇒ 与装配序一致：**先 awake 的组件先订阅**
+     * ⇒ 通知顺序 = 订阅先后 = 装配序 ✓。
+     * <p>用容器查找（`svc().components().get(...)`）而不是字段注入 ⇒ 本组件**不持有** `SanTEComponent` 引用，
+     * 与"组件只通过容器协作"的既有纪律一致 ✓。
+     */
+    @Override
+    public void awake() {
+        SanTEComponent sante = svc().components().get(SanTEComponent.class);
+        if (sante != null) {
+            sante.subscribe(this);
+        }
+    }
 
     //B⑨：惩罚状态搬进组件私有字段（原 RoleInstance.isSanTEPunishment 已删）
     private boolean inSanTEPunishment = false;
@@ -223,5 +242,10 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEAwa
     public void stop() {
         cancelPunishmentTask();
         inSanTEPunishment = false;
+        //阶段 12 · t89：**退订**（与 awake() 的订阅对称 ⇒ 拆卸后不再被通知 ✓）
+        SanTEComponent sante = svc().components().get(SanTEComponent.class);
+        if (sante != null) {
+            sante.unsubscribe(this);
+        }
     }
 }

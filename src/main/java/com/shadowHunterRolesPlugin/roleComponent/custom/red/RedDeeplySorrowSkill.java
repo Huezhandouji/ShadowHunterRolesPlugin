@@ -4,7 +4,7 @@ import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.core.dispatch.CastTrigger;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.roleComponent.SanTEAware;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -27,7 +27,7 @@ import org.bukkit.potion.PotionEffectType;
  *       生命恢复 `45, 5` 与力量 `45, 2` / 音效 `ENTITY_WITHER_DEATH 2,1` 与 `ENTITY_WITHER_SHOOT 1,1`；</li>
  * </ul>
  */
-public class RedDeeplySorrowSkill extends Skill implements SanTEAware {
+public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscriber {
 
     //该技能是否在执行中
     private boolean running = false;
@@ -36,6 +36,21 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEAware {
 
     public RedDeeplySorrowSkill(String id, ComponentServices services, Specification specification) {
         super(id, services, specification);
+    }
+
+    /**
+     * **订阅 SanTE 变更**（阶段 12 · t89 · C2 · 用户裁定 (b)）：**向 {@code SanTEComponent} 订阅** ✓，
+     * 而**不是**在类声明上 `implements` 某个能力接口 ✗ —— 后者正是用户点名的方向错误
+     * （`SanTE` 早已是组件 ⇒ 硬规矩 R-1：**不得再为它新增能力接口** ✗）。
+     * <p>时机 = `awake()` ⇒ 通知顺序 = 订阅先后 = 组件装配序 ✓。
+     * <p>容器查找（而不是字段注入）⇒ 本组件**不持有** `SanTEComponent` 引用 ✓。
+     */
+    @Override
+    public void awake() {
+        SanTEComponent sante = svc().components().get(SanTEComponent.class);
+        if (sante != null) {
+            sante.subscribe(this);
+        }
     }
 
     /**

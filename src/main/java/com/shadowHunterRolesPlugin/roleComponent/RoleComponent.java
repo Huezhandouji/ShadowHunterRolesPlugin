@@ -85,8 +85,9 @@ public abstract class RoleComponent {
 
     // ───────────── 领域事件 ─────────────
 
-    //（阶段 12 · t87）本基类**不再**声明 `onSanTEChange(int pre, int now)` ✗ ——
-    //  它已迁入能力接口 {@link SanTEAware}（同包）。迁移理由与逐字契约见该接口的 javadoc；
+    //（阶段 12 · t87 起）本基类**不再**声明 `onSanTEChange(int pre, int now)` ✗ ——
+    //  **现行形态**（阶段 12 · t89 更正后）：关心者向 `SanTEComponent` **订阅**（该组件的 `Subscriber` 口）✓
+    //  —— 依据用户硬规矩 **R-1**：SanTE 的家是组件 ⇒ **不得再为它新增能力接口** ✗。
     //  简言之：SanTE 的**真值持有者**早已是 SanTEComponent ⇒ 变更通知不该挂在**所有**组件的基类上。
     //  旧口径原文保留如下（**不静默改写**）：
     //  <i>「只在 SanTE **真变化**时派发（pre == now 不派发）。」（原 {@code RoleComponent} 内该方法的 javadoc，逐字）</i>

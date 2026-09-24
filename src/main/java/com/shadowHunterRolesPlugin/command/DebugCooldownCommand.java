@@ -1,4 +1,6 @@
 package com.shadowHunterRolesPlugin.command;
+import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;

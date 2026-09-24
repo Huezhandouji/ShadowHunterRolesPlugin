@@ -1,4 +1,6 @@
 package com.shadowHunterRolesPlugin;
+import com.shadowHunterRolesPlugin.listener.hook.HotbarItemProtectionListener;
+import com.shadowHunterRolesPlugin.listener.hook.DamageHookListener;
 
 import com.shadowHunterRolesPlugin.api.RoleAPI;
 import com.shadowHunterRolesPlugin.command.RoleCommand;

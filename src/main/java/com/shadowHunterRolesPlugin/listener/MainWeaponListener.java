@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.listener;
 
-import com.shadowHunterRolesPlugin.core.MainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;

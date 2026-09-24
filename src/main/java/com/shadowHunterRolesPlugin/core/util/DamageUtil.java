@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.core;
+package com.shadowHunterRolesPlugin.core.util;
 
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import org.bukkit.GameMode;

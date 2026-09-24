@@ -1,4 +1,7 @@
-package com.shadowHunterRolesPlugin.roleComponent;
+package com.shadowHunterRolesPlugin.roleComponent.builtin;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffType;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.platform.Task;

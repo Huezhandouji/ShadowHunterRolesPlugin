@@ -1,6 +1,7 @@
-package com.shadowHunterRolesPlugin.roleComponent;
+package com.shadowHunterRolesPlugin.roleComponent.builtin;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
 
-import com.shadowHunterRolesPlugin.core.Skill;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;

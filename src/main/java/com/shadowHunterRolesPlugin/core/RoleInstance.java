@@ -1,6 +1,10 @@
 package com.shadowHunterRolesPlugin.core;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
+import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
-import com.shadowHunterRolesPlugin.core.dispatch.ComponentRegistry;
+import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;

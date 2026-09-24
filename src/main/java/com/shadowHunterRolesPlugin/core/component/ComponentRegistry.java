@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.core.dispatch;
+package com.shadowHunterRolesPlugin.core.component;
 
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;

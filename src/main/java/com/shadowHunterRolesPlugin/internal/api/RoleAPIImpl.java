@@ -1,8 +1,9 @@
 package com.shadowHunterRolesPlugin.internal.api;
+import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
 
 import com.shadowHunterRolesPlugin.api.RoleAPI;
 import com.shadowHunterRolesPlugin.api.RoleInfo;
-import com.shadowHunterRolesPlugin.core.DamageUtil;
+import com.shadowHunterRolesPlugin.core.util.DamageUtil;
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;

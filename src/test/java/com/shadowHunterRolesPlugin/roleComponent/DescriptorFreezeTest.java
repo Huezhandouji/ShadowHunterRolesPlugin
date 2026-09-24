@@ -1,4 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;

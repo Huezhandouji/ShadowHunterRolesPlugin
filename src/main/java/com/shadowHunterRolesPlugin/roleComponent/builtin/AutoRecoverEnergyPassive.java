@@ -1,6 +1,6 @@
-package com.shadowHunterRolesPlugin.roleComponent;
+package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
-import com.shadowHunterRolesPlugin.core.PassiveSkill;
+import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;

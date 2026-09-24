@@ -1,9 +1,10 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.destroystokyo.paper.ParticleBuilder;
-import com.shadowHunterRolesPlugin.core.MainWeapon;
-import com.shadowHunterRolesPlugin.core.ParticleUtil;
+import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
+import com.shadowHunterRolesPlugin.core.util.ParticleUtil;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Color;
 import org.bukkit.Location;

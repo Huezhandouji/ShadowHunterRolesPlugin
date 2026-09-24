@@ -1,7 +1,11 @@
 package com.shadowHunterRolesPlugin.roleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.ExampleSelfRefreshingSkill;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.DefaultSanTEZeroPunishment;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverSanTEHealthPassive;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassive;
 
-import com.shadowHunterRolesPlugin.core.MainWeapon;
-import com.shadowHunterRolesPlugin.core.Skill;
+import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarPresentable;

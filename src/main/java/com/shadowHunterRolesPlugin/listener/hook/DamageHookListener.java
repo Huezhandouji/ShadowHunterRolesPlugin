@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.listener;
+package com.shadowHunterRolesPlugin.listener.hook;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;

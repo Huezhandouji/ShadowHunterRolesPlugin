@@ -1,4 +1,7 @@
 package com.shadowHunterRolesPlugin.core;
+import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
+import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;

@@ -1,4 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.platform.Task;

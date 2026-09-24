@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.core;
+package com.shadowHunterRolesPlugin.roleComponent.base;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;

@@ -1,4 +1,5 @@
 package com.shadowHunterRolesPlugin.core.hotbar;
+import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
 
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;

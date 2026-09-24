@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
 
-import com.shadowHunterRolesPlugin.core.Skill;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;

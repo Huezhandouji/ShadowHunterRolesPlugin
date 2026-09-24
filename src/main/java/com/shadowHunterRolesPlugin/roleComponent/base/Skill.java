@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.core;
+package com.shadowHunterRolesPlugin.roleComponent.base;
 
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import net.kyori.adventure.text.Component;

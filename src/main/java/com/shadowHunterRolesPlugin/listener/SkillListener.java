@@ -1,4 +1,5 @@
 package com.shadowHunterRolesPlugin.listener;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.manager.RoleManager;

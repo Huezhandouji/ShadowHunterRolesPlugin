@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.core;
+package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
 
 public class Buff {
 

@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
 
-import com.shadowHunterRolesPlugin.core.Skill;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;

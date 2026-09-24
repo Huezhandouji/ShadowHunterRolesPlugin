@@ -1,11 +1,13 @@
 package com.shadowHunterRolesPlugin.registry;
+import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
-import com.shadowHunterRolesPlugin.roleComponent.AutoRecoverEnergyPassive;
-import com.shadowHunterRolesPlugin.roleComponent.AutoRecoverSanTEHealthPassive;
-import com.shadowHunterRolesPlugin.roleComponent.DefaultSanTEZeroPunishment;
-import com.shadowHunterRolesPlugin.roleComponent.ExampleSelfRefreshingSkill;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassive;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverSanTEHealthPassive;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.DefaultSanTEZeroPunishment;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.ExampleSelfRefreshingSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;

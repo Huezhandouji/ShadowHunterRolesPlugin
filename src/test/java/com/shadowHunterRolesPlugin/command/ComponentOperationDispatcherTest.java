@@ -1,4 +1,5 @@
 package com.shadowHunterRolesPlugin.command;
+import com.shadowHunterRolesPlugin.command.ComponentOperationDispatcher;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;

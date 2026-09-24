@@ -9,7 +9,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * **渲染回调的"变化判据"单测**（阶段 12 · t88 · B3）。
+ * **渲染回调的"变化判据"单测**。
  *
  * <h2>测什么 / 不测什么（边界，先看这条）</h2>
  * 本类只钉**判据的决策形状**（{@link HotbarRenderer#contentDiffers}）—— 它是**纯函数、不碰 Bukkit** ✓。

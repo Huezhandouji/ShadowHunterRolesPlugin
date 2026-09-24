@@ -1,13 +1,18 @@
 package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
 
-import com.shadowHunterRolesPlugin.core.RoleInstance;
+import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * **框架级物品渲染组件**。
@@ -17,18 +22,18 @@ import org.bukkit.inventory.ItemStack;
  * <ul>
  *   <li><b>是</b>：<b>意图登记 + 置脏</b>的唯一归属点 ✓ —— 组件（以及框架自身）要"请求重绘"时，
  *       走的是<b>本组件</b>登记的这条通道 ✓；</li>
- *   <li><b>不是</b>：它<b>不写物品</b> ✗ —— <b>帧末 flush 仍是唯一的 {@code setItem} 写点</b>
- *       （{@code core/hotbar/HotbarRenderer#render()} 内那一次槽位写入）✓。本组件**拿不到**
- *       {@code Inventory} / {@code ItemStack} 的写入面，也**不暴露**渲染器本身 ⇒
- *       「组件只能请求、不能写」这条硬边界**逐字保留** ✓。</li>
+ *   <li><b>不是</b>：它<b>自己不出手写物品</b> ✗ —— 全仓唯一的物品写点仍是它**内部持有的**渲染器里
+ *       那一次槽位写入（{@code core/hotbar/HotbarRenderer#render()}）✓。本组件**不暴露**
+ *       渲染器本身、也不给组件侧任何写入面 ⇒ 「组件只能请求、不能写」这条硬边界**逐字保留** ✓。</li>
  * </ul>
- * <p>换句话说：本组件是"**要重绘**"这件事的拥有者，而"**怎么写**"仍归渲染器 ✗ ——
- * 二者以 {@code RoleInstance} 的一条置脏通道相连（见 {@link #requestRepaint()}）。
+ * <p>换句话说：本组件是"**要重绘**"这件事的拥有者，"**怎么写**"归它**自己持有的**
+ * {@link HotbarRenderer}（组件把本帧计划交出去、渲染器负责落位）⇒ 二者是**内部**调用，
+ * 框架侧只跟本组件打交道（见 {@link #flush()} / {@link #firstFlush()}）。
  *
  * <h2>为什么要有它（归属理由，非"为整洁而重构"）</h2>
- * 渲染器的**管道职责**只剩"按注册序遍历 → 取 {@code buildItem()} → 唯一写点落位"；
+ * 渲染器的**管道职责**只剩"按注册序取计划 → 唯一写点落位"；
  * 而**意图面**（谁在什么时候要求重绘）此前**没有组件形态**，只能挂在 `RoleInstance` 的私有字段上
- * （{@code markHotbarDirty} / {@code repaintRequester} 两处）。把意图面收进一个**框架级组件**后：
+ * （`markHotbarDirty` / `repaintRequester` 两处）。把意图面收进一个**框架级组件**后：
  * <ul>
  *   <li>它在**容器里可见、可查询**（{@code getAllByType} / {@code getComponent}）✓ ——
  *       后续 (b) 的"不可动物品保护"与回调有明确的挂载点 ✓；</li>
@@ -49,10 +54,8 @@ import org.bukkit.inventory.ItemStack;
 public class HotbarRenderComponent extends RoleComponent {
 
     /**
-     * **渲染意图的拥有者**（本组件委派的置脏通道）。
-     * <p>由 {@code RoleInstance} 在装配期注入（它同时持有渲染器与帧末 flush 调度）⇒
-     * 本组件**不自己找渲染器**、也**不持有**任何 Bukkit 库存对象 ✓。
-     * <p>{@code null} 是**合法**状态：无渲染器时（例如单元测试直接构造组件）请求重绘是**静默无操作** ✓
+     * **渲染意图的置脏入口**（本组件对外暴露的那一条通道的落点）。
+     * <p>{@code null} 是**合法**状态：未装配时（例如单元测试直接构造组件）请求重绘是**静默无操作** ✓
      * —— 与"未装配 ⇒ 无事可做"同义，**不是**错误 ✗。
      */
     @FunctionalInterface
@@ -64,14 +67,149 @@ public class HotbarRenderComponent extends RoleComponent {
     /** 置脏通道；装配期注入，未注入时为 {@code null}（见 {@link RepaintSink} 的 null 语义）。 */
     private RepaintSink repaintSink;
 
+    /**
+     * **渲染器**（唯一写点所在）—— 由本组件**持有并驱动** ✓。
+     * <p>构造期注入一次（{@code null} ⇒ 本组件自建一个，见构造器）；渲染器**不持有状态**
+     * （脏标记 / 变化基线 / 帧入口条件都在本组件里）⇒ 本组件是"**要重绘**"与"**什么时候刷**"
+     * 的唯一归属点，渲染器只是它的写物品手 ✓。
+     */
+    private final HotbarRenderer hotbarRenderer;
+
+    /**
+     * **置脏标记**。初值 = {@code true} ⇒ 即便无人置脏，首位 flush 也会完成首刷
+     * （构造期另有一次同步首刷，见 {@link #firstFlush()}）。
+     */
+    private boolean dirty = true;
+
+    /**
+     * **本帧是否真的改了东西**（由写物品段置位、由 {@link #consumeChanged()} 读取并清除）。
+     */
+    private boolean changed;
+
+    /**
+     * **上一帧真正写入的槽位内容**（**变化基线**）。
+     * <p>{@code null} = 尚无基线（首次渲染）⇒ 视作"有变化"（首刷应当被通知）。
+     */
+    private Map<Integer, ItemStack> lastRendered;
+
+    /**
+     * 渲染器由本组件**自建**（计划 = 本组件的 {@link #renderPlan()}）⇒ 它的构造点**唯一**在组件内部，
+     * 框架侧不经手渲染器本身 ✓（框架只跟本组件打交道）。
+     */
     public HotbarRenderComponent(String id, ComponentServices services) {
         super(id, services);
+        this.hotbarRenderer = new HotbarRenderer(this::renderPlan);
+    }
+
+    /**
+     * **帧末活动**（每 tick 调一次，落点 = 组件更新与到期扫描之后）：**判脏 → 写物品 → 清脏 → 取变更**
+     * —— ★ 这条顺序**不可交换** ✓。
+     * <p><b>入口条件</b>：① 本组件已置脏，或 ② **外观依赖活状态**的**占栏位**组件**正在冷却**
+     * ⇒ 每 tick 至少刷一次（否则技能名里的 {@code " x.xs"} 不再逐 tick 递减 = 可见行为变化）。
+     * 两个条件都不成立 ⇒ **本帧不写任何槽位**（「空闲 tick 零 {@code setItem}」）✓。
+     * <p><b>只置脏、不写物品</b>的是 {@link #requestRepaint()}；本方法才是**写物品**的那一半。
+     */
+    public void flush() {
+        if (!dirty && !hasCoolingTickingComponent()) {
+            return;
+        }
+        renderNow();
+        dirty = false;
+    }
+
+    /**
+     * **同步首刷一次**（选角色瞬间热键栏即就绪、零延迟）：与 {@link #flush()} 的**写物品段**同源，
+     * 但**不看入口条件** —— 首刷的必要性由 {@link #dirty} 的初值表达。
+     */
+    public void firstFlush() {
+        renderNow();
+    }
+
+    /** 写物品段（两个入口共用的那一半）：取计划 → 交渲染器落位 → 记基线与变化结论。 */
+    private void renderNow() {
+        HotbarRenderer.Result result = hotbarRenderer.render(playerOrNull(), lastRendered);
+        lastRendered = result.baseline();
+        changed = result.changed();
+    }
+
+    /** 本实例的玩家；服务集未带自身面时回 {@code null}（无玩家 ⇒ 本帧不写任何槽位）。 */
+    private Player playerOrNull() {
+        return (svc().self() == null) ? null : svc().self().player();
+    }
+
+    /**
+     * **本帧是否发生了真实变化**（渲染回调的取值点）：读取**并清除**（一次性，"读过即消费"）。
+     * <p>清除语义很重要：若不清除，下一帧即使什么都没变，也会沿用上一帧的 {@code true} 而**多报**。
+     */
+    public boolean consumeChanged() {
+        boolean value = this.changed;
+        this.changed = false;
+        return value;
+    }
+
+    /**
+     * **置脏**（幂等：同一 tick 多次置脏与一次等价）。**不写物品** ✓
+     * <p>由框架内部调用（施放管道 / 冷却启动 / 冷却到点 / 能量单一入口 / buff 移除）；
+     * 组件侧的重绘请求走 {@link #requestRepaint()}。
+     */
+    public void markDirty() {
+        this.dirty = true;
+    }
+
+    /** 是否已置脏（帧末入口条件之一）。 */
+    public boolean isDirty() {
+        return dirty;
+    }
+
+    /**
+     * **帧末 flush 完成后清脏**。**唯一消费者 = {@link #flush()} 的尾部**；
+     * 组件 / 渲染器内部都不得调用（会吞掉本 tick 的可见更新）。
+     */
+    public void clearDirty() {
+        this.dirty = false;
+    }
+
+    /**
+     * **本帧计划**：按**注册序**给出全部占栏位、且本帧能产出物品的 {@code (槽位, 物品)} 对。
+     * <p>注册序 = 容器内当前序（动态序 = 渲染序）；**栏位**取自组件自己的表现规格
+     * （装配期由装配点 {@code setSlot} 指定，与装配条目里的栏位同源），
+     * **物品**取自组件自己的默认画法读口（{@link #buildItemOf(RoleComponent)}）。
+     * <p>不占栏位、或本帧画不出物品的组件**不进计划**（与"跳过该槽位"同义）。
+     */
+    private List<HotbarRenderer.Entry> renderPlan() {
+        List<HotbarRenderer.Entry> plan = new ArrayList<>();
+        if (svc().components() == null) {
+            return plan;
+        }
+        for (RoleComponent component : svc().components().all()) {
+            ItemStack item = buildItemOf(component);
+            if (item == null) continue;
+            HotbarSpecification<?> specification = specificationOf(component);
+            if (specification == null || !specification.hasSlot()) continue;
+            plan.add(new HotbarRenderer.Entry(specification.slot(), item));
+        }
+        return plan;
+    }
+
+    /**
+     * **帧入口条件之一**：是否存在**外观依赖活状态**的**占栏位**组件正在冷却
+     * （判据 = 组件自报的 {@link #dependsOnLiveStateOf(RoleComponent)} + 它自己的冷却读口）。
+     */
+    private boolean hasCoolingTickingComponent() {
+        if (svc().components() == null) {
+            return false;
+        }
+        for (RoleComponent component : svc().components().all()) {
+            if (!dependsOnLiveStateOf(component)) continue;
+            if (component instanceof ActiveComponent active && active.isCoolingDown()) return true;
+        }
+        return false;
     }
 
     /**
      * **装配期绑定**（构造之后、{@code awake()} 之前）—— 与既有【装配期解析】同一条纪律
-     * （『创建后绑定』机制已整体删除 ✗：绑定一律在构造期完成）。
-     * <p>由 {@code RoleInstance} 在 {@code initComponents} 里调用（见该处注释）。
+     * （绑定一律在构造期完成）。
+     * <p>由 {@code RoleInstance} 在装配期调用（见该处注释）。
      */
     public void bindRepaintSink(RepaintSink sink) {
         this.repaintSink = sink;

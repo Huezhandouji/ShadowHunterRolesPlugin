@@ -13,7 +13,6 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 //"渲染组件按组件读的数据" ✗ ⇒ 本类只经 `HotbarRenderComponent` 的读口取用
 //（见 `hasCoolingTickingComponent()` 的接受集判据）。
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 //：聚合根只读服务面 —— 阵营读取的唯一入口（框架侧读口 {@link #roleInfo()} 的类型）。
@@ -67,9 +66,11 @@ public class RoleInstance {
     private final BuffComponent buffComponent;
     private final TimerComponent timerComponent;
  /**
- * ****：框架级**物品渲染组件** —— 渲染**意图面**（意图登记 + 置脏）的拥有者。
- * <p><b>唯一写点未变</b>：物品仍只由 {@link #hotbarRenderer} 在**帧末 flush** 里写；
- * 本组件**不写物品**、也拿不到库存写入面 （见 {@code HotbarRenderComponent} 的边界说明）。
+ * **物品渲染组件** —— 渲染**意图面**（意图登记 + 置脏）与渲染器（唯一写点）的**唯一归属点**。
+ * <p><b>唯一写点未变</b>：物品仍只在**帧末 flush** 里写一次（渲染组件自己持有的那个渲染器）；
+ * 本类**不持有**渲染器、也不经手 Bukkit 库存写入面 ⇒ 只跟组件打交道
+ * （置脏走 {@link HotbarRenderComponent#markDirty()} / {@code requestRepaint()}，
+ * 帧末走 {@link HotbarRenderComponent#flush()} / {@link HotbarRenderComponent#firstFlush()}）。
  * <p><b>（欠账 A 后半 · 本字段上方的那一项已不存在）</b>：原
  * `frameworkLevel.FactionComponent` 的**每实例持有已删除** —— 阵营不再是"每实例一个组件"的状态，
  * 而是**聚合根**（{@link Role}）上的一个声明值 ⇒ 读侧一律经 {@code roleInfo} 服务面
@@ -131,9 +132,8 @@ public class RoleInstance {
 
     private final NamespacedKey roleHealthModifierKey;
 
- //组件注册表（组件集合 + 每组件资源表 + getComponent 查找）与统一渲染器（**唯一渲染者**）
+ //组件注册表（组件集合 + 每组件资源表 + getComponent 查找）
     private final ComponentRegistry componentRegistry = new ComponentRegistry();
-    private final HotbarRenderer hotbarRenderer = new HotbarRenderer(this);
  /**
  * **聚合根只读服务面**（ 建立；**成为阵营读取的唯一入口**）：
  * {@link Role} 的只读视图（id / 描述 / **阵营** / 两个行为）。
@@ -149,17 +149,14 @@ public class RoleInstance {
  * 它们都**不**额外产生裸直呼点（计数守恒：5 处直呼 + 1 处方法引用）。
  * <p><b></b>：本 Runable 的实现从"直呼渲染器"改为经**渲染组件**的
  * {@code requestRepaint()} 转调 ⇒ 框架自身置脏与组件请求**收敛到同一条通道**
- * （渲染组件再把置脏交给 {@code hotbarRenderer::markDirty} 这个 sink）。
+ * （置脏的落点就是渲染组件自己的脏标记）。
  */
     private final Runnable markHotbarDirty = this::requestHotbarRepaint;
  /**
  * **组件侧"请求重绘"的唯一入口**（收进渲染组件）。
- * <p><b> 的取代动作（不静默改写）</b>：旧形态是 <i>「组件实现 {@code RepaintRequestable}，
- * 框架在装配期把 {@code RepaintRequester} 绑给它」</i> —— 那是**两条并存的重绘通道**
- * （组件侧一条 + 框架侧 {@link #markHotbarDirty} 一条）。 把它们**收敛为一条**：
- * 组件与框架**都**经 {@link HotbarRenderComponent#requestRepaint()}，
- * 由该组件把置脏交给渲染器（{@code bindRepaintSink}） ⇒ **禁两套并存**。
- * 那两个类型（{@code RepaintRequestable} / {@code RepaintRequester}）**已删除**。
+ * <p><b>现行形态</b>：组件与框架**都**经 {@link HotbarRenderComponent#requestRepaint()} 请求重绘，
+ * 置脏落点就是渲染组件自己的脏标记（帧末由它决定写不写物品）⇒ **只有一条重绘通道**
+ * （两个并存的老通道已删除）。
  * <p>边界逐字未变：它**只置脏**、不写物品 ⇒ 组件**只能请求、不能写**，
  * 「空闲 tick 零 setItem」与"写入仍由帧末 flush 完成"两条口径不变。
  */
@@ -179,13 +176,20 @@ public class RoleInstance {
  // **已删除** ⇒ 需要它的人走组件本身）。
         BuffManager buffManager = new BuffManager(player, this);
 
- //② 能量 / SanTE：真值（current）与上限（max，= 角色模板的声明值）都在组件里；
+ //② 物品渲染：**意图面**与渲染器（唯一写点）都归渲染组件 ⇒ 本类不经手渲染器本身
+ // 「组件只能请求、不能写」逐字保留（帧末 flush 归渲染组件的 flush()）。
+ // ★ 构造顺序：它必须**先于**任何要置脏的组件（能量构造期的回调就会置脏）——否则读取未初始化的 final 字段。
+        this.hotbarRenderComponent = new HotbarRenderComponent(SERVICE_ID_HOTBAR_RENDER,
+                createServices(SERVICE_ID_HOTBAR_RENDER));
+        this.hotbarRenderComponent.bindRepaintSink(this.hotbarRenderComponent::markDirty);
+
+ //③ 能量 / SanTE：真值（current）与上限（max，= 角色模板的声明值）都在组件里；
  // "置脏"这件平台事由容器**注册成监听器**承担 ⇒ 组件本身不需要任何旧端口。
         this.energyComponent = new EnergyComponent(SERVICE_ID_ENERGY, createServices(SERVICE_ID_ENERGY),
                 role.getMaxEnergy(),
                 change -> {
  //触点④（能量单一入口）：**无条件**置脏（不做"跨阈值才置脏"的优化 —— 那属性能项）
-                    hotbarRenderer.markDirty();
+                    hotbarRenderComponent.markDirty();
                 });
         this.santeComponent = new SanTEComponent(SERVICE_ID_SANTE, createServices(SERVICE_ID_SANTE),
                 role.getMaxSanTE());
@@ -194,13 +198,13 @@ public class RoleInstance {
  //容器**直派**：组件只管真值怎么变；"变了之后通知谁"这条边界在容器里（不再经 RoleEventListener 转发）
                 dispatchSanTEChange(change.previous(), change.current()));
 
- //③ 生命：clamp 策略的唯一实现在组件里（状态 = Bukkit 玩家属性，属外部平台状态）
+ //④ 生命：clamp 策略的唯一实现在组件里（状态 = Bukkit 玩家属性，属外部平台状态）
         this.vitalsComponent = new VitalsComponent(SERVICE_ID_VITALS, createServices(SERVICE_ID_VITALS));
 
- //④ buff：记账表（BuffManager）与药水账本（原 appliedPotionTypes 字段）都归它持有
+ //⑤ buff：记账表（BuffManager）与药水账本（原 appliedPotionTypes 字段）都归它持有
         this.buffComponent = new BuffComponent(SERVICE_ID_BUFFS, createServices(SERVICE_ID_BUFFS), buffManager);
 
- //⑤ 计时：任务的**创建**在组件里、**登记归属**按请求者；资源**存储**仍是容器的每组件资源表
+ //⑥ 计时：任务的**创建**在组件里、**登记归属**按请求者；资源**存储**仍是容器的每组件资源表
  // （TaskSink 就是 ComponentRegistry#track / #cancelAll ⇒ 既有回收机制一条都不改）
         this.timerComponent = new TimerComponent(SERVICE_ID_TIMERS, createServices(SERVICE_ID_TIMERS),
                 platform.scheduler(), new TimerComponent.TaskSink() {
@@ -215,19 +219,13 @@ public class RoleInstance {
             }
         });
 
- //⑥ 阵营（ · 欠账 A 后半）：**原 FactionComponent 已整体删除** ——
+ //⑦ 阵营：**原 FactionComponent 已整体删除** ——
  // 阵营的真值就是聚合根 `Role` 的 `faction` 字段（构造期由描述符写入）；
  // 关系表仍留平台（静态数据 ⇒ 外部单例许可，不进依赖图）：`RoleInfoImpl` / 平台自带 lookup 直接读它。
  // ⇒ 本相**不再构造任何阵营组件**，也不再登记任何阵营服务组件（阵营不是容器里的状态拥有者）。
 
- //⑦ 伤害：四个原语（ Part A 起由 VitalsComponent 承载 ⇒ 伤害与生命只有一个持有者）
+ //⑧ 伤害：四个原语（由 VitalsComponent 承载 ⇒ 伤害与生命只有一个持有者）
  // —— 原独立 DamageComponent 已删除，不再单独构造。
-
- //⑧ 物品渲染（）：**意图面**收进组件；置脏通道在装配期绑回渲染器 ⇒
- // 「组件只能请求、不能写」逐字保留（唯一写点仍是 hotbarRenderer 的帧末 flush）
-        this.hotbarRenderComponent = new HotbarRenderComponent(SERVICE_ID_HOTBAR_RENDER,
-                createServices(SERVICE_ID_HOTBAR_RENDER));
-        this.hotbarRenderComponent.bindRepaintSink(hotbarRenderer::markDirty);
 
  //裁定④ 的**动态删除路径**入口（隔离时"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + P2 守卫）
         this.componentLookup = new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger());
@@ -254,7 +252,7 @@ public class RoleInstance {
 
  /**
  * **框架自身的置脏入口**（）：经**物品渲染组件**转调 ⇒ 与组件侧请求
- * **收敛到同一条通道** （原先的独立 {@code markHotbarDirty → hotbarRenderer::markDirty} 直连已废止）。
+ * **收敛到同一条通道** （原先的"直连渲染器置脏"这条独立路径已废止）。
  * <p>用方法引用（{@code this::requestHotbarRepaint}）而不是 lambda：字段初始化式里**不能**读
  * 尚未在构造器里赋值的 final 字段（Java 的 definite-assignment 规则）⇒ 方法引用把读取推迟到调用时。
  */
@@ -312,7 +310,7 @@ public class RoleInstance {
 
  //④ 构造期**同步首刷一次**（可见时机与既有实现逐字一致 = 选角色瞬间热键栏即就绪、零延迟）；
  //首个 tick 因置脏初值为 true 还会再写一次同内容（不可见、且此后空闲 tick 不再写）。
-        hotbarRenderer.render();
+        hotbarRenderComponent.firstFlush();
     }
 
  //平台上下文：组件取用入口（逐批收窄后服务集只剩三个成员）
@@ -462,7 +460,9 @@ public class RoleInstance {
         runPendingQuarantine();
  //**仍返回 true**：本次已由管道"处理"（组件确实被调用过，只是抛了）⇒ 若返回 false，
  //调用方会回落到旧路径 ⇒ **二次派发**（组件已被隔离，二次派发是新的错误面）
-        hotbarRenderer.markDirty();
+ //施放后**无条件**置脏一次（与既有实现逐字一致：这次置脏**不在**帧末入口条件里
+ // ⇒ 即使本次施放没有可见变化，也照旧请求一次重绘）
+        hotbarRenderComponent.markDirty();
         return true;
     }
 
@@ -483,7 +483,8 @@ public class RoleInstance {
  //：唯一受保护调用（攻击同属派发边界）
         guardedCall(component, "onAttack", () -> hook.onAttack(new AttackSignal(victim)));
         runPendingQuarantine();
-        hotbarRenderer.markDirty();
+ //同 handleCast：攻击后**无条件**置脏一次（这次置脏不在帧末入口条件里）
+        hotbarRenderComponent.markDirty();
         return true;
     }
 
@@ -643,8 +644,8 @@ public class RoleInstance {
 
 
 
- //热键栏渲染：**唯一渲染者 = HotbarRenderer**（写物品只发生在 core/hotbar 内）；
- //本容器只提供查表与状态输入，不对外提供任何渲染器 / 物品访问器（清热键栏的静态入口也归渲染器 ✓）。
+ //热键栏渲染：唯一写点在渲染组件持有的渲染器里（`core/hotbar` 内）；
+ //本容器只提供查表与状态输入，**不持有**渲染器、也不对外提供任何渲染器 / 物品访问器。
 
     public Player getPlayer() { return player; }
     public Role getRole() { return role; }
@@ -868,20 +869,16 @@ public class RoleInstance {
 
 
  //帧末 flush（落点 = tick 末尾，紧接组件更新与到期扫描之后）：
- //① 判脏 → ② 写物品（唯一写点 = HotbarRenderer.render）→ ③ 清脏（此顺序不可交换）
- //入口条件（**与冻结口径等价**）：**外观含秒数**的占栏位组件在冷却
- //⇒ 每 tick 至少刷一次（否则技能名里的 " x.xs" 不再逐 tick 递减 = 可见行为变化）。
- //**主武器不让入口因它而变**（冷却名不带秒数 ⇒ 冻结差异；见 hasCoolingTickingComponent）。
-        if(hotbarRenderer.isDirty() || hasCoolingTickingComponent()){
-            hotbarRenderer.render();
-            hotbarRenderer.clearDirty();
- // · B3：**渲染回调**（读侧、只通知）—— 触发点 = 上面"真正完成一次刷新之后"
+ //渲染组件自己判定"要不要刷"（判脏 → 写物品 → 清脏 → 取变更，**顺序不可交换**）——
+ //入口条件与写物品段都在它内部，本类只转问它一个问题："本帧真的改了东西吗？"
+ //**主武器不让入口因它而变**（冷却名不带秒数 ⇒ 冻结差异；判据同样在组件内部）。
+        hotbarRenderComponent.flush();
+ //渲染回调（读侧、只通知）—— 触发点 = 上面"真正完成一次刷新之后"
  //★ 变化判据：只有**本帧真的改了东西**才回调（consumeChanged 一次性读取并清除）⇒ 无变化的那一帧 **0 次**
  //★ 派发：按能力接口扇出，**逐个**经 deliverHook（内含 guardedCall + 外裹 withinIterationWindow）
  // —— 不在此处裸调组件方法（否则抛异常时隔离四步不会被安排）
-            if(hotbarRenderer.consumeChanged()){
-                dispatchHotbarRendered();
-            }
+        if(hotbarRenderComponent.consumeChanged()){
+            dispatchHotbarRendered();
         }
 
     }
@@ -899,35 +896,6 @@ public class RoleInstance {
         }
     }
 
- /**
- * 帧入口谓词（**与冻结口径等价**）：是否存在**外观依赖活状态**的**占栏位**组件正在冷却。
- * <p>作用 = 让"冷却中每刻至少刷一次"成立：技能名里的 {@code x.xs} 才会逐刻递减
- * （装饰搬进组件之后，框架只剩 {@link ActiveComponent#isCoolingDown()} 这条读口）。
- * <p><b>判据由「{@code instanceof Skill}」下沉为「组件自报的值」</b> ——
- * 渲染组件的读口 {@code dependsOnLiveStateOf(component)}。理由（C-15 第三个实例测试）：
- * 早先写法把"外观含秒数"**写死成具体类** ⇒ ① 第三类带倒计时外观的组件加进来**必须改框架文件**；
- * ② 覆写掉秒数外观的 {@code Skill} 子类**仍被每 tick 重绘**。现在框架**不再点名任何具体组件类**，
- * 接受集由组件自报 ⇒ 新组件只加新文件（默认 {@code false}，需要就覆写 {@code true}）。
- * <p><b>等价性（与旧判据逐字相同）</b>：{@code core/Skill} 覆写为 {@code true}，主武器与被动保持默认
- * {@code false} ⇒ 既有 16 个组件的真值表不变（两侧对拍见交付说明）。
- * <p><b>边界（A12）</b>：主武器**不得**让帧入口因它而变 —— {@code core/MainWeapon} 家族的冷却名
- * **不带**秒数（冻结差异）⇒ 自报值为 {@code false} ⇒ 本谓词对它恒 {@code false} ⇒ 主武器冷却不驱动
- * 每 tick 刷新，与既有实现一致。
- * <p>接受集成立性：占栏位组件全是主动组件家族（该家族同时提供声明面与
- * {@link ActiveComponent#isCoolingDown()} 的冷却读口）⇒ 被本谓词检查到的组件一定能回答
- * {@code dependsOnLiveState()} 与 {@code isCoolingDown()}。
- */
-    private boolean hasCoolingTickingComponent(){
-        for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
-            if(!entry.getValue().hasSlot()) continue;
-            RoleComponent component = componentRegistry.getById(entry.getKey());
- //「外观是否依赖活状态」= 组件自报的值（框架**不点名**任何具体组件类）
- //读侧契约 = 渲染组件按组件读数据（组件不再实现能力接口）⇒ 接受集与旧判据逐字相同 ✓
-            if(!HotbarRenderComponent.dependsOnLiveStateOf(component)) continue;
-            if(component instanceof ActiveComponent active && active.isCoolingDown()) return true;
-        }
-        return false;
-    }
 
  // ─────────：**框架调用组件的唯一受保护入口** + 故障隔离（四步） ─────────
 

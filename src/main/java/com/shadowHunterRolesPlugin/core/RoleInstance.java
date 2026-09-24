@@ -808,30 +808,9 @@ public class RoleInstance {
     //  ⇒ 本类**不再**提供 `getFaction()` / `isHostileTo(...)` 三个读视图 ✗（调用点已改走 RoleInfo：
     //  `internal/api/RoleAPIImpl#getFaction(*2)`、`manager/RoleManager#areHostile(*2)`）。
     //★ 查表语义（`FactionLookup#isHostile`，关系表仍留平台）= 旧 {@code isHostileTo(Faction)} 逐字等价 ✓。
-
-    /**
-     * **重设阵营**（{@code RoleAPI#setFaction} 的落点；一般用不到）—— 转调到**聚合根** ✓。
-     * <p>阶段 13 · t123：旧落点是每实例的 `FactionComponent#setFaction`（组件已删除 ✗）⇒ 本方法改为
-     * 纯转调 {@link Role#setFaction(Faction)}，语义逐字保留：**写的是角色模板上的声明值** ✓、
-     * 影响该角色的**所有实例**（各实例下次经 {@code RoleInfo#faction()} 读取时即生效）✓。
-     * <p><b>不复刻旧守卫</b>：旧组件写法对 {@code null} 不判 —— 这里同样只做转调（{@code null} 经
-     * {@code Role#getFaction()} 原样返回，{@code RoleInfoImpl#faction()} 的行为与迁移前完全一致 ✓）。
-     */
-    public void setFaction(Faction faction){
-        role.setFaction(faction);
-    }
-
-    /**
-     * **复位为角色模板声明的阵营**（{@code RoleAPI#resetFaction} 的落点）—— 转调到**聚合根** ✓。
-     * <p>阶段 13 · t123：旧落点是每实例的 `FactionComponent#reset()`（组件已删除 ✗）⇒ 本方法改为
-     * 纯转调 {@link Role#resetFaction()}（回落目标 = {@code Role} 的只读 `defaultFaction`）⇒
-     * 与该组件旧实现 <i>{@code this.faction = defaultFaction;}</i> **逐字等价** ✓（连续调用幂等 ✓）。
-     */
-    public void resetFaction(){
-        if(role != null){
-            role.resetFaction();
-        }
-    }
+    //★ **阶段 13 · t126**：本类的**写视图也一并删除** ✗（`setFaction(Faction)` / `resetFaction()` 两条 ——
+    //  原为 `RoleAPI#setFaction/resetFaction` 的落点）⇒ 那两条 API 已**做空、不再生效** ✗ ⇒ 写视图**无消费者** ✓；
+    //  真值写入仍在**聚合根**（{@link Role#setFaction} / {@link Role#resetFaction} ✓，**不由外部直改** ✗）。
 
     //生命周期触发
     //awake阶段：只解析跨组件依赖并缓存引用，必须幂等且不改动玩家可见状态

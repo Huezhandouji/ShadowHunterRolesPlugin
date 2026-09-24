@@ -58,14 +58,17 @@ public interface RoleAPI {
     //能量系统
     @Deprecated
     int getPlayerEnergy(Player player);
+    @Deprecated
     int getPlayerEnergy(UUID uuid);
 
     @Deprecated
     int getPlayerMaxEnergy(Player player);
+    @Deprecated
     int getPlayerMaxEnergy(UUID uuid);
 
     @Deprecated
     void setPlayerEnergy(Player player, int amount);
+    @Deprecated
     void setPlayerEnergy(UUID uuid, int amount);
 
     @Deprecated
@@ -95,6 +98,7 @@ public interface RoleAPI {
     @Deprecated
     int getPlayerSanTE(Player player);
     /** 同 {@link #getPlayerSanTE(Player)}（UUID 口径）。 */
+    @Deprecated
     int getPlayerSanTE(UUID uuid);
 
     /**
@@ -102,16 +106,20 @@ public interface RoleAPI {
      * <p>与 {@link #getPlayerSanTE(UUID)} 的哨兵语义**互补而非取代**：旧方法与旧返回值一字未动，
      * 本方法只是给"没有角色"提供一个**不需要认哨兵**的读法。
      */
+    @Deprecated
     OptionalInt getPlayerSanTEOptional(Player player);
     /** 同 {@link #getPlayerSanTEOptional(Player)}（UUID 口径）。 */
+    @Deprecated
     OptionalInt getPlayerSanTEOptional(UUID uuid);
 
     @Deprecated
     int getPlayerMaxSanTE(Player player);
+    @Deprecated
     int getPlayerMaxSanTE(UUID uuid);
 
     @Deprecated
     void setPlayerSanTE(Player player, int amount);
+    @Deprecated
     void setPlayerSanTE(UUID uuid, int amount);
 
     @Deprecated
@@ -121,29 +129,35 @@ public interface RoleAPI {
 
     @Deprecated
     void decreaseSanTE(Player player, int amount);
+    @Deprecated
     void decreaseSanTE(UUID uuid, int amount);
 
 
     //生命值
     @Deprecated
     double getPlayerHealth(Player player);
+    @Deprecated
     double getPlayerHealth(UUID uuid);
 
     @Deprecated
     double getPlayerMaxHealth(Player player);
+    @Deprecated
     double getPlayerMaxHealth(UUID uuid);
 
     @Deprecated
     void healPlayer(Player player, double amount);
+    @Deprecated
     void healPlayer(UUID uuid, double amount);
 
     //技能相关
     @Deprecated
     boolean isSkillReady(Player player, String skillId);
+    @Deprecated
     boolean isSkillReady(UUID uuid, String skillId);
 
     @Deprecated
     int getSkillCooldownTick(Player player, String skillId);
+    @Deprecated
     int getSkillCooldownTick(UUID uuid, String skillId);
 
     //阵营信息
@@ -164,6 +178,7 @@ public interface RoleAPI {
 
     @Deprecated
     boolean areHostile(Player p1, Player p2);
+    @Deprecated
     boolean areHostile(UUID p1, UUID p2);
 
     //组件操作面（阶段 13 · t125：设计定案 §7.4 ② / §10.3）—— **唯一**的操作角色入口 ✓

@@ -13,7 +13,6 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
@@ -142,283 +141,274 @@ public class RoleAPIImpl implements RoleAPI {
         }
     }
 
-    //能量系统
+    //能量系统（阶段 13 · t126：**全部做空** ✗ —— 仍在但不再生效 ✓；替代路径 = executeComponentOperation ✓）
     @Deprecated
     @Override
     public int getPlayerEnergy(Player player) {
-        RoleInstance instance = getRoleInstance(player);
-        return instance != null ? instance.getCurrentEnergy() : -78; //-78代表没查到
+        stubbed("getPlayerEnergy(Player)");
+        return 0;
     }
+    @Deprecated
     @Override
     public int getPlayerEnergy(UUID uuid) {
-        RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? instance.getCurrentEnergy() : -78;
+        stubbed("getPlayerEnergy(UUID)");
+        return 0;
     }
 
     @Deprecated
     @Override
     public int getPlayerMaxEnergy(Player player) {
-        RoleInstance instance = getRoleInstance(player);
-        return instance != null ? instance.getMaxEnergy() : -78;
+        stubbed("getPlayerMaxEnergy(Player)");
+        return 0;
     }
+    @Deprecated
     @Override
     public int getPlayerMaxEnergy(UUID uuid) {
-        RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? instance.getMaxEnergy() : -78;
+        stubbed("getPlayerMaxEnergy(UUID)");
+        return 0;
     }
 
     @Deprecated
     @Override
     public void setPlayerEnergy(Player player, int amount){
-        RoleInstance instance = getRoleInstance(player);
-        if(instance == null) return;
-        instance.setCurrentEnergy(amount);
+        stubbed("setPlayerEnergy(Player,int)");
     }
+    @Deprecated
     @Override
     public void setPlayerEnergy(UUID uuid, int amount){
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return;
-        instance.setCurrentEnergy(amount);
+        stubbed("setPlayerEnergy(UUID,int)");
     }
 
     @Deprecated
     @Override
     public void increaseEnergy(Player player, int amount) {
-        RoleInstance instance = getRoleInstance(player);
-        if(instance == null) return;
-        instance.increaseEnergy(amount);
+        stubbed("increaseEnergy(Player,int)");
     }
+    @Deprecated
     @Override
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void increaseEnergy(UUID uuid, int amount) {
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return;
-        instance.increaseEnergy(amount);
+        stubbed("increaseEnergy(UUID,int)");
     }
 
     @Deprecated
     @Override
     public void decreaseEnergy(Player player, int amount) {
-        RoleInstance instance = getRoleInstance(player);
-        if(instance == null) return;
-        instance.decreaseEnergy(amount);
+        stubbed("decreaseEnergy(Player,int)");
     }
+    @Deprecated
     @Override
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = EnergyComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void decreaseEnergy(UUID uuid, int amount) {
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return;
-        instance.decreaseEnergy(amount);
+        stubbed("decreaseEnergy(UUID,int)");
     }
 
-    //sanTE相关
+    //sanTE相关（阶段 13 · t126：**全部做空** ✗ —— 含卡面未计入的 `getPlayerSanTEOptional` ×2，见交付说明 ✓）
     @Deprecated
     @Override
     public int getPlayerSanTE(Player player) {
-        RoleInstance instance = getRoleInstance(player);
-        return instance != null ? instance.getCurrentSanTE() : RoleAPI.NO_ROLE_SAN_TE_SENTINEL;
+        stubbed("getPlayerSanTE(Player)");
+        return 0;
     }
+    @Deprecated
     @Override
     public int getPlayerSanTE(UUID uuid) {
-        RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? instance.getCurrentSanTE() : RoleAPI.NO_ROLE_SAN_TE_SENTINEL;
+        stubbed("getPlayerSanTE(UUID)");
+        return 0;
     }
 
-    /** 只增入口（阶段 7 · 清理批）：无角色 ⇒ 空 Optional（不再需要调用方认哨兵）。 */
+    /** 只增入口（阶段 7 · 清理批）：**阶段 13 · t126 起做空** ✗（仍在但不再生效 ✓）⇒ 恒空 Optional ✓。 */
+    @Deprecated
     @Override
     public OptionalInt getPlayerSanTEOptional(Player player) {
-        RoleInstance instance = getRoleInstance(player);
-        return instance != null ? OptionalInt.of(instance.getCurrentSanTE()) : OptionalInt.empty();
+        stubbed("getPlayerSanTEOptional(Player)");
+        return OptionalInt.empty();
     }
-
+    @Deprecated
     @Override
     public OptionalInt getPlayerSanTEOptional(UUID uuid) {
-        RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? OptionalInt.of(instance.getCurrentSanTE()) : OptionalInt.empty();
+        stubbed("getPlayerSanTEOptional(UUID)");
+        return OptionalInt.empty();
     }
 
     @Deprecated
     @Override
     public int getPlayerMaxSanTE(Player player) {
-        RoleInstance instance = getRoleInstance(player);
-        return instance != null ? instance.getMaxSanTE() : -78;
+        stubbed("getPlayerMaxSanTE(Player)");
+        return 0;
     }
+    @Deprecated
     @Override
     public int getPlayerMaxSanTE(UUID uuid) {
-        RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? instance.getMaxSanTE() : -78;
+        stubbed("getPlayerMaxSanTE(UUID)");
+        return 0;
     }
 
     @Deprecated
     @Override
     public void setPlayerSanTE(Player player, int amount) {
-        RoleInstance instance = getRoleInstance(player);
-        if(instance == null) return;
-        instance.setCurrentSanTE(amount);
+        stubbed("setPlayerSanTE(Player,int)");
     }
+    @Deprecated
     @Override
     public void setPlayerSanTE(UUID uuid, int amount) {
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return;
-        instance.setCurrentSanTE(amount);
+        stubbed("setPlayerSanTE(UUID,int)");
     }
 
     @Deprecated
     @Override
     public void increaseSanTE(Player player, int amount) {
-        RoleInstance instance = getRoleInstance(player);
-        if(instance == null) return;
-        instance.increaseSanTE(amount);
+        stubbed("increaseSanTE(Player,int)");
     }
+    @Deprecated
     @Override
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = SanTEComponent（经 svc().components() 或 getAllByType 直接取组件） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void increaseSanTE(UUID uuid, int amount) {
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return;
-        instance.increaseSanTE(amount);
+        stubbed("increaseSanTE(UUID,int)");
     }
 
     @Deprecated
     @Override
     public void decreaseSanTE(Player player, int amount) {
-        RoleInstance instance = getRoleInstance(player);
-        if(instance == null) return;
-        instance.decreaseSanTE(amount);
+        stubbed("decreaseSanTE(Player,int)");
     }
+    @Deprecated
     @Override
     public void decreaseSanTE(UUID uuid, int amount) {
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return;
-        instance.decreaseSanTE(amount);
+        stubbed("decreaseSanTE(UUID,int)");
     }
 
-    //生命值相关
+    //生命值相关（阶段 13 · t126：**全部做空** ✗ —— 仍在但不再生效 ✓；替代路径 = executeComponentOperation ✓）
     @Deprecated
     @Override
     public double getPlayerHealth(Player player) {
-        return player.getHealth();
+        stubbed("getPlayerHealth(Player)");
+        return 0;
     }
+    @Deprecated
     @Override
     public double getPlayerHealth(UUID uuid) {
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return 0;
-        Player player = instance.getPlayer();
-        if(player == null) return 0;
-        return player.getHealth();
+        stubbed("getPlayerHealth(UUID)");
+        return 0;
     }
 
     @Deprecated
     @Override
     public double getPlayerMaxHealth(Player player) {
-        return player.getAttribute(Attribute.MAX_HEALTH).getValue();
+        stubbed("getPlayerMaxHealth(Player)");
+        return 0;
     }
+    @Deprecated
     @Override
     public double getPlayerMaxHealth(UUID uuid) {
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return 0;
-        Player player = instance.getPlayer();
-        if(player == null) return 0;
-        return player.getAttribute(Attribute.MAX_HEALTH).getValue();
+        stubbed("getPlayerMaxHealth(UUID)");
+        return 0;
     }
 
     @Deprecated
     @Override
     public void healPlayer(Player player, double amount) {
-        double newHealth = Math.min(player.getHealth() + amount, getPlayerMaxHealth(player));
-        player.setHealth(newHealth);
+        stubbed("healPlayer(Player,double)");
     }
+    @Deprecated
     @Override
     public void healPlayer(UUID uuid, double amount) {
-        Player player = Bukkit.getPlayer(uuid);
-        if(player == null) return;
-        double newHealth = Math.min(player.getHealth() + amount, getPlayerMaxHealth(player));
-        player.setHealth(newHealth);
+        stubbed("healPlayer(UUID,double)");
     }
 
-    //技能相关
+    //技能相关（阶段 13 · t126：**全部做空** ✗ —— 仍在但不再生效 ✓）
     @Deprecated
     @Override
     public boolean isSkillReady(Player player, String skillId) {
-        RoleInstance instance = getRoleInstance(player);
-        return instance != null && instance.isSkillReady(skillId);
+        stubbed("isSkillReady(Player,String)");
+        return false;
     }
+    @Deprecated
     @Override
     public boolean isSkillReady(UUID uuid, String skillId) {
-        RoleInstance instance = getRoleInstance(uuid);
-        return instance != null && instance.isSkillReady(skillId);
+        stubbed("isSkillReady(UUID,String)");
+        return false;
     }
 
     @Deprecated
     @Override
     public int getSkillCooldownTick(Player player, String skillId) {
-        RoleInstance instance = getRoleInstance(player);
-        return instance != null ? instance.getRemainingSkillCooldownTicks(skillId) : 0;
+        stubbed("getSkillCooldownTick(Player,String)");
+        return 0;
     }
+    @Deprecated
     @Override
     public int getSkillCooldownTick(UUID uuid, String skillId) {
-        RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? instance.getRemainingSkillCooldownTicks(skillId) : 0;
+        stubbed("getSkillCooldownTick(UUID,String)");
+        return 0;
     }
 
-    //阵营相关
+    //阵营相关（阶段 13 · t126：**全部做空** ✗ —— 仍在但不再生效 ✓；阵营读取唯一入口仍是 `RoleInfo` 服务面 ✓）
     //阶段 13 · t123（欠账 A 后半）：阵营**读取唯一入口 = `RoleInfo` 服务面** ✓ —— 旧写法走
     //`RoleInstance#getFaction()` 的**组件直读视图**（已随 FactionComponent 一并删除 ✗）。
     @Deprecated
     @Override
     public Faction getFaction(Player player) {
-        RoleInstance instance = getRoleInstance(player);
-        return instance != null ? instance.roleInfo().faction() : Faction.UNKNOWN;
+        stubbed("getFaction(Player)");
+        return Faction.UNKNOWN;
     }
+    @Deprecated
     @Override
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo#faction()（组件经角色信息服务取用，t90 唯一入口） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public Faction getFaction(UUID uuid) {
-        RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? instance.roleInfo().faction() : Faction.UNKNOWN;
+        stubbed("getFaction(UUID)");
+        return Faction.UNKNOWN;
     }
 
-    //阶段 13 · t123：写侧改接**聚合根**（`RoleInstance#setFaction` 转调 `Role#setFaction`）✓
-    //—— 旧落点 `FactionComponent#setFaction` 已随组件删除 ✗；`roleInfo` 服务面**不带写面**（R-1）✗。
+    //阶段 13 · t126：写侧**做空** ✗ —— t123 那条"转调聚合根"的写视图（`RoleInstance#setFaction/resetFaction`）
+    //已随本片**一并删除** ✗（做空后它再无消费者 ✓）；组件侧要改阵营请走角色服务面，**不要**由外部直改 ✗。
     @Deprecated
     @Override
     public void setFaction(Player player, Faction faction) {
-        RoleInstance instance = getRoleInstance(player);
-        if(instance == null) return;
-        instance.setFaction(faction);
+        stubbed("setFaction(Player,Faction)");
     }
+    @Deprecated
     @Override
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void setFaction(UUID uuid, Faction faction) {
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return;
-        instance.setFaction(faction);
+        stubbed("setFaction(UUID,Faction)");
     }
 
-    //阶段 13 · t123：复位同样改接**聚合根**（`RoleInstance#resetFaction` 转调 `Role#resetFaction`
-    //⇒ 回落目标 = 角色模板声明的阵营，与旧 `FactionComponent#reset()` 逐字等价 ✓）。
     @Deprecated
     @Override
     public void resetFaction(Player player) {
-        RoleInstance instance = getRoleInstance(player);
-        if(instance == null) return;
-        instance.resetFaction();
+        stubbed("resetFaction(Player)");
     }
+    @Deprecated
     @Override
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo/角色服务面（勿由外部直改阵营；组件侧经角色信息服务） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public void resetFaction(UUID uuid) {
-        RoleInstance instance = getRoleInstance(uuid);
-        if(instance == null) return;
-        instance.resetFaction();
+        stubbed("resetFaction(UUID)");
     }
 
     @Deprecated
     @Override
     public boolean areHostile(Player p1, Player p2) {
-        return roleManager.areHostile(p1, p2);
+        stubbed("areHostile(Player,Player)");
+        return false;
     }
+    @Deprecated
     @Override
     public boolean areHostile(UUID uuid1, UUID uuid2) {
-        return roleManager.areHostile(uuid1, uuid2);
+        stubbed("areHostile(UUID,UUID)");
+        return false;
     }
+
+    // ───────── 阶段 13 · t126：老 API 的**做空实现**（用户裁定） ─────────
+
+    /**
+     * **老 API 的做空实现**（阶段 13 · t126 · 用户裁定「在新 api 任务完成后，把老的直接操作组件的 api 做空实现」✓）。
+     * <p><b>方法仍在、签名与注解一律保留</b> ✓（第三方仍能编译 ✓ = P4 恢复生效 ✓），但**不再生效** ✗ ——
+     * 每次调用记一条 WARNING（内容含**方法名** + **替代路径** ✓）。
+     * <p><b>返回中性哨兵值</b> ✓（{@code false} / {@code 0} / {@code OptionalInt.empty()} /
+     * {@link Faction#UNKNOWN}）—— ★ **不用"随便一个数字"** ✗✗：假的 9999 会被调用方当真能量用 ✗。
+     * <p>替代路径 = {@link RoleAPI#executeComponentOperation(UUID, String, String)} ✓（读写都走它 ✓
+     * —— 一条实现、两个门面 ✓）。
+     */
+    private void stubbed(String method) {
+        Bukkit.getLogger().warning("[RoleAPI] " + method + " 已做空、不再生效 ✗（本方法直接操作组件）："
+                + "替代路径 = executeComponentOperation(uuid, componentId, payload) ✓");
+    }
+
     //阶段 3.3（RoleAPI 只增）：枚举已装配的角色 id 与只读快照
     @Override
     public Set<String> getAllRoleIds() {

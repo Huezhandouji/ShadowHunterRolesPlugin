@@ -12,14 +12,14 @@ package com.shadowHunterRolesPlugin.roleComponent;
  * </ul>
  * ★ <b>与 {@code RoleAPI#executeComponentOperation(UUID, String, String)} 的 {@code String} 返回逐字对齐</b> ✓
  * （**布尔换成字符串** ⇒ 组件终于**能把值交出来** ⇒ 读缺口关闭 ✓；读写都走**唯一**这一个操作入口 ✓）。
- * 参数 = **整段 payload 字符串**（v2 定案：op 与 args **合并**后交给组件自解析 ✓）—— 本接口**不解析**它 ✗。
+ * 参数 = **整段 payload 字符串**（op 与 args **合并**后交给组件自解析 ✓）—— 本接口**不解析**它 ✗。
  *
- * <h2>★ 三条护栏（防先例 · 设计定案 §10.2）</h2>
+ * <h2>★ 三条护栏（防先例）</h2>
  * <ol>
  *   <li><b>冻结为单方法</b> ✗：本接口**不得再加方法、不得加默认实现**；组件需要更多能力 ⇒
  *       暴露**自己的**方法 ✓（**不扩本接口** ✗）；</li>
  *   <li><b>包定位 = 组件契约</b>：本接口落在 {@code roleComponent/} ✓ —— **不进** {@code core/} 的
- *       "公共能力区" ✗（后者已被 R-1 清空）；</li>
+ *       "公共能力区" ✗（后者已清空）；</li>
  *   <li><b>若将来两个以上组件需要同一操作面</b> ⇒ 走"**折进组件**"的既有做法 ✓，
  *       **不再加顶层接口** ✗。</li>
  * </ol>
@@ -32,15 +32,12 @@ package com.shadowHunterRolesPlugin.roleComponent;
  *       （冷却状态 · 热键栏提供 · 耗能声明都已被折进组件 ⇒ 那些接口**完全多余** ✗）。</li>
  * </ul>
  *
- * <h2>payload 约定（设计定案 §10.4）</h2>
+ * <h2>payload 约定</h2>
  * <b>首 token 必为操作动词</b> ✓（如 {@code add 5} / {@code consume 3} / {@code current} / {@code set 120}）——
  * 派发器可**可选地**取首 token 用于权限校验与 Tab 补全 ✓（组件仍可忽略 ✓）；
  * 其余部分由**组件自解析** ✓ ⇒ **grammar 必须写进实现它的组件的 javadoc** ✓（本接口**不规定** grammar ✗）。
  *
- * <h2>本片范围（如实申报）</h2>
- * 本接口 + **能量组件试点** = 操作面的第一片 ✓；**指令面 / 派发器 / {@code RoleAPI} 收口**不在本片 ✗
- * （分别归后续实现 ✓）。<b>返回类型</b>由 {@code boolean} 改为 {@code String} ✓
- * （契约见上，形状护栏不变 ✓）。
+ * **本接口只定义"组件如何接受一条操作指令"** ✓；**指令面 / 派发器 / {@code RoleAPI} 收口**不归它 ✗。
  */
 public interface OperationProvider {
 

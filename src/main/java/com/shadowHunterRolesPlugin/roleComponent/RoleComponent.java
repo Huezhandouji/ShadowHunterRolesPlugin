@@ -87,7 +87,7 @@ public abstract class RoleComponent {
 
     //本基类**不再**声明 `onSanTEChange(int pre, int now)` ✗ ——
     //  **现行形态**：关心者向 `SanTEComponent` **添加监听**（`addListener` + JDK `Consumer`）✓
-    //  —— 依据用户硬规矩 **R-1**：SanTE 的家是组件 ⇒ **不得再为它新增能力接口** ✗。
+    //  —— SanTE 的家是组件 ⇒ **不得再为它新增能力接口** ✗。
     //  简言之：SanTE 的**真值持有者**早已是 SanTEComponent ⇒ 变更通知不该挂在**所有**组件的基类上。
 
     // ───────────── 装配期描述符 ─────────────

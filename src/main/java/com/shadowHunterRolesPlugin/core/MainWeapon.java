@@ -11,7 +11,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarItemProviding;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.hotbar.IconState;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;

@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.core.hotbar;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -19,7 +20,7 @@ import java.util.Map;
  *       才会写物品；<b>空闲 tick 零 setItem</b>（无脏、无冷却）；</li>
  *   <li><b>写到哪一格</b>：装配条目里的栏位（{@code Role.ComponentEntry#getSlot()}），
  *       按**注册序**遍历组件表 ⇒ 「注册序 = 渲染序」在代码上直接可见；</li>
- *   <li><b>写什么</b>：向组件要 —— {@code HotbarItemProviding#buildItem()}（阶段 8：物品**完全由组件控制**，
+ *   <li><b>写什么</b>：向组件要 —— {@code HotbarRenderComponent.HotbarItemProviding#buildItem()}（阶段 8：物品**完全由组件控制**，
  *       三态材质 / 文案 / 秒数 / 识别键都在组件的默认画法里，渲染器一概不判不问）；</li>
  *   <li><b>唯一写物品点</b> = {@link #render()} 内的那次槽位写入；</li>
  *   <li>组件**不参与**渲染调度：没有 HotbarPort，也没有组件可调用的 markDirty。</li>
@@ -128,11 +129,11 @@ public final class HotbarRenderer {
 
     /**
      * 帧末 flush 的**写物品段**（全仓唯一渲染写点）：**按注册序遍历组件表**，遇带栏位者落位，
-     * 物品由组件自己的 {@link HotbarItemProviding#buildItem()} 产出。
+     * 物品由组件自己的 {@link HotbarRenderComponent.HotbarItemProviding#buildItem()} 产出。
      * <p>遍历的是 {@code Role.getComponents()}（`LinkedHashMap` = 装配调用序）：**每个栏位至多被写一次**
      * （装配期已禁止重复栏位）⇒ 落位结果与旧实现逐格相同；「注册序 = 渲染序」因此不依赖槽位表的迭代顺序。
      * <p>只对**已注册**的组件生效（未知 id 跳过）；**不占栏位者跳过**（被动天然走这一支）；
-     * **不实现 {@link HotbarItemProviding} 者跳过**（仓内 = 只 extends RoleComponent 且不上热键栏的组件）。
+     * **不实现 {@link HotbarRenderComponent.HotbarItemProviding} 者跳过**（仓内 = 只 extends RoleComponent 且不上热键栏的组件）。
      * <p>本方法**不判断状态、不拼文案、不写识别键、不读任何表现 getter** —— 那些都是组件画法的一部分。
      * <p><b>阶段 12 · t88 · B3</b>：本方法**顺带**维护"**本帧是否真的改了东西**"这个判据 ——
      * 写入前逐槽位与{@link #lastRendered 上一帧基线}比较，**任一处不同**就把 {@link #changed} 置位 ✓；
@@ -156,7 +157,7 @@ public final class HotbarRenderer {
             if (!component.hasSlot()) continue;
             RoleComponent instance = owner.componentRegistry().getById(entry.getKey());
             //物品完全由组件控制：拿不到"会画物品"的组件就跳过（不住栏位的组件不会出现在这里）
-            if (!(instance instanceof HotbarItemProviding providing)) continue;
+            if (!(instance instanceof HotbarRenderComponent.HotbarItemProviding providing)) continue;
             ItemStack item = providing.buildItem();
             int slot = component.getSlot();
             //阶段 12 · t88 · B3：写入**之前**判"与本帧基线是否不同"（比较不改变写入行为）

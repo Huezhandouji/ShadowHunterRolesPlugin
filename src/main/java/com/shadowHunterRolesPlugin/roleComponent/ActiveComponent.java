@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import org.bukkit.entity.Player;
 
 /**
@@ -22,7 +23,7 @@ import org.bukkit.entity.Player;
  * <ul>
  *   <li>{@link #isCooling()} 在这里给出**唯一实现**（读本组件的冷却实例状态，见下）；
  *       框架的"秒数刷新节拍"读的就是它；</li>
- *   <li>{@code buildItem()}（{@link HotbarPresentable} ⊇ {@code HotbarItemProviding}）**在本类保持抽象**：
+ *   <li>{@code buildItem()}（{@link HotbarPresentable} ⊇ {@link HotbarRenderComponent.HotbarItemProviding}）**在本类保持抽象**：
  *       默认画法由两个**家族基类**给出（`core/Skill` 带秒数、`core/MainWeapon` 不带）——
  *       画物品要读运行期状态，做不到在这里按家族分叉；</li>
  *   <li>旧的 kind 形参构造器（7/8 参 `@Deprecated` 别名）已随 kind 枚举删除；

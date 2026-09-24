@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.core.hotbar;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
@@ -20,7 +21,7 @@ import java.util.List;
  *   <li>本类自身即 {@link HotbarItem} 的**声明面**（图标 / 显示名 / 描述 / 冷却 / 耗能），
  *       因此 {@link HotbarPresentable#asHotbarItem()} 直接返回本对象，无需适配代码；</li>
  *   <li><b>纯声明</b>：阶段 8 删掉了 {@code kind} 字段与构造参数 —— 描述符不再自述种类；
- *       "物品长什么样（含运行期状态）"由组件基类的 {@link HotbarItemProviding#buildItem()} 回答；</li>
+ *       "物品长什么样（含运行期状态）"由组件基类的 {@link HotbarRenderComponent.HotbarItemProviding#buildItem()} 回答；</li>
  *   <li><b>栏位必填</b>：本类型 {@link #requiresSlot()} = {@code true}（不带栏位的组件用另一支描述符）。</li>
  * </ul>
  * <b>栏位（阶段 7 · A 步）</b>：本类型是**带栏位**的那一支 —— 装配器用

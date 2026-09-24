@@ -3,13 +3,14 @@ package com.shadowHunterRolesPlugin.core.hotbar;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 
 /**
  * 热键栏物品的**声明面**（设计 §4.2）：图标 / 显示名 / 描述 / 冷却声明值 / 耗能声明值。
  * 命名沿用工程的 JavaBean 风格（设计 §4.3 命名约定：不引入 record 风格访问器）。
  * <p><b>阶段 8</b>：本接口**只陈述声明数据**（由描述符提供），**不再**自述种类
  * （旧的 {@code getKind()} 已随 kind 枚举一起删除 —— 表现面与行为分支都不再需要它）；
- * "物品长什么样（含运行期状态）"改由 {@link HotbarItemProviding#buildItem()} 回答，
+ * "物品长什么样（含运行期状态）"改由 {@link HotbarRenderComponent.HotbarItemProviding#buildItem()} 回答，
  * 默认画法在 `core/Skill` / `core/MainWeapon` 两个**组件基类**里。
  */
 public interface HotbarItem {

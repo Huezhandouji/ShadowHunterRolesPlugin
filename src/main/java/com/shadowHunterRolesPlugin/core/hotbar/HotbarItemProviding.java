@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.core.hotbar;
 
 import org.bukkit.inventory.ItemStack;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 
 /**
  * 「这个组件自己产出热键栏物品」的能力接口（阶段 8）：**唯一实现点是 {@link #buildItem()}**。
@@ -16,9 +17,9 @@ import org.bukkit.inventory.ItemStack;
  * （图标 / 显示名 / 描述 / 冷却 / 耗能）。
  * <p>
  * <b>能力簇（用户裁定 C-14：强依赖的能力应合并）</b>：本接口被 {@link HotbarPresentable} 收进热键栏能力簇
- * （{@code HotbarPresentable extends HotbarItem, CooldownBearing, EnergyCosting, HotbarItemProviding}）
+ * （{@code HotbarPresentable extends HotbarItem, CooldownBearing, EnergyComponent.EnergyCosting, HotbarItemProviding}）
  * ⇒ <b>实现者集合按构造相同</b>（凡"能出现在热键栏"的组件都必须给出 buildItem），且 {@code buildItem()}
- * 的语义**必须读**簇内状态（{@link CooldownBearing#isCooling()} / {@link EnergyCosting#getEnergyCost()} /
+ * 的语义**必须读**簇内状态（{@link CooldownBearing#isCooling()} / {@link EnergyComponent.EnergyCosting#getEnergyCost()} /
  * {@link HotbarItem} 的声明面）⇒ 两条合并判据同时成立。不占热键栏的组件（被动）**不在**本簇内，
  * 因此不会被强制实现一个永远不会被调用的方法。
  * <p>

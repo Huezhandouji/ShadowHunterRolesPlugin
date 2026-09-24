@@ -31,6 +31,20 @@ public class EnergyComponent extends RoleComponent {
         void onEnergyChanged(int previous, int current, int max);
     }
 
+    /**
+     * **「这个组件耗能量」的能力接口**（阶段 13 · t111 第①片：从 `core/hotbar/` 顶层迁入）。
+     * <p><b>归属原则</b>：耗能是**能量面**的声明 ⇒ 本接口归能量组件所有（用户裁定"能力各归其家"），
+     * <p><b>【已作废】旧口径原文（阶段 6 原文，逐字保留）</b>：「这个组件耗能量」的能力接口（阶段 6），      * 其**顶层形态位于 `core/hotbar/` 包**（顶层文件已于阶段 13 · t111 删除 ✗）——      * 阶段 13 · t111 第①片起改为**本嵌套形态**，原 5 处引用已全部改为嵌套限定名 ✓。
+     * <p>{@code MainWeapon} 的 {@code energyCost ≡ 0} 不变量由本接口承载（构造器第 6 位恒传 0）；
+     * 非零能量成本只有两个技能（`MeiqiheziBloodySlashSkill` = 8 / `MeiqiheziCircleSlashSkill` = 15）。
+     * <p>实现方式沿用旧口径：由 `HotbarPresentable` 的 `default` 满足（本组件不实现它，只承载声明面 ✓）。
+     */
+    public interface EnergyCosting {
+
+        /** 扔放所需能量（点）；{@code 0} = 不耗能（{@code ENERGY_LACK} 态不可达）。 */
+        int getEnergyCost();
+    }
+
     private final int max;
     private final ChangeSink sink;
 

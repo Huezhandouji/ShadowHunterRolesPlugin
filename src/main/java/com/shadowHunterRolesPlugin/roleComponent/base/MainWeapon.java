@@ -126,7 +126,7 @@ public abstract class MainWeapon extends ActiveComponent {
      * → **最后一步**写识别键 {@link Utils#MAIN_WEAPON_KEY}（值 = 本组件的注册 id）。
      * <p><b>覆写者须知（用户裁定：键与文案均允许覆写，覆写者自负其责）</b>：本方法整体可覆写。
      * 覆写后若**键写错**（与 {@code MainWeaponListener} 闸门读的键不一致）⇒ 点击该物品**无任何反应**；
-     * 若**键缺失** ⇒ 角色清除时 {@code RoleInstance.clearHotbar()} 扫不到它 ⇒ **物品残留**在背包里。
+     * 若**键缺失** ⇒ 角色清除时 {@code HotbarItems.clearFrom()} 扫不到它 ⇒ **物品残留**在背包里。
      * 详见渲染组件 {@link HotbarRenderComponent#buildItemOf} 的读侧契约 javadoc。
      */
     @Override

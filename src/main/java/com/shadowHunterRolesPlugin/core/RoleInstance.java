@@ -23,6 +23,7 @@ import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.roleComponent.HotbarItems;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
@@ -1183,8 +1184,8 @@ public class RoleInstance {
             updateTask = null;
         }
 
- //清角色 ⇒ 一并清掉本系统写在热键栏里的物品（静态入口，实现点在渲染器里 ✓）
-        HotbarRenderer.clearHotbar(player);
+ //清角色 ⇒ 一并清掉本系统写在热键栏里的物品（物品关注点归 roleComponent/HotbarItems ✓）
+        HotbarItems.clearFrom(player);
 
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(roleHealthModifierKey);
 

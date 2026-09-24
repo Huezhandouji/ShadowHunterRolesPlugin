@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.manager;
 
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffType;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.Task;
@@ -107,8 +108,11 @@ public class BuffManager {
         }
 
         if(instance != null){
-            //触点⑤（buff 移除）：置脏 + 帧末 flush（`addBuff` 保持不置脏 —— 与迁移前"添加后无刷新"逐字一致）
-            instance.hotbarRenderer().markDirty();
+            //buff 移除 ⇒ 请求重绘（添加时**不**请求 —— "添加后无刷新"的既有语义不变）
+            HotbarRenderComponent render = instance.getByType(HotbarRenderComponent.class);
+            if(render != null){
+                render.requestRepaint();
+            }
         }
     }
 

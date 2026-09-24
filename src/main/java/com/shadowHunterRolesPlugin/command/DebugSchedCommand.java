@@ -337,9 +337,9 @@ public class DebugSchedCommand implements SubCommand {
         else{
             final ComponentServices portSvc = portServices;
             //请求者 = 这一对服务集所属的那个组件实例（与 servicesOf 同一条 id 解析口径）；
-            //计时组件 = 框架级服务组件（装配期已登记进实例容器 ⇒ 这里用强类型读口直接取）
+            //计时组件 = 框架级服务组件（装配期已登记进实例容器 ⇒ 经容器的按类型查取入口取 ✓）
             RoleComponent portRequester = portSvc.components().getById(str[8]);
-            TimerComponent portTimer = portInstance != null ? portInstance.timerComponent() : null;
+            TimerComponent portTimer = portInstance != null ? portInstance.getByType(TimerComponent.class) : null;
             if(portRequester == null || portTimer == null){
                 str[8] = "portLeg=SKIPPED(no requester or no timer component)";
                 sendKey(player, "[sched] ④p port leg | " + str[8]);

@@ -1,8 +1,8 @@
 package com.shadowHunterRolesPlugin.listener;
 
 import com.shadowHunterRolesPlugin.core.Role;
-import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.roleComponent.HotbarItems;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -23,14 +23,14 @@ public class PlayerListener implements Listener {
         Player player = event.getEntity();
         if(roleManager.hasRole(player)){
             roleManager.clearRole(player);
-            RoleInstance.clearHotbar(player);
+            HotbarItems.clearFrom(player);
         }
     }
 
     @EventHandler
     public void onPlayerRespawn(PlayerRespawnEvent event){
         Player player = event.getPlayer();
-        RoleInstance.clearHotbar(player);
+        HotbarItems.clearFrom(player);
     }
 
     //阶段1.8（作者最终裁决 §10 第12条 / 设计文档 §9.1）：掉线即销毁角色实例 —— 与死亡同一条 clearRole 路径。

@@ -29,7 +29,7 @@ import java.util.List;
  * 三态材质 → 名称着色/加粗 → 后缀（技能冷却名带 {@code " x.xs"}，这是与主武器的**冻结差异**）
  * → 状态行 lore → 分隔线 + 描述 → **最后一步**写识别键 {@link Utils#SKILL_KEY}。
  */
-public abstract class Skill extends ActiveComponent implements HotbarItemProviding {
+public abstract class Skill extends ActiveComponent {
 
     // ───────── 阶段 13 · t110（用户裁定）：基类**不持** buff / energy、**不查容器**、**不做该项判断** ─────────
     //用户原话：「基类不需要存 buff 和 energy 字段。这些应该由子类判断。」

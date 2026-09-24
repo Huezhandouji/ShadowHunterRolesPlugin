@@ -34,7 +34,7 @@ import java.util.List;
  * —— 本类本来就声明 `onAttack`，那个接口只是重复声明 ⇒ 整体删除 ✗（派发判据改为按**本类**判，
  * 接受集逐字不变）；{@code AttackSignal} 随之成为 {@code ActiveComponent} 的嵌套类型 ✓。
  */
-public abstract class MainWeapon extends ActiveComponent implements HotbarItemProviding {
+public abstract class MainWeapon extends ActiveComponent {
 
     // ───────── 阶段 13 · t110（用户裁定）：基类**不持** buff / energy、**不查容器**、**不做该项判断** ─────────
     //用户原话：「基类不需要存 buff 和 energy 字段。这些应该由子类判断。」

@@ -102,7 +102,8 @@ public class MainWeaponListener implements Listener {
         instance.castMainWeaponRightClick(weaponId, player);
     }
 
-    @EventHandler
+    //阶段 12 · t88 · B2：补 ignoreCancelled —— 已取消的丢弃不重复取消、也不触发施法 ✓
+    @EventHandler(ignoreCancelled = true)
     public void onQDrop(PlayerDropItemEvent event){
         Player player = event.getPlayer();
         ItemStack item = event.getItemDrop().getItemStack();
@@ -137,7 +138,8 @@ public class MainWeaponListener implements Listener {
 
     }
 
-    @EventHandler
+    //阶段 12 · t88 · B2：补 ignoreCancelled —— 已取消的点击不重复取消 ✓
+    @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event){
         if(!(event.getWhoClicked() instanceof Player player)) return;
 

@@ -88,6 +88,9 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new RoleEventListener(), this);
         //阶段 11 · t83：受伤 / 受治疗的**平台事件面**（钩子投递；ignoreCancelled、只读不取消）
         Bukkit.getPluginManager().registerEvents(new DamageHookListener(roleManager), this);
+        //阶段 12 · t88：热键栏物品的**不可动保护**（拖拽 / F 键 / 容器搬运 / 合成格 四类真缺口的取消型保护）
+        //  ★ 与上一行的**姿态相反**：保护侧必须 setCancelled(true)；读侧只通知（见该类的 javadoc）
+        Bukkit.getPluginManager().registerEvents(new HotbarItemProtectionListener(), this);
 
         roleAPI = new RoleAPIImpl(roleManager, roleRegistry);
 

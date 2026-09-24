@@ -359,19 +359,23 @@ public class RoleAPIImpl implements RoleAPI {
     }
 
     //阵营相关
+    //阶段 13 · t123（欠账 A 后半）：阵营**读取唯一入口 = `RoleInfo` 服务面** ✓ —— 旧写法走
+    //`RoleInstance#getFaction()` 的**组件直读视图**（已随 FactionComponent 一并删除 ✗）。
     @Deprecated
     @Override
     public Faction getFaction(Player player) {
         RoleInstance instance = getRoleInstance(player);
-        return instance != null ? instance.getFaction() : Faction.UNKNOWN;
+        return instance != null ? instance.roleInfo().faction() : Faction.UNKNOWN;
     }
     @Override
     /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo#faction()（组件经角色信息服务取用，t90 唯一入口） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     public Faction getFaction(UUID uuid) {
         RoleInstance instance = getRoleInstance(uuid);
-        return instance != null ? instance.getFaction() : Faction.UNKNOWN;
+        return instance != null ? instance.roleInfo().faction() : Faction.UNKNOWN;
     }
 
+    //阶段 13 · t123：写侧改接**聚合根**（`RoleInstance#setFaction` 转调 `Role#setFaction`）✓
+    //—— 旧落点 `FactionComponent#setFaction` 已随组件删除 ✗；`roleInfo` 服务面**不带写面**（R-1）✗。
     @Deprecated
     @Override
     public void setFaction(Player player, Faction faction) {
@@ -387,6 +391,8 @@ public class RoleAPIImpl implements RoleAPI {
         instance.setFaction(faction);
     }
 
+    //阶段 13 · t123：复位同样改接**聚合根**（`RoleInstance#resetFaction` 转调 `Role#resetFaction`
+    //⇒ 回落目标 = 角色模板声明的阵营，与旧 `FactionComponent#reset()` 逐字等价 ✓）。
     @Deprecated
     @Override
     public void resetFaction(Player player) {

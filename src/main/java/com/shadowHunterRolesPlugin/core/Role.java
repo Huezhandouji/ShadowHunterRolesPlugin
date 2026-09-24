@@ -10,7 +10,8 @@ import com.shadowHunterRolesPlugin.roleComponent.ComponentFactory;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.FactionComponent;
+//阶段 13 · t123：`frameworkLevel.FactionComponent` 的 **未使用 import 已删除** ✗ —— 该组件本体
+//已随 faction 迁移收尾整体删除（阵营的真值 = 本类的 `faction` 字段 ⇒ 见下方 getFaction/setFaction/resetFaction）。
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
@@ -66,6 +67,16 @@ public class Role {
 
     private Faction faction;
 
+    /**
+     * **角色模板声明的阵营**（阶段 13 · t123）：构造期由描述符给出、**此后只读** ⇒ 它就是
+     * {@link #resetFaction()} 的回落目标 ✓。
+     * <p>与 {@link #faction}（可变、{@code setFaction} 的写入点）分开持有是**必需**的：旧口径下
+     * 回落目标住在**每实例**的阵营组件（原 `frameworkLevel/FactionComponent`，阶段 13 · t123 起已删除 ✗）
+     * 的默认阵营字段里（构造期取 {@code role.getFaction()}）
+     * ⇒ 若只保留一个可变字段，"复位"会变成"把当前值写回自己"的**空操作**，与旧行为不等价 ✗。
+     */
+    private final Faction defaultFaction;
+
     private final Material icon;
 
     //私有构造方法，需要通过内部构建器创建实例
@@ -79,6 +90,9 @@ public class Role {
         this.maxEnergy = builder.maxEnergy;
         this.maxSanTE = builder.maxSanTE;
         this.faction = builder.faction;
+        //回落目标与可变值同源起步（builder.faction 由 Builder#faction 保证非 null
+        //⇒ 与旧 FactionComponent 的 `faction = defaultFaction` 逐字一致 ✓）
+        this.defaultFaction = builder.faction;
 
         this.components = Collections.unmodifiableMap(new LinkedHashMap<>(builder.components));
         this.skillIds = Collections.unmodifiableSet(filterIds(this.components, Skill.Specification.class));
@@ -597,8 +611,25 @@ public class Role {
      * ② 影响**该角色的所有实例**（已实例化的玩家实例下一次经 `RoleInfo#faction()` 读取时即生效 ✓）；
      * ③ 阵营的**读取唯一入口仍是 `roleInfo` 服务面** ✓ ⇒ 外部不直改、组件不直读（R-6 ✓）。
      * <p><b>【已作废】旧口径原文</b>（阶段 10 · t90 原文，逐字保留）：「faction 为 final ⇒ 仅构造期由描述符写入」✗。
+     * <p><b>阶段 13 · t123（欠账 A 后半）</b>：本方法即旧
+     * `frameworkLevel/FactionComponent#setFaction` 的**唯一接替落点** —— 该组件已整体删除 ✗，
+     * 写侧经 `RoleInstance#setFaction` 转调到本方法 ✓；读侧一律走 `roleInfo` 服务面（不读本字段的裸值）✓。
      */
     public void setFaction(Faction faction){ this.faction = faction; }
+
+    /**
+     * **复位为角色模板声明的阵营**（阶段 13 · t123：`RoleAPI#resetFaction` 的落点 ✓）。
+     * <p>语义 = 旧 `frameworkLevel/FactionComponent#reset()` **逐字等价**（当时写作
+     * {@code this.faction = defaultFaction;}）✓ —— 回落目标就是构造期由描述符给出的
+     * {@link #defaultFaction}（只读），因此连续复位是幂等的 ✓。
+     * <p>旧口径的差异只有一处：回落目标从**每实例组件字段**搬到**角色模板字段** ⇒ 同一角色的实例
+     * 共享同一回落目标 ✓（阵营本就"一个角色一份、全局静态"）。
+     * <p><b>【已作废】旧口径原文</b>（阶段 10 · t90 原文，逐字保留）：复位落点在
+     * `FactionComponent#reset()`、真值在组件里 ✗。
+     * <p><b>后续（本卡不改）</b>：`api/RoleAPI` 的第三片把 `setFaction` / `resetFaction` 两条
+     * 改为空实现后，`RoleInstance` 上的两个**写视图**届时可一并删除 ✓（读侧已于本卡删除 ✗）。
+     */
+    public void resetFaction(){ this.faction = defaultFaction; }
 
     /**
      * 栏位视图（**派生**，阶段 7 · B 步）：`栏位 → 组件 id`，由构造期一次性从组件表派生。

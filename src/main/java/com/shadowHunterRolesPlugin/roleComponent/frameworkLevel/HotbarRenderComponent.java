@@ -32,7 +32,9 @@ import org.bukkit.inventory.ItemStack;
  *   <li>它在**容器里可见、可查询**（{@code getAllByType} / {@code getComponent}）✓ ——
  *       后续 (b) 的"不可动物品保护"与回调有明确的挂载点 ✓；</li>
  *   <li>它与其他框架级服务组件**同构** ✓（同包同族：{@code VitalsComponent} / {@code EnergyComponent} /
- *       {@code SanTEComponent} / {@code BuffComponent} / {@code TimerComponent} / {@code FactionComponent}）✓；</li>
+ *       {@code SanTEComponent} / {@code BuffComponent} / {@code TimerComponent}）✓ ——
+ *       阶段 13 · t123 现算 **5** 个 ✗←✓（【已作废】原清单第 6 项 = {@code FactionComponent}，
+ *       该组件已整体删除 ✗、阵营真值改住聚合根 {@code core/Role}）。</li>
  *   <li>它是 {@code RoleComponent} 的子类 ⇒ 受既有**生命周期**与**故障隔离**（{@code guardedCall}）管辖 ✓。</li>
  * </ul>
  *
@@ -66,7 +68,8 @@ public class HotbarRenderComponent extends RoleComponent {
     }
 
     /**
-     * **装配期绑定**（构造之后、{@code awake()} 之前）—— 与既有"创建后绑定"同一条纪律。
+     * **装配期绑定**（构造之后、{@code awake()} 之前）—— 与既有【装配期解析】同一条纪律
+     * （原『创建后绑定』机制已随 t118/t112 整体删除 ✗）。
      * <p>由 {@code RoleInstance} 在 {@code initComponents} 里调用（见该处注释）。
      */
     public void bindRepaintSink(RepaintSink sink) {

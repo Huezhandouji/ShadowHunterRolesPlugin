@@ -4,6 +4,8 @@ import com.shadowHunterRolesPlugin.api.RoleAPI;
 import com.shadowHunterRolesPlugin.command.RoleCommand;
 import com.shadowHunterRolesPlugin.config.ConfigurationManager;
 import com.shadowHunterRolesPlugin.core.Faction;
+//阶段 13 · t123：阵营读取改经**聚合根** `Role`（原 RoleInstance 读视图已随 FactionComponent 删除 ✗）。
+import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.internal.api.RoleAPIImpl;
 import com.shadowHunterRolesPlugin.listener.*;
@@ -50,7 +52,11 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
             public Faction factionOf(Player player) {
                 if(player == null) return Faction.UNKNOWN;
                 RoleInstance target = roleManager != null ? roleManager.getRoleInstance(player) : null;
-                return target != null ? target.getFaction() : Faction.UNKNOWN;
+                //阶段 13 · t123（欠账 A 后半）：取值改经**聚合根**（角色模板上的阵营声明值）✓ ——
+                //原 `RoleInstance#getFaction()` 视图已随 FactionComponent 整体删除 ✗；
+                //本 lambda 的语义不变：未选角色 / 取不到角色模板 ⇒ UNKNOWN。
+                Role role = target != null ? target.getRole() : null;
+                return role != null ? role.getFaction() : Faction.UNKNOWN;
             }
 
             @Override

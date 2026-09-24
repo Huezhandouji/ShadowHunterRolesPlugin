@@ -12,6 +12,8 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComp
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+//阶段 13 · t123：聚合根只读服务面 —— 阵营读取的唯一入口（框架侧读口 {@link #roleInfo()} 的类型）。
+import com.shadowHunterRolesPlugin.core.ports.RoleInfo;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
 import com.shadowHunterRolesPlugin.event.SanTEChangeEvent;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
@@ -20,7 +22,9 @@ import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.FactionComponent;
+//阶段 13 · t123（欠账 A 后半）：`frameworkLevel.FactionComponent` 的 **import 已删除** ✗ ——
+//该组件本体已整体删除，阵营的真值改住聚合根 `core/Role` 的 `faction` 字段
+//（读侧 = `roleInfo` 服务面，见下方 `roleInfo()` 读口；写侧 = `Role#setFaction/resetFaction`）。
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
@@ -46,35 +50,44 @@ public class RoleInstance {
     private final Player player;
     private final Role role;
 
-    // ───────── 阶段 10 · t63（A1 改正）：7 个服务组件**每角色实例一个**，由本容器持有 ─────────
+    // ───────── 阶段 10 · t63（A1 改正）：服务组件**每角色实例一个**，由本容器持有 ─────────
     //它们**不进 `Role` 模板**（`Role.getComponents()` 与装配表逐格不变 ✓），但会登记进**实例容器**
     //（`componentRegistry`）⇒ `svc().components().get(EnergyComponent.class)` 与 `RoleInstance#getByType(...)`
     //都能取到它们；**组件侧一律直接用组件本身**（阶段 13 · t106 起服务集不再转发这八件事 ✗）。
-    //★ 状态归属（A3「状态唯一」）：能量 / SanTE / 阵营的真值、buff 记账表、药水账本、计时资源
+    //★ 状态归属（A3「状态唯一」）：能量 / SanTE 的真值、buff 记账表、药水账本、计时资源
     //  **都在组件里** ⇒ 本类**不再持有这些字段** ✗（旧字段已全部移除，见说明件的状态归属表）。
+    //  **【已作废】原口径**（阶段 10 · t63 原文，逐字保留）：该清单里还有「阵营」一项 ✗ ——
+    //  阶段 13 · t123（欠账 A 后半）把 `FactionComponent` 整体删除 ✗ ⇒ **阵营的真值改住聚合根
+    //  `core/Role` 的 `faction` 字段** ✓（读 = `roleInfo` 服务面，写 = `Role#setFaction/resetFaction`）。
     private final EnergyComponent energyComponent;
     private final SanTEComponent santeComponent;
     private final VitalsComponent vitalsComponent;
     private final BuffComponent buffComponent;
     private final TimerComponent timerComponent;
-    private final FactionComponent factionComponent;
     /**
      * **阶段 12 · t86**：框架级**物品渲染组件** —— 渲染**意图面**（意图登记 + 置脏）的拥有者 ✓。
      * <p><b>唯一写点未变</b> ✗：物品仍只由 {@link #hotbarRenderer} 在**帧末 flush** 里写；
      * 本组件**不写物品**、也拿不到库存写入面 ✓（见 {@code HotbarRenderComponent} 的边界说明）。
+     * <p><b>阶段 13 · t123（欠账 A 后半 · 本字段上方的那一项已不存在）</b>：原
+     * `frameworkLevel.FactionComponent` 的**每实例持有已删除** ✗ —— 阵营不再是"每实例一个组件"的状态，
+     * 而是**聚合根**（{@link Role}）上的一个声明值 ✓ ⇒ 读侧一律经 {@code roleInfo} 服务面
+     * （{@link #roleInfo()}）、写侧经 {@link #setFaction} / {@link #resetFaction}（两者都转调到聚合根）。
+     * <p><b>【已作废】旧口径原文</b>（阶段 10 · t63 原文，逐字保留）：本处列的"能量 / SanTE / 阵营的真值
+     * 都在组件里、本类不持有这些字段" ✗ —— 阶段 13 · t123 起 **faction 一项例外** ✓。
      */
     private final HotbarRenderComponent hotbarRenderComponent;
 
-    /** 7 个服务组件在**实例容器**里的 id（与 {@code ComponentServices} 的成员名同形 ⇒ 便于逐项对照）。 */
+    /** 服务组件在**实例容器**里的 id（与 {@code ComponentServices} 的成员名同形 ⇒ 便于逐项对照）。 */
     private static final String SERVICE_ID_ENERGY = "energy";
     private static final String SERVICE_ID_SANTE = "sante";
     private static final String SERVICE_ID_VITALS = "vitals";
     private static final String SERVICE_ID_BUFFS = "buffs";
     private static final String SERVICE_ID_TIMERS = "timers";
-    private static final String SERVICE_ID_FACTIONS = "factions";
+    //阶段 13 · t123（欠账 A 后半）：原 `SERVICE_ID_FACTIONS`（"factions"）**已删除** ✗ ——
+    //它是 FactionComponent 的容器 id，随组件本体一并删除（阵营不再是容器里的服务组件 ✓）。
     //阶段 10 · t73 Part A：`SERVICE_ID_DAMAGE` 已删除 —— 原 DamageComponent 并入 VitalsComponent
     //⇒ 框架服务组件由 7 个减为 6 个（`damage` 不再是独立服务组件；四个伤害原语改由生命组件承载）。
-    //阶段 12 · t86：**物品渲染组件**的容器 id（第 7 个框架级服务组件；与渲染器分工见 HotbarRenderComponent）
+    //阶段 12 · t86：**物品渲染组件**的容器 id（框架级服务组件之一；与渲染器分工见 HotbarRenderComponent）
     private static final String SERVICE_ID_HOTBAR_RENDER = "hotbarRender";
 
 
@@ -121,6 +134,15 @@ public class RoleInstance {
     //组件注册表（组件集合 + 每组件资源表 + getComponent 查找）与统一渲染器（**唯一渲染者**）
     private final ComponentRegistry componentRegistry = new ComponentRegistry();
     private final HotbarRenderer hotbarRenderer = new HotbarRenderer(this);
+    /**
+     * **聚合根只读服务面**（阶段 13 · t90 建立；**t123 起成为阵营读取的唯一入口** ✓）：
+     * {@link Role} 的只读视图（id / 描述 / **阵营** / 两个行为）。
+     * <p><b>本卡（t123 · 欠账 A 后半）</b>：原 `RoleInstance#factionComponent()` 读口与它的
+     * **读侧视图**（{@code getFaction} + 三个 {@code isHostileTo}）**已删除** ✗ ⇒ 阵营读取一律走本端口 ✓
+     * （组件侧 = {@code svc().roleInfo()}，框架侧 = {@link #roleInfo()}）。
+     * <p><b>只读，不带写面</b>（R-1）：写入仍在**聚合根** {@link Role#setFaction} / {@link Role#resetFaction} ✓。
+     */
+    private final RoleInfo roleInfo = new RoleInfoImpl(this);
     /**
      * **唯一的方法引用持有者**（阶段 5 判据 C-03）：供三条"程序化刷新"路径共用 ——
      * 冷却到点（启动时预约）、每 tick 到期扫描、显式结束冷却（S3）。
@@ -194,9 +216,10 @@ public class RoleInstance {
             }
         });
 
-        //⑥ 阵营：当前阵营的真值在组件里；关系表仍留平台（静态数据 ⇒ 外部单例许可，不进依赖图）
-        this.factionComponent = new FactionComponent(SERVICE_ID_FACTIONS, createServices(SERVICE_ID_FACTIONS),
-                platform.factions(), role.getFaction());
+        //⑥ 阵营（阶段 13 · t123 · 欠账 A 后半）：**原 FactionComponent 已整体删除** ✗ ——
+        //   阵营的真值就是聚合根 `Role` 的 `faction` 字段（构造期由描述符写入）✓；
+        //   关系表仍留平台（静态数据 ⇒ 外部单例许可，不进依赖图）：`RoleInfoImpl` / 平台自带 lookup 直接读它。
+        //   ⇒ 本相**不再构造任何阵营组件**，也不再登记任何阵营服务组件（阵营不是容器里的状态拥有者 ✓）。
 
         //⑦ 伤害：四个原语（阶段 10 · t73 Part A 起由 VitalsComponent 承载 ⇒ 伤害与生命只有一个持有者 ✓）
         //   —— 原独立 DamageComponent 已删除，不再单独构造。
@@ -212,8 +235,9 @@ public class RoleInstance {
 
         initComponents();
 
-        //7 个服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
-        //（阶段 12 · t86 起为 7 个：6 个原服务组件 + 物品渲染组件）
+        //服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
+        //（阶段 12 · t86 起为 7 个：6 个原服务组件 + 物品渲染组件；
+        //  阶段 13 · t123 起为 **6 个**：原"阵营"一项已随 FactionComponent 删除 ✗）
         registerServiceComponents();
 
         //装配完成 → 冻结注册表（此后 getComponent 才合法）
@@ -303,9 +327,19 @@ public class RoleInstance {
     //组件注册表（框架内部：装配、资源兜底、getComponent 查找）
     public ComponentRegistry componentRegistry() { return componentRegistry; }
 
-    // ───────── 阶段 10 · t63：7 个服务组件的读口（组件侧取用与取证都走这里） ─────────
+    /**
+     * **角色信息服务面的框架侧读口**（阶段 13 · t123 新增；取代原 `factionComponent()` 读口 ✗）：
+     * 阵营读取与两个行为（{@code isHostile} / {@code hasEnemyInRange}）都经它 —
+     * 与组件侧拿到的 {@code svc().roleInfo()} **同一个实例**（{@code createServices} 交出去的就是它 ✓）。
+     * <p><b>只读</b>：本端口不带写面（R-1）✓；写侧在聚合根上（{@link Role#setFaction} / {@link Role#resetFaction}）。
+     */
+    public RoleInfo roleInfo() { return roleInfo; }
+
+    // ───────── 阶段 10 · t63：服务组件的读口（组件侧取用与取证都走这里） ─────────
     //它们是**每实例一个**的框架服务（不进 Role 模板），登记在实例容器里；这里给出强类型读口
     //（阶段 13 · t106 起这是组件侧取服务组件的**唯一**入口 —— 服务集不再转发它们 ✗）。
+    //（阶段 13 · t123：原"阵营"一项的读口 `factionComponent()` **已删除** ✗ —— 组件本体没了；
+    //  阵营读取改走上面的 `roleInfo()` 服务面 ✓）
 
     public EnergyComponent energyComponent() { return energyComponent; }
 
@@ -317,13 +351,13 @@ public class RoleInstance {
 
     public TimerComponent timerComponent() { return timerComponent; }
 
-    public FactionComponent factionComponent() { return factionComponent; }
-
     /**
-     * 把 7 个服务组件登记进**实例容器**（阶段 10 · t63）。
+     * 把**框架级服务组件**登记进**实例容器**（阶段 10 · t63）。
      * <p><b>不进 {@code Role} 模板</b> ⇒ {@code role.getComponents()} = 装配表 = 冻结 CELLS **逐格不变** ✓；
-     * 登记后它们可被 {@code svc().components().get(EnergyComponent.class)} / {@code getById("energy")} 取到
+     * 登记后它们可被 {@code svc().components().get(EnergyComponent.class)} / {@code getId} 取到
      * （= 用户计划里"角色实例 = 组件的容器"的落点）。
+     * <p><b>阶段 13 · t123</b>：清单为 **6 个**（能量 / SanTE / 生命 / buff / 计时 / 物品渲染）——
+     * 原"阵营"一项**已删除** ✗（阵营 = 聚合根上的声明值，不是容器里的服务组件 ✓）。
      * <p><b>id 冲突</b>（角色模板里恰好也有同名组件）：角色组件优先（模板是产品内容），服务组件**跳过登记**
      * 并记一条 WARNING —— 它仍由字段持有、强类型读口仍能取到它 ⇒ **能力不受影响**（只是容器按 id/类型查不到它）。
      */
@@ -333,7 +367,6 @@ public class RoleInstance {
         registerServiceComponent(vitalsComponent);
         registerServiceComponent(buffComponent);
         registerServiceComponent(timerComponent);
-        registerServiceComponent(factionComponent);
         registerServiceComponent(hotbarRenderComponent);
     }
 
@@ -402,8 +435,10 @@ public class RoleInstance {
                 //与装配期组件走**同一条**构造路径（同一服务集口径）；日志用于 P2 的
                 //"拒绝删除被依赖组件"留痕（点名被删组件 / 阻止者 / 缺的类型）
                 new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger()),
-                //阶段 13 · t90（A2）：角色信息服务（聚合根只读面）—— 构造点仅此一处（现算 1 处）
-                new RoleInfoImpl(this)
+                //阶段 13 · t90（A2）：角色信息服务（聚合根只读面）；
+                //阶段 13 · t123：构造点仍是**这一处** ✓ —— 本类持有同一实例并给出框架侧读口 {@link #roleInfo()}
+                //（组件侧 `svc().roleInfo()` 与框架侧 `instance.roleInfo()` = **同一个实例** ✓）。
+                roleInfo
         );
     }
 
@@ -767,39 +802,35 @@ public class RoleInstance {
         buffComponent.applyPotionEffect(effect);
     }
 
-    //faction相关（**视图**：当前阵营的真值在阵营组件里）
-    public Faction getFaction(){
-        return factionComponent.faction();
-    }
+    // ───────── 阵营（阶段 13 · t123 · 欠账 A 后半）：**读侧视图已删除** ✗ / 写侧视图保留 ✓ ─────────
+    //★ 真值所在：聚合根 `Role` 的 `faction` 字段（原 `FactionComponent.faction` 组件字段已随组件删除 ✗）。
+    //★ **读取唯一入口 = `roleInfo` 服务面**：组件侧 `svc().roleInfo()`、框架侧 {@link #roleInfo()} ✓
+    //  ⇒ 本类**不再**提供 `getFaction()` / `isHostileTo(...)` 三个读视图 ✗（调用点已改走 RoleInfo：
+    //  `internal/api/RoleAPIImpl#getFaction(*2)`、`manager/RoleManager#areHostile(*2)`）。
+    //★ 查表语义（`FactionLookup#isHostile`，关系表仍留平台）= 旧 {@code isHostileTo(Faction)} 逐字等价 ✓。
 
-    //重设faction，一般用不到
+    /**
+     * **重设阵营**（{@code RoleAPI#setFaction} 的落点；一般用不到）—— 转调到**聚合根** ✓。
+     * <p>阶段 13 · t123：旧落点是每实例的 `FactionComponent#setFaction`（组件已删除 ✗）⇒ 本方法改为
+     * 纯转调 {@link Role#setFaction(Faction)}，语义逐字保留：**写的是角色模板上的声明值** ✓、
+     * 影响该角色的**所有实例**（各实例下次经 {@code RoleInfo#faction()} 读取时即生效）✓。
+     * <p><b>不复刻旧守卫</b>：旧组件写法对 {@code null} 不判 —— 这里同样只做转调（{@code null} 经
+     * {@code Role#getFaction()} 原样返回，{@code RoleInfoImpl#faction()} 的行为与迁移前完全一致 ✓）。
+     */
     public void setFaction(Faction faction){
-        factionComponent.setFaction(faction);
+        role.setFaction(faction);
     }
 
+    /**
+     * **复位为角色模板声明的阵营**（{@code RoleAPI#resetFaction} 的落点）—— 转调到**聚合根** ✓。
+     * <p>阶段 13 · t123：旧落点是每实例的 `FactionComponent#reset()`（组件已删除 ✗）⇒ 本方法改为
+     * 纯转调 {@link Role#resetFaction()}（回落目标 = {@code Role} 的只读 `defaultFaction`）⇒
+     * 与该组件旧实现 <i>{@code this.faction = defaultFaction;}</i> **逐字等价** ✓（连续调用幂等 ✓）。
+     */
     public void resetFaction(){
-        factionComponent.reset();
-    }
-
-    public boolean isHostileTo(RoleInstance other){
-        if(other == null){
-            return true;
+        if(role != null){
+            role.resetFaction();
         }
-
-        Faction otherFaction = other.getFaction();
-
-        return isHostileTo(otherFaction);
-    }
-
-    //阶段 2：不再查 RoleManager 单例，改走注入进来的 FactionLookup（未选角色 → UNKNOWN → 敌对）
-    //阶段 10 · t63：判定入口已搬到阵营组件（关系表仍留平台）
-    public boolean isHostileTo(Player other){
-        return factionComponent.isHostile(other);
-    }
-
-    public boolean isHostileTo(Faction otherFaction){
-        Faction thisFaction = getFaction();
-        return thisFaction != otherFaction || thisFaction == Faction.UNKNOWN;
     }
 
     //生命周期触发

@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.manager;
 
 import com.shadowHunterRolesPlugin.core.*;
+import com.shadowHunterRolesPlugin.core.ports.RoleInfo;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import org.bukkit.Bukkit;
@@ -227,13 +228,20 @@ public class RoleManager {
 
     //这两个查询原本是 core/RoleInstance 的静态方法（内部走 RoleManager.getInstance()）。
     //阶段 2 移到数据所有者这里：语义逐字保留（任一方没有角色 → true），且 core 不再依赖单例。
+    //阶段 13 · t123（欠账 A 后半）：判定入口从 `RoleInstance#isHostileTo(...)` 的**读视图**
+    //（已随 FactionComponent 整体删除 ✗）改走 **`roleInfo` 服务面** ✓ —— 唯一读入口 ✓。
+    //口径逐字等价（同一条 `FactionLookup#isHostile` 关系表 + 同一个 `isHostileTo(RoleInstance)` 的
+    //对称化写法：任一方敌对即敌对；任一方未选角色/为空/info 为空 → 真值 true 直返）✓。
     public boolean areHostile(Player p1, Player p2){
         if(p1 == null || p2 == null) return false;
         RoleInstance ins1 = getRoleInstance(p1);
         RoleInstance ins2 = getRoleInstance(p2);
 
         if(ins1 == null || ins2 == null) return true;
-        return ins1.isHostileTo(ins2);
+        RoleInfo info1 = ins1.roleInfo();
+        RoleInfo info2 = ins2.roleInfo();
+        if(info1 == null || info2 == null) return true;
+        return info1.isHostile(p2) || info2.isHostile(p1);
 
     }
     public boolean areHostile(UUID p1, UUID p2){
@@ -242,7 +250,15 @@ public class RoleManager {
         RoleInstance ins2 = getRoleInstance(p2);
 
         if(ins1 == null || ins2 == null) return true;
-        return ins1.isHostileTo(ins2);
+        RoleInfo info1 = ins1.roleInfo();
+        RoleInfo info2 = ins2.roleInfo();
+        if(info1 == null || info2 == null) return true;
+        return info1.isHostile(playerOf(p2)) || info2.isHostile(playerOf(p1));
+    }
+
+    /** uuid → 在线 {@code Player}（离线 / 未加载 ⇒ {@code null}）；供 {@code areHostile(UUID,UUID)} 走服务面。 */
+    private static Player playerOf(UUID uuid){
+        return uuid == null ? null : Bukkit.getPlayer(uuid);
     }
 
 

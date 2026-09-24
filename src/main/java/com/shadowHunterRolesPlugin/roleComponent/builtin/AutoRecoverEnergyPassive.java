@@ -20,7 +20,7 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
      * 批次⑤（B⑤）迁移：旧 `update(Player, RoleInstance)` 的**逐条等价**新写法。
      * 数值/间隔**逐字不变**：半径 `10`、无敌人累计上限 `200` tick、每秒判定 `20` tick、`+3` 能量。
      * 阵营判定改走 `svc().roleInfo().hasEnemyInRange(10)`（其语义 = 原 `SkillUtil.hasEnemyInRange`，
-     * 含"未选角色的玩家也算敌人"）；能量改走 `energy.gain(3)` ⇒ **同一条记账/真值路径**。
+     * 含"未选角色的玩家也算敌人"）；能量改走 `energy.increase(3)` ⇒ **同一条记账/真值路径**。
      * 容器在 tick 里对该组件广播 `update()`（B⑤ 第 1 步，`:802`）。
      */
     @Override
@@ -38,7 +38,7 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
             tickSecondRecord++;
             if(tickSecondRecord >= 20){
                 tickSecondRecord = 0;
-                energy.gain(3);
+                energy.increase(3);
             }
         }
     }

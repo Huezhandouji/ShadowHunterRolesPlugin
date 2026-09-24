@@ -176,7 +176,7 @@ public class RedBleedPassive extends PassiveSkill {
             vitals.trueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
             //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 **Buff 组件**的入口（与框架**同一条已记账路径**））
             buff.applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
-            sante.gain(BLEED_SANTE_RECOVER);
+            sante.increase(BLEED_SANTE_RECOVER);
 
             if(newBleed <= 0) {
                 toRemove.add(pid);
@@ -261,7 +261,7 @@ public class RedBleedPassive extends PassiveSkill {
 
         //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 **Buff 组件**的入口（与框架**同一条已记账路径**））
         buff.applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
-        sante.gain(BLEED_SANTE_RECOVER);
+        sante.increase(BLEED_SANTE_RECOVER);
 
         victim.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
     }

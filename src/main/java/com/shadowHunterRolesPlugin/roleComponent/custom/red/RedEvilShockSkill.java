@@ -60,7 +60,7 @@ public class RedEvilShockSkill extends Skill{
                 bleed.requestResolve(p.getUniqueId(), 5);
             }
         }
-        sante.gain(10);
+        sante.increase(10);
 
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITCH_CELEBRATE, 1, 1);
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);

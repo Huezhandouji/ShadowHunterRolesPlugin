@@ -100,7 +100,7 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
     }
 
     /** 增加能量（内部按上限 clamp）。 */
-    public void gain(int amount) {
+    public void increase(int amount) {
         set(current + amount);
     }
 
@@ -114,7 +114,7 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
     /**
      * **操作面 grammar**（设计定案 §10.4：首 token 必为操作动词 ✓；本片试点只接这四个 ✓）：
      * <pre>
-     * add &lt;非负整数&gt;      增能（内部按上限 clamp；等价于 {@link #gain(int)}）
+     * add &lt;非负整数&gt;      增能（内部按上限 clamp；等价于 {@link #increase(int)}）
      * consume &lt;非负整数&gt;  试扣（能量不足 ⇒ 不扣、不产生变更；等价于 {@link #tryConsume(int)}）
      * set &lt;非负整数&gt;      直接写入（内部按 [0, max] clamp；等价于 {@link #set(int)}）
      * current             只读：当前能量（**无副作用**；读口 = {@link #current()}）
@@ -147,7 +147,7 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
                 int amount = parseNonNegative(tokens[1]);
                 if (amount < 0) return null;                             // 非数字 / 负数 / 溢出
                 switch (tokens[0]) {
-                    case "add" -> gain(amount);
+                    case "add" -> increase(amount);
                     case "consume" -> tryConsume(amount);
                     default -> set(amount);
                 }

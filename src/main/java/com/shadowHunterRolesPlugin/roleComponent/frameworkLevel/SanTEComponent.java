@@ -11,7 +11,7 @@ import java.util.function.Consumer;
 /**
  * SanTE 组件（阶段 10 · t63 · A1 改正）：系统级能力「SanTE」的**组件形态**（每角色实例一个，裁定③）。
  * <p><b>★ 本组件持有状态与行为</b>：SanTE 真值 {@code current} 与上限 {@code max} 都在本组件里，
- * clamp 与 gain/decrease/set 的语义全在本组件内实现 —— **不再转调任何旧端口** ✗。
+ * clamp 与 increase/decrease/set 的语义全在本组件内实现 —— **不再转调任何旧端口** ✗。
  * <p><b>与容器的分工</b>：写后对平台说两句话 —— 发布 {@code SanTEChangeEvent} 与
  * 向**监听器列表**派发（含 I-14 重入护栏）—— 前者由容器以 {@link ChangeSink} 注入；组件只负责真值怎么变。
  * <p><b>状态唯一</b>：容器侧**不再**持有 {@code currentSanTE} 字段 ✗（只保留视图方法）。
@@ -203,7 +203,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
     }
 
     /** 增加 SanTE（内部按上限 clamp）。 */
-    public void gain(int amount) {
+    public void increase(int amount) {
         set(current + amount);
     }
 
@@ -218,7 +218,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
      *   <li>{@code current} —— 读：回**当前 SanTE**（无参 ✓，越界参数 ⇒ 未识别）；</li>
      *   <li>{@code max} —— 读：回**上限**（无参 ✓）；</li>
      *   <li>{@code set &lt;int≥0&gt;} —— 写：调既有的 {@link #set(int)}（内部 clamp + ChangeSink 照常 ✓），回**写后值**；</li>
-     *   <li>{@code gain &lt;int≥0&gt;} —— 写：调既有的 {@link #gain(int)} ✓，回**写后值**；</li>
+     *   <li>{@code gain &lt;int≥0&gt;} —— 写：调既有的 {@link #increase(int)} ✓，回**写后值**；</li>
      *   <li>{@code decrease &lt;int≥0&gt;} —— 写：调既有的 {@link #decrease(int)} ✓，回**写后值**（不足则按既有 clamp 语义 ✓）。</li>
      * </ul>
      * <p><b>三态返回</b>：{@code null} = **未识别 / 拒绝执行**（未知动词 ✓ · 参数缺失/多余 ✓ · 非数字/负数/溢出 ✓ · 空或空白 payload ✓）；
@@ -246,7 +246,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
         if (amount < 0) return null;
         switch (verb) {
             case "set" -> set(amount);
-            case "gain" -> gain(amount);
+            case "gain" -> increase(amount);
             default -> decrease(amount);
         }
         return Integer.toString(current());

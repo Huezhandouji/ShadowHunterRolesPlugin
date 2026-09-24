@@ -78,7 +78,7 @@ public class StateBindingByInstanceTest {
                 bound, RoleInstance.preferBound(bound, byId));
     }
 
-    /** 未绑定（{@code null}）⇒ 按 id 回落的实例（**保留回落**：构造早于组件、框架级服务组件都靠它）。 */
+    /** 未绑定（{@code null}）⇒ 按 id 回落的实例（**保留回落口径**：纯函数的唯一裁决点，本类直测它）。 */
     @Test
     public void unboundFallsBackToIdResolution() {
         FakePlain byId = new FakePlain("energy");
@@ -116,7 +116,7 @@ public class StateBindingByInstanceTest {
 
     /** 空服务集桩（冻结件 §4 T-5 批准形态）：只满足构造期读取，不驱动任何运行期行为。 */
     private static ComponentServices inertServices() {
-        return new ComponentServices(null, null, null, null, null, null, null, null, null, null, null);
+        return new ComponentServices(null, null, null);
     }
 
     /** 实现能力接口的假组件（用于接受集判定）。 */

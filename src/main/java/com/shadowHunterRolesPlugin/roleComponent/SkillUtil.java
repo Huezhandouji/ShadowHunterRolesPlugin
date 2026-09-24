@@ -12,9 +12,9 @@ import java.util.*;
 
 public class SkillUtil {
 
-    //阶段 4（B⑤）：`hasEnemyInRange(RoleInstance, …)` 已**删除** —— 它当时唯一的剩余调用点是
-    //`core/FactionPortImpl`，其逻辑已**逐字搬入**该适配器的 `hasEnemyInRange(radius)`
-    //（含 `loc == null || world == null` 短路与"**未选角色的玩家也算敌人**"语义）。
+    //阶段 4（B⑤）：`hasEnemyInRange(RoleInstance, …)` 已**删除** —— 它当时唯一的剩余调用点是一个阵营适配器，
+    //其逻辑已**逐字搬入** `RoleInfo#hasEnemyInRange(radius)`（阶段 13 · t90 起由聚合根的只读服务面提供；
+    //含 `loc == null || world == null` 短路与"**未选角色的玩家也算敌人**"语义）。
     //本类现在只剩**无状态几何工具** `getPlayersInSightLine`（纯射线几何、不查阵营、零插件依赖）。
 
     public static List<Player> getPlayersInSightLine(Player player, double maxDistance, double range) {

@@ -6,6 +6,8 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
 import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
@@ -34,8 +36,9 @@ import java.util.List;
  * {@code run()} / {@code runLater(20)} 与 {@code Task} 句柄取消；
  * ④m **归一化矩阵**：8 组声明值（5 个生产形态 (1,1)/(0,1)/(0,2)/(0,40)/(1,6) + (0,10)/(1,2)/(1,10)）
  *     分别走原生 Bukkit 与适配器，逐组打印首/次触发 tick ⇒ 判据 = 两路径首/次触发逐字相同；
- * ④p **端口链**：走组件侧真入口（**经服务集端口的转发形态**：`runRepeating(0L, 10L, …)`，请求者在**末位**）
- *     ⇒ 覆盖 TimerPortImpl 的转调 + 双入口归一；与 ④m 的 (0,10)=1/11 比对（无角色时打印 SKIPPED）；
+ * ④p **组件链**：走组件侧真入口（**计时组件的强类型形态**：`runRepeating(requester, 0L, 10L, …)`，
+ *     请求者在**首位**）⇒ 覆盖 计时组件 → Scheduler → 适配器 这条链；与 ④m 的 (0,10)=1/11 比对
+ *     （无角色时打印 SKIPPED）。**输出键沿用历史名**（`portLeg` / `portFirstSecond`）= 既有证据的引用锚；
  * ④ {@code ScheduledTask.cancel()} 返回值 / {@code isCancelled()} / {@code getExecutionState()} / 重复 cancel；
  * ⑤ 一句话结论（由本次原始值现算，不只给结论）。
  * <p>
@@ -304,16 +307,17 @@ public class DebugSchedCommand implements SubCommand {
             sendKey(player, "[sched] ④m verdict | " + str[7]);
         }, 50L);
 
-        //④p **端口链实测**（规格 B③"双入口归一"：TimerPortImpl → Scheduler → 适配器 → GlobalRegionScheduler）：
-        //    走组件侧真入口（**经服务集端口的转发形态**：请求者在**末位**）⇒
+        //④p **组件链实测**（规格 B③"双入口归一"：计时组件 → Scheduler → 适配器 → GlobalRegionScheduler）：
+        //    走组件侧真入口（**计时组件的强类型形态**：请求者在**首位**）⇒
         //    与 ④m 的 (0,10) 期望值 **1/11** 比对。**仅当玩家已有角色时可测**（服务集构造期注入）；
-        //    无角色 ⇒ 明确打印 SKIPPED（不伪造）
+        //    无角色 ⇒ 明确打印 SKIPPED（不伪造）。输出键沿用历史名（portLeg / portFirstSecond）= 引用锚
         final int[] portTicks = {-1, -1};
         final int[] portCount = {0};
         final Task[] portHolder = new Task[1];
         ComponentServices portServices = null;
+        RoleInstance portInstance = null;
         if(roleManager.hasRole(player)){
-            RoleInstance portInstance = roleManager.getRoleInstance(player);
+            portInstance = roleManager.getRoleInstance(player);
             String[] candidates = {"autoRecoverEnergy_passive", "autoRecoverSanTEPassive", "default_san_te_zero_punishment",
                     "meiqihezi_mainWeapon_juejue", "meiqihezi_equippments_passive", "red_equippments_passive"};
             if(portInstance != null){
@@ -332,22 +336,32 @@ public class DebugSchedCommand implements SubCommand {
         }
         else{
             final ComponentServices portSvc = portServices;
-            portHolder[0] = portSvc.timers().runRepeating(0L, 10L, () -> {
-                int now = Bukkit.getCurrentTick();
-                portCount[0]++;
-                int k = portCount[0];
-                if(k <= 2){
-                    portTicks[k - 1] = now - baseTick;
-                    player.sendMessage(Component.text("[sched] ④p port(TimerPortImpl) delay=0 period=10 #" + k
-                            + " | tick=" + now + " | delta=" + (now - baseTick) + " | component=" + str[8]));
-                }
-                if(k == 2){
-                    portHolder[0].cancel();
-                    str[8] = str[8] + ",portFirstSecond=" + portTicks[0] + "/" + portTicks[1];
-                    sendKey(player, "[sched] ④p port leg | component=" + str[8]
-                            + " | expectedByMatrix(0,10)=1/11 | identical=" + (portTicks[0] == 1 && portTicks[1] == 11));
-                }
-            });
+            //请求者 = 这一对服务集所属的那个组件实例（与 servicesOf 同一条 id 解析口径）；
+            //计时组件 = 框架级服务组件（装配期已登记进实例容器 ⇒ 这里用强类型读口直接取）
+            RoleComponent portRequester = portSvc.components().getById(str[8]);
+            TimerComponent portTimer = portInstance != null ? portInstance.timerComponent() : null;
+            if(portRequester == null || portTimer == null){
+                str[8] = "portLeg=SKIPPED(no requester or no timer component)";
+                sendKey(player, "[sched] ④p port leg | " + str[8]);
+            }
+            else{
+                portHolder[0] = portTimer.runRepeating(portRequester, 0L, 10L, () -> {
+                    int now = Bukkit.getCurrentTick();
+                    portCount[0]++;
+                    int k = portCount[0];
+                    if(k <= 2){
+                        portTicks[k - 1] = now - baseTick;
+                        player.sendMessage(Component.text("[sched] ④p component(TimerComponent) delay=0 period=10 #" + k
+                                + " | tick=" + now + " | delta=" + (now - baseTick) + " | component=" + str[8]));
+                    }
+                    if(k == 2){
+                        portHolder[0].cancel();
+                        str[8] = str[8] + ",portFirstSecond=" + portTicks[0] + "/" + portTicks[1];
+                        sendKey(player, "[sched] ④p port leg | component=" + str[8]
+                                + " | expectedByMatrix(0,10)=1/11 | identical=" + (portTicks[0] == 1 && portTicks[1] == 11));
+                    }
+                });
+            }
         }
 
         //⑤ 结论：70 tick 后（全部周期任务均已自取消）以本次原始值现算"能否直切"

@@ -51,7 +51,7 @@ public class RoleInstance {
     // ───────── 阶段 10 · t63（A1 改正）：7 个服务组件**每角色实例一个**，由本容器持有 ─────────
     //它们**不进 `Role` 模板**（`Role.getComponents()` 与装配表逐格不变 ✓），但会登记进**实例容器**
     //（`componentRegistry`）⇒ `svc().components().get(EnergyComponent.class)` 与 `RoleInstance#getByType(...)`
-    //都能取到它们；`svc().<旧端口>()` 的每个方法都**转发到它们**（临时兼容层，第 3 步删除）。
+    //都能取到它们；**组件侧一律直接用组件本身**（阶段 13 · t106 起服务集不再转发这八件事 ✗）。
     //★ 状态归属（A3「状态唯一」）：能量 / SanTE / 阵营的真值、buff 记账表、药水账本、计时资源
     //  **都在组件里** ⇒ 本类**不再持有这些字段** ✗（旧字段已全部移除，见说明件的状态归属表）。
     private final EnergyComponent energyComponent;
@@ -75,7 +75,7 @@ public class RoleInstance {
     private static final String SERVICE_ID_TIMERS = "timers";
     private static final String SERVICE_ID_FACTIONS = "factions";
     //阶段 10 · t73 Part A：`SERVICE_ID_DAMAGE` 已删除 —— 原 DamageComponent 并入 VitalsComponent
-    //⇒ 框架服务组件由 7 个减为 6 个（`damage` 不再是独立服务组件；`DamagePort` 面不变，转发到生命组件）。
+    //⇒ 框架服务组件由 7 个减为 6 个（`damage` 不再是独立服务组件；四个伤害原语改由生命组件承载）。
     //阶段 12 · t86：**物品渲染组件**的容器 id（第 7 个框架级服务组件；与渲染器分工见 HotbarRenderComponent）
     private static final String SERVICE_ID_HOTBAR_RENDER = "hotbarRender";
 
@@ -296,7 +296,7 @@ public class RoleInstance {
         hotbarRenderer.render();
     }
 
-    //平台上下文：阶段 2 的组件取用入口（阶段 4 起逐批收窄为 ComponentServices 端口白名单）
+    //平台上下文：阶段 2 的组件取用入口（阶段 4 起逐批收窄；阶段 13 · t106 后服务集只剩三个成员）
     public RolesContext rolesContext() { return platform; }
 
     //统一渲染器：阶段 5 · 4.4 起为**唯一渲染者**（写物品只发生在 core/hotbar 内）
@@ -305,9 +305,9 @@ public class RoleInstance {
     //组件注册表（框架内部：装配、资源兜底、getComponent 查找）
     public ComponentRegistry componentRegistry() { return componentRegistry; }
 
-    // ───────── 阶段 10 · t63：7 个服务组件的读口（端口转发与取证都走这里） ─────────
-    //它们是**每实例一个**的框架服务（不进 Role 模板），登记在实例容器里；这里给出强类型读口，
-    //使 `*PortImpl` 能"纯转发"而**不持有任何状态**（A2/A3）。
+    // ───────── 阶段 10 · t63：7 个服务组件的读口（组件侧取用与取证都走这里） ─────────
+    //它们是**每实例一个**的框架服务（不进 Role 模板），登记在实例容器里；这里给出强类型读口
+    //（阶段 13 · t106 起这是组件侧取服务组件的**唯一**入口 —— 服务集不再转发它们 ✗）。
 
     public EnergyComponent energyComponent() { return energyComponent; }
 
@@ -327,7 +327,7 @@ public class RoleInstance {
      * 登记后它们可被 {@code svc().components().get(EnergyComponent.class)} / {@code getById("energy")} 取到
      * （= 用户计划里"角色实例 = 组件的容器"的落点）。
      * <p><b>id 冲突</b>（角色模板里恰好也有同名组件）：角色组件优先（模板是产品内容），服务组件**跳过登记**
-     * 并记一条 WARNING —— 它仍由字段持有、端口仍转发到它 ⇒ **能力不受影响**（只是容器按 id/类型查不到它）。
+     * 并记一条 WARNING —— 它仍由字段持有、强类型读口仍能取到它 ⇒ **能力不受影响**（只是容器按 id/类型查不到它）。
      */
     private void registerServiceComponents() {
         registerServiceComponent(energyComponent);
@@ -378,9 +378,10 @@ public class RoleInstance {
     }
 
     /**
-     * **临时调试用**（冷却自管理冒烟入口）：取某组件一对一的服务集，使调试命令能调用**同一个**端口实例
-     * （如 {@code cooldowns().end()} / {@code cooldowns().start(ticks)}）。
-     * 冒烟结束后随调试入口一并删除（见交付报告的删除清单）。
+     * **调试用读口**：取某组件一对一的服务集（调试探针按 id 定位组件用，例如 {@code /role debug sched}
+     * 的组件链实测取请求者与计时组件）。
+     * <p><b>阶段 13 · t106</b>：服务集只剩三个成员（{@code self} / {@code components} / {@code roleInfo}）
+     * ⇒ 本方法不再是"取端口实例"的手段（冷却自管理的冒烟入口已随其端口一并删除 ✗）。
      */
     public ComponentServices servicesOf(String componentId){
         RoleComponent component = componentRegistry.getById(componentId);
@@ -388,25 +389,19 @@ public class RoleInstance {
     }
 
     /**
-     * 组件与其**一对一**的服务集（按本组件 id 构造的冷却端口、按本组件 id 定位资源表的定时器端口）。
+     * 组件与其**一对一**的服务集（阶段 13 · t106 后为三个成员：玩家实例面 / 组件查找 / 聚合根只读面）。
      * <p><b>阶段 8 前置</b>：冷却表已合并为**单一命名空间** ⇒ 本方法**不再需要 kind**
-     * （合并前冷却端口必须在构造期绑定 kind 才能选表，那是"删 kind 枚举"的硬阻塞）。
+     * （合并前"按 kind 选表"的构造期绑定，是"删 kind 枚举"的硬阻塞）。
      * 阶段 8 本卡把 kind 枚举整个删掉 ⇒ 注册处也不再承载任何"权威种类"。
+     * <p><b>阶段 13 · t106</b>：{@code componentId} 形参**保留**（动态添加路径的服务集工厂签名不变：
+     * {@code ComponentLookupImpl} 吃的就是 {@code Function<String, ComponentServices>}），
+     * 但服务集本身**不再按 id 绑定任何资源** —— 资源归属一律由组件自己按请求者登记 ✓。
      */
     private ComponentServices createServices(String componentId){
         return new ComponentServices(
                 new SelfImpl(this),
-                new EnergyPortImpl(this),
-                new SanTEPortImpl(this),
-                new VitalsPortImpl(this),
-                new CooldownPortImpl(this, componentId),
-                new BuffPortImpl(this),
-                new FactionPortImpl(this),
-                //阶段 10 · t73 Part A：伤害端口转发到**生命组件**（原独立伤害组件已并入 ⇒ 单一持有者）
-                new DamagePortImpl(this),
-                new TimerPortImpl(this, componentRegistry, componentId),
                 //阶段 10 · t55：组件服务 = 查找 + **动态添加** —— 服务集工厂传进去，运行期新增的组件
-                //与装配期组件走**同一条**构造路径（一对一端口、同一资源表口径）；日志用于 P2 的
+                //与装配期组件走**同一条**构造路径（同一服务集口径）；日志用于 P2 的
                 //"拒绝删除被依赖组件"留痕（点名被删组件 / 阻止者 / 缺的类型）
                 new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger()),
                 //阶段 13 · t90（A2）：角色信息服务（聚合根只读面）—— 构造点仅此一处（现算 1 处）
@@ -497,8 +492,8 @@ public class RoleInstance {
             //  旧 `RepaintRequestable` / `RepaintRequester` 两条通道**已删除** ✓。
             //绑定时机的纪律不变：渲染组件本身在构造器里就已 bindRepaintSink（早于任何 awake/start）✓。
 
-            //阶段 11 · t84：**创建后绑定**「持有这对端口的那一个实例」（F-1/F-2/F-3 的修复点）——
-            //时机必须在构造之后、任何钩子（awake/start）之前（组件可能一醒就起冷却 / 登记任务）。
+            //阶段 11 · t84：**创建后绑定**（F-1/F-2/F-3 的修复点）—— 时机必须在构造之后、任何钩子
+            //（awake/start）之前。阶段 13 · t106 起端口面已清理 ⇒ 该落点**已无绑定目标**（见 bindOwnerPorts）。
             bindOwnerPorts(services, component);
 
             //旧窄类型视图（供既有公共访问器使用）：按**具体类型**归位，不按任何"种类"猜测
@@ -624,20 +619,18 @@ public class RoleInstance {
     }
 
     /**
-     * **创建后绑定**（阶段 11 · t84）：把"持有这一对端口的那一个组件实例"写进端口。
-     * <p><b>时机</b>：必须在**组件构造之后、任何钩子之前**（{@code awake()} / {@code start()} 里组件可能
-     * 立刻用端口起冷却 / 登记任务）⇒ 两个创建点（装配期 {@link #initComponents()}、
-     * 运行期动态增 {@code ComponentLookupImpl#insertAt}）都在构造返回后**立刻**调用本方法 ✓。
-     * <p>只绑**计时**那一对端口：它是"状态面按实例"的落点（资源登记归属）；其余端口不持 per-instance 状态 ⇒ 不绑。
-     * ⇒ 那个时刻物理上拿不到实例引用（这正是 F-1/F-2 的根因）；给端口加一个绑定钩子是最小修法。
-     * <p>只绑**冷却**与**计时**两对端口：它们是"状态面按实例"的三处落点（能力判定 / 回调投递 /
-     * 资源登记归属）；其余端口不持 per-instance 状态 ⇒ 不绑。
-     * <p>未绑定时端口一律按 id 回落（{@link #preferBound(RoleComponent, RoleComponent)}）
-     * ⇒ 行为与改前一致，**没有静默丢弃** ✗。
+     * **创建后绑定（历史落点；阶段 13 · t106 起无绑定目标）**。
+     * <p><b>它原来做什么</b>（阶段 11 · t84）：把"持有那一对端口的那一个组件实例"写进端口 —— 端口在构造期
+     * 造出（早于组件构造），那个时刻物理上拿不到实例引用（这正是 F-1/F-2 的根因）；给端口加绑定钩子是最小修法，
+     * 落点是"状态面按实例"的三处（能力判定 / 回调投递 / 资源登记归属）。
+     * <p><b>现状</b> ✗：端口面已清理 ⇒ 状态一律归**组件实例本身**（冷却状态是组件字段、计时资源由组件按请求者
+     * 登记）⇒ 本方法**没有任何绑定目标**；保留签名只为不改动两个调用点的形状（装配期 {@link #initComponents()}、
+     * 运行期动态增 {@code ComponentLookupImpl#insertAt}）。
+     * <p>⇒ 行为 = **无操作**；不存在"静默丢弃"：没有端口再持有 per-instance 状态，
+     * {@link #preferBound(RoleComponent, RoleComponent)} 的回落口径也随之不再被端口用到。
      */
     static void bindOwnerPorts(ComponentServices services, RoleComponent component){
-        if(component == null || services == null) return;
-        if(services.timers() instanceof TimerPortImpl port) port.bind(component);
+        //无绑定目标（见 javadoc）：形参保留，以维持两个调用点的签名不变。
     }
 
 

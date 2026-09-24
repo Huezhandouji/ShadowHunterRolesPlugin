@@ -40,9 +40,9 @@ import static org.junit.Assert.assertTrue;
  */
 public class CapabilityDispatchTest {
 
-    /** 空服务集：10 个端口全 null，构造组件时只被存下来（本测试从不读它）。 */
+    /** 空服务集：三个成员全 null，构造组件时只被存下来（本测试从不读它）。 */
     private static ComponentServices inertServices() {
-        return new ComponentServices(null, null, null, null, null, null, null, null, null, null, null);
+        return new ComponentServices(null, null, null);
     }
 
     /** 全部**既有**具体组件（含 t46 的示例组件）+ 每个组件的冻结期望（是否产出物品、是否依赖活状态）。 */

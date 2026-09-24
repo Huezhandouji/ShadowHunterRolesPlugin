@@ -12,7 +12,7 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
  * <ul>
  *   <li>任务的**创建**（{@link Scheduler} = Bukkit 调度器 = 允许依赖的"外部东西" ✓）在本组件内完成；</li>
  *   <li>任务的**登记归属**由本组件按 {@code requester}（请求者组件）决定 —— 这是原先散布在
- *       {@code core/TimerPortImpl} 里的"按组件 id 解析请求者"逻辑的**唯一新家** ✓；</li>
+ *       **按组件 id 解析请求者的转发形态**里的逻辑的**唯一新家** ✓；</li>
  *   <li>资源的**存储**仍落在容器的**每组件资源表**（{@link TaskSink} 注入 = {@code ComponentRegistry#track} /
  *       {@code #cancelAll}）⇒ <b>既有回收机制一条都不改</b>（{@code clear()} 的 {@code cancelAllAndClear()}、
  *       运行期删除路径的 {@code cancelAll} 全部照旧生效 ⇒ 不引入新泄漏面 ✓）。</li>
@@ -21,8 +21,8 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
  * 是这条语义的入口，容器在 {@code triggerLifecycleStop()} 里**每个组件 {@code stop()} 之后**调用一次
  * ⇒ "谁请求的计时，谁停止时被取消" ✓（旧实现只在实例 {@code clear()} 的兜底里取消 ⇒ 单独 {@code stop()}
  * 会漏；本卡把这一点补上，见说明件的偏离留痕）。
- * <p><b>不再转调任何旧端口</b> ✗（原实现是经服务集端口的转发形态；阶段 13 · t102 起调用点一律
- * **直接用本组件**，该端口的调用点已清零）。
+ * <p><b>不再转调任何旧端口</b> ✗（原实现是经服务集转发的形态；阶段 13 · t102 起调用点一律
+ * **直接用本组件**，阶段 13 · t106 起那一族端口**已整体删除** ⇒ 全库零残留）。
  */
 public class TimerComponent extends RoleComponent {
 

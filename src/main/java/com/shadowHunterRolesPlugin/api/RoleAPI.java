@@ -50,7 +50,7 @@ public interface RoleAPI {
     List<Component> getRoleDescription(String roleId);
     Material getRoleIcon(String roleId);
 
-    //角色清单（阶段 3.3：**只增**，既有方法签名一律未动）
+    //角色清单（**只增**：既有方法签名一律未动）
     //下游用这两个方法自行发现"有哪些角色"，而不是 import 内部类去读注册表
     Set<String> getAllRoleIds();
     List<RoleInfo> getRoles();
@@ -58,19 +58,19 @@ public interface RoleAPI {
     //能量系统
     @Deprecated
     int getPlayerEnergy(Player player);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     int getPlayerEnergy(UUID uuid);
 
     @Deprecated
     int getPlayerMaxEnergy(Player player);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     int getPlayerMaxEnergy(UUID uuid);
 
     @Deprecated
     void setPlayerEnergy(Player player, int amount);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     void setPlayerEnergy(UUID uuid, int amount);
 
@@ -87,7 +87,7 @@ public interface RoleAPI {
     //sanTE
     /**
      * {@link #getPlayerSanTE(Player)} / {@link #getPlayerSanTE(UUID)} 在**玩家没有角色**时返回的哨兵值。
-     * <p>阶段 7 · 清理批**只增**：把那个"魔法数"变成有名字、有文档的常量（**值与原实现逐字相同 = -78**）。
+     * <p>**只增**：把那个"魔法数"变成有名字、有文档的常量（**值与既有实现逐字相同 = -78**）。
      * 新代码请改用 {@link #getPlayerSanTEOptional(UUID)} —— 它把"没有角色"表达成**空 Optional**，
      * 调用方不必先 {@link #hasRole(UUID)} 再读、也不必认哨兵。
      */
@@ -95,7 +95,7 @@ public interface RoleAPI {
 
     /**
      * 当前 SanTE 值；**玩家没有角色时返回哨兵 {@value #NO_ROLE_SAN_TE_SENTINEL}**
-     * （语义与迁移前**逐字不变**，本批未动它）。
+     * （语义**逐字不变**，本方法未动它）。
      * <p>新代码建议改用 {@link #getPlayerSanTEOptional(Player)}。
      */
     @Deprecated
@@ -103,18 +103,18 @@ public interface RoleAPI {
     /**
      * 同 {@link #getPlayerSanTE(Player)}（UUID 口径）。
      *
-     * @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗ —— 现恒回 {@code 0} ✓；
+     * @deprecated **已做空（仍在但不再生效）** ✗ —— 现恒回 {@code 0} ✓；
      *             替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。
      */
     @Deprecated
     int getPlayerSanTE(UUID uuid);
 
     /**
-     * **只增入口**（阶段 7 · 清理批）：当前 SanTE 值；**玩家没有角色时返回空 {@link OptionalInt}**。
+     * **只增入口**：当前 SanTE 值；**玩家没有角色时返回空 {@link OptionalInt}**。
      * <p>与 {@link #getPlayerSanTE(UUID)} 的哨兵语义**互补而非取代**：旧方法与旧返回值一字未动，
      * 本方法只是给"没有角色"提供一个**不需要认哨兵**的读法。
      *
-     * @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗ —— 现恒回**空 {@link OptionalInt}** ✓；
+     * @deprecated **已做空（仍在但不再生效）** ✗ —— 现恒回**空 {@link OptionalInt}** ✓；
      *             替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。
      */
     @Deprecated
@@ -122,7 +122,7 @@ public interface RoleAPI {
     /**
      * 同 {@link #getPlayerSanTEOptional(Player)}（UUID 口径）。
      *
-     * @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗ —— 现恒回**空 {@link OptionalInt}** ✓；
+     * @deprecated **已做空（仍在但不再生效）** ✗ —— 现恒回**空 {@link OptionalInt}** ✓；
      *             替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。
      */
     @Deprecated
@@ -130,13 +130,13 @@ public interface RoleAPI {
 
     @Deprecated
     int getPlayerMaxSanTE(Player player);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     int getPlayerMaxSanTE(UUID uuid);
 
     @Deprecated
     void setPlayerSanTE(Player player, int amount);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     void setPlayerSanTE(UUID uuid, int amount);
 
@@ -147,7 +147,7 @@ public interface RoleAPI {
 
     @Deprecated
     void decreaseSanTE(Player player, int amount);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     void decreaseSanTE(UUID uuid, int amount);
 
@@ -155,39 +155,39 @@ public interface RoleAPI {
     //生命值
     @Deprecated
     double getPlayerHealth(Player player);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     double getPlayerHealth(UUID uuid);
 
     @Deprecated
     double getPlayerMaxHealth(Player player);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     double getPlayerMaxHealth(UUID uuid);
 
     @Deprecated
     void healPlayer(Player player, double amount);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     void healPlayer(UUID uuid, double amount);
 
     //技能相关
     @Deprecated
     boolean isSkillReady(Player player, String skillId);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     boolean isSkillReady(UUID uuid, String skillId);
 
     @Deprecated
     int getSkillCooldownTick(Player player, String skillId);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     int getSkillCooldownTick(UUID uuid, String skillId);
 
     //阵营信息
     @Deprecated
     Faction getFaction(Player player);
-    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo#faction()（组件经角色信息服务取用，t90 唯一入口） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
+    /** @deprecated 本方法**直接操作组件** ✗；替代路径 = RoleInfo#faction()（组件经角色信息服务取用，唯一入口） ✓（R-6：只许 ComponentLookup/RoleInfo/Self 三端口 + 直接取组件）✓。 */     @Deprecated
     Faction getFaction(UUID uuid);
 
     @Deprecated
@@ -202,20 +202,20 @@ public interface RoleAPI {
 
     @Deprecated
     boolean areHostile(Player p1, Player p2);
-    /** @deprecated 阶段 13 · t126 起**已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
+    /** @deprecated **已做空（仍在但不再生效）** ✗；替代路径 = {@link #executeComponentOperation(UUID, String, String)} ✓。 */
     @Deprecated
     boolean areHostile(UUID p1, UUID p2);
 
-    //组件操作面（阶段 13 · t125：设计定案 §7.4 ② / §10.3）—— **唯一**的操作角色入口 ✓
+    //组件操作面 —— **唯一**的操作角色入口 ✓
     /**
-     * **执行一条组件操作**（阶段 13 · t125；设计定案 §7.4 ② / §10.3）：**唯一**的"操作角色"入口 ✓ ——
+     * **执行一条组件操作**：**唯一**的"操作角色"入口 ✓ ——
      * 读与写都走它 ✓（写操作回"写后状态"、读操作回值本身 ✓）。
      * <p><b>grammar 由组件自己规定</b> ✓：payload 的**首 token 必为操作动词** ✓（如 {@code add 5} / {@code current}），
      * 其余部分由目标组件自解析 ✓ ⇒ 具体动词表见**实现它的组件的 javadoc**（如能量组件 ✓）。
      * <p><b>与 {@code OperationProvider} 的关系</b>：本方法只做「解析实例 → 按 id 定位组件 → 转发」✓ ——
      * 目标组件**未实现** {@code OperationProvider} ⇒ 回 {@code null} ✗（不支持操作指令）。
      *
-     * @param uuid        目标玩家。**参数类型用 UUID** ✓（用户裁定：此后新增 API 一律以 UUID 为玩家参数 ✗
+     * @param uuid        目标玩家。**参数类型用 UUID** ✓（此后新增 API 一律以 UUID 为玩家参数 ✗
      *                    不用 {@code Player}）—— 这与"仅在线"裁定不冲突 ✓：**解析不到角色实例即回 {@code null}** ✓
      * @param componentId 组件在实例容器里的登记 id（如 {@code energy}）；**多实例消歧写在 id 字符串里** ✓ ——
      *                    形如 {@code energy#2}（{@code #} 后是 **0 基**下标 ✓）；同 id 命中**多份**而**未给**下标

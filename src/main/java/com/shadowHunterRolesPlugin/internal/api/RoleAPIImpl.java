@@ -142,7 +142,7 @@ public class RoleAPIImpl implements RoleAPI {
         }
     }
 
-    //能量系统（阶段 13 · t126：**全部做空** ✗ —— 仍在但不再生效 ✓；替代路径 = executeComponentOperation ✓）
+    //能量系统（**全部做空** ✗ —— 仍在但不再生效 ✓；替代路径 = executeComponentOperation ✓）
     @Deprecated
     @Override
     public int getPlayerEnergy(Player player) {
@@ -202,7 +202,7 @@ public class RoleAPIImpl implements RoleAPI {
         stubbed("decreaseEnergy(UUID,int)");
     }
 
-    //sanTE相关（阶段 13 · t126：**全部做空** ✗ —— 含卡面未计入的 `getPlayerSanTEOptional` ×2，见交付说明 ✓）
+    //sanTE相关（**全部做空** ✗ —— 含 `getPlayerSanTEOptional` ×2 ✓）
     @Deprecated
     @Override
     public int getPlayerSanTE(Player player) {
@@ -216,7 +216,7 @@ public class RoleAPIImpl implements RoleAPI {
         return 0;
     }
 
-    /** 只增入口（阶段 7 · 清理批）：**阶段 13 · t126 起做空** ✗（仍在但不再生效 ✓）⇒ 恒空 Optional ✓。 */
+    /** 只增入口：**已做空** ✗（仍在但不再生效 ✓）⇒ 恒空 Optional ✓。 */
     @Deprecated
     @Override
     public OptionalInt getPlayerSanTEOptional(Player player) {
@@ -276,7 +276,7 @@ public class RoleAPIImpl implements RoleAPI {
         stubbed("decreaseSanTE(UUID,int)");
     }
 
-    //生命值相关（阶段 13 · t126：**全部做空** ✗ —— 仍在但不再生效 ✓；替代路径 = executeComponentOperation ✓）
+    //生命值相关（**全部做空** ✗ —— 仍在但不再生效 ✓；替代路径 = executeComponentOperation ✓）
     @Deprecated
     @Override
     public double getPlayerHealth(Player player) {
@@ -314,7 +314,7 @@ public class RoleAPIImpl implements RoleAPI {
         stubbed("healPlayer(UUID,double)");
     }
 
-    //技能相关（阶段 13 · t126：**全部做空** ✗ —— 仍在但不再生效 ✓）
+    //技能相关（**全部做空** ✗ —— 仍在但不再生效 ✓）
     @Deprecated
     @Override
     public boolean isSkillReady(Player player, String skillId) {
@@ -341,8 +341,8 @@ public class RoleAPIImpl implements RoleAPI {
         return 0;
     }
 
-    //阵营相关（阶段 13 · t126：**全部做空** ✗ —— 仍在但不再生效 ✓；阵营读取唯一入口仍是 `RoleInfo` 服务面 ✓）
-    //阶段 13 · t123（欠账 A 后半）：阵营**读取唯一入口 = `RoleInfo` 服务面** ✓ —— 旧写法走
+    //阵营相关（**全部做空** ✗ —— 仍在但不再生效 ✓；阵营读取唯一入口仍是 `RoleInfo` 服务面 ✓）
+    //阵营**读取唯一入口 = `RoleInfo` 服务面** ✓ —— 既有写法走
     //`RoleInstance#getFaction()` 的**组件直读视图**（已随 FactionComponent 一并删除 ✗）。
     @Deprecated
     @Override
@@ -357,7 +357,7 @@ public class RoleAPIImpl implements RoleAPI {
         return Faction.UNKNOWN;
     }
 
-    //阶段 13 · t126：写侧**做空** ✗ —— t123 那条"转调聚合根"的写视图（`RoleInstance#setFaction/resetFaction`）
+    //写侧**做空** ✗ —— 那条"转调聚合根"的写视图（`RoleInstance#setFaction/resetFaction`）
     //已随本片**一并删除** ✗（做空后它再无消费者 ✓）；组件侧要改阵营请走角色服务面，**不要**由外部直改 ✗。
     @Deprecated
     @Override
@@ -394,10 +394,10 @@ public class RoleAPIImpl implements RoleAPI {
         return false;
     }
 
-    // ───────── 阶段 13 · t126：老 API 的**做空实现**（用户裁定） ─────────
+    // ───────── 老 API 的**做空实现** ─────────
 
     /**
-     * **老 API 的做空实现**（阶段 13 · t126 · 用户裁定「在新 api 任务完成后，把老的直接操作组件的 api 做空实现」✓）。
+     * **老 API 的做空实现**（老的"直接操作组件"的 API 一律做空，改用组件操作面 ✓）。
      * <p><b>方法仍在、签名与注解一律保留</b> ✓（第三方仍能编译 ✓ = P4 恢复生效 ✓），但**不再生效** ✗ ——
      * 每次调用记一条 WARNING（内容含**方法名** + **替代路径** ✓）。
      * <p><b>返回中性哨兵值</b> ✓（{@code false} / {@code 0} / {@code OptionalInt.empty()} /
@@ -410,7 +410,7 @@ public class RoleAPIImpl implements RoleAPI {
                 + "替代路径 = executeComponentOperation(uuid, componentId, payload) ✓");
     }
 
-    //阶段 3.3（RoleAPI 只增）：枚举已装配的角色 id 与只读快照
+    //枚举已装配的角色 id 与只读快照（RoleAPI **只增**）
     @Override
     public Set<String> getAllRoleIds() {
         return registry.ids();
@@ -425,7 +425,7 @@ public class RoleAPIImpl implements RoleAPI {
         return result;
     }
 
-    // ───────── 阶段 13 · t125：组件操作面（**唯一**操作入口 · 设计定案 §7.4 ② / §10.3） ─────────
+    // ───────── 组件操作面（**唯一**操作入口） ─────────
 
     /**
      * **唯一**的"操作角色"入口（读与写都走它 ✓）：解析实例 → 按 id 定位组件 → 转发给组件的操作面 ✓。

@@ -9,11 +9,11 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * 能量组件：系统级能力「能量」的**组件形态**（每角色实例一个，裁定③）。
+ * 能量组件：系统级能力「能量」的**组件形态**（每角色实例一个）。
  * <p><b>★ 本组件持有状态与行为</b>：能量真值 {@code current} 与上限 {@code max} 都在本组件里，
  * clamp、检查+扣减合一、增加，全部在本组件内实现 —— **不再转调任何旧端口** ✗
  * （用户口径：{@code ComponentServices} 只保留「玩家实例 + 组件服务」，其他能力做成组件）。
- * <p><b>与容器的分工</b>：能量变化之后对外的**平台事**是热键栏置脏（触点④）—— 由容器把一条
+ * <p><b>与容器的分工</b>：能量变化之后对外的**平台事**是热键栏置脏 —— 由容器把一条
  * 监听器注册进本组件的名单来承担；组件只负责"真值怎么变"，容器只负责"变了之后做什么"。
  * 这条分界让组件**不需要**
  * {@code svc()} 就能完整实现能力语义（唯一的 {@code svc()} 用途 = {@code self()} 取玩家）。
@@ -21,13 +21,13 @@ import java.util.function.Consumer;
  * <h2>订阅面：<b>JDK {@code Consumer} 监听器列表</b></h2>
  * <b>旧形态</b>：本组件曾嵌套一个 {@code public interface ChangeSink}（唯一方法
  * {@code onEnergyChanged(int previous, int current, int max)}），并由一个**单播字段**持有它 ✗ ——
- * 现算**没有任何类 {@code implements} 它**（唯一实现形态 = 容器构造期传的 lambda ⇒ 它其实是"单播字段"，
+ * **没有任何类 {@code implements} 它**（唯一实现形态 = 容器构造期传的 lambda ⇒ 它其实是"单播字段"，
  * 而不是被其他类实现的接口 ✗）。**监听器列表**的形态是：「一个函数式接口的列表，其他类只需要添加
  * {@code Consumer} 即可」✓。
  * <p><b>新形态</b>：本组件持有 {@code List<Listener>}（{@link Listener} = {@code owner} +
  * {@code Consumer<Change>} 的**成对**登记，record ✓），对外只暴露 {@link #addListener(RoleComponent, Consumer)} ✓；
- * ★ **用 JDK 的 {@code Consumer}**（**不新增自定义接口** ✗ —— R-1「凡关注点已是组件 ⇒ 不得再为它新增能力接口」
- * / R-8 同理）✓。
+ * ★ **用 JDK 的 {@code Consumer}**（**不新增自定义接口** ✗ —— 「凡关注点已是组件 ⇒ 不得再为它新增能力接口」
+ * 同理）✓。
  * <p><b>载荷取「最小充分类型」</b>：旧方法有三个入参（{@code previous} / {@code current} / {@code max}）⇒
  * 用一个**小 record** {@link Change}（**record 不是接口** ⇒ 不违反"不新增接口"✓）—— 三者都保留 ✓
  * （{@code max} 与旧载荷一致 ⇒ 监听器拿到的值与旧 lambda 逐字相同 ✓）。
@@ -43,7 +43,7 @@ import java.util.function.Consumer;
  * <p><b>组件操作面</b>：本组件**选择实现** {@link OperationProvider} ✓ ——
  * 外部指令面可把整段 payload 交给 {@link #onOperationCommand(String)} 自解析 ✓；
  * <b>grammar 与返回值语义写在该方法的 javadoc 里</b> ✓（本组件**不扩**那个接口 ✗：需要更多能力时
- * 暴露**自己的**方法 ✓ —— 设计定案 §10.2 护栏①）。
+ * 暴露**自己的**方法 ✓（不扩本接口）。
  */
 public class EnergyComponent extends RoleComponent implements OperationProvider {
 
@@ -207,10 +207,10 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
         set(current - amount);
     }
 
-    // ───────── 组件操作面（设计定案 §2 / §10.4；本片 = 能量试点） ─────────
+    // ───────── 组件操作面（能量试点） ─────────
 
     /**
-     * **操作面 grammar**（设计定案 §10.4：首 token 必为操作动词 ✓；本片试点只接这四个 ✓）：
+     * **操作面 grammar**（首 token 必为操作动词 ✓；试点只接这四个 ✓）：
      * <pre>
      * add &lt;非负整数&gt;      增能（内部按上限 clamp；等价于 {@link #increase(int)}）
      * consume &lt;非负整数&gt;  试扣（能量不足 ⇒ 不扣、不产生变更；等价于 {@link #tryConsume(int)}）
@@ -220,14 +220,14 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
      * <b>严格规则（逐条可测）</b>：动词**小写**、**大小写敏感** ✓；{@code add}/{@code consume}/{@code set}
      * **必须**且**只带一个非负整数**（缺参 / 多参 / 非数字 / 负数 / 溢出 ⇒ 拒绝 ✗）；
      * {@code current} **不得**带参数 ✗；payload 为 {@code null} / 空串 / 纯空白 ⇒ **无动词 ⇒ 未识别** ✗
-     * （本组件把"空 payload"定义为**未识别** ✓ —— 设计定案 §1 允许组件自定该语义 ✓）。
+     * （本组件把"空 payload"定义为**未识别** ✓ —— 允许组件自定该语义 ✓）。
      * <p><b>返回值语义</b>（与 {@link OperationProvider} 的契约逐字一致）：**四个动词一律回"写后 / 当前的能量值"**
      * （规范化十进制字符串，如 {@code "55"} ✓）—— 本组件**从不**返回空串（它总有一个可回的值 ✓）；
      * **未知动词 / 空 payload / 语法错 / 参数不合法 ⇒ {@code null}** ✗（= 未识别或拒绝 ✓）。
      * 注意 {@code consume} 因能量不足而未扣时**仍算已识别** ✓ ⇒ 回**未变**的当前值（如 {@code "100"}）✓
      * 而不是 {@code null} ✓。
      * <p><b>副作用与置脏</b>：三个写动词一律经本组件的**既有强类型方法** ⇒ 变更通知（置脏）由
-     * 容器注册的监听器**照常触发** ✓ —— **不新增第二条变更通道** ✗（设计定案 §7.2"一套实现、
+     * 容器注册的监听器**照常触发** ✓ —— **不新增第二条变更通道** ✗（"一套实现、
      * 两套门面"：字符串面只是**薄适配层** ✓）；{@code current} 无副作用 ✓。
      */
     @Override

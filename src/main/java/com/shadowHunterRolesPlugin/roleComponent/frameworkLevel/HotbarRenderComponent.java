@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
@@ -151,13 +150,13 @@ public class HotbarRenderComponent extends RoleComponent {
      * {@code core/Skill} 与 {@code core/MainWeapon} 这两个**组件基类**里（合成指标：三态材质 · 六条状态文案 ·
      * 技能带 {@code x.xs} 而主武器不带 · 两个 PDC 键 · 声明数据取自描述符）。描述符只保留**声明数据**
      * （图标 / 显示名 / 描述 / 冷却 / 耗能）。
-     * <p><b>能力簇（用户裁定 C-14：强依赖的能力应合并）</b>：本接口被 {@link HotbarPresentable} 收进热键栏能力簇
-     * （{@code HotbarPresentable extends HotbarItem, EnergyComponent.EnergyCosting, HotbarItemProviding}）
-     * ⇒ <b>实现者集合按构造相同</b>（凡"能出现在热键栏"的组件都必须给出 buildItem），且 {@code buildItem()}
-     * 的语义**必须读**簇内状态（冷却读口见 {@code RoleComponent.CooldownBearing} /
+     * <p><b>能力面（阶段 8 收簇 · 阶段 13 · t115 拆簇）</b>：本接口与 {@link HotbarPresentable}（能上热键栏的声明面）
+     * 曾经是"复合能力袋"里的一员 ✗ —— t115 起**拆解**：二者各自独立，由实现者**显式声明**真正具备的能力 ✓
+     * ⇒ 凡"能出现在热键栏"的组件仍必须给出 {@code buildItem()}（实现者集合按构造相同 ✓），
+     * 且 {@code buildItem()} 的语义**必须读**同族状态（冷却读口见 {@code RoleComponent.CooldownBearing} /
      * {@link EnergyComponent.EnergyCosting#getEnergyCost()} / {@link HotbarItem} 的声明面）
-     * ⇒ 两条合并判据同时成立。不占热键栏的组件（被动）**不在**本簇内，
-     * 因此不会被强制实现一个永远不会被调用的方法。
+     * ⇒ 合并判据的**语义**不变，只是归属从"一次 extends"改为"显式 implements" ✓。
+     * 不占热键栏的组件（被动）**不在**本面内，因此不会被强制实现一个永远不会被调用的方法。
      * <p><b>覆写者须知（用户裁定：PDC 键与六条文案**均允许组件覆写**，覆写者自负其责）</b>：
      * <ul>
      *   <li><b>键写错</b>（写入的键与框架读取的键不一致）⇒ 该物品在监听器前置闸门
@@ -245,5 +244,83 @@ public class HotbarRenderComponent extends RoleComponent {
          * @param id 注册处的组件 id（覆写者可用于区分同类的不同实例；默认实现不读它）
          */
         ItemStack baseItem(String id);
+    }
+
+    // ───────── 阶段 13 · t115：本组件承载的第三个**能力接口**（原顶层 core/hotbar/HotbarPresentable） ─────────
+
+    /**
+     * 「这个组件能出现在热键栏」的能力面（阶段 6 立、阶段 7 · A 步改全拼、**阶段 8 收簇**、
+     * **阶段 13 · t115 拆簇 + 迁入本组件**）：
+     * **唯一实现点是 {@link #specification()}**（声明数据），
+     * 其余访问器都由本接口的 `default` 方法委托给它 ⇒ 新组件**只写 specification()**，不写任何委托。
+     * <p><b>阶段 13 · t115 的两件事（用户 V3：拆解复合能力袋）</b>：
+     * <ol>
+     *   <li><b>迁入</b>：原顶层 `core/hotbar/HotbarPresentable` 已删 ✗ ⇒ 它与声明面 / 产出面
+     *       （{@link HotbarItem} / {@link HotbarItemProviding}）同处本组件 ✓；</li>
+     *   <li><b>拆解</b> ✗：本接口**不再 `extends`** 其余任何能力 —— 旧形态是"一次 extends 把三件事一次拿全"
+     *       的**复合能力袋** ⇒ 实现者改为**显式声明它真正具备的能力** ✓
+     *       （见 {@code roleComponent/ActiveComponent} 的 implements 子句）。</li>
+     * </ol>
+     * <b>拆解后的 Java 代价（本卡实测，写在这里免得后人踩）</b>：本接口的 `default` 与 {@link HotbarItem} 的
+     * **抽象声明**同名，而两者已**无继承关系** ⇒ 同时实现二者的类**必须自己实现**那些方法
+     * （javac 硬拒："未覆盖抽象方法"；**只有继承关系内的 default 才会自动胜出** ✗）——
+     * `ActiveComponent` 因此写了 7 个**纯转发**覆写（{@code HotbarPresentable.super.getX()}，零逻辑重复 ✓）。
+     * <p><b>不占热键栏的组件（被动）不在本面内</b>（{@code PassiveSkill} 只继承 {@code RoleComponent}）：它们
+     * 既不被渲染，也就**不会**被强制实现一个永远不被调用的 {@code buildItem()}。
+     * <p>与继承的关系（阶段 6 冻结 + 阶段 8 不变）：新组件只需 `extends RoleComponent` + 按需实现能力接口，
+     * **不必**继承 `Skill` / `MainWeapon` / `PassiveSkill`；只是"默认画法"这一份便利实现长在那两个基类上。
+     * <p>注意：本接口提供的只是**声明**数据；行为分支（冷却表 / 闸门 / 识别键 / 文案表）一律由组件自己的
+     * {@code buildItem()} 与框架管道决定 —— 阶段 8 起仓内**没有** kind 这个运行期概念。
+     * <p><b>【已作废】旧路径与旧口径逐字保留</b>：「{@code core.hotbar.HotbarPresentable}`（顶层接口，
+     * {@code core/hotbar/} 下）」+「本接口把 {@link HotbarItem}（声明面）· {@link EnergyComponent.EnergyCosting}
+     * （耗能声明）与 {@link HotbarItemProviding}（自己画物品）**四合一**」+ 旧声明
+     * 「{@code HotbarPresentable extends HotbarItem, EnergyComponent.EnergyCosting, HotbarItemProviding}」
+     * —— 那是**复合能力袋**的旧形态 ⇒ 已作废 ✗（现为本组件的嵌套类型，且**不再**是复合接口）。
+     */
+    public interface HotbarPresentable {
+
+        /**
+         * **唯一实现点**：表现规格（阶段 7 · A 步改全拼）。
+         * 旧短名 `spec()` 的兼容别名**已删除**（阶段 10 · t71）；旧口径原文保留如下：
+         * <i>「旧短名 `spec()` 保留为 `@Deprecated` 别名」</i> —— **该口径已作废**（现以 {@link #specification()} 为唯一入口）。
+         */
+        HotbarSpecification<?> specification();
+
+        default String getId() {
+            return specification().getId();
+        }
+
+        default Component getDisplayName() {
+            return specification().getDisplayName();
+        }
+
+        default Component getDescription() {
+            return specification().getDescription();
+        }
+
+        default Material getIcon() {
+            return specification().getIcon();
+        }
+
+        default int getCooldownTicks() {
+            return specification().getCooldownTicks();
+        }
+
+        default int getEnergyCost() {
+            return specification().getEnergyCost();
+        }
+
+        /** 声明面视图（{@link HotbarItem} 在本批保留，不删）。 */
+        default HotbarItem asHotbarItem() {
+            return specification();
+        }
+
+        /**
+         * **基础物品**（阶段 7 · C 步）：委托给唯一实现点 {@link #specification()} 的同名方法
+         * ⇒ 组件只写一处（描述符），基类默认画法读到的就是它。
+         */
+        default ItemStack baseItem(String id) {
+            return specification().baseItem(id);
+        }
     }
 }

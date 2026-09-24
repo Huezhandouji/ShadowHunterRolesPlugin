@@ -18,9 +18,9 @@ import java.util.List;
  * <p>
  * 分工（阶段 8 冻结）：
  * <ul>
- *   <li>{@link HotbarPresentable#specification()} = **唯一实现点** —— 组件只写这一处；</li>
+ *   <li>{@link HotbarRenderComponent.HotbarPresentable#specification()} = **唯一实现点** —— 组件只写这一处；</li>
  *   <li>本类自身即 {@link HotbarItem} 的**声明面**（图标 / 显示名 / 描述 / 冷却 / 耗能），
- *       因此 {@link HotbarPresentable#asHotbarItem()} 直接返回本对象，无需适配代码；</li>
+ *       因此 {@link HotbarRenderComponent.HotbarPresentable#asHotbarItem()} 直接返回本对象，无需适配代码；</li>
  *   <li><b>纯声明</b>：阶段 8 删掉了 {@code kind} 字段与构造参数 —— 描述符不再自述种类；
  *       "物品长什么样（含运行期状态）"由组件基类的 {@link HotbarRenderComponent.HotbarItemProviding#buildItem()} 回答；</li>
  *   <li><b>栏位必填</b>：本类型 {@link #requiresSlot()} = {@code true}（不带栏位的组件用另一支描述符）。</li>
@@ -29,7 +29,7 @@ import java.util.List;
  * {@link #setSlot(int)} 指定它在热键栏里的位置，装配期未设栏位则
  * {@link RoleComponent.Specification#freeze()} **抛异常**（绝不静默变成"不占栏位"）。
  * <b>"不占栏位"由类型表达</b>：不带栏位的组件用 {@code PassiveSkill.Specification}（它继承根类型、
- * **没有** {@code setSlot}），或直接实现 {@link HotbarPresentable}；本类型内部不再出现 `-1` 哨兵。
+ * **没有** {@code setSlot}），或直接实现 {@link HotbarRenderComponent.HotbarPresentable}；本类型内部不再出现 `-1` 哨兵。
  * <p>
  * 命名沿用工程的 JavaBean 风格（设计 §4.3：不引入 record 风格访问器）；
  * 旧短名 {@code HotbarSpec} 保留为 `@Deprecated` 别名（见该类）。
@@ -93,7 +93,7 @@ public class HotbarSpecification<T extends RoleComponent>
      * **失败关闭（fail-fast）**：本类的默认创建体不造任何组件 —— 具体组件由**组件自己声明的嵌套
      * `Specification`** 覆写本方法给出（阶段 7 · B 步落地）。把裸的 {@link HotbarSpecification}
      * 交给装配入口会立刻在这里抛异常，而不是造出一个语义不明的组件。
-     * <p>本类在阶段 7 · A 步的另一半职责是"组件内部的声明值对象"：{@link HotbarPresentable#specification()}
+     * <p>本类在阶段 7 · A 步的另一半职责是"组件内部的声明值对象"：{@link HotbarRenderComponent.HotbarPresentable#specification()}
      * 返回它、基类默认画法读它，那条路径**从不调用本方法**。
      */
     @Override

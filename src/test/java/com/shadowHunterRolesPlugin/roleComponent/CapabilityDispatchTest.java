@@ -4,7 +4,7 @@ import com.shadowHunterRolesPlugin.core.MainWeapon;
 import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
@@ -112,7 +112,7 @@ public class CapabilityDispatchTest {
         }
     }
 
-    /** 产出物品者 = {技能家族} ∪ {主武器家族}（= `HotbarPresentable` 簇）；被动**不在**簇内。 */
+    /** 产出物品者 = {技能家族} ∪ {主武器家族}（= 实现 `HotbarPresentable` 者）；被动**不在**其内。 */
     @Test
     public void providersAreExactlyTheActiveComponentFamilies() {
         for (Object component : components().values()) {
@@ -121,7 +121,7 @@ public class CapabilityDispatchTest {
             assertEquals("产出物品者的集合必须 = 技能家族 ∪ 主武器家族：" + component.getClass().getSimpleName(),
                     expected, provider);
             if (provider) {
-                assertTrue("产出物品者必须在 HotbarPresentable 簇内（能力簇四合一）",
+                assertTrue("产出物品者必须实现 HotbarPresentable（阶段 13 · t115 起能力面已拆解 ⇒ 由实现者逐项显式声明）",
                         component instanceof HotbarPresentable);
                 assertTrue("能出现在热键栏的组件必须有冷却能力（isCooling 的接受集）",
                         component instanceof CooldownBearing);

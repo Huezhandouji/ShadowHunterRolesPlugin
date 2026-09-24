@@ -37,7 +37,7 @@ public class EnergyComponent extends RoleComponent {
      * <p><b>【已作废】旧口径原文（阶段 6 原文，逐字保留）</b>：「这个组件耗能量」的能力接口（阶段 6），      * 其**顶层形态位于 `core/hotbar/` 包**（顶层文件已于阶段 13 · t111 删除 ✗）——      * 阶段 13 · t111 第①片起改为**本嵌套形态**，原 5 处引用已全部改为嵌套限定名 ✓。
      * <p>{@code MainWeapon} 的 {@code energyCost ≡ 0} 不变量由本接口承载（构造器第 6 位恒传 0）；
      * 非零能量成本只有两个技能（`MeiqiheziBloodySlashSkill` = 8 / `MeiqiheziCircleSlashSkill` = 15）。
-     * <p>实现方式沿用旧口径：由 `HotbarPresentable` 的 `default` 满足（本组件不实现它，只承载声明面 ✓）。
+     * <p>实现方式沿用旧口径：由 `HotbarRenderComponent.HotbarPresentable` 的 `default` 满足，并由 `ActiveComponent` 显式转发（本组件不实现它，只承载声明面 ✓）。
      */
     public interface EnergyCosting {
 

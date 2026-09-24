@@ -1,17 +1,24 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItem;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarPresentable;
+import net.kyori.adventure.text.Component;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 /**
  * 主动组件基类（设计 §4.3）：= 原 `Skill` + `MainWeapon` 去重后的并集，不多一个成员。
  * <p>
  * <b>阶段 6 · 统一装配</b>：本类降级为**可选的便利实现** —— 它只做一件事：把构造参数装进
- * {@link HotbarSpecification} 并实现 {@link #specification()}（**唯一实现点**）。表现访问器全部由
- * {@link HotbarPresentable} 的 `default` 方法提供 ⇒ 子类不再需要（也不应）逐个手写委托。
+ * {@link HotbarSpecification} 并实现 {@link #specification()}（**唯一实现点**）。表现访问器由
+ * {@link HotbarPresentable} 的 `default` 方法提供，本类**显式转发**到它们（阶段 13 · t115 起，
+ * 见下）⇒ 子类不再需要（也不应）逐个手写委托。
  * <p>
  * <b>阶段 7 · A 步</b>：表现规格类改全拼（`HotbarSpec` → {@link HotbarSpecification}；**旧短名类已于阶段 10 · t71 删除** ✓），
  * 同时把它升格为**装配期描述符**（{@link RoleComponent.Specification}）的"带栏位"分支。
@@ -41,7 +48,8 @@ import org.bukkit.entity.Player;
  * （嵌套类型，见下）—— 与使用它们的组件同处、只由本组件持有 ✓。
  */
 public abstract class ActiveComponent extends RoleComponent
-        implements HotbarRenderComponent.HotbarItem, HotbarPresentable, RoleComponent.CooldownBearing {
+        implements HotbarPresentable, HotbarItem, HotbarItemProviding,
+        EnergyComponent.EnergyCosting, RoleComponent.CooldownBearing {
 
     // ───────── 阶段 13 · t108：物品使用入口的词汇（原 core/dispatch/ 的三个类型迁入本组件） ─────────
     //裁定⑤（用户答复）：**施放与攻击由「物品支持类组件」处理** ⇒ 原 `HotbarActionable` / `CombatHook`
@@ -91,6 +99,51 @@ public abstract class ActiveComponent extends RoleComponent
     @Override
     public final HotbarSpecification<?> specification() {
         return specification;
+    }
+
+    // ───────── 阶段 13 · t115（用户 V3：拆解复合能力袋）：本类**显式声明**它真正具备的能力 ─────────
+    //拆解后 `HotbarPresentable` **不再 extends** 声明面 / 产出面 / 耗能面 ✗ ⇒ "一次 extends 拿全"的旧便利没了：
+    //本类必须**自己**把 `HotbarItem` 的 7 个抽象访问器实现掉（本卡 javac 实测：**无继承关系**的两个接口里
+    //"抽象声明 + 同名 default"并存 ⇒ 实现者必须自己实现 ✗；只有继承关系内的 default 才自动胜出）。
+    //★ 写法 = **纯转发**到那些 default（`HotbarPresentable.super.getX()`）⇒ **零逻辑重复** ✓，
+    //  求值结果与拆解前**逐字相同**（都是 `specification().getX()`）✓。
+    //★ **`getId()` 不在其列**（实测）：`RoleComponent.getId()` 是 **final** ⇒ 它本来就**赢过**接口 default
+    //  （类方法恒胜接口 default ✓）⇒ 拆解前后都走它，**无需也不可**覆写 ✗。
+
+    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
+    @Override
+    public Component getDisplayName() {
+        return HotbarPresentable.super.getDisplayName();
+    }
+
+    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
+    @Override
+    public Component getDescription() {
+        return HotbarPresentable.super.getDescription();
+    }
+
+    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
+    @Override
+    public Material getIcon() {
+        return HotbarPresentable.super.getIcon();
+    }
+
+    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
+    @Override
+    public int getCooldownTicks() {
+        return HotbarPresentable.super.getCooldownTicks();
+    }
+
+    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}（一处同时满足 `HotbarItem` 与 `EnergyCosting` 两处声明）。 */
+    @Override
+    public int getEnergyCost() {
+        return HotbarPresentable.super.getEnergyCost();
+    }
+
+    /** 声明面转发（阶段 13 · t115）：同 {@link #getId()}。 */
+    @Override
+    public ItemStack baseItem(String id) {
+        return HotbarPresentable.super.baseItem(id);
     }
 
     /**

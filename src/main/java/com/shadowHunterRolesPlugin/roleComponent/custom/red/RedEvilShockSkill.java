@@ -13,23 +13,8 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 public class RedEvilShockSkill extends Skill{
 
-    /**
-     * **SanTEComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final SanTEComponent santeComponent(){
-        return svc().components().get(SanTEComponent.class);
-    }
-
-    /**
-     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final BuffComponent buffComponent(){
-        return svc().components().get(BuffComponent.class);
-    }
+    private BuffComponent buff;
+    private SanTEComponent sante;
 
     public RedEvilShockSkill(String id, ComponentServices services, Specification specification) {
         super(id, services, specification);
@@ -62,7 +47,7 @@ public class RedEvilShockSkill extends Skill{
     @Override
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
-        if(!buffComponent().canCastSkill()) return;
+        if(!buff.canCastSkill()) return;
 
         RedBleedPassive bleed = getComponent(RedBleedPassive.class);
         for(Player p : caster.getLocation().getNearbyPlayers(5)){
@@ -75,11 +60,22 @@ public class RedEvilShockSkill extends Skill{
                 bleed.requestResolve(p.getUniqueId(), 5);
             }
         }
-        santeComponent().gain(10);
+        sante.gain(10);
 
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITCH_CELEBRATE, 1, 1);
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
 
         startCooldown();   //D1：组件自启冷却（框架不再代启动）
+
+    }
+
+    /**
+     * **开始生效**（阶段 13 · t107）：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
+     * <p>R-4：取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配后冻结 ⇒ 与按需解析恒等 ✓。
+     */
+    @Override
+    public void start(){
+        buff = svc().components().get(BuffComponent.class);
+        sante = svc().components().get(SanTEComponent.class);
     }
 }

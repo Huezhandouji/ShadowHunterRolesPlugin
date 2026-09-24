@@ -29,23 +29,8 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  */
 public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscriber {
 
-    /**
-     * **SanTEComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final SanTEComponent santeComponent(){
-        return svc().components().get(SanTEComponent.class);
-    }
-
-    /**
-     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final BuffComponent buffComponent(){
-        return svc().components().get(BuffComponent.class);
-    }
+    private BuffComponent buff;
+    private SanTEComponent sante;
 
     //该技能是否在执行中
     private boolean running = false;
@@ -73,7 +58,8 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
      */
     @Override
     public void start() {
-        SanTEComponent sante = svc().components().get(SanTEComponent.class);
+        buff = svc().components().get(BuffComponent.class);
+        sante = svc().components().get(SanTEComponent.class);
         if (sante != null) {
             sante.subscribe(this);
         }
@@ -100,7 +86,7 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
     @Override
     public void onCast(CastSignal signal) {
         if(signal.trigger() != CastTrigger.RIGHT_CLICK) return;
-        if(!buffComponent().canCastSkill()) return;
+        if(!buff.canCastSkill()) return;
         running = true;
         svc().self().player().getWorld().playSound(svc().self().player().getLocation().clone(), Sound.ENTITY_WITHER_DEATH, 2, 1);
         //冷却 600 由本组件在施放成功处按声明值启动（T-2 ③ 后所有组件无条件走新管道）
@@ -117,10 +103,10 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
 
         Player caster = svc().self().player();
 
-        santeComponent().decrease(10);
+        sante.decrease(10);
         //药水记账（O-7）：经 **Buff 组件**的入口（与框架**同一条已记账路径**），clear() 时只回收本系统施加的效果
-        buffComponent().applyPotionEffect(PotionEffectType.REGENERATION, 45, 5);
-        buffComponent().applyPotionEffect(PotionEffectType.STRENGTH, 45, 2);
+        buff.applyPotionEffect(PotionEffectType.REGENERATION, 45, 5);
+        buff.applyPotionEffect(PotionEffectType.STRENGTH, 45, 2);
         startCooldown();
 
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_WITHER_SHOOT, 1, 1);
@@ -145,7 +131,6 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
      */
     @Override
     public void stop() {
-        SanTEComponent sante = svc().components().get(SanTEComponent.class);
         if (sante != null) {
             sante.unsubscribe(this);
         }

@@ -32,31 +32,9 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  */
 public class RedBleedPassive extends PassiveSkill {
 
-    /**
-     * **SanTEComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final SanTEComponent santeComponent(){
-        return svc().components().get(SanTEComponent.class);
-    }
-
-    /**
-     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final BuffComponent buffComponent(){
-        return svc().components().get(BuffComponent.class);
-    }
-
-    /**
-     * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合。
-     */
-    private final VitalsComponent vitalsComponent(){
-        return svc().components().get(VitalsComponent.class);
-    }
+    private VitalsComponent vitals;
+    private BuffComponent buff;
+    private SanTEComponent sante;
 
     //最大流血层数
     public static final int MAX_BLEED_STACK = 15;
@@ -123,13 +101,25 @@ public class RedBleedPassive extends PassiveSkill {
 
     /**
      * 停止生效（新钩子，无参）：清空两个账本 Map。
-     * <p>与旧 `stop(Player, RoleInstance)` **语义一致**（原实现只做这两件清空）；`start()` 在 B⑦ 之后
-     * 无需再做任何事（过渡桥已删）⇒ **不再覆写**（基类默认空实现）。
+     * <p>与旧 `stop(Player, RoleInstance)` **语义一致**（原实现只做这两件清空）；
+     * **阶段 13 · t107 起本类另覆写 `start()`**（协作组件缓存进字段 ✓），两者成对 ✓。
      */
     @Override
     public void stop() {
         playerBleedRecord.clear();
         playerBleedResolveRequests.clear();
+    }
+
+    /**
+     * **开始生效**（阶段 13 · t107）：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
+     * <p>R-4：取组件只能在本钩子（或新写/既有 `start()`）里做 ✗ —— 不得放 `awake()`；
+     * 注册表在装配期后冻结 ⇒ 缓存引用与按需解析**恒等** ✓。
+     */
+    @Override
+    public void start(){
+        vitals = svc().components().get(VitalsComponent.class);
+        buff = svc().components().get(BuffComponent.class);
+        sante = svc().components().get(SanTEComponent.class);
     }
 
     /**
@@ -182,10 +172,10 @@ public class RedBleedPassive extends PassiveSkill {
 
             //粒子
             player.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
-            vitalsComponent().trueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
+            vitals.trueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
             //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 **Buff 组件**的入口（与框架**同一条已记账路径**））
-            buffComponent().applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
-            santeComponent().gain(BLEED_SANTE_RECOVER);
+            buff.applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
+            sante.gain(BLEED_SANTE_RECOVER);
 
             if(newBleed <= 0) {
                 toRemove.add(pid);
@@ -266,11 +256,11 @@ public class RedBleedPassive extends PassiveSkill {
             playerBleedRecord.put(pid, newBleed);
         }
 
-        vitalsComponent().trueDamage(victim, caster, finalResolveBleedAmount * BLEED_DAMAGE_PER_SECOND);
+        vitals.trueDamage(victim, caster, finalResolveBleedAmount * BLEED_DAMAGE_PER_SECOND);
 
         //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 **Buff 组件**的入口（与框架**同一条已记账路径**））
-        buffComponent().applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
-        santeComponent().gain(BLEED_SANTE_RECOVER);
+        buff.applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
+        sante.gain(BLEED_SANTE_RECOVER);
 
         victim.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
     }

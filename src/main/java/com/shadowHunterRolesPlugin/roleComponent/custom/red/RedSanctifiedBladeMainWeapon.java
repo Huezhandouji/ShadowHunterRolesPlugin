@@ -13,14 +13,7 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 
 public class RedSanctifiedBladeMainWeapon extends MainWeapon {
 
-    /**
-     * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final VitalsComponent vitalsComponent(){
-        return svc().components().get(VitalsComponent.class);
-    }
+    private VitalsComponent vitals;
 
     //每次普攻施加的流血层数
     private static final int BLEED_STACKS_PER_HIT = 15;
@@ -70,7 +63,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
                 bleed.applyStacks(victim.getUniqueId(), BLEED_STACKS_PER_HIT);
             }
 
-            vitalsComponent().physicalDamage(victim, attacker, 8, 1);
+            vitals.physicalDamage(victim, attacker, 8, 1);
         }
 
         attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ELDER_GUARDIAN_CURSE, 1, 1.8f);
@@ -82,6 +75,15 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
 
         //冷却由框架按 getCooldownTicks() 启动（声明值是唯一真值来源）
         startCooldown();   //D1：组件自启冷却（框架不再代启动）
+    }
+
+    /**
+     * **开始生效**（阶段 13 · t107）：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
+     * <p>R-4：取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配后冻结 ⇒ 与按需解析恒等 ✓。
+     */
+    @Override
+    public void start(){
+        vitals = svc().components().get(VitalsComponent.class);
     }
 
 }

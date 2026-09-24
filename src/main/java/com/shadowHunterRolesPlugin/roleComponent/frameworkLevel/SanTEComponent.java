@@ -12,9 +12,11 @@ import java.util.function.Consumer;
  * SanTE 组件：系统级能力「SanTE」的**组件形态**（每角色实例一个）。
  * <p><b>★ 本组件持有状态与行为</b>：SanTE 真值 {@code current} 与上限 {@code max} 都在本组件里，
  * clamp 与 increase/decrease/set 的语义全在本组件内实现 —— **不再转调任何旧端口** ✗。
- * <p><b>与容器的分工</b>：写后对平台说两句话 —— 先把变更交给**平台侧通道**（容器以本组件名义登记的那一条监听，
- * 见 {@link #set(int)} / {@link #broadcastChange(int, int)}），再由容器在**派发边界**向
- * 监听器列表派发（含重入护栏）；组件只负责真值怎么变。
+ * <p><b>与容器的分工</b>：写后对平台说两句话 —— ① 把变更交给**平台侧通道**（容器**以本组件名义**登记的那一条
+ * 监听；它是**平台侧通知的唯一入口**，只在写入路径里被调到），② 再由容器在**派发边界**向
+ * 监听器列表派发（含真变化闸门 · 逐监听器隔离 · 重入护栏）；组件只负责真值怎么变。
+ * <p><b>两条通道各通知一次</b>：① 每次写入（含无变化的写入）各一次；② 只在**真变化**时一次
+ * ⇒ 同一次真变化对容器侧是"写入路径 1 次 + 派发边界 0 次"（派发边界**不**再回调平台侧）。
  * <p><b>状态唯一</b>：容器侧**不再**持有 {@code currentSanTE} 字段 ✗（只保留视图方法）。
  * <p><b>归零惩罚的钉 0 语义不变</b>：惩罚组件（{@code DefaultSanTEZeroPunishment}）仍按既有方式
  * 调**组件自身**的 {@code set(0)} 逐 tick 钉 0（协作组件引用在 `start()` 内一次取好、存进字段 ✓）⇒ 走的还是这一条 clamp + 派发路径。
@@ -191,11 +193,14 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
     }
 
     /**
-     * **只通知平台侧通道**（写入路径专用 ✓）。
+     * **只通知平台侧通道**（**平台侧通知的唯一入口** ✓）。
      * <p><b>为什么不走 {@link #notifyListeners(Change)}</b>：订阅者必须在容器的**派发边界**被通知
      * —— 真变化闸门（无变化写入不派发）、逐监听器故障隔离、重入合并三条都在那里 ✓；
      * 写入路径直接通知订阅者会绕过这三条 ✗。
      * <p>本方法**不做**任何隔离：平台侧回调抛异常 ⇒ **照常上抛**（与写入路径的既有语义一致 ✓）。
+     * <p><b>调用时机</b>：只在写入路径（{@link #set(int)}）里，**且不筛真变化** ——
+     * "有没有真变化"由容器在派发边界过闸门（`pre == now` 直接返回）✓ ⇒
+     * 「变更何时到达平台侧」的语义逐字不变。
      */
     private void notifyPlatform(Change change) {
         forEachListener(entry -> {
@@ -203,19 +208,6 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
                 entry.listener().accept(change);
             }
         });
-    }
-
-    /**
-     * **把变更交给平台侧**（本方法**只**做这一件事 ✓）——
-     * 由容器在**派发边界**调用（`RoleInstance.broadcastSanTEChange` ⇒ 先逐个通知监听器、再走平台侧通道 ✓）。
-     * <p><b>调用时机未变</b> ✓：容器在 {@code dispatchSanTEChange} 里已先过 {@code pre == now} 的
-     * "真变化"闸门 ⇒ 本方法仍**只在真变化时**被调到（**不是**在每次 {@code set()} 里无条件调 ✗
-     * —— 那会改变"变更何时到达平台侧"的既有语义 ✓）。
-     * <p><b>为什么还叫 broadcast</b>：历史名（旧形态里它同时向订阅者广播 + 走平台侧 ✗）；
-     * 监听器通知现已归 {@link #forEachListener(Consumer)} ✓ ⇒ 本方法只剩平台侧这一半 ✓。
-     */
-    public void broadcastChange(int pre, int now) {
-        notifyPlatform(new Change(pre, now));
     }
 
     /** 增加 SanTE（内部按上限 clamp）。 */

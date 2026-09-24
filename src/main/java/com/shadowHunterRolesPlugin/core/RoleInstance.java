@@ -836,8 +836,10 @@ public class RoleInstance {
  * <p><b>未改的两件</b>（已确立、原样保留）：**逐个**经 {@code guardedCall}
  * （异常 ⇒ 只隔离抛异常的那一个、其余照常收到）· 整段在 {@link #withinIterationWindow} 里
  * （⇒ 真四步在窗口关闭后执行）。
- * <p><b>顺带</b>：派发完再调 {@code broadcastChange} —— 「订阅者派发」与「平台侧通道」都归本组件
- * （后者经它持有的**平台侧监听**，不是订阅者名单里的一条）。
+ * <p><b>平台侧通道</b>：**唯一入口 = 写入路径的直接通知**（`SanTEComponent#set` → `notifyPlatform` →
+ * 它自己那条 owner 为本组件的监听 ⇒ 本方法）⇒ **一次真变化恰好一次** ✓。
+ * 派发边界**不再**回调平台侧通道（那会造成同一监听被通知两次，而第二次的派发会被重入闸门吞掉 ⇒
+ * 只是空转）。
  */
     private void broadcastSanTEChange(int preSanTE, int newSanTE){
         SanTEComponent sante = (SanTEComponent) resolve(SERVICE_ID_SANTE);
@@ -856,8 +858,8 @@ public class RoleInstance {
                         () -> entry.listener().accept(new SanTEComponent.Change(preSanTE, newSanTE)));
             });
         });
- //平台侧通道仍归本组件的**平台侧监听** —— 调用点与时机逐字未变（写入路径一次、派发边界一次）
-        sante.broadcastChange(preSanTE, newSanTE);
+ //★ 到此为止：**不再**回调平台侧通道 —— 那次回调产生的第二次通知会被重入闸门收下、
+ //补偿分支又因 `notified == target` 跳过 ⇒ 空转；同一监听被通知两次也会让"命中次数"失真。
     }
 
  /** 每 tick 派发（：**收窄为 private** ← —— 唯一消费者 = 构造期 ticker 的 `this::triggerUpdate`）。 */

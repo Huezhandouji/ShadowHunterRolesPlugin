@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.core.dispatch.CastSignal;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
@@ -20,6 +21,10 @@ public class RedSolitaryArroganceSkill extends Skill {
 
     //O-5：任务句柄化，stop 时取消（阶段 2 由平台 Scheduler 提供，同时去掉 Folia 全局调度器误用）
     private Task attackTask;
+
+    //阶段 13 · t101（第①批）：生命能力改向**组件本身**取用（R-6），引用缓存在 start()。
+    //旧写法经服务集的白名单端口成员取用；该端口是**纯转发**（同一组件的同一方法）⇒ 逐字等价。
+    private VitalsComponent vitals;
 
 
     public RedSolitaryArroganceSkill(String id, ComponentServices services, Specification specification) {
@@ -89,7 +94,7 @@ public class RedSolitaryArroganceSkill extends Skill {
                         }
 
                         if(shouldRecoverHealth){
-                            svc().vitals().heal(4);
+                            vitals.heal(4);
                         }
 
                         //特效
@@ -108,8 +113,17 @@ public class RedSolitaryArroganceSkill extends Skill {
         svc().cooldowns().start(getCooldownTicks());   //D1：组件自启冷却（框架不再代启动）
     }
 
+    /**
+     * **开始生效**（阶段 13 · t101 第①批填实）：把生命组件**一次查好**缓存进字段 ✓。
+     * <p>为什么在 {@code start()} 而不是 {@code awake()}：硬规矩 **R-4** 禁止在 {@code awake()} 里
+     * 取用其他组件 ✗（awake 只做构造期自检 / 只读自身）；`start()` 相容器已冻结 ⇒ 容器查找合法 ✓。
+     * <p>为什么缓存：本技能每 6 tick 结算一次，回血点在循环体内 ⇒ 重复查容器是纯浪费；
+     * 旧的端口引用本身也是**构造期就持有的引用** ⇒ 缓存与旧口径同族 ✓。
+     * <p>等价性：该端口是**纯转发**（转发到本实例的同一个生命组件、同一个方法）⇒ 逐字等价 ✓。
+     */
     @Override
     public void start() {
+        vitals = svc().components().get(VitalsComponent.class);
     }
 
     /**

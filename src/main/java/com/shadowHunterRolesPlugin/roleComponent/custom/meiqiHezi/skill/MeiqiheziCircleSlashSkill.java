@@ -67,7 +67,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     }
 
     /**
-     * 批次②（B②-b-2）迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
+     * 迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
      * 判定顺序（2026-09-18 调整）：**先判 `canCastSkill`** —— 不满足 → 直接返回（被禁用，不施放、不扣能量），
      * **再**做能量 `tryConsume` —— 不满足 → 直接返回（与旧路径一致、**不启冷却**）；
      * 冷却由本组件在施放成功处按声明值 **200** 启动；

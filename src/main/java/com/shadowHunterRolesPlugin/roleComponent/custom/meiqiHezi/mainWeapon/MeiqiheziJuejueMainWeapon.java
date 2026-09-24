@@ -53,7 +53,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
     }
 
     /**
-     * 攻击路径（新管道；B⑦ 已把 `MainWeaponListener.onAttackPlayer` 接到 `instance.handleAttack`）。
+     * 攻击路径（新管道；`MainWeaponListener.onAttackPlayer` 接到 `instance.handleAttack`）。
      * <p>语义与旧路径**逐条等价** —— 旧 listener 在近战命中时**同时**调 `onAttack(...)` 与 `onLeftClick(...)`：
      * <ul>
      *   <li>能量 `>= 20`：`onAttack` 直接返回（不做事），**范围伤害由 `onLeftClick` 打出** ⇒ 本方法在此分支

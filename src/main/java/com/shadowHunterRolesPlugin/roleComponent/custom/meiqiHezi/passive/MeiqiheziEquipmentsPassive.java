@@ -18,7 +18,7 @@ public class MeiqiheziEquipmentsPassive extends PassiveSkill {
     }
 
     /**
-     * 批次④（B④）迁移：改**无参新钩子**（容器 B②-c 已广播），装备发放逻辑**逐字未动**
+     * 迁移：改**无参新钩子**（容器已广播），装备发放逻辑**逐字未动**
      * （四槽 = IRON_HELMET / LEATHER_CHESTPLATE / IRON_LEGGINGS / LEATHER_BOOTS；
      * 设置顺序 helmet→chestplate→leggings→boots 不变）。
      */

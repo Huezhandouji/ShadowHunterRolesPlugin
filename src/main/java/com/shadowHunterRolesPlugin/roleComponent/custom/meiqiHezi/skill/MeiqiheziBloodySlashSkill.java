@@ -81,7 +81,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
     }
 
     /**
-     * 右击施放（新管道；批次⑧-b/B⑧-b 迁移）。与旧 `onRightClick(Player, RoleInstance)` **逐条等价**：
+     * 右击施放（新管道）。与旧 `onRightClick(Player, RoleInstance)` **逐条等价**：
      * 能量不足 / 被禁用时**直接返回且不启动冷却**（旧代码即如此）⇒ 早返回跳过后续语句；
      * 否则扣能量 `8`、以 `0L` 初始延迟 / `2L` 周期启动前摇任务（**登记进本组件资源表**，角色清除时由框架兜底取消
      * ⇒ 原 `isValid()` 守卫不需要）、四周 `4` 格内敌对目标各受 `14` 点物理伤害、粒子/音效逐字不变；

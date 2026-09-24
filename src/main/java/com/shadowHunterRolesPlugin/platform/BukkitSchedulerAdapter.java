@@ -13,7 +13,7 @@ import org.bukkit.plugin.Plugin;
  * <p>接口面（{@link Scheduler} / {@link Task}）与全部调用方**零改动**：两者句柄的差异
  * （{@code ScheduledTask.cancel()} 返回 {@code CancelledState} 而非 {@code void}）在本类内吞掉。
  *
- * <p>迁移依据 = t51 实证探针的原始输出（`debug-logs/测试记录/阶段4-schedprobe-停服物证.txt` §3.3）：
+ * <p>迁移依据 = t51 实证探针的原始输出（`debug-logs/测试记录/阶段4/阶段4-schedprobe-停服物证.txt` §3.3）：
  * 回调线程（{@code Server thread}）、周期实际触发（声明 1/10 ⇒ 1/11/21）、延时段（声明 20 ⇒ 20）
  * 与 {@code BukkitScheduler} 的对照任务**逐字相同**；取消语义等价
  * （{@code NEXT_RUNS_CANCELLED} → 重复 {@code NEXT_RUNS_CANCELLED_ALREADY}、{@code isCancelled()=true}、

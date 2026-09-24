@@ -3,7 +3,6 @@ import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
-import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
@@ -66,18 +65,15 @@ public class DebugCooldownCommand implements SubCommand {
             return true;
         }
         RoleComponent component = instance.componentRegistry().getById(componentId);
-        //阶段 7 · 清理批：判据由「继承关系」改为「**能力接口**」——本命令只需要"声明了冷却时长"这一项能力
-        //（`CooldownBearing#getCooldownTicks`）。阶段 13 · t108：派发面的判据已随"吸收"回到**物品支持组件
-        //本身**（`RoleInstance#handleCast` / `#handleAttack` 判 `ActiveComponent` / `MainWeapon`）⇒ 命令面
-        //与派发面仍是同一套接受集（仓内实现该能力的仍只有活动组件基类那一棵子树）。
-        //行为不变：仓内实现该能力的仍只有活动组件基类那一棵子树（表现规格对象只实现 HotbarItem，不在此列）。
-        //（本注释刻意不写那个类型名：卡面判据是裸 grep 该名字，注释里出现它会被误读成"类型判据还在"。）
+        //判据 = **组件类型**：本命令只需要"有冷却这回事 + 能读声明时长"的组件 ⇒ 与派发面同一套接受集
+        //（`RoleInstance#handleCast` / `#handleAttack` 也判 `ActiveComponent` / `MainWeapon`）。
+        //仓内满足该接受集的只有活动组件基类那一棵子树（表现规格对象只实现 HotbarItem，不在此列）。
         if(!(component instanceof ActiveComponent active)){
             send(player, "Not an active component (skill/main weapon): " + componentId);
             return true;
         }
-        //阶段 13 · t105（第③步）：冷却读数与动作**直接问组件本身**（旧的"经服务集端口取表"路径已拆 ✗）——
-        //  声明值仍由能力接口给出（`CooldownBearing#getCooldownTicks`），状态与动作由组件基类给出 ✓。
+        //冷却读数与动作**直接问组件本身**（旧的"经服务集端口取表"路径已拆 ✗）——
+        //  声明值由描述符给出（`getCooldownTicks()`），状态与动作由组件基类给出 ✓。
         int declared = active.getCooldownTicks();
 
         switch (action){

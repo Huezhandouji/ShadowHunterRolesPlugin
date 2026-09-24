@@ -41,13 +41,13 @@ import org.bukkit.inventory.ItemStack;
  *
  * <h2>冷却：状态与判断都在本类</h2>
  * 每实例一份 {@code cooldownUntilTick}（同 id 的两个实例**各自独立** ✓），框架既不登记、也不派发、
- * 更不落表；框架侧只在需要读数时**转问组件**（{@link #isCooling()} / 读数口），公开面一条不删 ✓。
+ * 更不落表；框架侧只在需要读数时**转问组件**（{@link #isCoolingDown()} / 读数口），公开面一条不删 ✓。
  * <p>旧的"冷却结束回调"随该能力接口一并删除 —— 全库**零覆写点** ⇒ 删除**零行为变化** ✓。
  * <p>物品使用入口（{@link #onCast(CastSignal)}）与入口词汇（{@link CastTrigger} / {@link CastSignal} /
  * {@link AttackSignal}）都归本组件：施放与攻击由「物品支持类组件」处理 ✓。
  */
 public abstract class ActiveComponent extends RoleComponent
-        implements EnergyComponent.EnergyCosting, RoleComponent.CooldownBearing {
+        implements EnergyComponent.EnergyCosting {
 
     /** **热键栏触发的三种来源**（listener 只做"事件 → trigger"翻译；`onCast` 入口的输入词汇）。 */
     public enum CastTrigger {
@@ -181,7 +181,14 @@ public abstract class ActiveComponent extends RoleComponent
         cooldownUntilTick = 0;
     }
 
-    /** **冷却状态读数**：本实例的冷却是否**正在进行**（未到期）。 */
+    /**
+     * **冷却状态读数**：本实例的冷却是否**正在进行**（未到期）——
+     * 逐字读**本组件实例**的 {@link #cooldownUntilTick}（不经任何端口 ✗）。
+     * <p>框架的帧末 flush 用它驱动"冷却中每 tick 至少刷一次"（技能名里的秒数才会逐刻递减）——
+     * 这条**节拍链**与展示链（{@code %.1f} 秒数）读的是同一份状态 ✓。
+     * <p>框架侧的**唯一消费者** = 帧末 flush 的入口条件（"有占栏位组件在冷却 ⇒ 本 tick 至少刷一次"）；
+     * 该条件按 {@code instanceof ActiveComponent} 取接受集 ✓（组件自持冷却后框架不需要任何冷却接口 ✗）。
+     */
     public boolean isCoolingDown() {
         return org.bukkit.Bukkit.getCurrentTick() < cooldownUntilTick;
     }
@@ -189,19 +196,6 @@ public abstract class ActiveComponent extends RoleComponent
     /** **剩余冷却刻数**：不在冷却中 ⇒ `0`（**不返回负数** ✓）。 */
     public int remainingCooldownTicks() {
         return Math.max(0, cooldownUntilTick - org.bukkit.Bukkit.getCurrentTick());
-    }
-
-    /**
-     * **冷却状态读数**（{@link RoleComponent.CooldownBearing} 的唯一实现）：
-     * 逐字等价于 {@link #isCoolingDown()}（改为读**本组件实例**的状态，不再经任何端口 ✗）。
-     * <p>框架的帧末 flush 用它驱动"冷却中每 tick 至少刷一次"（技能名里的秒数才会逐刻递减）——
-     * 这条**节拍链**与展示链（{@code %.1f} 秒数）读的是同一份状态 ✓。
-     * <p>旧的"冷却启动即置脏"动作已随之消失：冷却期间本读数恒为 `true` ⇒ flush 入口条件每 tick 成立
-     * ⇒ **仍会重绘** ✓（等价性论证见交付说明的置脏语义一节）。
-     */
-    @Override
-    public final boolean isCooling() {
-        return isCoolingDown();
     }
 
     /**

@@ -9,7 +9,6 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
-import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
 //热键栏三件事（声明面 / 物品产出 / 外观是否依赖活状态）已由"能力接口"改为
 //"渲染组件按组件读的数据" ✗ ⇒ 本类只经 `HotbarRenderComponent` 的读口取用
 //（见 `hasCoolingTickingComponent()` 的接受集判据）。
@@ -41,7 +40,6 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -328,9 +326,6 @@ public class RoleInstance {
  //平台上下文：阶段 2 的组件取用入口（阶段 4 起逐批收窄； 后服务集只剩三个成员）
     public RolesContext rolesContext() { return platform; }
 
- //统一渲染器：阶段 5 · 4.4 起为**唯一渲染者**（写物品只发生在 core/hotbar 内）
-    public HotbarRenderer hotbarRenderer() { return hotbarRenderer; }
-
  //组件注册表（框架内部：装配、资源兜底、getComponent 查找）
     public ComponentRegistry componentRegistry() { return componentRegistry; }
 
@@ -341,22 +336,6 @@ public class RoleInstance {
  * <p><b>只读</b>：本端口不带写面（R-1）；写侧在聚合根上（{@link Role#setFaction} / {@link Role#resetFaction}）。
  */
     public RoleInfo roleInfo() { return roleInfo; }
-
- // ─────────：服务组件的读口（组件侧取用与取证都走这里） ─────────
- //它们是**每实例一个**的框架服务（不进 Role 模板），登记在实例容器里；这里给出强类型读口
- //（ 起这是组件侧取服务组件的**唯一**入口 —— 服务集不再转发它们）。
- //（原"阵营"一项的读口 `factionComponent()` **已删除** —— 组件本体没了；
- // 阵营读取改走上面的 `roleInfo()` 服务面）
-
-    public EnergyComponent energyComponent() { return energyComponent; }
-
-    public SanTEComponent santeComponent() { return santeComponent; }
-
-    public VitalsComponent vitalsComponent() { return vitalsComponent; }
-
-    public BuffComponent buffComponent() { return buffComponent; }
-
-    public TimerComponent timerComponent() { return timerComponent; }
 
  /**
  * 把**框架级服务组件**登记进**实例容器**（）。
@@ -672,27 +651,8 @@ public class RoleInstance {
 
 
 
- //热键栏渲染：阶段 5 · 4.4 起**唯一渲染者 = HotbarRenderer**（写物品只发生在 core/hotbar 内）；
- //本容器只提供查表与状态输入，旧的"更新物品栏 / 更新元数据"方法（连同其两条调用路径）已随本批删除。
- //（整理②）：原 `hotbarItemOf(String)` **描述符视图公开访问器已删除** ——
- //现算消费者 0（渲染器**直接取组件实例**要物品，见渲染组件的 `buildItemOf` 读口；
- //本口早已是"渲染器不再经它取值"的遗留面 ⇒ 删后无能力失去入口）。
-
- //清除主武器，技能占用的快捷栏
- //（整理②）：**实例版 `clearHotbar()` 已删除** （现算消费者 0；`clear()` 与
- //`PlayerListener` 走的都是**静态版** `clearHotbar(Player)`）⇒ 本类里那条重复实现一并消失。
- //实现点仍**只有一处**（静态版，语义逐字未变）。
-
-    public static void clearHotbar(Player player){
-        Inventory inv = player.getInventory();
-        for(int i = 0; i < 9; i++){
-            ItemStack item = inv.getItem(i);
-            if(Skill.Utils.isSkillItem(item) ||
-                    MainWeapon.Utils.isMainWeapon(item)){
-                inv.setItem(i, null);
-            }
-        }
-    }
+ //热键栏渲染：**唯一渲染者 = HotbarRenderer**（写物品只发生在 core/hotbar 内）；
+ //本容器只提供查表与状态输入，不对外提供任何渲染器 / 物品访问器（清热键栏的静态入口也归渲染器 ✓）。
 
     public Player getPlayer() { return player; }
     public Role getRole() { return role; }
@@ -950,7 +910,7 @@ public class RoleInstance {
  /**
  * B-2 谓词（阶段 8 口径；**与冻结口径等价**）：是否存在**外观依赖活状态**的**占栏位**组件正在冷却。
  * <p>作用 = 让"冷却中每刻至少刷一次"成立：技能名里的 {@code x.xs} 才会逐刻递减
- * （装饰搬进组件之后，框架只剩 {@link CooldownBearing#isCooling()} 这条读口）。
+ * （装饰搬进组件之后，框架只剩 {@link ActiveComponent#isCoolingDown()} 这条读口）。
  * <p><b>判据由「{@code instanceof Skill}」下沉为「组件自报的值」</b> ——
  * 渲染组件的读口 {@code dependsOnLiveStateOf(component)}。理由（C-15 第三个实例测试）：
  * 旧写法把"外观含秒数"**写死成具体类** ⇒ ① 第三类带倒计时外观的组件加进来**必须改框架文件**；
@@ -962,8 +922,8 @@ public class RoleInstance {
  * **不带**秒数（冻结差异）⇒ 自报值为 {@code false} ⇒ 本谓词对它恒 {@code false} ⇒ 主武器冷却不驱动
  * 每 tick 刷新，与迁移前一致。
  * <p>接受集成立性：占栏位组件全是主动组件家族（该家族同时提供声明面与
- * {@link CooldownBearing} 的冷却读口）⇒ 被本谓词检查到的组件一定能回答
- * {@code dependsOnLiveState()} 与 {@code isCooling()}。
+ * {@link ActiveComponent#isCoolingDown()} 的冷却读口）⇒ 被本谓词检查到的组件一定能回答
+ * {@code dependsOnLiveState()} 与 {@code isCoolingDown()}。
  */
     private boolean hasCoolingTickingComponent(){
         for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
@@ -972,7 +932,7 @@ public class RoleInstance {
  //「外观是否依赖活状态」= 组件自报的值（框架**不点名**任何具体组件类）
  //读侧契约 = 渲染组件按组件读数据（组件不再实现能力接口）⇒ 接受集与旧判据逐字相同 ✓
             if(!HotbarRenderComponent.dependsOnLiveStateOf(component)) continue;
-            if(component instanceof CooldownBearing bearing && bearing.isCooling()) return true;
+            if(component instanceof ActiveComponent active && active.isCoolingDown()) return true;
         }
         return false;
     }
@@ -1223,8 +1183,8 @@ public class RoleInstance {
             updateTask = null;
         }
 
- //（整理②）：改走**静态实现点**（实例版 `clearHotbar()` 已删 ⇒ 实现点仍只有一处）
-        clearHotbar(player);
+ //清角色 ⇒ 一并清掉本系统写在热键栏里的物品（静态入口，实现点在渲染器里 ✓）
+        HotbarRenderer.clearHotbar(player);
 
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(roleHealthModifierKey);
 

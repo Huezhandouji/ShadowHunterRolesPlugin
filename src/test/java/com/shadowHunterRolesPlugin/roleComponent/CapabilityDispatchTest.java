@@ -6,7 +6,6 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassiv
 
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
-import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
@@ -129,8 +128,8 @@ public class CapabilityDispatchTest {
             if (provider) {
                 assertNotNull("产出物品者必须提供声明面（specification 非 null —— 图标/显示名/描述/冷却/耗能都住在它上面）",
                         ((ActiveComponent) component).specification());
-                assertTrue("能出现在热键栏的组件必须有冷却能力（isCooling 的接受集）",
-                        component instanceof CooldownBearing);
+                assertTrue("能出现在热键栏的组件必须有冷却这回事（主动组件家族的接受集）",
+                        component instanceof ActiveComponent);
             } else {
                 assertFalse("被动不得进热键栏家族：" + component.getClass().getSimpleName(),
                         component instanceof ActiveComponent);

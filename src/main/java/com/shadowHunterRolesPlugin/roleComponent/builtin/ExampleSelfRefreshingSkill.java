@@ -15,17 +15,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * **「外观会自己变」的示例组件**（阶段 8 · t46）：本类同时是两项能力的**生产使用点**
+ * **「外观会自己变」的示例组件**：本类同时是两项能力的**生产使用点**
  * （C-15 配套②：没有使用点的能力 = 未验证的能力）。
  * <p>
  * <b>它演示的第一件事 = 组件可以「请求重绘」</b>：组件**只请求、不写** —— 它从容器里取
- * {@link HotbarRenderComponent}（阶段 12 · t86 起的**唯一**重绘通道），**不持有**渲染器（**阶段 13 · t109 起改为持有渲染组件字段** ✗；旧口径原文「**不持有**渲染器」**已作废**）、
+ * {@link HotbarRenderComponent}（**唯一**重绘通道），**不持有**渲染器、
  * **不持有**任何 Bukkit 库存对象。请求只置脏，真正的写入仍由框架在**帧末 flush** 完成
  * ⇒ 「空闲 tick 零 setItem」逐字不变。
  * <p>
- * <b>t86 的取代动作（不静默改写）</b>：旧形态是本类实现 <i>{@code RepaintRequestable}</i> 并由框架
- * 把 <i>{@code RepaintRequester}</i> 绑给它 —— 那是**两条并存的重绘通道** ✗。t86 起改为
- * 「**从容器取渲染组件、调 {@code requestRepaint()}**」这一条通道 ✓（旧的
+ * <b>取代动作（不静默改写）</b>：旧形态是本类实现 <i>{@code RepaintRequestable}</i> 并由框架
+ * 把 <i>{@code RepaintRequester}</i> 绑给它 —— 那是**两条并存的重绘通道** ✗。现改为
+ * 「**从容器取渲染组件、调 {@code requestRepaint()}**」这一条通道 ✓（那两个
  * {@code RepaintRequestable} / {@code RepaintRequester} **两个类型已删除** ✓）。
  * <p>
  * <b>它演示的第二件事 = {@code dependsOnLiveState()} 为 {@code false} 的组件不被每 tick 重绘</b>（A8）：
@@ -42,12 +42,12 @@ import java.util.List;
  */
 public class ExampleSelfRefreshingSkill extends Skill {
 
-    //阶段 13 · t109：渲染组件引用改为**字段 + 在 start() 内赋值**（与全仓统一形态一致 ✓）——
+    //渲染组件引用采用**字段 + 在 start() 内赋值**（与全仓统一形态一致 ✓）——
     //  R-4：取组件只能在本钩子（或新写/既有 start()）里做 ✗，不得放 awake()；
     //  注册表装配期后冻结 ⇒ 缓存引用与按需查找**恒等** ✓（未装配时仍为 null ⇒ 下面的静默检查逐字保留 ✓）。
     private HotbarRenderComponent renderComponent;
 
-    //阶段 13 · t110：**可用性判定下放给子类**（用户裁定：基类不持 buff / energy、不查容器）⇒
+    //**可用性判定下放给子类**（基类不持 buff / energy、不查容器）⇒
     //  本组件自己持 buff 字段（在既有 start() 内一次查好 ✓，与全仓统一形态一致）。
     private BuffComponent buff;
 
@@ -68,7 +68,7 @@ public class ExampleSelfRefreshingSkill extends Skill {
     /**
      * 组件自己的状态变化点：窗口内每 {@value #REQUEST_PERIOD_TICKS} 刻**主动请求**一次重绘。
      * <p>这正是"外观由组件决定"所缺的那一环：框架并不知道本组件的外观需要更新。
-     * <p><b>t86</b>：请求走**渲染组件**这一条通道（容器查找；未装配时为 {@code null} ⇒ 静默不请求 ✓）。
+     * <p>请求走**渲染组件**这一条通道（容器查找；未装配时为 {@code null} ⇒ 静默不请求 ✓）。
      */
     @Override
     public void update(){
@@ -135,7 +135,7 @@ public class ExampleSelfRefreshingSkill extends Skill {
     }
 
     /**
-     * **开始生效**（阶段 13 · t109）：把渲染组件**一次查好**缓存进字段 ✓（原先是在 `update()` 里按需查找 ✗）。
+     * **开始生效**：把渲染组件**一次查好**缓存进字段 ✓（不在 `update()` 里按需查找 ✗）。
      * <p>R-4：取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配期后冻结 ⇒ 与按需查找恒等 ✓。
      */
     @Override
@@ -145,7 +145,7 @@ public class ExampleSelfRefreshingSkill extends Skill {
     }
 
     /**
-     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     * **闸门放行？**（基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
      */
     @Override
     protected boolean gateOpen(){
@@ -153,8 +153,8 @@ public class ExampleSelfRefreshingSkill extends Skill {
     }
 
     /**
-     * **当前能量**（阶段 13 · t110）：本组件**不参与能量维度**（声明耗能 0）⇒ 返回声明值；
-     * 与迁移前**逐字等价**（能量组件内 clamp 到 `[0, max]` ⇒ 原判定 `current() < 0` 恒假）。
+     * **当前能量**：本组件**不参与能量维度**（声明耗能 0）⇒ 返回声明值；
+     * 与既有读法**逐字等价**（能量组件内 clamp 到 `[0, max]` ⇒ 判定 `current() < 0` 恒假）。
      */
     @Override
     protected int currentEnergy(){

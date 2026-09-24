@@ -13,8 +13,8 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
     private int noEnemySurroundTime = 0;
     private int tickSecondRecord = 0;
 
-    //阶段 13 · t101（第①批）：生命能力改向**组件本身**取用（R-6），引用缓存在 start()。
-    //旧写法经服务集的白名单端口成员取用；该端口是**纯转发**（同一组件的同一方法）⇒ 逐字等价。
+    //生命能力改向**组件本身**取用，引用缓存在 start()。
+    //服务集的白名单端口是**纯转发**（同一组件的同一方法）⇒ 两种取用逐字等价。
     private VitalsComponent vitals;
 
     public AutoRecoverSanTEHealthPassive(String id, ComponentServices services) {
@@ -22,11 +22,11 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
     }
 
     /**
-     * **开始生效**（阶段 13 · t101 第①批新增）：把生命组件**一次查好**缓存进字段 ✓。
+     * **开始生效**：把生命组件**一次查好**缓存进字段 ✓。
      * <p>为什么在 {@code start()} 而不是 {@code awake()}：硬规矩 **R-4** 禁止在 {@code awake()} 里
      * 取用其他组件 ✗（awake 只做构造期自检 / 只读自身）；`start()` 相容器已冻结 ⇒ 容器查找合法 ✓。
      * <p>为什么缓存：本被动**每 tick** 跑一次 `update()`，回血点在其内层判定里 ⇒ 重复查容器是纯浪费；
-     * 旧的端口引用本身也是**构造期就持有的引用** ⇒ 缓存与旧口径同族 ✓。
+     * 端口引用本身也是**构造期就持有的引用** ⇒ 缓存与经端口取用同族 ✓。
      * <p>等价性：该端口是**纯转发**（转发到本实例的同一个生命组件、同一个方法）⇒ 逐字等价 ✓。
      */
     @Override
@@ -40,7 +40,7 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
      * 数值/间隔**逐字不变**：半径 `10`、累计上限 `200` tick、每秒判定 `20` tick、`+3` SanTE、`+1` 生命；
      * SanTE 为 0 时提前 return 的短路**保持**。阵营判定走 `svc().roleInfo().hasEnemyInRange(10)`
      * （语义 = 原 `SkillUtil.hasEnemyInRange`）；SanTE 改走 `sante.increase(3)`、
-     * 生命改走**生命组件**的回血入口（阶段 13 · t101 第①批：不再经服务集端口，改为组件本身用）✓。
+     * 生命改走**生命组件**的回血入口（不再经服务集端口，改为组件本身用）✓。
      * 容器在 tick 里对该组件广播 `update()`（B⑤ 第 1 步，`:802`）。
      */
     @Override

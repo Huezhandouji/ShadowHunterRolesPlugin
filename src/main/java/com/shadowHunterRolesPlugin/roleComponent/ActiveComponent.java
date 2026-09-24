@@ -42,7 +42,7 @@ import org.bukkit.inventory.ItemStack;
  * <h2>冷却：状态与判断都在本类</h2>
  * 每实例一份 {@code cooldownUntilTick}（同 id 的两个实例**各自独立** ✓），框架既不登记、也不派发、
  * 更不落表；框架侧只在需要读数时**转问组件**（{@link #isCoolingDown()} / 读数口），公开面一条不删 ✓。
- * <p>旧的"冷却结束回调"随该能力接口一并删除 —— 全库**零覆写点** ⇒ 删除**零行为变化** ✓。
+ * <p>"冷却结束回调"已随能力接口一并删除 —— 全库**零覆写点** ⇒ 删除**零行为变化** ✓。
  * <p>物品使用入口（{@link #onCast(CastSignal)}）与入口词汇（{@link CastTrigger} / {@link CastSignal} /
  * {@link AttackSignal}）都归本组件：施放与攻击由「物品支持类组件」处理 ✓。
  */
@@ -98,7 +98,7 @@ public abstract class ActiveComponent extends RoleComponent
      * **本组件的外观是否依赖"活状态"**：{@code true} = 它的外观会在**没有框架置脏事件**的情况下自己变
      * （例如技能冷却名里的 {@code x.xs} 秒数每刻都在变）⇒ 只要它在冷却中，框架就必须**每 tick** 至少刷一次，
      * 否则玩家看到的是陈旧外观。
-     * <p><b>为什么这是一个自报值、而不是框架里的一句 {@code instanceof Skill}</b>：旧判据把「外观含秒数」
+     * <p><b>为什么这是一个自报值、而不是框架里的一句 {@code instanceof Skill}</b>：把「外观含秒数」
      * **写死成具体类** ⇒ ① 第三类"带倒计时外观"的组件加进来时**必须改框架文件** ✗；
      * ② 覆写 {@link #buildItem()} 去掉秒数外观的子类**仍会被每 tick 重绘**（白写）✗。
      * 改为自报后：新组件**只加新文件**即可（默认 {@code false}，需要就覆写 {@code true}）✓，
@@ -151,7 +151,7 @@ public abstract class ActiveComponent extends RoleComponent
      * 全部产品调用点都是"按声明值启动" ✓。
      *
      * @return 是否真的写入了冷却状态：声明值 ≤ 0（"没有冷却这回事"，如被动）⇒ **不写状态并返回 `false`**，
-     *         与迁移前的无声语义逐字一致 ✓
+     *         与既有的无声语义逐字一致 ✓
      */
     public boolean startCooldown() {
         return startCooldown(getCooldownTicks());
@@ -159,7 +159,7 @@ public abstract class ActiveComponent extends RoleComponent
 
     /**
      * **按给定时长开始（或覆盖式重启）冷却**。
-     * <p>语义：从**当前刻**重算到期（覆盖旧值，不做"取较大值"的续期 ✗）—— 与迁移前"以本次调用时刻重算"
+     * <p>语义：从**当前刻**重算到期（覆盖旧值，不做"取较大值"的续期 ✗）—— 与"以本次调用时刻重算"
      * 的覆盖式重启**逐字等价** ✓。
      * <p>存在理由：兼容薄壳（原冷却端口）与调试命令需要按**显式刻数**驱动冷却（旧端口签名是
      * `start(int ticks)`）⇒ 本重载让那条路径成为**纯委托**，不再需要框架侧的表 ✓。
@@ -201,7 +201,7 @@ public abstract class ActiveComponent extends RoleComponent
     /**
      * **物品使用入口（施放）**：默认不做事、也**不**进冷却（与 listener 的行为一致：未重写的热键栏
      * 触发只做就绪预检）。
-     * <p>返回值为 {@code void}（旧的施放结果枚举已删 —— 它**没有任何消费点**）。
+     * <p>返回值为 {@code void}（施放结果枚举已删 —— 它**没有任何消费点**）。
      * <p>本方法**不是**覆写任何接口：它是本组件的**自有声明**（原 `HotbarActionable` 已被吸收 ✗）
      * ⇒ 无 {@code @Override}；方法签名与默认体**逐字未变** ✓。
      */

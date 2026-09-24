@@ -17,7 +17,7 @@ import java.util.List;
  * ② 服务集由 `final` 字段承接 ⇒ 只可能注入一次，重复注入在类型上不可表达；
  * ③ {@link #svc()} 保留"未注入即抛"的防御语义（禁止静默 null）；
  * ④ 组件构造点唯一（容器内单一创建路径）⇒ id 与服务集只可能成对产生；
- * ⑤ 过渡期的"先创建再注入"方法已在阶段 4 收尾批次删除（见交付小结的待办）。
+ * ⑤ "先创建再注入"的过渡方法已删除 ⇒ 注入只可能发生在构造期。
  */
 public abstract class RoleComponent {
 
@@ -55,12 +55,12 @@ public abstract class RoleComponent {
      * 取本角色实例内的另一个组件（**按类型**）。
      * <p><b>语义 = 添加顺序第一个满足可赋值性者</b>（用父类/接口查询会命中子类/实现类实例）；
      * 未注册 → {@code null}；冻结前调用 → 抛 {@code IllegalStateException}。要拿**全部**符合者请用
-     * {@code svc().components().getAll(type)}（阶段 10 · t67 新增）。
+     * {@code svc().components().getAll(type)}。
      * <p>【已作废】旧句原文：「取本角色实例内的另一个组件（**按具体类优先**；未注册 → null，
      * 冻结前调用 → 抛异常）。」—— 实现一直是**纯线性扫描**（无任何"具体类优先"分支）⇒
      * 该措辞属**对行为撒谎的值** ✗，已按真实语义改写 ✓。
-     * 取代指向：`t67` 已在 `core/ports/ComponentLookup` 与 `core/dispatch/ComponentRegistry` 改正，
-     * 本处（组件侧**唯一取用入口**）是最后一块（`t71` 亦以同法处理过 `HotbarSpec` 家族的作废措辞）。
+     * 同类措辞已在 `core/ports/ComponentLookup` 与 `core/dispatch/ComponentRegistry` 改正，
+     * 本处（组件侧**唯一取用入口**）是最后一块（`HotbarSpec` 家族的作废措辞亦已同法处理）。
      */
     protected final <T extends RoleComponent> T getComponent(Class<T> type) {
         return svc().components().get(type);
@@ -88,17 +88,17 @@ public abstract class RoleComponent {
 
     // ───────────── 领域事件 ─────────────
 
-    //（阶段 12 · t87 起）本基类**不再**声明 `onSanTEChange(int pre, int now)` ✗ ——
-    //  **现行形态**（阶段 12 · t89 更正后）：关心者向 `SanTEComponent` **订阅**（该组件的 `Subscriber` 口）✓
+    //本基类**不再**声明 `onSanTEChange(int pre, int now)` ✗ ——
+    //  **现行形态**：关心者向 `SanTEComponent` **添加监听**（`addListener` + JDK `Consumer`）✓
     //  —— 依据用户硬规矩 **R-1**：SanTE 的家是组件 ⇒ **不得再为它新增能力接口** ✗。
     //  简言之：SanTE 的**真值持有者**早已是 SanTEComponent ⇒ 变更通知不该挂在**所有**组件的基类上。
     //  旧口径原文保留如下（**不静默改写**）：
     //  <i>「只在 SanTE **真变化**时派发（pre == now 不派发）。」（原 {@code RoleComponent} 内该方法的 javadoc，逐字）</i>
 
-    // ───────────── 装配期描述符（阶段 7 · A 步） ─────────────
+    // ───────────── 装配期描述符 ─────────────
 
     /**
-     * **装配期描述符根类型**（阶段 7 · A 步骨架；**阶段 8 起不含 kind**）：把"这个组件怎么造"与"它占不占热键栏"从
+     * **装配期描述符根类型**（不含 kind）：把"这个组件怎么造"与"它占不占热键栏"从
      * **工厂 + 值的哨兵**（旧：`slot = -1`）改成**一个有类型的声明**。
      * <p>
      * <b>职责</b>：
@@ -111,20 +111,20 @@ public abstract class RoleComponent {
      *       （`setSlot` 之类一律抛异常）⇒ 同一个描述符实例被两个角色共享时不可能被串改；</li>
      *   <li>{@link #create(String, ComponentServices)} —— 抽象创建：由**具体描述符**决定造哪个类。</li>
      * </ul>
-     * <b>规则进类型</b>（阶段 7 · A 步）：带栏位的分支是 {@code core/hotbar/HotbarSpecification}
+     * <b>规则进类型</b>：带栏位的分支是 {@code core/hotbar/HotbarSpecification}
      * （它有 {@code setSlot}）；被动描述符 {@code PassiveSkill.Specification} **继承本根类型**、
      * 因此**没有** {@code setSlot} —— "被动不占栏位"于是成为**编译期事实**，不再靠装配点自觉。
-     * <p><b>阶段 8 · kind 已删</b>：旧的 kind 枚举（SKILL / MAIN_WEAPON / PASSIVE）与构造参数一起删除；
+     * <p><b>kind 已删</b>：kind 枚举（SKILL / MAIN_WEAPON / PASSIVE）与构造参数一起删除；
      * 表现面不再自述种类、行为分支也不再读它（热键栏物品完全由组件的 {@code buildItem()} 控制）。
      * <p>
      * <b>命名</b>：按本工程的 JavaBean 口径（设计 §4.3），不写成 record；访问器名沿用
-     * {@code slot()} / {@code hasSlot()} / {@code descriptorLabel()} 与既有 {@code HotbarSpec.kind()} 的口径（**历史引用**：`HotbarSpec` 类已于阶段 10 · t71 删除 ✓，此处只留作口径回溯）。
+     * {@code slot()} / {@code hasSlot()} / {@code descriptorLabel()} 与既有 {@code HotbarSpec.kind()} 的口径（`HotbarSpec` 类已删除 ✓，此处只留作口径回溯）。
      */
     public abstract static class Specification<T extends RoleComponent> {
 
         /**
          * **诊断标签**（**不是行为分支**）：旧 `kind` 的"可读性"由本字段承接 —— 它**只**用于装配期
-         * 异常文案（保证文案与迁移前逐字相同），**不含任何枚举语义**、也没有任何行为按它分叉。
+         * 异常文案（保证文案逐字稳定），**不含任何枚举语义**、也没有任何行为按它分叉。
          */
         private final String descriptorLabel;
 
@@ -137,12 +137,12 @@ public abstract class RoleComponent {
         /**
          * 装配期绑定的**注册 id**（{@link #bindId(String)} 写入；未绑定 ⇒ {@code null}）。
          * <p>与栏位同属"**必须由装配器设置**的参数"：组件自带的描述符不知道自己的注册 id，
-         * 若不绑定，任何读 id 的代码都会拿到 {@code null}（t34 第一轮的真实回归即由此而来）。
+         * 若不绑定，任何读 id 的代码都会拿到 {@code null}。
          */
         private String boundId;
 
         /**
-         * **必需的依赖类型**（阶段 10 · t54）：{@link #requires(Class[])} 写入；装配期由
+         * **必需的依赖类型**：{@link #requires(Class[])} 写入；装配期由
          * {@code core/Role#verifyDependencies()} 检查 —— 缺任一 ⇒ 抛 {@link ComponentDependencyException}
          * ⇒ 该角色**不注册**。
          */
@@ -167,7 +167,7 @@ public abstract class RoleComponent {
         }
 
         /**
-         * **声明"我需要同角色里还有某个组件"**（阶段 10 · t54 · 用户计划第三条）。
+         * **声明"我需要同角色里还有某个组件"**。
          * <p><b>按类型声明</b>（不是按 id）：id 属于注册处，类型才是"我需要什么样的能力提供者"。
          * <p><b>语义</b>：装配期检查时，本组件**自己不算**提供者（用户原话是"检查自己需要的依赖（**其他组件**）"）
          * ⇒ 至少要有**另一个**组件的"提供类型"可赋值给这里声明的类型，否则视为缺依赖。
@@ -308,7 +308,7 @@ public abstract class RoleComponent {
         /**
          * **装配器绑定注册 id**（与 {@link #assignSlot(int)} 同族：都是"必须由装配器设置"的参数）。
          * <p>为什么必须有它：组件自带的描述符用"不带 id 的构造"声明（id 属于注册处）⇒ 若不绑定，
-         * 描述符里任何读 id 的路径都会拿到 {@code null}（t34 第一轮的真实回归根因）。绑定后
+         * 描述符里任何读 id 的路径都会拿到 {@code null}。绑定后
          * **描述符的 id 与注册处同源同值**，字段不再撒谎。
          * <p>id 为空 / 已冻结 / 已绑定到**另一个** id ⇒ 抛异常（同 id 重复绑定是幂等的）。
          */
@@ -340,7 +340,7 @@ public abstract class RoleComponent {
          * ⇒ 角色模板**不持有描述符对象**，两个角色共用一个描述符实例也互不影响。
          * <p><b>带栏位必填</b>：子类若声明"本类型必须有栏位"（{@link #requiresSlot()}），则未设栏位时
          * **在此抛异常** —— 不占栏位必须由**类型**表达（用无栏位的描述符），不得静默降级。
-         * <p><b>依赖声明的自检</b>（阶段 10 · t54）：同一个类型不得**既必需又可选择** ⇒ 抛
+         * <p><b>依赖声明的自检</b>：同一个类型不得**既必需又可选择** ⇒ 抛
          * {@link IllegalStateException}（自相矛盾的声明必须在装配期就喊出来，而不是"看哪条先被读到"）。
          */
         public final Snapshot freeze() {

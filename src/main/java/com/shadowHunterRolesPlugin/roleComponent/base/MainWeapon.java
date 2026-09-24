@@ -22,31 +22,31 @@ import java.util.List;
 
 
 /**
- * 主武器组件基类（阶段 4 B0b-3 起改基到 {@link ActiveComponent}、`energyCost` 恒传 0）。
+ * 主武器组件基类（继承 {@link ActiveComponent}；`energyCost` 恒传 0）。
  * <p>
- * <b>阶段 8</b>：本类**给出主武器侧默认画法** {@link #buildItem()}。与技能侧的两条冻结差异：
+ * 本类**给出主武器侧默认画法** {@link #buildItem()}。与技能侧的两条冻结差异：
  * <ul>
  *   <li>冷却名**不带** {@code " x.xs"} 秒数后缀（技能带）；</li>
  *   <li>{@code energyCost ≡ 0} 由类型封死 ⇒ {@link IconState#ENERGY_LACK} 对主武器**不可达**。</li>
  * </ul>
  * 识别键 = {@link Utils#MAIN_WEAPON_KEY}。
- * <p><b>阶段 13 · t108</b>：原 `CombatHook`（唯一方法 {@link #onAttack(AttackSignal)}）**被本类吸收**
- * —— 本类本来就声明 `onAttack`，那个接口只是重复声明 ⇒ 整体删除 ✗（派发判据改为按**本类**判，
+ * <p>原 `CombatHook`（唯一方法 {@link #onAttack(AttackSignal)}）**已被本类吸收**
+ * —— 本类本来就声明 `onAttack`，那个接口只是重复声明 ⇒ 整体删除 ✗（派发按**本类**判，
  * 接受集逐字不变）；{@code AttackSignal} 随之成为 {@code ActiveComponent} 的嵌套类型 ✓。
  */
 public abstract class MainWeapon extends ActiveComponent {
 
-    // ───────── 阶段 13 · t110（用户裁定）：基类**不持** buff / energy、**不查容器**、**不做该项判断** ─────────
+    // ───────── 基类**不持** buff / energy、**不查容器**、**不做该项判断** ─────────
     //用户原话：「基类不需要存 buff 和 energy 字段。这些应该由子类判断。」
     //⇒ 原先本类的两个按需取用入口已**整体删除** ✗（同 `Skill` 的那一段）。
     //★ 能量维度：主武器的声明耗能由类型**封死 ≡ 0**（{@link Specification} 没有 `setEnergyCost`）
     //  ⇒ 「能量不足」态对它**不可达**（冻结面口径）⇒ 本类**不设**能量钩子，判定直接传声明值 ✓。
     //【已作废】原两个取用入口的 javadoc 口径**逐字保留**在此：「向**组件本身**取用（R-6），不再经服务集的
     //  白名单端口成员」「按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合」——
-    //  那描述的是**基类自己去查**的旧形态 ⇒ 与用户裁定冲突，**已作废** ✗（新归属：字段与判断都在子类）。
+    //  那描述的是**基类自己去查**的形态 ⇒ 与现行归属冲突，**已作废** ✗（新归属：字段与判断都在子类）。
 
     /**
-     * **闸门是否放行？**（阶段 13 · t110：**下放给子类**）—— 基类不查任何组件 ✗。
+     * **闸门是否放行？**（**下放给子类**）—— 基类不查任何组件 ✗。
      * <p>子类用**自己的 buff 字段**回答（主武器侧 = `canUseMainWeapon()`：非 STUN）。
      * <p><b>为什么是抽象</b>：「禁用」态完全由本值决定 ⇒ 若给默认值，漏写者会**静默**丢掉灰显 ✗。
      */
@@ -54,12 +54,12 @@ public abstract class MainWeapon extends ActiveComponent {
 
     /**
      * 状态行与描述之间的分隔线（冻结字面量，值一字不变）。本类与 {@link Skill} 各持一份
-     * ⇒ 两份都落在**组件基类的默认实现**里，渲染器内 0 处（归属判据 C-13）。
+     * ⇒ 两份都落在**组件基类的默认实现**里，渲染器内 0 处。
      */
     private static final String LORE_SEPARATOR = "====================";
 
     /**
-     * **描述符口径的构造**（阶段 7 · B 步）：表现值由组件自己的 {@link Specification} 提供，
+     * **描述符口径的构造**：表现值由组件自己的 {@link Specification} 提供，
      * 本构造器只做"把描述符转交给基类"这一件事（主武器的能量消耗由类型恒为 0）。
      */
     public MainWeapon(String id, ComponentServices services, Specification specification){
@@ -67,7 +67,7 @@ public abstract class MainWeapon extends ActiveComponent {
     }
 
     /**
-     * 旧构造口径（表现参数内联）：**保留为兼容别名** —— 与迁移前逐字同序同义（`energyCost` 仍恒传 0）。
+     * 表现参数内联的构造口径：**保留为兼容别名** —— 与既有口径逐字同序同义（`energyCost` 仍恒传 0）。
      *
      * @deprecated 改用 `(id, services, Specification)`：表现值写进组件自己的嵌套 `Specification`。
      */
@@ -77,19 +77,19 @@ public abstract class MainWeapon extends ActiveComponent {
     }
 
     /**
-     * **主武器描述符**（阶段 7 · A 步骨架、**阶段 8 收敛为纯声明**）：带栏位
+     * **主武器描述符**（收敛为纯声明）：带栏位
      * （继承 {@link HotbarSpecification} ⇒ 有 {@code setSlot}），kind 已删（不再自述种类）。
      * <p>参数顺序 = 本类构造器去掉前两位（`id` / `services`）后的**原样顺序**。
-     * <p><b>规则进类型</b>（阶段 7 拍板）：本类型**没有** `setEnergyCost` —— 能量消耗**根本不是参数**，
+     * <p><b>规则进类型</b>：本类型**没有** `setEnergyCost` —— 能量消耗**根本不是参数**，
      * 在构造期以字面量 {@code 0} 交给父类 ⇒ **"主武器 `energyCost ≡ 0`"由类型封死**，
      * 不再是"装配点记得传 0"的自觉；`ENERGY LACK` 态因此对主武器**不可达**（冻结面口径不变）。
      * <p>本类型**不实现** {@link #create(String, ComponentServices)} ⇒ 具体组件必须自己声明嵌套
      * `Specification` 并覆写它（编译期强制）。
      */
-    // ───────── 冷却：**由本组件实例自持**（阶段 13 · t104 第①步）────────────────────────────
-    //用户裁定：主武器 / 技能这两个组件**自己持有冷却和其判断**，并**写开启冷却 / 停止冷却方法供子类使用**；
+    // ───────── 冷却：**由本组件实例自持** ────────────────────────────
+    //主武器 / 技能这两个组件**自己持有冷却和其判断**，并**写开启冷却 / 停止冷却方法供子类使用**；
     //**框架不参与**（本类不向框架登记任何冷却状态、不新增组件、不新增端口）。
-    //阶段 13 · t105（第②步）：冷却状态与 API 已**上提到 `ActiveComponent`**（两家族基类合一 ✓）——
+    //冷却状态与 API 已**上提到 `ActiveComponent`**（两家族基类合一 ✓）——
     //  本类不再自带副本；`startCooldown()` / `startCooldown(int ticks)` / `stopCooldown()` /
     //  `isCoolingDown()` / `remainingCooldownTicks()` 均由父类提供 ✓。
 
@@ -112,19 +112,19 @@ public abstract class MainWeapon extends ActiveComponent {
     }
 
     /**
-     * **物品使用入口（攻击）的新契约**（阶段 8 起为 {@code void}）：今天 listener 在攻击后**无条件**启动武器冷却。
-     * <p>阶段 13 · t108：本方法从"覆写能力接口"变成**本类的声明**（原 `CombatHook` 被吸收 ✗）
+     * **物品使用入口（攻击）的契约**（返回 {@code void}）：listener 在攻击后**无条件**启动武器冷却。
+     * <p>本方法从"覆写能力接口"变成**本类的声明**（原 `CombatHook` 被吸收 ✗）
      * ⇒ `@Override` 已删（它已无超类型方法可覆写）；签名与默认体**逐字未变** ✓。
      */
     public void onAttack(AttackSignal signal){
     }
 
     /**
-     * **主武器侧默认画法**（阶段 8）：组件侧自判状态、产出**完整已装饰**的热键栏物品。
+     * **主武器侧默认画法**：组件侧自判状态、产出**完整已装饰**的热键栏物品。
      * <p>序列与技能侧同构（冻结，顺序不可交换）：声明数据 → 状态判定 → 三态材质 → 名称着色/加粗
      * → 后缀（**只有 ` DISABLED` / ` ENERGY LACK`，冷却态无秒数**）→ 状态行 lore + 分隔线 + 描述
      * → **最后一步**写识别键 {@link Utils#MAIN_WEAPON_KEY}（值 = 本组件的注册 id）。
-     * <p><b>覆写者须知（用户裁定：键与文案均允许覆写，覆写者自负其责）</b>：本方法整体可覆写。
+     * <p><b>覆写者须知（键与文案均允许覆写，覆写者自负其责）</b>：本方法整体可覆写。
      * 覆写后若**键写错**（与 {@code MainWeaponListener} 闸门读的键不一致）⇒ 点击该物品**无任何反应**；
      * 若**键缺失** ⇒ 角色清除时 {@code HotbarItems.clearFrom()} 扫不到它 ⇒ **物品残留**在背包里。
      * 详见渲染组件 {@link HotbarRenderComponent#buildItemOf} 的读侧契约 javadoc。
@@ -142,7 +142,7 @@ public abstract class MainWeapon extends ActiveComponent {
                 ? baseMeta.lore() : List.of(getDescription());
 
         //② 状态判定（读运行期状态）；主武器 energyCost ≡ 0 ⇒ ENERGY_LACK 不可达
-        //阶段 13 · t110：闸门由**子类**给出（基类不查容器 ✗）；能量维不参与 ⇒ 传声明值（恒 0）
+        //闸门由**子类**给出（基类不查容器 ✗）；能量维不参与 ⇒ 传声明值（恒 0）
         IconState state = IconState.of(
                 !isCoolingDown(),
                 gateOpen(),
@@ -210,6 +210,6 @@ public abstract class MainWeapon extends ActiveComponent {
     }
 
     //getters 已上移到 ActiveComponent（getId/getDisplayName/getDescription/getIcon/getCooldownTicks/getEnergyCost）
-    //阶段 8：getKind() 已随旧的 kind 枚举一并删除（表现面不再自述种类）。
+    //getKind() 已随 kind 枚举一并删除（表现面不再自述种类）。
 
 }

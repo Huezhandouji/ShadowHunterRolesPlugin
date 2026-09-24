@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
 /**
- * **伤害类型**（阶段 11 · t83 · B-静态半 · 用户裁定）：
+ * **伤害类型**：
  * 统一入口 {@code VitalsComponent.damage(Player, double, DamageKind)} 的第三个参数。
  * <p><b>为什么需要它</b>：合并前的调用点里 {@code physicalDamage}（走护甲/减伤）与
  * {@code trueDamage}（无视护甲）**各占一半** ⇒ 若两参入口只固定一种，就会**悄悄改掉一半调用点的语义** ✗。

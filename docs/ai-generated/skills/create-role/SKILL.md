@@ -15,14 +15,14 @@ description: 在 ShadowHunterRolesPlugin 里**只做角色、不碰框架**地�
    ```powershell
    cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"
    ```
-3. **用例基线 = 91**（`src/test` 共 15 个测试文件）✓ —— 你**不得**删/停用任何测试 ✗；改了框架才会动它，而你**不该**改框架 ✓。
+3. **用例基线 = 91**（`../../../../src/test` 共 15 个测试文件）✓ —— 你**不得**删/停用任何测试 ✗；改了框架才会动它，而你**不该**改框架 ✓。
 
 ## 1. 硬边界表（★ 本 skill 的核心 ✗）
 
 ### 绝对不要改（改了就是碰框架 ✗）
 | 路径 | 为什么 ✗ |
 |---|---|
-| `src/main/java/com/shadowHunterRolesPlugin/core/` | 领域核心：`Role`（聚合根）/`RoleInstance`（每实例容器）/`RoleInfoImpl`（只读服务面）—— 你**读**它们、**不写**它们 ✓ |
+| `../../../../src/main/java/com/shadowHunterRolesPlugin/core` | 领域核心：`Role`（聚合根）/`RoleInstance`（每实例容器）/`RoleInfoImpl`（只读服务面）—— 你**读**它们、**不写**它们 ✓ |
 | `…/api/` · `…/internal/api/` | 公开 API 面 + 实现；`RoleApiSurfaceTest` 冻结 **58** 条签名 ✗（改一处即真红） |
 | `…/command/` | 指令面（`/role …`）；加角色**不需要**新指令 ✓（`/role set <id>` 自动可用 ✓） |
 | `…/listener/` | 平台事件入口（施放/攻击/伤害钩子投递）—— 由框架统一接线 ✓ |
@@ -31,14 +31,14 @@ description: 在 ShadowHunterRolesPlugin 里**只做角色、不碰框架**地�
 | `…/roleComponent/frameworkLevel/` | 框架级服务组件（`EnergyComponent`/`SanTEComponent`/`VitalsComponent`/`BuffComponent`/`TimerComponent`/`HotbarRenderComponent`）—— 你**取用**它们 ✓、**不新增/不改**它们 ✗ |
 | `…/roleComponent/base/` | 组件基类（`Skill`/`MainWeapon`/`PassiveSkill`）—— 你 **extends** 它们 ✓ |
 | `…/roleComponent/`（根，除 §3 允许的读取 ✗） | `RoleComponent`/`ActiveComponent`/`OperationProvider`/`ComponentFactory` 等基座 —— 只读 ✓ |
-| `build.gradle.kts` · `settings.gradle.kts` · `src/main/resources/plugin.yml` · `config.yml` | 构建与插件清单；加角色**不需要**动它们 ✓（你**不新增依赖、不新增指令、不新增权限节点** ✓） |
-| `src/test/`（**除 §6 自检** ✓） | 基线 91 不许降 ✗；给角色加测试**可选**（会改基线，需在结卡里申报 ✓） |
+| `../../../../build.gradle.kts` · `../../../../settings.gradle.kts` · `../../../../src/main/resources/plugin.yml` · `config.yml` | 构建与插件清单；加角色**不需要**动它们 ✓（你**不新增依赖、不新增指令、不新增权限节点** ✓） |
+| `../../../../src/test`（**除 §6 自检** ✓） | 基线 91 不许降 ✗；给角色加测试**可选**（会改基线，需在结卡里申报 ✓） |
 
 ### 允许新增 / 修改（**只有这些** ✓）
 | 路径 | 说明 |
 |---|---|
 | `src/main/java/com/shadowHunterRolesPlugin/roleComponent/custom/<角色名>/…` | **你的全部新代码**（建议子包：`skill/` · `passive/` · `mainWeapon/` ✓ —— 照 `custom/red/` 与 `custom/meiqiHezi/` 的既有布局 ✓） |
-| `src/main/java/com/shadowHunterRolesPlugin/registry/RoleLoader.java` | **唯一允许碰的框架文件** ✓，且**只允许**：① 加一行 `private static final String ID_… = "…";` ② 加一行 `new Definition("<id>", RoleLoader::<id>Builder)` ③ 加一个 `private static Role.Builder <id>Builder()` ✓ |
+| `../../../../src/main/java/com/shadowHunterRolesPlugin/registry/RoleLoader.java` | **唯一允许碰的框架文件** ✓，且**只允许**：① 加一行 `private static final String ID_… = "…";` ② 加一行 `new Definition("<id>", RoleLoader::<id>Builder)` ③ 加一个 `private static Role.Builder <id>Builder()` ✓ |
 
 ## 2. 三层模型（30 秒版）
 
@@ -98,7 +98,7 @@ public class MyPassive extends PassiveSkill {
 **★ 冷却与耗能** ✓（R-7）：冷却由**组件自持** —— 在施放成功处调 `startCooldown()` ✓、需要停时 `stopCooldown()` ✓（**不要**去框架里找冷却表 ✗）。耗能写进描述符（第 5 参 ✓），施放前用 `currentEnergy()` 声明读口 ✓。
 
 ### 步骤 3：注册（**唯一允许碰的框架文件** ✓ · 三处小改）
-`src/main/java/com/shadowHunterRolesPlugin/registry/RoleLoader.java`：
+`../../../../src/main/java/com/shadowHunterRolesPlugin/registry/RoleLoader.java`：
 ```java
 // ① 常量区（照 ID_RED_DEEPLY_SORROW 等既有写法）
 private static final String ID_MY_SKILL = "myrole_skill_my";
@@ -149,7 +149,7 @@ cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.g
 | **归属原则** | 能力**各归其家**：能量→`EnergyComponent`、SanTE→`SanTEComponent`、生命→`VitalsComponent`、Buff→`BuffComponent`、计时→`TimerComponent`、热键栏→`HotbarRenderComponent` ✓ | 把能量状态写进自己的组件 ✗ |
 | **`OperationProvider`** | **可选加入**：`String onOperationCommand(String payload)` ✓ —— **单方法冻结** ✗（不得加方法/默认实现 ✓）；payload 首 token 必为动词 ✓，grammar 写进你的 javadoc ✓ | 给接口加第二个方法 ✗ |
 | **Adventure** | 一切玩家可见文本用 `net.kyori.adventure.text.Component` ✓ | `ChatColor` ✗ |
-| **基线 91** | `src/test` 15 件 / 91 用例 ✓ —— 不得降 ✗ | 删测试 ✗ |
+| **基线 91** | `../../../../src/test` 15 件 / 91 用例 ✓ —— 不得降 ✗ | 删测试 ✗ |
 | **两条闸门** | `compileJava` + `test`，**真执行态**（`--rerun --no-build-cache` ✓） | 只跑 `build` ✗ |
 
 ## 6. 自检清单（结卡前逐条 ✓）

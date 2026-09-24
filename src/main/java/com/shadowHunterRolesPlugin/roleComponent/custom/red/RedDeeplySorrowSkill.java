@@ -133,4 +133,21 @@ public class RedDeeplySorrowSkill extends Skill implements SanTEComponent.Subscr
             sante.unsubscribe(this);
         }
     }
+
+    /**
+     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     */
+    @Override
+    protected boolean gateOpen(){
+        return buff.canCastSkill();
+    }
+
+    /**
+     * **当前能量**（阶段 13 · t110）：本组件**不参与能量维度**（声明耗能 0）⇒ 返回声明值；
+     * 与迁移前**逐字等价**（能量组件内 clamp 到 `[0, max]` ⇒ 原判定 `current() < 0` 恒假）。
+     */
+    @Override
+    protected int currentEnergy(){
+        return getEnergyCost();
+    }
 }

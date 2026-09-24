@@ -8,11 +8,15 @@ import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 
 public class RedSanctifiedBladeMainWeapon extends MainWeapon {
 
     private VitalsComponent vitals;
+    //阶段 13 · t110：**可用性判定下放给子类**（用户裁定：基类不持 buff / energy、不查容器）⇒
+    //  本组件自己持 buff 字段（在既有 start() 内一次查好 ✓）。
+    private BuffComponent buff;
 
     //每次普攻施加的流血层数
     private static final int BLEED_STACKS_PER_HIT = 15;
@@ -83,6 +87,15 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
     @Override
     public void start(){
         vitals = svc().components().get(VitalsComponent.class);
+        buff = svc().components().get(BuffComponent.class);
+    }
+
+    /**
+     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     */
+    @Override
+    protected boolean gateOpen(){
+        return buff.canUseMainWeapon();
     }
 
 }

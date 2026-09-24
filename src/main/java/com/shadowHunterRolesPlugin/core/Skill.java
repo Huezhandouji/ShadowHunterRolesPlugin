@@ -19,8 +19,6 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 
 import java.util.ArrayList;
 import java.util.List;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 
 /**
@@ -33,23 +31,32 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  */
 public abstract class Skill extends ActiveComponent implements HotbarItemProviding {
 
-    /**
-     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final BuffComponent buffComponent(){
-        return svc().components().get(BuffComponent.class);
-    }
+    // ───────── 阶段 13 · t110（用户裁定）：基类**不持** buff / energy、**不查容器**、**不做该项判断** ─────────
+    //用户原话：「基类不需要存 buff 和 energy 字段。这些应该由子类判断。」
+    //⇒ 原先本类的两个**按需取用入口**（阶段 13 · t102/t103 落地的那两个私有方法）已**整体删除** ✗；
+    //  可用性判定的两项输入改由**各子类用自己的字段**给出 ✓（下面两个抽象钩子）。
+    //★ 与 `ActiveComponent` 的分工不变：冷却那半仍由父类自持（`isCoolingDown()`）；本类只把
+    //  「闸门 / 当前能量」这两项**下放**，而判定的**顺序与语义**仍唯一落在状态枚举的静态工厂里 ✓。
+    //【已作废】原两个取用入口的 javadoc 口径**逐字保留**在此：「向**组件本身**取用（R-6），不再经服务集的
+    //  白名单端口成员」「按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合」——
+    //  那描述的是**基类自己去查**的旧形态 ⇒ 与用户裁定冲突，**已作废** ✗（新归属：字段与判断都在子类）。
 
     /**
-     * **EnergyComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     * **闸门是否放行？**（阶段 13 · t110：**下放给子类**）—— 基类不查任何组件 ✗。
+     * <p>子类用**自己的 buff 字段**回答（技能侧 = `canCastSkill()`：非 STUN 且非 SILENCE）。
+     * <p><b>为什么是抽象</b>：三态里的「禁用」完全由本值决定 ⇒ 若给默认值，漏写者会
+     * **静默**丢掉"被沉默 / 眩晕时灰显"的可见行为 ✗（本仓口径：漏写要成为**编译错误**，不是运行期惊喜）。
      */
-    private final EnergyComponent energyComponent(){
-        return svc().components().get(EnergyComponent.class);
-    }
+    protected abstract boolean gateOpen();
+
+    /**
+     * **当前能量**（阶段 13 · t110：**下放给子类**）—— 基类不查任何组件 ✗。
+     * <p>子类用**自己的 energy 字段**回答；**声明耗能 ≤ 0 的组件不参与能量维度** ⇒ 直接返回
+     * {@link #getEnergyCost()}（"恰好够"）：与迁移前**逐字等价** —— 迁移前读的是组件的 `current()`，
+     * 而该值在组件内被 clamp 到 `[0, max]`（构造期 = max）⇒ `current() < 0` 恒假 ✓。
+     * <p>同理**抽象**：声明耗能 &gt; 0 的组件若漏写，会静默丢掉「能量不足」态 ✗。
+     */
+    protected abstract int currentEnergy();
 
     /**
      * 状态行与描述之间的分隔线（冻结字面量，值一字不变）。本类与 {@link MainWeapon} 各持一份
@@ -155,11 +162,12 @@ public abstract class Skill extends ActiveComponent implements HotbarItemProvidi
         List<Component> baseLore = baseMeta != null && baseMeta.lore() != null && !baseMeta.lore().isEmpty()
                 ? baseMeta.lore() : List.of(getDescription());
 
-        //② 状态判定（读运行期状态：冷却表 / 闸门 / 当前能量 —— 描述符拿不到这些）
+        //② 状态判定（读运行期状态：冷却 / 闸门 / 当前能量 —— 描述符拿不到这些）
+        //阶段 13 · t110：后两项由**子类**给出（基类不查容器 ✗）；判定顺序与语义仍唯一在状态枚举的静态工厂里 ✓
         IconState state = IconState.of(
                 !isCoolingDown(),
-                buffComponent().canCastSkill(),
-                energyComponent().current(),
+                gateOpen(),
+                currentEnergy(),
                 getEnergyCost());
 
         //③ 三态材质：就绪 = 基础物品材质；禁用 = BARRIER；冷却 / 能量不足 = STRUCTURE_VOID

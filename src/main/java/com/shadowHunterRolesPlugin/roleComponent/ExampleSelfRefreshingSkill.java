@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -44,6 +45,10 @@ public class ExampleSelfRefreshingSkill extends Skill {
     //  R-4：取组件只能在本钩子（或新写/既有 start()）里做 ✗，不得放 awake()；
     //  注册表装配期后冻结 ⇒ 缓存引用与按需查找**恒等** ✓（未装配时仍为 null ⇒ 下面的静默检查逐字保留 ✓）。
     private HotbarRenderComponent renderComponent;
+
+    //阶段 13 · t110：**可用性判定下放给子类**（用户裁定：基类不持 buff / energy、不查容器）⇒
+    //  本组件自己持 buff 字段（在既有 start() 内一次查好 ✓，与全仓统一形态一致）。
+    private BuffComponent buff;
 
     /** 请求窗口起点（刻）：此前不请求 ⇒ 用于"请求前不刷"的对照窗。 */
     public static final int REQUEST_WINDOW_START_TICKS = 100;
@@ -135,5 +140,23 @@ public class ExampleSelfRefreshingSkill extends Skill {
     @Override
     public void start(){
         renderComponent = svc().components().get(HotbarRenderComponent.class);
+        buff = svc().components().get(BuffComponent.class);
+    }
+
+    /**
+     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     */
+    @Override
+    protected boolean gateOpen(){
+        return buff.canCastSkill();
+    }
+
+    /**
+     * **当前能量**（阶段 13 · t110）：本组件**不参与能量维度**（声明耗能 0）⇒ 返回声明值；
+     * 与迁移前**逐字等价**（能量组件内 clamp 到 `[0, max]` ⇒ 原判定 `current() < 0` 恒假）。
+     */
+    @Override
+    protected int currentEnergy(){
+        return getEnergyCost();
     }
 }

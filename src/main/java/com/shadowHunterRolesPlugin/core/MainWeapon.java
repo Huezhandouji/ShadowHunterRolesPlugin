@@ -19,8 +19,6 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 
 import java.util.ArrayList;
 import java.util.List;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 
 /**
@@ -38,23 +36,21 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  */
 public abstract class MainWeapon extends ActiveComponent implements HotbarItemProviding {
 
-    /**
-     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final BuffComponent buffComponent(){
-        return svc().components().get(BuffComponent.class);
-    }
+    // ───────── 阶段 13 · t110（用户裁定）：基类**不持** buff / energy、**不查容器**、**不做该项判断** ─────────
+    //用户原话：「基类不需要存 buff 和 energy 字段。这些应该由子类判断。」
+    //⇒ 原先本类的两个按需取用入口已**整体删除** ✗（同 `Skill` 的那一段）。
+    //★ 能量维度：主武器的声明耗能由类型**封死 ≡ 0**（{@link Specification} 没有 `setEnergyCost`）
+    //  ⇒ 「能量不足」态对它**不可达**（冻结面口径）⇒ 本类**不设**能量钩子，判定直接传声明值 ✓。
+    //【已作废】原两个取用入口的 javadoc 口径**逐字保留**在此：「向**组件本身**取用（R-6），不再经服务集的
+    //  白名单端口成员」「按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合」——
+    //  那描述的是**基类自己去查**的旧形态 ⇒ 与用户裁定冲突，**已作废** ✗（新归属：字段与判断都在子类）。
 
     /**
-     * **EnergyComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
+     * **闸门是否放行？**（阶段 13 · t110：**下放给子类**）—— 基类不查任何组件 ✗。
+     * <p>子类用**自己的 buff 字段**回答（主武器侧 = `canUseMainWeapon()`：非 STUN）。
+     * <p><b>为什么是抽象</b>：「禁用」态完全由本值决定 ⇒ 若给默认值，漏写者会**静默**丢掉灰显 ✗。
      */
-    private final EnergyComponent energyComponent(){
-        return svc().components().get(EnergyComponent.class);
-    }
+    protected abstract boolean gateOpen();
 
     /**
      * 状态行与描述之间的分隔线（冻结字面量，值一字不变）。本类与 {@link Skill} 各持一份
@@ -146,10 +142,11 @@ public abstract class MainWeapon extends ActiveComponent implements HotbarItemPr
                 ? baseMeta.lore() : List.of(getDescription());
 
         //② 状态判定（读运行期状态）；主武器 energyCost ≡ 0 ⇒ ENERGY_LACK 不可达
+        //阶段 13 · t110：闸门由**子类**给出（基类不查容器 ✗）；能量维不参与 ⇒ 传声明值（恒 0）
         IconState state = IconState.of(
                 !isCoolingDown(),
-                buffComponent().canUseMainWeapon(),
-                energyComponent().current(),
+                gateOpen(),
+                getEnergyCost(),
                 getEnergyCost());
 
         //③ 三态材质：就绪 = 基础物品材质；禁用 = BARRIER；冷却 = STRUCTURE_VOID

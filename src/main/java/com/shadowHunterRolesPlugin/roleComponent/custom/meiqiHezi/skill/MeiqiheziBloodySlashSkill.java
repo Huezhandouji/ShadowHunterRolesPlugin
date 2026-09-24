@@ -145,4 +145,21 @@ public class MeiqiheziBloodySlashSkill extends Skill {
         }
     }
 
+    /**
+     * **闸门放行？**（阶段 13 · t110：基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     */
+    @Override
+    protected boolean gateOpen(){
+        return buffs.canCastSkill();
+    }
+
+    /**
+     * **当前能量**（阶段 13 · t110）：本组件**声明耗能 8** ⇒ 必须给出真实能量（否则"能量不足"态不出现 ✗）；
+     * 与迁移前**逐字等价**：同一个能量组件实例（注册表装配期后冻结、同类型实例唯一 ⇒ 字段引用与按需查找恒等 ✓）。
+     */
+    @Override
+    protected int currentEnergy(){
+        return energy.current();
+    }
+
 }

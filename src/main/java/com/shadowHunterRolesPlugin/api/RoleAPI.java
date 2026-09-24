@@ -165,4 +165,26 @@ public interface RoleAPI {
     @Deprecated
     boolean areHostile(Player p1, Player p2);
     boolean areHostile(UUID p1, UUID p2);
+
+    //组件操作面（阶段 13 · t125：设计定案 §7.4 ② / §10.3）—— **唯一**的操作角色入口 ✓
+    /**
+     * **执行一条组件操作**（阶段 13 · t125；设计定案 §7.4 ② / §10.3）：**唯一**的"操作角色"入口 ✓ ——
+     * 读与写都走它 ✓（写操作回"写后状态"、读操作回值本身 ✓）。
+     * <p><b>grammar 由组件自己规定</b> ✓：payload 的**首 token 必为操作动词** ✓（如 {@code add 5} / {@code current}），
+     * 其余部分由目标组件自解析 ✓ ⇒ 具体动词表见**实现它的组件的 javadoc**（如能量组件 ✓）。
+     * <p><b>与 {@code OperationProvider} 的关系</b>：本方法只做「解析实例 → 按 id 定位组件 → 转发」✓ ——
+     * 目标组件**未实现** {@code OperationProvider} ⇒ 回 {@code null} ✗（不支持操作指令）。
+     *
+     * @param uuid        目标玩家。**参数类型用 UUID** ✓（用户裁定：此后新增 API 一律以 UUID 为玩家参数 ✗
+     *                    不用 {@code Player}）—— 这与"仅在线"裁定不冲突 ✓：**解析不到角色实例即回 {@code null}** ✓
+     * @param componentId 组件在实例容器里的登记 id（如 {@code energy}）；**多实例消歧写在 id 字符串里** ✓ ——
+     *                    形如 {@code energy#2}（{@code #} 后是 **0 基**下标 ✓）；同 id 命中**多份**而**未给**下标
+     *                    ⇒ **拒绝并回 {@code null}** ✓（**绝不静默取第一份** ✗）
+     * @param payload     **整段**操作文本（**可含空格** ✓）；{@code null} / 空串的语义由组件自行定义 ✓
+     * @return {@code null} = 未识别 / 被拒绝 / **无角色实例** / 组件**命中 0 份**或（同 id）**多份而未给下标** /
+     *         {@code componentId} 语法不合法 / 目标组件**未实现** {@code OperationProvider} / **组件内部异常** ✓；
+     *         **非空串** = 规范化值（读操作回值 · 写操作回"写后状态" ✓）；
+     *         {@code ""} = 已识别但**没有回值**（纯写操作 ✓）
+     */
+    String executeComponentOperation(UUID uuid, String componentId, String payload);
 }

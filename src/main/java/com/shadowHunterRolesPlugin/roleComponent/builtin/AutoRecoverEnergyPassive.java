@@ -44,7 +44,7 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
     }
     /**
      * **开始生效**：把协作组件**一次查好**缓存进字段 ✓（与全仓统一形态一致）。
-     * <p>R-4：取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配期后冻结 ⇒ 与按需解析**恒等** ✓。
+     * <p>取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配期后冻结 ⇒ 与按需解析**恒等** ✓。
      */
     @Override
     public void start(){

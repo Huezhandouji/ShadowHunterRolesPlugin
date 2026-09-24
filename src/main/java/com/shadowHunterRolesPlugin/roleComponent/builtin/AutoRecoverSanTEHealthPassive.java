@@ -23,7 +23,7 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
 
     /**
      * **开始生效**：把生命组件**一次查好**缓存进字段 ✓。
-     * <p>为什么在 {@code start()} 而不是 {@code awake()}：硬规矩 **R-4** 禁止在 {@code awake()} 里
+     * <p>为什么在 {@code start()} 而不是 {@code awake()}：禁止在 {@code awake()} 里
      * 取用其他组件 ✗（awake 只做构造期自检 / 只读自身）；`start()` 相容器已冻结 ⇒ 容器查找合法 ✓。
      * <p>为什么缓存：本被动**每 tick** 跑一次 `update()`，回血点在其内层判定里 ⇒ 重复查容器是纯浪费；
      * 端口引用本身也是**构造期就持有的引用** ⇒ 缓存与经端口取用同族 ✓。

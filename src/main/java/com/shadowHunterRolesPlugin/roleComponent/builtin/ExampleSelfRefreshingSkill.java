@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * **「外观会自己变」的示例组件**：本类同时是两项能力的**生产使用点**
- * （C-15 配套②：没有使用点的能力 = 未验证的能力）。
+ * （没有使用点的能力 = 未验证的能力）。
  * <p>
  * <b>它演示的第一件事 = 组件可以「请求重绘」</b>：组件**只请求、不写** —— 它从容器里取
  * {@link HotbarRenderComponent}（**唯一**重绘通道），**不持有**渲染器、
@@ -28,7 +28,7 @@ import java.util.List;
  * 「**从容器取渲染组件、调 {@code requestRepaint()}**」这一条通道 ✓（那两个
  * {@code RepaintRequestable} / {@code RepaintRequester} **两个类型已删除** ✓）。
  * <p>
- * <b>它演示的第二件事 = {@code dependsOnLiveState()} 为 {@code false} 的组件不被每 tick 重绘</b>（A8）：
+ * <b>它演示的第二件事 = {@code dependsOnLiveState()} 为 {@code false} 的组件不被每 tick 重绘</b>：
  * 本类覆写了 {@link #buildItem()}，把父类画的 {@code " x.xs"} 秒数后缀**去掉** ⇒ 冷却期间它的外观
  * **不再逐刻变化** ⇒ 能力覆写为 {@code false} 是**诚实**的（不是把刷新关掉硬省），于是它冷却时
  * 不会被每 tick 重绘（对照：{@code core/Skill} 家族的默认画法带秒数 ⇒ 能力为 {@code true} ⇒ 每刻刷）。
@@ -43,7 +43,7 @@ import java.util.List;
 public class ExampleSelfRefreshingSkill extends Skill {
 
     //渲染组件引用采用**字段 + 在 start() 内赋值**（与全仓统一形态一致 ✓）——
-    //  R-4：取组件只能在本钩子（或新写/既有 start()）里做 ✗，不得放 awake()；
+    //  取组件只能在本钩子（或新写/既有 start()）里做 ✗，不得放 awake()；
     //  注册表装配期后冻结 ⇒ 缓存引用与按需查找**恒等** ✓（未装配时仍为 null ⇒ 下面的静默检查逐字保留 ✓）。
     private HotbarRenderComponent renderComponent;
 
@@ -136,7 +136,7 @@ public class ExampleSelfRefreshingSkill extends Skill {
 
     /**
      * **开始生效**：把渲染组件**一次查好**缓存进字段 ✓（不在 `update()` 里按需查找 ✗）。
-     * <p>R-4：取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配期后冻结 ⇒ 与按需查找恒等 ✓。
+     * <p>取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配期后冻结 ⇒ 与按需查找恒等 ✓。
      */
     @Override
     public void start(){

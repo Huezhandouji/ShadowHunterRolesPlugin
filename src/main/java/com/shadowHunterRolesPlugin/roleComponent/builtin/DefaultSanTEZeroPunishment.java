@@ -90,8 +90,8 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
     /**
      * **订阅 SanTE 变更**：**向 {@code SanTEComponent} 添加一条监听** ✓，
-     * 而**不是**实现某个能力接口 ✗（硬规矩 R-1：SanTE 的家是组件 ⇒ 消费者向**组件本身**取用/订阅 ✓）。
-     * <p><b>时机 = {@code start()}</b>（R-4：`awake()` 只做构造期自检 / 只读自身，**不得取用其他组件** ✗）；
+     * 而**不是**实现某个能力接口 ✗（SanTE 的家是组件 ⇒ 消费者向**组件本身**取用/订阅 ✓）。
+     * <p><b>时机 = {@code start()}</b>（`awake()` 只做构造期自检 / 只读自身，**不得取用其他组件** ✗）；
      * 与 {@link #stop()} 的移除**成对** ✓（`addListener` 本身幂等 ⇒ 重复 start 不会重复登记 ✓）。
      * <p><b>通知顺序</b> = **添加先后** = 容器 `start()` 广播序（= 组件装配序，因为 start 也按容器序广播）。
      * <b>与 {@code awake()} 是否同序需另证</b>（未做运行级取证）⇒ 不宣称"awake 序" ✗。
@@ -251,7 +251,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                 });
     }
 
-    //取消仍在运行的惩罚任务/回满任务并复位句柄（O-6；两把句柄都属本组件资源表）
+    //取消仍在运行的惩罚任务/回满任务并复位句柄（两把句柄都属本组件资源表）
     private void cancelPunishmentTask(){
         if(punishmentTask != null){
             punishmentTask.cancel();

@@ -110,7 +110,7 @@ public class RoleInstance {
     private QuarantineRequest pendingQuarantine;
  //隔离的**对外处置**（日志/提醒/清空角色）由 RoleManager 在实例构造成功后绑定（它才知道 map 与玩家归属）
     private QuarantineHandler quarantineHandler;
- //裁定④ 的动态删除路径入口（"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + P2 删除守卫）
+ //动态删除路径入口（"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + 删除守卫）
     private final ComponentLookup componentLookup;
 
     private Task updateTask;
@@ -125,7 +125,7 @@ public class RoleInstance {
  * <p><b>本组件</b>：原 `RoleInstance#factionComponent()` 读口与它的
  * **读侧视图**（{@code getFaction} + 三个 {@code isHostileTo}）**已删除** ⇒ 阵营读取一律走本端口
  * （组件侧 = {@code svc().roleInfo()}，框架侧 = {@link #roleInfo()}）。
- * <p><b>只读，不带写面</b>（R-1）：写入仍在**聚合根** {@link Role#setFaction} / {@link Role#resetFaction}。
+ * <p><b>只读，不带写面</b>：写入仍在**聚合根** {@link Role#setFaction} / {@link Role#resetFaction}。
  */
     private final RoleInfo roleInfo = new RoleInfoImpl(this);
  /**
@@ -147,7 +147,7 @@ public class RoleInstance {
  */
     private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
 
- //T-2 ①③：迁移标记已删 —— 所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）。
+ //所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）。
 
     public RoleInstance(Player player, Role role, RolesContext platform){
         this.player = player;
@@ -209,7 +209,7 @@ public class RoleInstance {
  //⑧ 伤害：四个原语（由 VitalsComponent 承载 ⇒ 伤害与生命只有一个持有者）
  // —— 原独立 DamageComponent 已删除，不再单独构造。
 
- //裁定④ 的**动态删除路径**入口（隔离时"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + P2 守卫）
+ //**动态删除路径**入口（隔离时"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + 删除守卫）
         this.componentLookup = new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger());
 
         initComponents();
@@ -277,7 +277,7 @@ public class RoleInstance {
         );
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(am);
         player.getAttribute(Attribute.MAX_HEALTH).addModifier(am);
- //（整理②）：原 `getMaxHealth()` 视图已删 ⇒ 就地读属性（**同一读数**，行为逐字不变）
+ //就地读属性（**同一读数**，行为逐字不变）
         player.setHealth(player.getAttribute(Attribute.MAX_HEALTH).getValue());
 
  //③ 生命周期时序：全部组件创建完成 -> awake全部 -> start全部 -> 启动ticker -> 渲染热键栏
@@ -305,7 +305,7 @@ public class RoleInstance {
  * **角色信息服务面的框架侧读口**（ 新增；取代原 `factionComponent()` 读口）：
  * 阵营读取与两个行为（{@code isHostile} / {@code hasEnemyInRange}）都经它 —
  * 与组件侧拿到的 {@code svc().roleInfo()} **同一个实例**（{@code createServices} 交出去的就是它）。
- * <p><b>只读</b>：本端口不带写面（R-1）；写侧在聚合根上（{@link Role#setFaction} / {@link Role#resetFaction}）。
+ * <p><b>只读</b>：本端口不带写面；写侧在聚合根上（{@link Role#setFaction} / {@link Role#resetFaction}）。
  */
     public RoleInfo roleInfo() { return roleInfo; }
 
@@ -336,18 +336,16 @@ public class RoleInstance {
  * <p><b>调用点申报</b>：生产侧 0 调用点 —— 它是容器的公开读口（**容器职责**：组件查取入口），
  * 消费者是**后续卡的依赖注入路径**与仓外探针（组件侧取组件一律走
  * {@code RoleComponent#getComponent(Class)} ⇒ {@code svc().components().get(...)}）。
- * <p><b></b>：本口**只增不改**（语义按真实行为写明 = "添加顺序第一个"）；
+ * <p>本口**只增不改**（语义按真实行为写明 = "添加顺序第一个"）；
  * 新增的 {@link #getAllByType(Class)} 是它的"全部"版本（后者已是**活码**：
  * {@code listener/hook/DamageHookListener} 的承受方扇出在用）。
- * <p><b></b>：本口**只增不改**（语义按真实行为写明 = "添加顺序第一个"）；
- * 新增的 {@link #getAllByType(Class)} 是它的"全部"版本。
  */
     public <T> T getByType(Class<T> type) {
         return componentRegistry.getByType(type);
     }
 
  /**
- * **按类型取本实例内的全部组件**（ · 用户新路线图第 1 条新增的公开读口）：
+ * **按类型取本实例内的全部组件**（新增的公开读口）：
  * 返回全部可赋值给 {@code type} 的组件，顺序 = **添加顺序**；无人符合 ⇒ **空列表**（不是 null）。
  * <p>与 {@link #getByType(Class)} 同一条件、同一顺序 ⇒ 其首元素恒等于 {@code getByType(type)}；
  * 空列表 ⟺ {@code getByType(type) == null}。
@@ -383,7 +381,7 @@ public class RoleInstance {
         return new ComponentServices(
                 new SelfImpl(this),
  //：组件服务 = 查找 + **动态添加** —— 服务集工厂传进去，运行期新增的组件
- //与装配期组件走**同一条**构造路径（同一服务集口径）；日志用于 P2 的
+ //与装配期组件走**同一条**构造路径（同一服务集口径）；日志用于删除守卫的
  //"拒绝删除被依赖组件"的日志（点名被删组件 / 阻止者 / 缺的类型）
                 new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger()),
  //（A2）：角色信息服务（聚合根只读面）；
@@ -396,7 +394,7 @@ public class RoleInstance {
  /**
  * 组件创建之后的**紧邻登记**（五条件①④）：服务集与组件一对一进表，组件同时进注册表。
  * 服务集是在**构造期**交给组件的（{@code factory.create(id, services)}）⇒ 不存在"创建后尚未注入"的窗口。
- * <p><b>（P2）</b>：登记时把装配条目里的**依赖声明**（提供类型 + 必需依赖）一并交给注册表
+ * <p>登记时把装配条目里的**依赖声明**（提供类型 + 必需依赖）一并交给注册表
  * —— 它是"删除前算反向依赖"的唯一数据来源，且**从描述符声明算出**（不手工维护）。
  */
     private void registerCreated(RoleComponent component, ComponentServices services, Role.ComponentEntry entry){
@@ -458,12 +456,12 @@ public class RoleInstance {
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
- //：判据 = **物品支持组件本身**（裁定⑤ 的"吸收"落点）—— 原能力接口已随吸收删除；
+ //：判据 = **物品支持组件本身** —— 原能力接口已随吸收删除；
  //接受集**逐字不变**（那个接口的唯一实现者就是本类），本处只用到 onCast。
         if(!(component instanceof ActiveComponent active)) return false;
 
  //冷却自管理（D1）：框架**不再**代启动冷却 —— 组件在施放成功处自行 startCooldown()（状态归组件、框架只转问）；
- //声明值仍是唯一真值来源（4.7/O-13），启动点与启动值都与旧框架代启动逐字一致 ⇒ 可观察行为不变。
+ //声明值仍是唯一真值来源，启动点与启动值都与旧框架代启动逐字一致 ⇒ 可观察行为不变。
  //：**唯一受保护调用**（施放是框架派发边界之一）⇒ 组件抛异常 = 整实例隔离
         guardedCall(component, "onCast", () -> active.onCast(new CastSignal(trigger)));
  //本入口不在遍历窗口内 ⇒ 立即执行待处理的隔离
@@ -532,7 +530,7 @@ public class RoleInstance {
     }
 
 
- //（整理②）：原 `getBuffManager()` **转发访问器已删除** —— 现算消费者 0
+ //原 `getBuffManager()` **转发访问器已删除** —— 消费者 0
  //（buff 记账表的持有者本来就是 `BuffComponent`；需要它的人走组件本身，不经聚合根转发）。
 
 
@@ -542,8 +540,8 @@ public class RoleInstance {
  //技能相关
  /**
  * 就绪判定（**单一冷却命名空间**的视图）：无条目/已到期 ⇒ {@code true}。
- * <p><b>（整理②）</b>：原实现转调 `isCooldownReady(skillId)` 的**转发访问器已删除**
- * ⇒ 判定就地转问组件（ 口径：框架不持有冷却状态，只转问）。
+ * <p><b>判定就地转问组件</b>：原实现经 `isCooldownReady(skillId)` 转发，现改为就地转问组件
+ * ⇒ 框架不持有冷却状态，只转问（口径不变）。
  * 行为**逐字等价**：无冷却能力 ⇒ 恒就绪。
  */
     public boolean isSkillReady(String skillId){
@@ -551,8 +549,8 @@ public class RoleInstance {
         return !(component instanceof ActiveComponent active) || !active.isCoolingDown();
     }
 
- //（整理②）：冷却**剩余量视图**（技能 2 件 + 主武器 2 件）与它们唯一的下游
- //`remainingCooldownTicks` / `isCooldownReady` **转发访问器已删除** —— 现算消费者 0
+ //冷却**剩余量视图**（技能 2 件 + 主武器 2 件）与它们唯一的下游
+ //`remainingCooldownTicks` / `isCooldownReady` **转发访问器已删除** —— 消费者 0
  //（冷却状态自 归 `ActiveComponent`：读侧直接问组件，不经聚合根转发；
  // 就绪判定仍由**活码** `isSkillReady` / `isMainWeaponReady` 提供 ⇒ 能力未失去入口）。
 
@@ -560,8 +558,6 @@ public class RoleInstance {
  //技能释放
     public boolean castSkillLeftClick(String skillId, Player caster){
         if(runComponentPipeline(CastTrigger.LEFT_CLICK, caster)) return true;
- //T-1 (4)：旧派发入口（onLeftClick）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
- //未迁移组件（T-1 后已无）不再有特殊落点。
         if(skillMap.get(skillId) == null){
             caster.sendMessage(Component.text("unknown skill!"));
         }
@@ -574,21 +570,19 @@ public class RoleInstance {
         if(skill == null){
             caster.sendMessage(Component.text("unknown skill!"));
         }
- //T-2c：T-1 的未迁移回退已删（组件侧一律走新管道）；可见刷新由 handleCast 的置脏 + 帧末 flush 保证。
+ //组件侧一律走新管道；可见刷新由 handleCast 的置脏 + 帧末 flush 保证。
         return false;
     }
 
     public boolean castSkillQDrop(String skillId, Player caster){
         if(runComponentPipeline(CastTrigger.DROP, caster)) return true;
- //T-1 (4)：旧派发入口（onDrop）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
- //未迁移组件（T-1 后已无）不再有特殊落点。
         if(skillMap.get(skillId) == null){
             caster.sendMessage(Component.text("unknown skill!"));
         }
         return false;
     }
 
- /** T-2 (3)：**纯委派**（迁移标记已删）—— 组件一律走新管道，单一入口 = {@link #handleCast}。 */
+ /** **纯委派** —— 组件一律走新管道，单一入口 = {@link #handleCast}。 */
     private boolean runComponentPipeline(CastTrigger trigger, Player caster){
         return handleCast(trigger, caster);
     }
@@ -609,10 +603,10 @@ public class RoleInstance {
 
  //（代码卫生）：原先这里的三个成员 —— 按 id 解析的**回落入口**、那条口径的
  // **纯判定函数**、以及"创建后绑定"的**空转落点** —— 已**整体删除**。
- //理由（逐条现算）：① 三者的生产消费者 **0 个**（端口面 清理后，"端口按 id 回落"这条口径再无使用者）；
+ //理由（逐条）：① 三者的生产消费者 **0 个**（端口面 清理后，"端口按 id 回落"这条口径再无使用者）；
  // ② 绑定落点自 就是 **no-op**（唯一绑定目标 = 计时端口，已删）；
  // ③ 留着它们会让"状态面按实例"看起来仍由框架兜底 —— 而事实是**状态一律归组件实例本身**。
- //★ 唯一仍在的同类语义 = 组件自己的 `start()` 里**按需/一次解析强类型组件**（R-4），与本处无关。
+ //★ 唯一仍在的同类语义 = 组件自己的 `start()` 里**按需/一次解析强类型组件**，与本处无关。
 
 
 
@@ -624,8 +618,6 @@ public class RoleInstance {
  //释放主武器技能
     public boolean castMainWeaponLeftClick(String weaponId, Player caster){
         if(runComponentPipeline(CastTrigger.LEFT_CLICK, caster)) return true;
- //T-1 (4)：旧派发入口（onLeftClick）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
- //未迁移组件（T-1 后已无）不再有特殊落点。
         if(mainWeaponMap.get(weaponId) == null){
             caster.sendMessage(Component.text("unknown mainWeapon!"));
         }
@@ -634,8 +626,6 @@ public class RoleInstance {
 
     public boolean castMainWeaponRightClick(String weaponId, Player caster){
         if(runComponentPipeline(CastTrigger.RIGHT_CLICK, caster)) return true;
- //T-1 (4)：旧派发入口（onRightClick）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
- //未迁移组件（T-1 后已无）不再有特殊落点。
         if(mainWeaponMap.get(weaponId) == null){
             caster.sendMessage(Component.text("unknown mainWeapon!"));
         }
@@ -644,8 +634,6 @@ public class RoleInstance {
 
     public boolean castMainWeaponQDrop(String weaponId, Player caster){
         if(runComponentPipeline(CastTrigger.DROP, caster)) return true;
- //T-1 (4)：旧派发入口（onDrop）与组件侧 legacy 回调已删 —— 组件侧一律走新管道；
- //未迁移组件（T-1 后已无）不再有特殊落点。
         if(mainWeaponMap.get(weaponId) == null){
             caster.sendMessage(Component.text("unknown mainWeapon!"));
         }
@@ -663,8 +651,8 @@ public class RoleInstance {
 
 
  //生命
- //（整理②）：原三个**生命视图转发访问器**（`getCurrentHealth` / `setCurrentHealth` /
- //`getMaxHealth`）**已删除** —— 现算消费者 0（生命状态 = Bukkit 玩家属性，持有者是 `VitalsComponent`
+ //原三个**生命视图转发访问器**（`getCurrentHealth` / `setCurrentHealth` /
+ //`getMaxHealth`）**已删除** —— 消费者 0（生命状态 = Bukkit 玩家属性，持有者是 `VitalsComponent`
  //⇒ 需要时走组件本身；`heal(double)` 与 `damage(...)` 仍为**活码**（组件/监听器在用））。
 
     public void heal(double amount){
@@ -680,8 +668,8 @@ public class RoleInstance {
     }
 
  //能量（**视图**：真值与 clamp/检查扣减的行为都在能量组件里）
- //（整理②）：`getMaxEnergy` / `decreaseEnergy` / `increaseEnergy` 三个转发访问器
- //**已删除** （现算消费者 0 —— 把 `api/` 侧 38 个老方法做空后，原先的
+ //`getMaxEnergy` / `decreaseEnergy` / `increaseEnergy` 三个转发访问器
+ //**已删除** （消费者 0：`api/` 侧 38 个老方法做空后，原先的
  //`instance.increaseEnergy(...)` 一类调用已消失）；`getCurrentEnergy` / `setCurrentEnergy`
  //仍是**活码**（`command/EnergyCommand` 的读数与设值路径）。
 
@@ -692,14 +680,14 @@ public class RoleInstance {
     }
 
  //SanTE（**视图**：真值与 clamp 都在 SanTE 组件里；派发边界由容器**给出的平台侧监听**触发）
- //（整理②）：`getCurrentSanTE` / `setCurrentSanTE` / `increaseSanTE` / `decreaseSanTE` /
- //`getMaxSanTE` 五个转发访问器**已删除** （现算消费者 0；真值与行为都在 `SanTEComponent`）。
+ //`getCurrentSanTE` / `setCurrentSanTE` / `increaseSanTE` / `decreaseSanTE` /
+ //`getMaxSanTE` 五个转发访问器**已删除** （消费者 0；真值与行为都在 `SanTEComponent`）。
 
  //实例是否有效：clear() 之后为 false，供组件里的延时任务做失效守卫
- //（整理②）：原 `isValid()` 公开读口**已删除** （现算消费者 0 —— 容器内一律
+ //原 `isValid()` 公开读口**已删除**（消费者 0：容器内一律
  //直接读私有字段 `valid`；字段本身保留：clear() / activate() / 组件隔离守卫都在用它）。
 
- //药水施加入口（记账）：施加到本实例玩家身上的效果记入账本，clear() 时只回收账本里的类型（O-7）
+ //药水施加入口（记账）：施加到本实例玩家身上的效果记入账本，clear() 时只回收账本里的类型
  //：**账本的持有者 = buff 组件** ⇒ 本方法保留为视图（BuffManager 在用）。
     public void applyPotionEffect(PotionEffect effect){
         pickApply(SERVICE_ID_BUFFS, BuffComponent.class, component -> component.applyPotionEffect(effect));
@@ -715,16 +703,15 @@ public class RoleInstance {
  // 原为 `RoleAPI#setFaction/resetFaction` 的落点）⇒ 那两条 API 已**做空、不再生效** ⇒ 写视图**无消费者**；
  // 真值写入仍在**聚合根**（{@link Role#setFaction} / {@link Role#resetFaction}，**不由外部直改**）。
 
- //生命周期触发（ · 整理②：**四个触发口收窄为 private** ← —— 现算消费者
- //**只有容器自己**（`activate()` 调 awake/start、`clear()` 调 stop、构造期 ticker 用 `this::triggerUpdate`）
- //⇒ 它们不是"直达钩子"而是**容器职责的实现细节** ⇒ 不再对外暴露；语义与调用序逐字未变）
+ //生命周期触发：**四个触发口收窄为 private** —— 消费者
+ //**只有容器自己**（`activate()` 调 awake/start、`clear()` 调 stop、构造期 ticker 用 `this::triggerUpdate`） ⇒ 它们不是"直达钩子"而是**容器职责的实现细节** ⇒ 不再对外暴露；语义与调用序逐字未变
  //awake阶段：只解析跨组件依赖并缓存引用，必须幂等且不改动玩家可见状态
     private void triggerLifecycleAwake(){
         if(player == null ) return;
 
  //为**注册表内组件**广播新基类钩子 awake()。
  //广播给"全部注册组件"：所有组件的新钩子由各组件自行实现（基类提供默认空实现）；
- //按迁移状态分支会引入第二套判据（与硬约束 §20 删总闸的教训同类）。legacy 生命周期扇出已在 T-1 ④ 删除。
+ //按迁移状态分支会引入第二套判据。
  //遍历窗口（）：广播期间**禁止**增/删/插位（注册表在窗口内拒绝写口）
  //：窗口包装 + **唯一受保护调用**（异常 ⇒ 记下隔离请求，窗口关闭后执行四步）
         withinIterationWindow(() -> {
@@ -747,12 +734,12 @@ public class RoleInstance {
         });
     }
 
- //stop阶段：停止生效（T-1 ④ 后仅剩新钩子广播，按注册表顺序）
+ //stop阶段：停止生效（仅剩新钩子广播，按注册表顺序）
     private void triggerLifecycleStop(){
         if(player == null ) return;
 
  //为注册表内组件广播新基类钩子 stop()。
- //**顺序说明**：新钩子按**注册表顺序**停止（legacy 逆序扇出已在 T-1 ④ 删除）。
+ //**顺序说明**：新钩子按**注册表顺序**停止。
  //两者不会对同一组件双触发同一逻辑 —— 组件**不再实现 legacy 生命周期接口**，
  //未迁移组件则对基类 stop() 是**默认空实现** ⇒ 任一组件在任一时刻只被"真实逻辑"处理一次。
  //**幂等说明**：若组件在 stop() 里自行取消任务，随后 clear() 的 cancelAllAndClear() 仍会取消其
@@ -772,7 +759,7 @@ public class RoleInstance {
         });
     }
 
- //I-14：SanTE 派发的重入护栏状态。哨兵 Integer.MIN_VALUE = 无待发值；
+ //SanTE 派发的重入护栏状态。哨兵 Integer.MIN_VALUE = 无待发值；
  //派发期间的组件重入写入只记最新值（禁止嵌套），返回后合并补发一次。
     private boolean sanTEDispatching = false;
     private int sanTEPendingValue = Integer.MIN_VALUE;
@@ -829,7 +816,7 @@ public class RoleInstance {
  * 把 SanTE 真值变化**派发给订阅者**（顺序 = **订阅先后** = 组件装配序）。
  * <p><b> · C2（回退 `` 的方向错误）</b>：接受集的决定方式从
  * 「**实现了某个能力接口的组件**」 改为
- * 「**向 {@code SanTEComponent} 订阅过的组件**」 —— 依据用户硬规矩 **R-1**：
+ * 「**向 {@code SanTEComponent} 订阅过的组件**」 ——
  * **凡关注点已是组件 ⇒ 不得再为它新增能力接口** （SanTE 的家就是 `SanTEComponent`）。
  * <p>遍历的是**监听器名单**（{@code SanTEComponent#forEachListener}），**不是**容器注册表
  * ⇒ 「谁关心」由**订阅**表达，不再由接口/继承表达。
@@ -869,7 +856,7 @@ public class RoleInstance {
         if(quarantined) return;
 
  //为**注册表内组件**广播新基类钩子 update()。
- //**顺序说明**：按**注册表顺序**遍历（legacy 三段扇出已在 T-1 ④ 删除，无先后关系）；
+ //**顺序说明**：按**注册表顺序**遍历（无先后关系）；
  //所有组件都对基类 update() 自行实现（基类默认空实现）；组件均已迁移（无迁移标记）
  //**不再实现 legacy 更新接口** ⇒ 只被这一条路径调用，不会双触发。
  //遍历窗口（）：**update() 广播期间禁止增/删/插位**（"禁止遍历中修改"的落点）
@@ -942,7 +929,7 @@ public class RoleInstance {
  * **框架调用组件的唯一受保护入口**（ · A1）。
  * <p>框架在**每一处**调用组件（{@code awake/start/stop/update/onSanTEChange} 广播 ·
  * {@code onCast}/{@code onAttack}）都必须经这里 ——
- * **不在组件内部各自 try** （否则第三个组件又要重写一遍 ⇒ C-15 第三个实例测试不合格）。
+ * **不在组件内部各自 try** （否则第三个组件又要重写一遍）。
  * <p>异常处置分三种：
  * <ol>
  * <li><b>拆卸中 / 已隔离</b> ⇒ **只记日志**（不递归隔离 A7）；</li>
@@ -970,8 +957,7 @@ public class RoleInstance {
  * {@code EntityRegainHealthEvent}）经它把"受伤 / 受治疗"通知到**本实例**的组件。
  * <p><b>★ 为什么必须经这里、而不能从施动方实例直接调目标组件</b>：钩子抛异常时要按
  * {@link #guardedCall} 的**故障隔离**语义处置（真四步）—— 那套语义只存在于本类 ⇒ 绕过它就等于
- * 开第二条调用路径 （违反"唯一受保护入口"）。调用方按
- * {@code instance.getAllByType(Participant.class)} **扇出**后逐个交给本方法。
+ * 开第二条调用路径（违反"唯一受保护入口"）⇒ 调用方按 {@code instance.getAllByType(Participant.class)} **扇出**后逐个交给本方法。
  * <p><b>为什么外面还要包一层 {@link #withinIterationWindow}</b>：{@code guardedCall} 只把异常**记成**
  * {@link #pendingQuarantine}，真四步是在窗口的 {@code finally} 里跑的（{@code runPendingQuarantine}）⇒
  * 若从事件面裸调 {@code guardedCall}，隔离请求会被记下却**永远不执行** ⇒ 必须自建窗口边界。
@@ -1035,7 +1021,7 @@ public class RoleInstance {
  * **故障隔离四步（顺序不可颠倒 · 用户新设计）**：
  * <ol>
  * <li><b>先尝试执行所有组件的终止方法</b> —— 逐个 try（一个失败不阻断其余）；</li>
- * <li><b>然后将其所有组件移除</b> —— 整实例隔离，走裁定④ 动态删除路径 + P2 删除守卫；</li>
+ * <li><b>然后将其所有组件移除</b> —— 整实例隔离，走动态删除路径 + 删除守卫；</li>
  * <li><b>记录 log</b> —— 点名 角色 / 玩家 / 组件 / 异常（含栈）；</li>
  * <li><b>给所有人发消息提醒</b> —— 全服简报 + OP 详情 + 限流去重（交给 {@link QuarantineHandler}）。</li>
  * </ol>
@@ -1094,7 +1080,7 @@ public class RoleInstance {
  /**
  * ②「然后将其所有组件移除」（整实例隔离）。
  * <p><b>顺序策略</b>：每次挑一个"**当前无人声明为必需**"的组件删（装配期已禁止依赖环 ⇒ 一定能删完），
- * 这样 P2 删除守卫**不会**因为"还有依赖者"而拒绝 ⇒ 级联删除天然按依赖倒序完成。
+ * 这样删除守卫**不会**因为"还有依赖者"而拒绝 ⇒ 级联删除天然按依赖倒序完成。
  * <p><b>失败面干净</b>：若某次删除仍被拒绝（守卫拒绝，或该组件的 {@code stop()} 抛），
  * **显式记一条 SEVERE**，然后**强制移除**（{@code ComponentRegistry#remove}）——
  * 隔离的目的是"失败面干净"，留残留才是真正的问题。
@@ -1106,9 +1092,9 @@ public class RoleInstance {
         while (guard++ < 512) {
             RoleComponent pick = null;
             for (RoleComponent component : componentRegistry.all()) {
- //：反向依赖按**实例**现算（既有写法 requiredBy(id) 在重复 id 下算的是"第一个同 id 者"
+ //：反向依赖按**实例**（既有写法 requiredBy(id) 在重复 id 下算的是"第一个同 id 者"
  //⇒ 被检查的组件可能不是挑出来的那一个）。移除仍走动态删除路径（按 id ⇒ 第一个同 id 者）；
- //若因此被 P2 拒绝，下面的 catch 会记 SEVERE 并强制移除 ⇒ 失败面仍然干净。
+ //若因此被删除守卫拒绝，下面的 catch 会记 SEVERE 并强制移除 ⇒ 失败面仍然干净。
                 if (componentRegistry.requiredBy(component).isEmpty()) {
                     pick = component;
                     break;
@@ -1140,7 +1126,7 @@ public class RoleInstance {
     }
 
  //两条每 tick 轮询判定（"检测是否应该更新物品"）已删 ——
- //其中一条是恒假死路径，另一条的语义（B-2）并入 triggerUpdate 末尾的帧末 flush 入口条件。
+ //其中一条是恒假死路径，另一条的语义并入 triggerUpdate 末尾的帧末 flush 入口条件。
 
  //清除这个实例时使用，重置玩家状态
     public void clear(){
@@ -1164,7 +1150,7 @@ public class RoleInstance {
 
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(roleHealthModifierKey);
 
- //药水记账（O-7 / D6）：**账本随 buff 组件持有** ⇒ 由它只移除本系统记账过的效果，
+ //药水记账：**账本随 buff 组件持有** ⇒ 由它只移除本系统记账过的效果，
  //不再无条件清空玩家身上的所有药水效果（返回移除的类型数，供诊断）
         pickApply(SERVICE_ID_BUFFS, BuffComponent.class, BuffComponent::clearAppliedPotionEffects);
 

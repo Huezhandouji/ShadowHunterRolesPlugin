@@ -1,6 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -42,7 +41,7 @@ import org.bukkit.entity.Player;
  * （嵌套类型，见下）—— 与使用它们的组件同处、只由本组件持有 ✓。
  */
 public abstract class ActiveComponent extends RoleComponent
-        implements HotbarItem, HotbarPresentable, RoleComponent.CooldownBearing {
+        implements HotbarRenderComponent.HotbarItem, HotbarPresentable, RoleComponent.CooldownBearing {
 
     // ───────── 阶段 13 · t108：物品使用入口的词汇（原 core/dispatch/ 的三个类型迁入本组件） ─────────
     //裁定⑤（用户答复）：**施放与攻击由「物品支持类组件」处理** ⇒ 原 `HotbarActionable` / `CombatHook`

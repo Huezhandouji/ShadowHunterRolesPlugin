@@ -6,7 +6,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent.CooldownBearing;
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItem;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent.HotbarItemProviding;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
@@ -681,7 +681,7 @@ public class RoleInstance {
      * 统一渲染器的查表入口：按槽位表里的 id 取可渲染组件（未注册 id ⇒ {@code null}，渲染器跳过该槽位）。
      * <p>**适配点（阶段 6）**：优先取 {@link HotbarPresentable#asHotbarItem()} 的规格视图 ——
      * 这样「只 `extends RoleComponent` + 实现 `HotbarPresentable`」的新式组件同样可被渲染；
-     * 旧式实现（自身即 `HotbarItem`）原样返回。
+     * 旧式实现（自身即 `HotbarRenderComponent.HotbarItem`）原样返回。
      * <p><b>阶段 8</b>：渲染器**不再经本方法取值**（它直接取组件实例调
      * {@code HotbarItemProviding#buildItem()}）；本方法保留为描述符视图的公开访问器，仓内 0 调用点
      * （已申报）。行为分支（技能/主武器）**不再由任何"种类"决定**。

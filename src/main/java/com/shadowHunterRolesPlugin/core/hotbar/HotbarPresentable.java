@@ -12,7 +12,7 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComp
  * 其余访问器都由本接口的 `default` 方法委托给它 ⇒ 新组件**只写 specification()**，不写任何委托。
  * <p>
  * <b>阶段 8 · 能力簇（用户裁定 C-14：互相强依赖的能力应合并）</b>：本接口把
- * {@link HotbarItem}（声明面）· {@link EnergyComponent.EnergyCosting}（耗能声明）
+ * {@link HotbarRenderComponent.HotbarItem}（声明面）· {@link EnergyComponent.EnergyCosting}（耗能声明）
  * 与 {@link HotbarRenderComponent.HotbarItemProviding}（自己画物品）**四合一**，理由 = 两条合并判据同时成立：
  * <ul>
  *   <li><b>① 实现者集合相同（按构造）</b>：实现本接口者**必然**要实现 {@code buildItem()}；
@@ -20,7 +20,7 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComp
  *       （{@code roleComponent/ActiveComponent} ⇒ {@code core/Skill} / {@code core/MainWeapon}）；</li>
  *   <li><b>② 一方方法语义必须读另一方的状态</b>：{@code buildItem()} 要读冷却状态
  *       （冷却读口已**移出本簇**：归 `roleComponent/RoleComponent.CooldownBearing` ✓）、闸门与能量（`svc()` 端口），
- *       并读声明面（{@link HotbarItem} 的图标 / 显示名 / 描述 / 耗能）—— 语义上离不开。</li>
+ *       并读声明面（{@link HotbarRenderComponent.HotbarItem} 的图标 / 显示名 / 描述 / 耗能）—— 语义上离不开。</li>
  * </ul>
  * <b>不占热键栏的组件（被动）不在本簇内**（{@code PassiveSkill} 只继承 {@code RoleComponent}）：它们
  * 既不被渲染，也就**不会**被强制实现一个永远不被调用的 {@code buildItem()}（避免"能被读却没人读"的能力）。
@@ -31,7 +31,7 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComp
  * 注意：本接口提供的只是**声明**数据；行为分支（冷却表 / 闸门 / 识别键 / 文案表）一律由组件自己的
  * {@code buildItem()} 与框架管道决定 —— 阶段 8 起仓内**没有** kind 这个运行期概念。
  */
-public interface HotbarPresentable extends HotbarItem, EnergyComponent.EnergyCosting, HotbarRenderComponent.HotbarItemProviding {
+public interface HotbarPresentable extends HotbarRenderComponent.HotbarItem, EnergyComponent.EnergyCosting, HotbarRenderComponent.HotbarItemProviding {
 
     /**
      * **唯一实现点**：表现规格（阶段 7 · A 步改全拼）。
@@ -65,8 +65,8 @@ public interface HotbarPresentable extends HotbarItem, EnergyComponent.EnergyCos
         return specification().getEnergyCost();
     }
 
-    /** 声明面视图（`HotbarItem` 在本批保留，不删）。 */
-    default HotbarItem asHotbarItem() {
+    /** 声明面视图（`HotbarRenderComponent.HotbarItem` 在本批保留，不删）。 */
+    default HotbarRenderComponent.HotbarItem asHotbarItem() {
         return specification();
     }
 

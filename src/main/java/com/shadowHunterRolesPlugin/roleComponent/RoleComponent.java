@@ -25,13 +25,13 @@ public abstract class RoleComponent {
     //用户裁定「能力各归其家」+ R-7（框架不知道冷却）：冷却是**组件自身**的判断 ⇒ 该接口归组件基类所有 ✓。
     //★ 落**父类**：类不得实现它自己的嵌套接口（JLS 循环继承 ✗，t112 实测 ✗）⇒ 嵌本类后
     //  `ActiveComponent extends RoleComponent implements RoleComponent.CooldownBearing` **合法** ✓。
-    //★ F4 修法（实测）：声明时长 `getCooldownTicks()` **不再**在本接口重复声明 ✗（它已由 `HotbarItem` 声明、
-    //  由 `HotbarPresentable` 的 default 满足 ✓）⇒ 本接口**只管状态读数** `isCooling()` ✓（接受集不变 ✓）。
+    //★ F4 修法（实测）：声明时长 `getCooldownTicks()` **不再**在本接口重复声明 ✗（它已由
+    //  `HotbarRenderComponent.HotbarItem` 声明、由 `HotbarPresentable` 的 default 满足 ✓）⇒ 本接口**只管状态读数** `isCooling()` ✓（接受集不变 ✓）。
 
     /**
      * **「这个组件有冷却」的能力接口**（阶段 6 立；阶段 8 增补状态读数；**阶段 13 · t112 迁入本类**）。
      * <p>本接口**只承载冷却的状态读数** {@link #isCooling()} ✓ —— **声明时长**（"多久"）不在此处：
-     * 它由渲染族的 `HotbarItem#getCooldownTicks()` 声明、并由 `HotbarPresentable` 的 default 委托到描述符 ✓
+     * 它由渲染族的 `HotbarRenderComponent.HotbarItem#getCooldownTicks()` 声明、并由 `HotbarPresentable` 的 default 委托到描述符 ✓
      * （t112 实测：同名方法在两处并存会让实现者"不兼容 ✗" ⇒ 收敛到唯一声明处 ✓）。
      * <p><b>归属</b>：{@code isCooling()} 读的正是本接口的面（"有没有冷却这回事"）；阶段 13 · t105 起冷却结束回调已整体删除
      * ⇒ 冷却相关只剩"声明（渲染族）+ 状态（本接口）"两件事 ✓。**唯一实现者 = {@code ActiveComponent}**（每实例冷却字段 ✓，R-7 ✗）。

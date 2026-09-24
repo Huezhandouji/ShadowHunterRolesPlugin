@@ -116,7 +116,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
         //(3) 忽略重入（用户裁定）：惩罚进行中直接返回 —— 不取消、不重启、不刷新 count、不重放表现层
         if(inSanTEPunishment) return;
         if(now > 0) return;
-        Faction faction = svc().factions().faction();
+        Faction faction = svc().roleInfo().faction();
 
         //O-6：单一活动任务不变量（先取消仍在跑的旧任务；旧实现的"任务泄漏"在此闭合）
         //注意：这里**不是**"重入保护" —— 重入由上面的 (3) 守卫处理，本行只保证同时最多一个任务对象。

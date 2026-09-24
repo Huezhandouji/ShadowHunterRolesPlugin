@@ -81,7 +81,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
                 Collection<? extends Player> victims = loc.getNearbyPlayers(4);
 
                 for (Player victim : victims) {
-                    if (!svc().factions().isHostile(victim)) continue;
+                    if (!svc().roleInfo().isHostile(victim)) continue;
                     victim.setNoDamageTicks(0);
                     svc().damage().physicalDamage(victim, player, 14);
                 }

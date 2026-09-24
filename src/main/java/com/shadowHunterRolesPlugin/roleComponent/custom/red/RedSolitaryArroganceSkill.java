@@ -82,7 +82,7 @@ public class RedSolitaryArroganceSkill extends Skill {
                         boolean shouldRecoverHealth = false;
                         for(Player victim : playersInSightLine){
                             if(victim == null || victim.isDead() || !victim.isOnline()) continue;
-                            if(!svc().factions().isHostile(victim)) continue;
+                            if(!svc().roleInfo().isHostile(victim)) continue;
 
                             shouldRecoverHealth = true;
                             svc().damage().physicalDamage(victim, cas, 8);

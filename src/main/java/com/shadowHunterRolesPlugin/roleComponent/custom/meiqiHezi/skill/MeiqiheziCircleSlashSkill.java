@@ -91,7 +91,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
                 Collection<? extends Player> victims = loc.getNearbyPlayers(7);
 
                 for(Player victim : victims){
-                    if (!svc().factions().isHostile(victim)) continue;
+                    if (!svc().roleInfo().isHostile(victim)) continue;
                     svc().damage().trueDamage(victim, caster, 20);
                 }
 

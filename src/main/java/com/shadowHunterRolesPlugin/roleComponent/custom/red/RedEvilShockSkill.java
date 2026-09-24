@@ -46,7 +46,7 @@ public class RedEvilShockSkill extends Skill{
 
         RedBleedPassive bleed = getComponent(RedBleedPassive.class);
         for(Player p : caster.getLocation().getNearbyPlayers(5)){
-            if(svc().factions().isHostile(p)){
+            if(svc().roleInfo().isHostile(p)){
                 p.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(61, 1));
                 p.addPotionEffect(PotionEffectType.SLOWNESS.createEffect(61, 3));
                 //结算5层流血：写账本的唯一公开入口（硬约束第 18 条前移）

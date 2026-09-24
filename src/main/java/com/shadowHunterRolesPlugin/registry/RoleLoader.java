@@ -28,7 +28,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * 显式角色装配器（阶段 3.2）。
+ * 显式角色装配器。
  *
  * <p>取代原先 {@link RoleRegistry} 里的 {@code static { ... }} 初始化块：
  * <ul>
@@ -38,7 +38,7 @@ import java.util.logging.Logger;
  *       其余角色继续装配；**不会**升级成 {@code ExceptionInInitializerError} 拖垮整个插件。</li>
  * </ul>
  *
- * <p>角色定义（数值、文案、槽位、图标）与阶段 0–2 完全一致，逐字未改。
+ * <p>角色定义（数值、文案、槽位、图标）逐字未改。
  */
 public class RoleLoader {
 
@@ -65,7 +65,7 @@ public class RoleLoader {
     private static final String ID_RED_SANCTIFIED_BLADE = "red_mainWeapon_sanctifiedBlade";
     private static final String ID_RED_SOLITARY_ARROGANCE = "red_solitaryArrogance_skill";
 
-    /** 示例角色里的组件 id（阶段 8 · t46）。 */
+    /** 示例角色里的组件 id。 */
     private static final String ID_EXAMPLE_SELF_REFRESHING = "example_self_refreshing_skill";
 
 
@@ -77,7 +77,7 @@ public class RoleLoader {
 
     /**
      * 本插件的角色定义（原 {@code RoleRegistry} 静态块内容，逐字迁移）。
-     * <p>阶段 8 · t46：追加**第三个** = 示例角色（给"组件可请求重绘"这条能力一个生产使用点）。
+     * <p>追加**第三个** = 示例角色（给"组件可请求重绘"这条能力一个生产使用点）。
      * **既有两个角色的定义一字未动**（组件集合、注册序、表现值都不变）。
      */
     public List<Definition> defaultDefinitions() {
@@ -94,7 +94,7 @@ public class RoleLoader {
 
     /**
      * 逐条装配并注册。
-     * <p><b>阶段 10 · t54（A2/A6）</b>：在 {@code build()} 与 {@code register()} **之间**插入
+     * <p><b>在 {@code build()} 与 {@code register()} 之间插入</b>
      * {@link Role#verifyDependencies()} —— 依赖不齐（或缺依赖环）的模板在**注册之前**就抛异常，
      * 由下面的既有 {@code catch (Throwable)} 记一条 {@code SEVERE} 并**跳过该角色**
      * ⇒ 它**根本不在注册表里**（既不会被 {@code /role set} 选中，也不会走到任何 {@code awake()}）。
@@ -113,7 +113,7 @@ public class RoleLoader {
             try {
                 Role.Builder builder = definition.builder().get();
                 Role role = builder.build();
-                //阶段 10 · t54：装配期依赖检查（缺必需依赖 / 依赖环 ⇒ 抛 ComponentDependencyException）
+                //装配期依赖检查（缺必需依赖 / 依赖环 ⇒ 抛 ComponentDependencyException）
                 role.verifyDependencies();
                 registry.register(role);
                 registered++;
@@ -143,8 +143,8 @@ public class RoleLoader {
                 .baseATK(10)
                 .maxEnergy(100)
                 .maxSanTE(100)
-                //阶段 7 · B 步：表现值（名字/描述/冷却/耗能/图标）随组件自己的 Specification 走，
-                //装配点**只写 setSlot**；注册顺序与迁移前逐字一致（= 派发序 = 渲染序）。
+                //表现值（名字/描述/冷却/耗能/图标）随组件自己的 Specification 走，
+ //装配点**只写 setSlot**；注册顺序与既有实现逐字一致（= 派发序 = 渲染序）。
                 .addComponent(ID_MEIQIHEZI_UNCONCERN, new MeiqiheziUnconcernSkill.Specification().setSlot(1))
                 .addComponent(ID_MEIQIHEZI_BLOODY_SLASH, new MeiqiheziBloodySlashSkill.Specification().setSlot(2))
                 .addComponent(ID_MEIQIHEZI_CIRCLE_SLASH, new MeiqiheziCircleSlashSkill.Specification().setSlot(3))
@@ -184,7 +184,7 @@ public class RoleLoader {
     }
 
     /**
-     * **示例角色**（阶段 8 · t46）：唯一目的 = 给「组件可请求重绘」这条能力一个**生产使用点**
+     * **示例角色**：唯一目的 = 给「组件可请求重绘」这条能力一个**生产使用点**
      * （C-15 配套②：没有使用点的能力 = 未验证的能力）。
      * <p>它**不改动任何既有角色**：`red` / `meiqihezi` 的组件集合与注册序一字未动
      * ⇒ 外观取证与帧入口边界读数对本角色完全无感（代际对拍可证）。

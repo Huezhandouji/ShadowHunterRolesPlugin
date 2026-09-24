@@ -14,14 +14,14 @@ public class RoleManager {
 
     private final Map<UUID, RoleInstance> playerRoleMap = new HashMap<>();
 
-    //阶段 2：去掉静态单例，改由主类在 onEnable 构造并注入平台上下文
+    //去掉静态单例，改由主类在 onEnable 构造并注入平台上下文
     private final RolesContext context;
 
-    //阶段 4（⑤）：RoleRegistry 改为构造注入（D-2 静态桥已删）
+    //RoleRegistry 改为构造注入（D-2 静态桥已删）
     private final RoleRegistry roleRegistry;
 
     /**
-     * 阶段 10 · t66：故障隔离的**提醒器**（全服简报 + OP 详情 + **限流/去重**）。
+     * 故障隔离的**提醒器**（全服简报 + OP 详情 + **限流/去重**）。
      * 它由管理器持有（而不是 RoleInstance）：提醒是"对全服说一句话"，属管理器职责；
      * 且限流表需要**跨实例**共享（同一角色反复失败时，N 秒内只播一次 ✓）。
      */
@@ -40,23 +40,23 @@ public class RoleManager {
 
     /**
      * 选择角色。
-     * <p><b>阶段 10 · t54（A5 · AR-2 修正）</b>：旧写法是"**先 clear 旧角色、再裸构造新实例**"且全文件
+ * <p><b>早先写法是"**先 clear 旧角色、再裸构造新实例**"</b>且全文件
      * 0 处 try/catch ⇒ 构造一旦失败，玩家**先丢角色、再吃逃逸异常**。
-     * <p><b>阶段 10 · t64（P6 两阶段构造 · 本卡）</b>：t54 只做到"**预检先行**"（依赖不齐这类可预知的失败
+     * <p><b>两阶段构造</b>：只做到"**预检先行**"（依赖不齐这类可预知的失败
      * 在清理之前被挡下）⇒ **非依赖类**的构造异常（例如某个组件构造器抛）仍发生在 {@code clearRole}
-     * **之后**，玩家照样丢角色 ✗。本卡把 {@code RoleInstance} 拆成两相后，顺序变成：
+ * **之后**，玩家照样丢角色 ✗。把 {@code RoleInstance} 拆成两相后，顺序变成：
      * <ol>
-     *   <li><b>预检先行</b>：{@link Role#verifyDependencies()} 放在**清理旧角色之前**（t54，保留）；</li>
+ * <li><b>预检先行</b>：{@link Role#verifyDependencies()} 放在**清理旧角色之前**（，保留）；</li>
      *   <li><b>第一相：构造（不可见）</b>：{@link Role#createInstance(Player, RolesContext)} ——
      *       只做装配 / 注册表冻结 / 服务集 / 依赖检查，**不写任何玩家可见状态、不创建任务**
-     *       ⇒ 失败时**原样返回**，旧角色完好无损 ✓（这是 t54 那条残留的收口点）；</li>
+ * ⇒ 失败时**原样返回**，旧角色完好无损 ✓（这是 那条残留的收口点）；</li>
      *   <li><b>清旧角色</b>：构造**成功之后**才 {@link #clearRole(Player)} —— 此刻新实例**尚未**写入
      *       生命修饰符 / 热键栏 / 药水 ⇒ 旧实例 {@code clear()} 的三条"按共享 key 误伤"路径全部落空 ✓；</li>
      *   <li><b>第二相：激活（可见）</b>：{@link RoleInstance#activate()} —— 写生命修饰符 + 设置生命 +
      *       生命周期广播 + 启动 ticker + 构造期同步首刷；异常同样**不逃逸**（失败面见第 4 条申报）；</li>
      *   <li><b>换引用</b>：{@code playerRoleMap.put(...)}（唯一写入点，成功路径才发生）。</li>
      * </ol>
-     * <p><b>可见顺序与迁移前逐字一致</b>：旧写法的可见序列 = "旧角色清理的可见效果 → 新实例构造期的
+ * <p><b>可见顺序与既有实现逐字一致</b>：早先写法的可见序列 = "旧角色清理的可见效果 → 新实例构造期的
      * 可见效果"；本写法 = "（构造期不可见）→ 旧角色清理 → 新实例激活" ⇒ 可见序列不变 ✓。
      * <p><b>如实申报（第 4 条的失败面）</b>：第二相本身也可能抛（组件在 {@code awake()/start()} 里抛）。
      * 此时旧角色**已经**被释放（第 3 步不可回退）⇒ 该分支下玩家会处于"无角色"状态：本方法记一条
@@ -81,8 +81,8 @@ public class RoleManager {
             return false;
         }
 
-        //A5 ②（t64 第一相）：**先把新实例构造成功**（构造器只做不可见的事）
-        //⇒ 失败时旧角色原样保留（t54 残留的收口点：非依赖类构造异常不再让玩家丢角色）
+ //A5 ②（第一相）：**先把新实例构造成功**（构造器只做不可见的事）
+ //⇒ 失败时旧角色原样保留（残留的收口点：非依赖类构造异常不再让玩家丢角色）
         RoleInstance instance;
         try {
             instance = role.createInstance(player, context);
@@ -93,14 +93,14 @@ public class RoleManager {
             return false;
         }
 
-        //阶段 10 · t66：**绑定隔离处置**（必须在 activate() 之前 ⇒ awake()/start() 里的异常也能被隔离）
+        //**绑定隔离处置**（必须在 activate() 之前 ⇒ awake()/start() 里的异常也能被隔离）
         instance.bindQuarantineHandler(this::onInstanceQuarantined);
 
         //A5 ③：构造**成功之后**才清旧角色 —— 新实例此时尚未写入任何玩家可见状态（生命修饰符 /
-        //热键栏 / 药水），旧实例的 clear() 无从误伤它（t54 实测的三条约束逐条见交付说明 A3）
+ //热键栏 / 药水），旧实例的 clear() 无从误伤它（实测的三条约束逐条见交付说明 A3）
         if(hasRole(player)) clearRole(player);
 
-        //A5 ④（t64 第二相）：激活 —— 可见副作用全部在这里，异常不逃逸
+ //A5 ④（第二相）：激活 —— 可见副作用全部在这里，异常不逃逸
         try {
             instance.activate();
         } catch (Throwable failure) {
@@ -112,7 +112,7 @@ public class RoleManager {
             return false;
         }
 
-        //阶段 10 · t66：激活期被隔离（组件在 awake()/start() 里抛）⇒ 隔离流程已经记日志 / 提醒 / 清空角色，
+        //激活期被隔离（组件在 awake()/start() 里抛）⇒ 隔离流程已经记日志 / 提醒 / 清空角色，
         //这里**不再**把已死的实例写进 map（否则玩家会拿到一个"组件已被全部移除"的空壳角色 ✗）
         if(instance.isQuarantined()) {
             return false;
@@ -152,7 +152,7 @@ public class RoleManager {
             return false;
         }
 
-        //同 Player 重载：绑定隔离处置（t66，必须在 activate() 之前）
+ //同 Player 重载：绑定隔离处置（，必须在 activate() 之前）
         instance.bindQuarantineHandler(this::onInstanceQuarantined);
 
         //同 Player 重载：构造成功之后才清旧角色（A5 ③）
@@ -170,7 +170,7 @@ public class RoleManager {
             return false;
         }
 
-        //同 Player 重载：激活期被隔离 ⇒ 不再写入 map（t66）
+ //同 Player 重载：激活期被隔离 ⇒ 不再写入 map（）
         if(instance.isQuarantined()) {
             return false;
         }
@@ -181,11 +181,11 @@ public class RoleManager {
     }
 
     /**
-     * **故障隔离的对外处置**（阶段 10 · t66 第 ④ 步 + A6）——由 {@link RoleInstance} 在隔离的第 ④ 步回调。
+     * **故障隔离的对外处置** ——由 {@link RoleInstance} 在隔离的第 ④ 步回调。
      *
      * <ol>
      *   <li><b>提醒</b>：全服简报 + OP 详情，**经限流器**（同一 {@code role:component} 在窗口内只播一次 ✓）；</li>
-     *   <li><b>清空角色</b>（用户裁定 ①）：**复用既有清理链** {@link #clearRole(UUID)}（= 从表里摘除 +
+ * <li><b>清空角色</b>：**复用既有清理链** {@link #clearRole(UUID)}（= 从表里摘除 +
      *       {@code instance.clear()}）⇒ 热键栏 / 生命修饰符 / 药水 / 任务全部回收，**不另写一套** ✓。</li>
      * </ol>
      * 未入表的实例（构造后、激活期被隔离）⇒ 直接 {@code instance.clear()} 释放半激活实例（不留泄漏面）。
@@ -227,8 +227,8 @@ public class RoleManager {
     }
 
     //这两个查询原本是 core/RoleInstance 的静态方法（内部走 RoleManager.getInstance()）。
-    //阶段 2 移到数据所有者这里：语义逐字保留（任一方没有角色 → true），且 core 不再依赖单例。
-    //阶段 13 · t123（欠账 A 后半）：判定入口从 `RoleInstance#isHostileTo(...)` 的**读视图**
+    //移到数据所有者这里：语义逐字保留（任一方没有角色 → true），且 core 不再依赖单例。
+    //判定入口从 `RoleInstance#isHostileTo(...)` 的**读视图**
     //（已随 FactionComponent 整体删除 ✗）改走 **`roleInfo` 服务面** ✓ —— 唯一读入口 ✓。
     //口径逐字等价（同一条 `FactionLookup#isHostile` 关系表 + 同一个 `isHostileTo(RoleInstance)` 的
     //对称化写法：任一方敌对即敌对；任一方未选角色/为空/info 为空 → 真值 true 直返）✓。

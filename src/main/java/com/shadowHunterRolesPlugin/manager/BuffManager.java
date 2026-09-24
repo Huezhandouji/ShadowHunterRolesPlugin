@@ -30,7 +30,7 @@ public class BuffManager {
     public BuffManager(Player player, RoleInstance instance){
         this.player = player;
         this.instance = instance;
-        //阶段 10 · t64（P6 两阶段构造）：**构造期不再启动每 tick 更新** —— 第一相（构造）不得创建任何任务，
+        //**构造期不启动每 tick 更新** —— 第一相（构造）不得创建任何任务，
         //否则构造中途抛错（例如某个组件构造器抛）会泄漏一个永久运行的 ticker。
         //启动点改为 `RoleInstance#activate()`（第二相），由它调用 {@link #startUpdater()}。
     }
@@ -140,7 +140,7 @@ public class BuffManager {
     }
 
     /**
-     * 启动记账表的每 tick 更新（阶段 10 · t64 · P6 两阶段构造）。
+     * 启动记账表的每 tick 更新（两阶段构造的第二相）。
      * <p>**调用方 = {@code core/RoleInstance#activate()}（第二相）**，不再是本类构造器 —— 见构造器处注释。
      * <p>**幂等**：重复调用只保留一个任务（`clearAll()` 会把句柄置回 `null`，此后可再次启动）。
      */

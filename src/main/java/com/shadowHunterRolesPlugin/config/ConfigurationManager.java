@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.logging.Logger;
 
 /**
- * 配置管理器（阶段 7 · A 步）：本插件的**唯一读盘口径** —— 所有配置字段都经这里取值。
+ * 配置管理器：本插件的**唯一读盘口径** —— 所有配置字段都经这里取值。
  *
  * <p><b>为什么要有它</b>：在此之前"读配置"与"读 {@code ops.json}"两套机制各写一遍缓存与回落，
  * 且主类**从不调用 {@code saveDefaultConfig()}** ⇒ jar 内置的默认值只在内存里生效、
@@ -19,7 +19,7 @@ import java.util.logging.Logger;
  * 现在：① 默认配置**落盘**（主类 `onEnable` 先 `saveDefaultConfig()`）；② 取值只剩这一处；
  * ③ 每个字段的定义集中在 {@link ConfigKey}（默认值 / 校验 / 说明一处）。
  *
- * <p><b>生效时效（与旧实现逐字一致，冻结语义）</b>：数据目录内 {@code config.yml} 带
+ * <p><b>生效时效（逐字一致，冻结语义）</b>：数据目录内 {@code config.yml} 带
  * {@value #TTL_MILLIS} ms TTL + **文件戳（mtime×31+长度）变更即失效** ⇒ 改完配置文件**最迟一个 TTL**
  * 内生效，**无需重启或 reload**。文件不存在时回落 **jar 内置默认值**（`plugin.getConfig()`）。
  *
@@ -32,8 +32,8 @@ import java.util.logging.Logger;
 public final class ConfigurationManager {
 
     /**
-     * 指令权限等级（等价于旧的 `CommandAccess.CONFIG_KEY`）：字段名、默认值 3、域 0-4
-     * **逐字沿用**阶段 6 冻结的口径。
+ * 指令权限等级（等价于 `CommandAccess.CONFIG_KEY`）：字段名、默认值 3、域 0-4
+     * **逐字沿用**已冻结的口径。
      */
     public static final ConfigKey<Integer> COMMAND_PERMISSION_LEVEL = ConfigKey.integer(
             "command-permission-level", 3, 0, 4,
@@ -112,7 +112,7 @@ public final class ConfigurationManager {
                 source = YamlConfiguration.loadConfiguration(file);
                 sourceLabel = "file";
             } else {
-                //文件不在 ⇒ 回落 jar 内置默认值（旧实现同一条分支）
+ //文件不在 ⇒ 回落 jar 内置默认值（同一条分支）
                 source = plugin.getConfig();
                 sourceLabel = "jar-default";
             }

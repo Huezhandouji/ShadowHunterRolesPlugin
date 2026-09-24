@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 
 /**
  * SanTE 组件（阶段 10 · t63 · A1 改正）：系统级能力「SanTE」的**组件形态**（每角色实例一个，裁定③）。
@@ -14,7 +15,7 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
  * <p><b>归零惩罚的钉 0 语义不变</b>：惩罚组件（{@code DefaultSanTEZeroPunishment}）仍按既有方式
  * 调**组件自身**的 {@code set(0)} 逐 tick 钉 0（阶段 13 · t109：取用形态统一为"字段 + 在 `start()` 内赋值" ✗）⇒ 走的还是这一条 clamp + 派发路径。
  */
-public class SanTEComponent extends RoleComponent {
+public class SanTEComponent extends RoleComponent implements OperationProvider {
 
     /** 变更通知（容器在构造期注入）：事件发布 + {@code onSanTEChange} 派发（含重入护栏）都在容器侧。 */
     public interface ChangeSink {
@@ -139,5 +140,45 @@ public class SanTEComponent extends RoleComponent {
     /** 减少 SanTE（内部按 0 下限 clamp；归零惩罚由既有组件监听真变化后触发）。 */
     public void decrease(int amount) {
         set(current - amount);
+    }
+    /**
+     * **组件操作面（阶段 13 · t136）**：把外部字符串指令**薄适配**到本组件既有强类型方法（零新增状态通道 ✓）。
+     * <p><b>grammar（首 token 必为动词，大小写敏感；参数以单个空格分隔）</b>：
+     * <ul>
+     *   <li>{@code current} —— 读：回**当前 SanTE**（无参 ✓，越界参数 ⇒ 未识别）；</li>
+     *   <li>{@code max} —— 读：回**上限**（无参 ✓）；</li>
+     *   <li>{@code set &lt;int≥0&gt;} —— 写：调既有的 {@link #set(int)}（内部 clamp + ChangeSink 照常 ✓），回**写后值**；</li>
+     *   <li>{@code gain &lt;int≥0&gt;} —— 写：调既有的 {@link #gain(int)} ✓，回**写后值**；</li>
+     *   <li>{@code decrease &lt;int≥0&gt;} —— 写：调既有的 {@link #decrease(int)} ✓，回**写后值**（不足则按既有 clamp 语义 ✓）。</li>
+     * </ul>
+     * <p><b>三态返回</b>：{@code null} = **未识别 / 拒绝执行**（未知动词 ✓ · 参数缺失/多余 ✓ · 非数字/负数/溢出 ✓ · 空或空白 payload ✓）；
+     * 非空串 = **规范化值**（写类回写后值、读类回当前值 ✓）。
+     * <p><b>薄适配纪律</b>：本方法**只调**上述既有方法 ⇒ 不新增平行的状态改动路径 ✗、不绕过既有 clamp / 事件 / 置脏 ✓。
+     */
+    @Override
+    public String onOperationCommand(String payload) {
+        if (payload == null) return null;
+        String text = payload.trim();
+        if (text.isEmpty()) return null;
+        String[] parts = text.split(" ");
+        String verb = parts[0];
+        if (verb.isEmpty()) return null;
+        if (verb.equals("current")) return parts.length == 1 ? Integer.toString(current()) : null;
+        if (verb.equals("max")) return parts.length == 1 ? Integer.toString(max()) : null;
+        if (!verb.equals("set") && !verb.equals("gain") && !verb.equals("decrease")) return null;
+        if (parts.length != 2) return null;
+        int amount;
+        try {
+            amount = Integer.parseInt(parts[1]);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+        if (amount < 0) return null;
+        switch (verb) {
+            case "set" -> set(amount);
+            case "gain" -> gain(amount);
+            default -> decrease(amount);
+        }
+        return Integer.toString(current());
     }
 }

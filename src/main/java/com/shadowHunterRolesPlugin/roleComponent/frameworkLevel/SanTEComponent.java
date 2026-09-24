@@ -12,7 +12,7 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
  * 注入；组件只负责真值怎么变。
  * <p><b>状态唯一</b>：容器侧**不再**持有 {@code currentSanTE} 字段 ✗（只保留视图方法）。
  * <p><b>归零惩罚的钉 0 语义不变</b>：惩罚组件（{@code DefaultSanTEZeroPunishment}）仍按既有方式
- * 调 {@code santeComponent().set(0)} 逐 tick 钉 0 ⇒ 走的还是这一条 clamp + 派发路径。
+ * 调**组件自身**的 {@code set(0)} 逐 tick 钉 0（阶段 13 · t109：取用形态统一为"字段 + 在 `start()` 内赋值" ✗）⇒ 走的还是这一条 clamp + 派发路径。
  */
 public class SanTEComponent extends RoleComponent {
 

@@ -46,13 +46,13 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  *   <li>**进入即标记**：归零判定通过后立即 {@code inSanTEPunishment = true}，**先于**起任务
  *       （消除"起任务与标记之间"的重入窗口）；</li>
  *   <li>**惩罚期间持续钉 SanTE = 0（逐 tick）**：{@link #update()} 里以 {@code inSanTEPunishment} 守卫，
- *       **每一 tick** 执行 {@code santeComponent().set(0)}
+ *       **每一 tick** 执行 {@code sante.set(0)}
  *       （阶段 6 · t27 对齐用户裁定 **Q1 = A**：此前是"任务体每 40 刻钉一次"，整个惩罚只钉 3 次、
  *       两钉点之间可被其它组件抬高（如流血 `+4`）⇒ 现改为逐 tick，**惩罚期间每一 tick 都是 0**）；</li>
  *   <li>**忽略重入**：{@code onSanTEChange} 顶部守卫 {@code if (inSanTEPunishment) return;}
  *       ⇒ 惩罚进行中**不取消、不重启、不刷新 {@code count}、不重放标题/粒子、不重复上 STUN**；</li>
  *   <li>**结束回满（推迟到 STUN 结束）**：在**施加 STUN 的那一跳**（{@code count == 1}）预约
- *       {@code timerComponent().runLater(this, 100L, …)} ⇒ **STUN 100 刻到期那一刻**清标记并把 SanTE 恢复至 {@code max}
+ *       {@code timer.runLater(this, 100L, …)} ⇒ **STUN 100 刻到期那一刻**清标记并把 SanTE 恢复至 {@code max}
  *       （阶段 6 · t27 对齐用户裁定 **Q2 = A**：此前在第 3 跳 ≈4.05 s 就回满、而 STUN 到 5 s 才结束
  *       ⇒ 存在约 1 秒「已回满但仍在眩晕」的窗口 ⇒ 现已消除；回满在**同一处一次性**完成）。</li>
  * </ol>
@@ -69,41 +69,11 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
  */
 public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTEComponent.Subscriber {
 
-    /**
-     * **SanTEComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final SanTEComponent santeComponent(){
-        return svc().components().get(SanTEComponent.class);
-    }
+    private TimerComponent timer;
+    private VitalsComponent vitals;
+    private BuffComponent buff;
+    private SanTEComponent sante;
 
-    /**
-     * **BuffComponent 取用入口**（阶段 13 · t103）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final BuffComponent buffComponent(){
-        return svc().components().get(BuffComponent.class);
-    }
-
-    /**
-     * **VitalsComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final VitalsComponent vitalsComponent(){
-        return svc().components().get(VitalsComponent.class);
-    }
-
-    /**
-     * **TimerComponent 取用入口**（阶段 13 · t102）：向**组件本身**取用（R-6），不再经服务集的白名单端口成员。
-     * <p>按需解析（**不缓存**）：R-4 只禁 `awake()`；不缓存引用 ⇒ 不引入生命周期耦合
-     * （基类/子类各自覆写 `start()` 时，缓存的引用可能静默为空 ✗）。
-     */
-    private final TimerComponent timerComponent(){
-        return svc().components().get(TimerComponent.class);
-    }
     public DefaultSanTEZeroPunishment(String id, ComponentServices services) {
         super(
                 id,
@@ -126,15 +96,21 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
      * {@code start()}；与 {@link #stop()} 的退订**成对** ✓（`subscribe` 本身幂等 ⇒ 重复 start 不会重复登记 ✓）。
      * <p><b>通知顺序</b> = **订阅先后** = 容器 `start()` 广播序（= 组件装配序，因为 start 也按容器序广播）。
      * <b>与 {@code awake()} 是否同序需另证</b>（本卡未做运行级取证）⇒ 不再宣称"awake 序" ✗。
-     * <p>用容器查找（`svc().components().get(...)`）而不是字段注入 ⇒ 本组件**不持有** `SanTEComponent` 引用，
-     * 与"组件只通过容器协作"的既有纪律一致 ✓。
+     * <p><b>取用形态（阶段 13 · t109 统一）</b>：四个协作组件改为**字段 + 在本 `start()` 内赋值** ✓
+     * （与全仓统一形态一致）；R-4 只禁 `awake()` ⇒ 在 `start()` 取组件正是它要求的时机 ✓。
+     * <p><b>【已作废】旧口径原文（阶段 12 · t89 原文，逐字保留）</b>：「用容器查找（`svc().components().get(...)`）
+     * 而不是字段注入 ⇒ 本组件**不持有** `SanTEComponent` 引用，与"组件只通过容器协作"的既有纪律一致 ✓。」
+     * —— 阶段 13 · t109 起改为**持有字段引用**（缓存与按需查找恒等：注册表装配期后冻结 ✓）⇒ 该表述**作废** ✗。
      * <p><b>【已作废】旧口径原文（阶段 12 · t89 原文，逐字保留）</b>：
      * 「时机 = `awake()`（生命周期里"构造之后、start 之前"）⇒ 与装配序一致：**先 awake 的组件先订阅**
      * ⇒ 通知顺序 = 订阅先后 = 装配序 ✓。」—— 订阅迁到 `start()` 之后该表述**作废** ✗（订阅现在发生在 start 相）。
      */
     @Override
     public void start() {
-        SanTEComponent sante = svc().components().get(SanTEComponent.class);
+        timer = svc().components().get(TimerComponent.class);
+        vitals = svc().components().get(VitalsComponent.class);
+        buff = svc().components().get(BuffComponent.class);
+        sante = svc().components().get(SanTEComponent.class);
         if (sante != null) {
             sante.subscribe(this);
         }
@@ -156,7 +132,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
     @Override
     public void update() {
         if (inSanTEPunishment) {
-            santeComponent().set(0);
+            sante.set(0);
         }
     }
 
@@ -174,7 +150,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
         //(1) 进入即标记：必须先于起任务（消除"起任务与标记之间"的重入窗口）
         inSanTEPunishment = true;
 
-        punishmentTask = timerComponent().runRepeating(this, 0L, 40L, new Runnable() {
+        punishmentTask = timer.runRepeating(this, 0L, 40L, new Runnable() {
 
                     int count = 0;
                     Player player = svc().self().player();
@@ -211,17 +187,17 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
                         Location loc = player.getLocation();
 
                         if (count == 1) {
-                            buffComponent().add(BuffType.STUN, 100);
+                            buff.add(BuffType.STUN, 100);
 
                             //(4) 回满推迟到 STUN 结束（用户裁定 Q2 = A）：STUN 在本跳施加、持续 100 刻
                             //    ⇒ 自本跳起 100 刻后（= STUN 到期那一刻）清标记并一次性回满。
                             //    ⇒ 惩罚期间 SanTE 全程真正为 0（逐 tick 钉 + 结束后才回满），消除"已回满但仍眩晕"的窗口。
-                            punishmentRestoreTask = timerComponent().runLater(DefaultSanTEZeroPunishment.this, 100L, () -> {
+                            punishmentRestoreTask = timer.runLater(DefaultSanTEZeroPunishment.this, 100L, () -> {
                                 //(5-⑤ 正常结束) 若标记已被中止路径复位 ⇒ 不再回满（防越权恢复）
                                 if (!inSanTEPunishment) return;
                                 //先清标记：否则同一 tick 的逐 tick 钉 0 会把刚回满的值立刻抹回 0
                                 inSanTEPunishment = false;
-                                santeComponent().set(santeComponent().max());
+                                sante.set(sante.max());
                             });
                             player.playSound(loc, Sound.ITEM_TOTEM_USE, 1f, 1f);
 
@@ -264,7 +240,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
                             Location particleLoc = loc.clone().add(0, 1, 0);
                             particleLoc.getWorld().spawnParticle(Particle.SCULK_SOUL, particleLoc, 30, 0.5d, 0.5d, 0.5d);
                         }
-                        vitalsComponent().trueDamage(player, null, totalDamageAmount * 0.33333d);
+                        vitals.trueDamage(player, null, totalDamageAmount * 0.33333d);
                         //(4) 回满**不再**发生在第 3 跳：已推迟到 STUN 结束（见 count == 1 处的回满任务，Q2 = A）
                     }
                 });
@@ -293,7 +269,6 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill implements SanTECom
         inSanTEPunishment = false;
         //阶段 12 · t89：**退订**（阶段 13 · t92a：订阅已迁到 start() ⇒ 本行与 start() 对称 ✓
         //  ⇒ 拆卸后不再被通知 ✓；旧口径原文「与 awake() 的订阅对称」在迁移后作废 ✗）
-        SanTEComponent sante = svc().components().get(SanTEComponent.class);
         if (sante != null) {
             sante.unsubscribe(this);
         }

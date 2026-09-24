@@ -17,7 +17,7 @@ import java.util.List;
  * （C-15 配套②：没有使用点的能力 = 未验证的能力）。
  * <p>
  * <b>它演示的第一件事 = 组件可以「请求重绘」</b>：组件**只请求、不写** —— 它从容器里取
- * {@link HotbarRenderComponent}（阶段 12 · t86 起的**唯一**重绘通道），**不持有**渲染器、
+ * {@link HotbarRenderComponent}（阶段 12 · t86 起的**唯一**重绘通道），**不持有**渲染器（**阶段 13 · t109 起改为持有渲染组件字段** ✗；旧口径原文「**不持有**渲染器」**已作废**）、
  * **不持有**任何 Bukkit 库存对象。请求只置脏，真正的写入仍由框架在**帧末 flush** 完成
  * ⇒ 「空闲 tick 零 setItem」逐字不变。
  * <p>
@@ -39,6 +39,11 @@ import java.util.List;
  * <b>边界</b>：本类**不**在 {@code buildItem()} 里写背包、**不**读任何渲染器状态 —— 它只产出物品。
  */
 public class ExampleSelfRefreshingSkill extends Skill {
+
+    //阶段 13 · t109：渲染组件引用改为**字段 + 在 start() 内赋值**（与全仓统一形态一致 ✓）——
+    //  R-4：取组件只能在本钩子（或新写/既有 start()）里做 ✗，不得放 awake()；
+    //  注册表装配期后冻结 ⇒ 缓存引用与按需查找**恒等** ✓（未装配时仍为 null ⇒ 下面的静默检查逐字保留 ✓）。
+    private HotbarRenderComponent renderComponent;
 
     /** 请求窗口起点（刻）：此前不请求 ⇒ 用于"请求前不刷"的对照窗。 */
     public static final int REQUEST_WINDOW_START_TICKS = 100;
@@ -64,7 +69,6 @@ public class ExampleSelfRefreshingSkill extends Skill {
         ticks++;
         if(ticks < REQUEST_WINDOW_START_TICKS || ticks > REQUEST_WINDOW_END_TICKS) return;
         if(ticks % REQUEST_PERIOD_TICKS != 0) return;
-        HotbarRenderComponent renderComponent = svc().components().get(HotbarRenderComponent.class);
         if(renderComponent != null){
             renderComponent.requestRepaint();
         }
@@ -122,5 +126,14 @@ public class ExampleSelfRefreshingSkill extends Skill {
         public ExampleSelfRefreshingSkill create(String id, ComponentServices services){
             return new ExampleSelfRefreshingSkill(id, services, this);
         }
+    }
+
+    /**
+     * **开始生效**（阶段 13 · t109）：把渲染组件**一次查好**缓存进字段 ✓（原先是在 `update()` 里按需查找 ✗）。
+     * <p>R-4：取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配期后冻结 ⇒ 与按需查找恒等 ✓。
+     */
+    @Override
+    public void start(){
+        renderComponent = svc().components().get(HotbarRenderComponent.class);
     }
 }

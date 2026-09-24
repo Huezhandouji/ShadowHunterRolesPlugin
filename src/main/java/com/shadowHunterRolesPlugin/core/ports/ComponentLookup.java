@@ -5,12 +5,12 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import java.util.List;
 
 /**
- * 组件服务端口（用户计划第一段：`ComponentServices` 只提供「玩家实例」与「**组件服务（组件查找 + 动态组件添加）**」）。
+ * 组件服务端口（`ComponentServices` 只提供「玩家实例」与「**组件服务（组件查找 + 动态组件添加）**」）。
  * <p>本端口就是那"组件服务"的**全部内容**：
  * <ul>
  * <li><b>查找</b>：{@link #get(Class)}（按类型，**第一个**）· {@link #getAll(Class)}（按类型，**全部**）·
  * {@link #getById(String)}（按 id，**第一个**）· {@link #all()}（当前序快照）；</li>
- * <li><b>动态添加</b>（ · 裁定④"运行期可增 / 可删 / 插位"）：
+ * <li><b>动态添加</b>（"运行期可增 / 可删 / 插位"）：
  * {@link #add(String, RoleComponent.Specification)} ·
  * {@link #insertAt(int, String, RoleComponent.Specification)} · {@link #remove(String)}。</li>
  * </ul>
@@ -108,7 +108,7 @@ public interface ComponentLookup {
  * **运行期动态删除**：先算**反向依赖**（P2）—— 若仍有组件把它声明为必需 ⇒
  * **拒绝删除** + **记日志** + 抛异常；否则 {@code stop()} → 回收该组件资源 → 移出容器。
  * <p><b>（id 可重复）</b>：本口删的是**添加顺序第一个**同 id 者，
- * 反向依赖表也**按那一个**现算（见 {@code ComponentRegistry#requiredBy(String)}）；
+ * 反向依赖表也**按那一个**实例计算（见 {@code ComponentRegistry#requiredBy(String)}）；
  * 其余同 id 者留在容器里。
  * @return 是否确实删除了一个组件（未注册 ⇒ {@code false}，无副作用）
  * @throws IllegalStateException 框架正在遍历组件表；或存在把本组件声明为必需的阻止者

@@ -4,7 +4,7 @@ import com.shadowHunterRolesPlugin.core.Faction;
 import org.bukkit.entity.Player;
 
 /**
- * **角色信息服务**（ · A1）：聚合根（{@code core/Role}）的**只读服务面**。
+ * **角色信息服务**：聚合根（{@code core/Role}）的**只读服务面**。
  * <p><b>为什么需要它</b>：角色的**阵营**是"一个角色一份、全局静态"的属性 ⇒ 按 ADR-0006 的通用判据
  * 归**聚合根**（{@code Role}）持有；而组件不能直接摸 {@code Role}/{@code RoleInstance}（那会把
  * 内部实现细节变成组件契约）⇒ 由本端口提供**读取与行为**的唯一入口。
@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
  * 阵营组件里的实现；**关系表仍留平台**（{@code platform.FactionLookup}：interface + 构造期注入 +
  * 静态数据，不随实例复制）。
  * <p><b>纯加性</b>：只新增本端口与它的实现，并把它挂进 {@code ComponentServices}；
- * **不删**任何既有成员 / 组件 / 端口 —— 删除与消费者接线由后续两张卡承担（见说明件 §3）。
+ * **不删**任何既有成员 / 组件 / 端口 —— 删除与消费者接线由后续两张卡承担（见 §3）。
  */
 public interface RoleInfo {
 

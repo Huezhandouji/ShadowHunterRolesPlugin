@@ -1,9 +1,8 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.core.Skill;
-import com.shadowHunterRolesPlugin.core.hotbar.RepaintRequestable;
-import com.shadowHunterRolesPlugin.core.hotbar.RepaintRequester;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
@@ -17,10 +16,15 @@ import java.util.List;
  * **「外观会自己变」的示例组件**（阶段 8 · t46）：本类同时是两项能力的**生产使用点**
  * （C-15 配套②：没有使用点的能力 = 未验证的能力）。
  * <p>
- * <b>它演示的第一件事 = 组件可以「请求重绘」</b>：组件**只请求、不写** —— 它持有
- * {@link RepaintRequester}（只有 {@code requestRepaint()} 一个方法），**不持有**渲染器、
+ * <b>它演示的第一件事 = 组件可以「请求重绘」</b>：组件**只请求、不写** —— 它从容器里取
+ * {@link HotbarRenderComponent}（阶段 12 · t86 起的**唯一**重绘通道），**不持有**渲染器、
  * **不持有**任何 Bukkit 库存对象。请求只置脏，真正的写入仍由框架在**帧末 flush** 完成
  * ⇒ 「空闲 tick 零 setItem」逐字不变。
+ * <p>
+ * <b>t86 的取代动作（不静默改写）</b>：旧形态是本类实现 <i>{@code RepaintRequestable}</i> 并由框架
+ * 把 <i>{@code RepaintRequester}</i> 绑给它 —— 那是**两条并存的重绘通道** ✗。t86 起改为
+ * 「**从容器取渲染组件、调 {@code requestRepaint()}**」这一条通道 ✓（旧的
+ * {@code RepaintRequestable} / {@code RepaintRequester} **两个类型已删除** ✓）。
  * <p>
  * <b>它演示的第二件事 = {@code dependsOnLiveState()} 为 {@code false} 的组件不被每 tick 重绘</b>（A8）：
  * 本类覆写了 {@link #buildItem()}，把父类画的 {@code " x.xs"} 秒数后缀**去掉** ⇒ 冷却期间它的外观
@@ -34,7 +38,7 @@ import java.util.List;
  * <p>
  * <b>边界</b>：本类**不**在 {@code buildItem()} 里写背包、**不**读任何渲染器状态 —— 它只产出物品。
  */
-public class ExampleSelfRefreshingSkill extends Skill implements RepaintRequestable {
+public class ExampleSelfRefreshingSkill extends Skill {
 
     /** 请求窗口起点（刻）：此前不请求 ⇒ 用于"请求前不刷"的对照窗。 */
     public static final int REQUEST_WINDOW_START_TICKS = 100;
@@ -43,9 +47,6 @@ public class ExampleSelfRefreshingSkill extends Skill implements RepaintRequesta
     /** 请求周期（刻）：窗口内每这么多刻请求一次。 */
     public static final int REQUEST_PERIOD_TICKS = 20;
 
-    /** 框架在装配期交给本组件的请求入口（**唯一**的重绘通道）。 */
-    private RepaintRequester repaintRequester;
-
     /** 本组件自己的活状态（外观里显示的计数）。 */
     private int ticks;
 
@@ -53,22 +54,19 @@ public class ExampleSelfRefreshingSkill extends Skill implements RepaintRequesta
         super(id, services, specification);
     }
 
-    @Override
-    public void bindRepaintRequester(RepaintRequester requester){
-        this.repaintRequester = requester;
-    }
-
     /**
      * 组件自己的状态变化点：窗口内每 {@value #REQUEST_PERIOD_TICKS} 刻**主动请求**一次重绘。
      * <p>这正是"外观由组件决定"所缺的那一环：框架并不知道本组件的外观需要更新。
+     * <p><b>t86</b>：请求走**渲染组件**这一条通道（容器查找；未装配时为 {@code null} ⇒ 静默不请求 ✓）。
      */
     @Override
     public void update(){
         ticks++;
         if(ticks < REQUEST_WINDOW_START_TICKS || ticks > REQUEST_WINDOW_END_TICKS) return;
         if(ticks % REQUEST_PERIOD_TICKS != 0) return;
-        if(repaintRequester != null){
-            repaintRequester.requestRepaint();
+        HotbarRenderComponent renderComponent = svc().components().get(HotbarRenderComponent.class);
+        if(renderComponent != null){
+            renderComponent.requestRepaint();
         }
     }
 

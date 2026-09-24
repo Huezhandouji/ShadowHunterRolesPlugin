@@ -58,7 +58,9 @@ public interface HotbarItemProviding {
      * ⇒ **既有 16 个组件的接受集逐字不变**。
      * <p>注意：本能力只回答"**要不要**每刻刷"；"**写不写**"仍由帧末 flush 决定（空闲 tick 零 setItem 不变）。
      * 外观依赖活状态、但变化**不是每刻**的组件（例如自己按需刷新计数的组件）应返回 {@code false}，
-     * 并在状态真的变了时用 {@link RepaintRequester#requestRepaint()} **主动请求** —— 那才是它的刷新节拍。
+     * 并在状态真的变了时用 {@code HotbarRenderComponent#requestRepaint()} **主动请求**
+     * —— 那才是它的刷新节拍（阶段 12 · t86 起请求走**渲染组件**这一条通道；
+     * 旧的 {@code RepaintRequester} 类型已删除 ✓）。
      */
     default boolean dependsOnLiveState() {
         return false;

@@ -12,8 +12,6 @@ import com.shadowHunterRolesPlugin.core.hotbar.HotbarItem;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarItemProviding;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarPresentable;
 import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
-import com.shadowHunterRolesPlugin.core.hotbar.RepaintRequestable;
-import com.shadowHunterRolesPlugin.core.hotbar.RepaintRequester;
 import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.event.EnergyChangeEvent;
@@ -25,6 +23,7 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.FactionComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
@@ -61,6 +60,12 @@ public class RoleInstance {
     private final BuffComponent buffComponent;
     private final TimerComponent timerComponent;
     private final FactionComponent factionComponent;
+    /**
+     * **阶段 12 · t86**：框架级**物品渲染组件** —— 渲染**意图面**（意图登记 + 置脏）的拥有者 ✓。
+     * <p><b>唯一写点未变</b> ✗：物品仍只由 {@link #hotbarRenderer} 在**帧末 flush** 里写；
+     * 本组件**不写物品**、也拿不到库存写入面 ✓（见 {@code HotbarRenderComponent} 的边界说明）。
+     */
+    private final HotbarRenderComponent hotbarRenderComponent;
 
     /** 7 个服务组件在**实例容器**里的 id（与 {@code ComponentServices} 的成员名同形 ⇒ 便于逐项对照）。 */
     private static final String SERVICE_ID_ENERGY = "energy";
@@ -71,6 +76,8 @@ public class RoleInstance {
     private static final String SERVICE_ID_FACTIONS = "factions";
     //阶段 10 · t73 Part A：`SERVICE_ID_DAMAGE` 已删除 —— 原 DamageComponent 并入 VitalsComponent
     //⇒ 框架服务组件由 7 个减为 6 个（`damage` 不再是独立服务组件；`DamagePort` 面不变，转发到生命组件）。
+    //阶段 12 · t86：**物品渲染组件**的容器 id（第 7 个框架级服务组件；与渲染器分工见 HotbarRenderComponent）
+    private static final String SERVICE_ID_HOTBAR_RENDER = "hotbarRender";
 
 
     //实例是否仍然有效：clear() 之后置为 false，组件里的延时任务用它做"实例已失效"守卫
@@ -127,16 +134,22 @@ public class RoleInstance {
      * **唯一的方法引用持有者**（阶段 5 判据 C-03）：供三条"程序化刷新"路径共用 ——
      * 冷却到点（启动时预约）、每 tick 到期扫描、显式结束冷却（S3）。
      * 它们都**不**额外产生裸直呼点（阶段 5 判据 C-02 的计数守恒：5 处直呼 + 1 处方法引用）。
+     * <p><b>阶段 12 · t86</b>：本 Runable 的实现从"直呼渲染器"改为经**渲染组件**的
+     * {@code requestRepaint()} 转调 ⇒ 框架自身置脏与组件请求**收敛到同一条通道** ✓
+     * （渲染组件再把置脏交给 {@code hotbarRenderer::markDirty} 这个 sink）✓。
      */
-    private final Runnable markHotbarDirty = hotbarRenderer::markDirty;
+    private final Runnable markHotbarDirty = this::requestHotbarRepaint;
     /**
-     * **组件侧"请求重绘"的唯一入口**（阶段 8 · t46）：交给实现了 {@link RepaintRequestable} 的组件
-     * （见 {@code initComponents} 的绑定点）。它**只置脏**、不写物品 ⇒ 组件**只能请求、不能写**，
-     * 「空闲 tick 零 setItem」与"写入仍由帧末 flush 完成"两条口径逐字不变。
-     * <p>与方法引用同源（同一个 {@code markHotbarDirty}）⇒ 组件请求与框架置脏走的是**同一条路径**，
-     * 不新增第二个置脏机制。
+     * **组件侧"请求重绘"的唯一入口**（阶段 8 · t46 建立；**阶段 12 · t86 收进渲染组件**）。
+     * <p><b>t86 的取代动作（不静默改写）</b>：旧形态是 <i>「组件实现 {@code RepaintRequestable}，
+     * 框架在装配期把 {@code RepaintRequester} 绑给它」</i> —— 那是**两条并存的重绘通道** ✗
+     * （组件侧一条 + 框架侧 {@link #markHotbarDirty} 一条）。t86 把它们**收敛为一条**：
+     * 组件与框架**都**经 {@link HotbarRenderComponent#requestRepaint()} ✓，
+     * 由该组件把置脏交给渲染器（{@code bindRepaintSink}）✓ ⇒ **禁两套并存** ✓。
+     * 旧的两个类型（{@code RepaintRequestable} / {@code RepaintRequester}）**已删除** ✓。
+     * <p>边界逐字未变：它**只置脏**、不写物品 ⇒ 组件**只能请求、不能写** ✓，
+     * 「空闲 tick 零 setItem」与"写入仍由帧末 flush 完成"两条口径不变 ✓。
      */
-    private final RepaintRequester repaintRequester = markHotbarDirty::run;
     private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
 
     //T-2 ①③：迁移标记已删 —— 所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）。
@@ -197,12 +210,19 @@ public class RoleInstance {
         //⑦ 伤害：四个原语（阶段 10 · t73 Part A 起由 VitalsComponent 承载 ⇒ 伤害与生命只有一个持有者 ✓）
         //   —— 原独立 DamageComponent 已删除，不再单独构造。
 
+        //⑧ 物品渲染（阶段 12 · t86）：**意图面**收进组件；置脏通道在装配期绑回渲染器 ⇒
+        //   「组件只能请求、不能写」逐字保留（唯一写点仍是 hotbarRenderer 的帧末 flush）✓
+        this.hotbarRenderComponent = new HotbarRenderComponent(SERVICE_ID_HOTBAR_RENDER,
+                createServices(SERVICE_ID_HOTBAR_RENDER));
+        this.hotbarRenderComponent.bindRepaintSink(hotbarRenderer::markDirty);
+
         //裁定④ 的**动态删除路径**入口（隔离时"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + P2 守卫）
         this.componentLookup = new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger());
 
         initComponents();
 
         //7 个服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
+        //（阶段 12 · t86 起为 7 个：6 个原服务组件 + 物品渲染组件）
         registerServiceComponents();
 
         //装配完成 → 冻结注册表（此后 getComponent 才合法）
@@ -216,6 +236,16 @@ public class RoleInstance {
         //（⇒ **构造期不创建任何任务**，构造失败不留下永久运行的 ticker）。
         //**为什么**：构造失败（含**非依赖类**的组件构造异常）必须在玩家身上**零痕迹**，
         //`RoleManager#selectRole` 才可能"先构造成功、再清旧角色"（本卡要收口的那条残留）。
+    }
+
+    /**
+     * **框架自身的置脏入口**（阶段 12 · t86）：经**物品渲染组件**转调 ⇒ 与组件侧请求
+     * **收敛到同一条通道** ✓（旧的独立 {@code markHotbarDirty → hotbarRenderer::markDirty} 直连已废止 ✗）。
+     * <p>用方法引用（{@code this::requestHotbarRepaint}）而不是 lambda：字段初始化式里**不能**读
+     * 尚未在构造器里赋值的 final 字段（Java 的 definite-assignment 规则）⇒ 方法引用把读取推迟到调用时 ✓。
+     */
+    private void requestHotbarRepaint() {
+        hotbarRenderComponent.requestRepaint();
     }
 
     /**
@@ -313,6 +343,7 @@ public class RoleInstance {
         registerServiceComponent(buffComponent);
         registerServiceComponent(timerComponent);
         registerServiceComponent(factionComponent);
+        registerServiceComponent(hotbarRenderComponent);
     }
 
     private void registerServiceComponent(RoleComponent component) {
@@ -464,12 +495,12 @@ public class RoleInstance {
             RoleComponent component = role.createComponent(componentId, services);
             if(component == null) continue;
 
-            //阶段 8 · t46：把「请求重绘」入口交给**实现了能力接口**的组件 —— 绑定时机 = 构造之后、
-            //awake()/start() 之前（生命周期在构造器尾部才广播）⇒ 组件在任何钩子里都能安全使用；
-            //未实现者**永远拿不到** requester（opt-in，服务集白名单保持恰好 10 成员）。
-            if(component instanceof RepaintRequestable requestable){
-                requestable.bindRepaintRequester(repaintRequester);
-            }
+            //阶段 12 · t86：组件侧不再被绑定一条**独立**的重绘通道 ✗ —— 需要请求重绘的组件改为
+            //经**渲染组件**这一条通道：`svc().components().get(HotbarRenderComponent.class)`
+            //（或按 id "hotbarRender"）拿到它，再调 requestRepaint() ✓。
+            //⇒ 框架侧（markHotbarDirty）与组件侧**收敛到同一条通道**（禁两套并存 ✓）；
+            //  旧 `RepaintRequestable` / `RepaintRequester` 两条通道**已删除** ✓。
+            //绑定时机的纪律不变：渲染组件本身在构造器里就已 bindRepaintSink（早于任何 awake/start）✓。
 
             //阶段 11 · t84：**创建后绑定**「持有这对端口的那一个实例」（F-1/F-2/F-3 的修复点）——
             //时机必须在构造之后、任何钩子（awake/start）之前（组件可能一醒就起冷却 / 登记任务）。

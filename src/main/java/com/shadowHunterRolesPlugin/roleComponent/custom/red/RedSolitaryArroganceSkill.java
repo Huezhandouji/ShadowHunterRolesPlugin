@@ -120,7 +120,7 @@ public class RedSolitaryArroganceSkill extends Skill {
 
     /**
      * **开始生效**：把生命组件**一次查好**缓存进字段 ✓。
-     * <p>为什么在 {@code start()} 而不是 {@code awake()}：硬规矩 **R-4** 禁止在 {@code awake()} 里
+     * <p>为什么在 {@code start()} 而不是 {@code awake()}：禁止在 {@code awake()} 里
      * 取用其他组件 ✗（awake 只做构造期自检 / 只读自身）；`start()` 相容器已冻结 ⇒ 容器查找合法 ✓。
      * <p>为什么缓存：本技能每 6 tick 结算一次，回血点在循环体内 ⇒ 重复查容器是纯浪费；
  * 端口引用本身也是**构造期就持有的引用** ⇒ 缓存与既有口径同族 ✓。
@@ -135,7 +135,7 @@ public class RedSolitaryArroganceSkill extends Skill {
 
     /**
      * 新基类（RoleComponent）停止钩子：容器在 legacy 扇出之后、
-     * `cancelAllAndClear()` **之前**广播 ⇒ 与旧 `LifecycleAware.stop(...)` 等价（O-5 的取消）；框架另有兜底（幂等）。
+     * `cancelAllAndClear()` **之前**广播 ⇒ 与旧 `LifecycleAware.stop(...)` 等价（取消）；框架另有兜底（幂等）。
      */
     @Override
     public void stop() {

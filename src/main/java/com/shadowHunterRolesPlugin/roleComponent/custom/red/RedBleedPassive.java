@@ -113,7 +113,7 @@ public class RedBleedPassive extends PassiveSkill {
 
     /**
      * **开始生效**：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
-     * <p>R-4：取组件只能在本钩子（或新写/既有 `start()`）里做 ✗ —— 不得放 `awake()`；
+     * <p>取组件只能在本钩子（或新写/既有 `start()`）里做 ✗ —— 不得放 `awake()`；
      * 注册表在装配期后冻结 ⇒ 缓存引用与按需解析**恒等** ✓。
      */
     @Override

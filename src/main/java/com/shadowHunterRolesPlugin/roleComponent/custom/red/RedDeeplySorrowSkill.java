@@ -13,14 +13,14 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
 
 /**
  * 黯然销魂（红）：持续扣减红的 SanTE，归零前给自己回血与力量。
- * <p><b>批次⑩/B10 的迁移口径</b>（T 块第 ⑧ 项的前置：四类 `*Aware` 实现者归零）：
+ * <p><b>迁移口径</b>（四类 `*Aware` 实现者归零）：
  * <ul>
  *   <li>去 legacy `UpdateAware` 与 `SanTEChangeAware` ⇒ 改走基类新钩子 {@link #update()} 与
  *       {@link #onSanTEChange(int, int)}（容器对**注册表内组件**广播；SanTE 侧为"真变化才派发"，
  * 由既有实现完成、不新增可见变化）；</li>
  *   <li>聚合根调用端口化：`instance.decreaseSanTE(10)` → **SanTE 组件**的 `decrease(10)`（直接用组件）；
  *       `instance.applyPotionEffect(…createEffect(45, 5/2))` → **Buff 组件**的 `applyPotionEffect(type, 45, 5/2)`（同上）
- *       （**同一条已记账路径** O-7）；`instance.startSkillCooldown(getId(), getCooldownTicks())` →
+ *       （**同一条已记账路径**）；`instance.startSkillCooldown(getId(), getCooldownTicks())` →
  *       **组件自持冷却**的 `startCooldown()`（状态归组件实例、框架只**转问** ✗）；</li>
  *   <li>**数值与间隔逐字不变**：冷却 `600` / 能量 `0` / 每秒（`20` tick）一结算 / 扣 `10` 点 SanTE /
  *       生命恢复 `45, 5` 与力量 `45, 2` / 音效 `ENTITY_WITHER_DEATH 2,1` 与 `ENTITY_WITHER_SHOOT 1,1`；</li>
@@ -49,9 +49,9 @@ public class RedDeeplySorrowSkill extends Skill {
 
     /**
      * **订阅 SanTE 变更**：**向 {@code SanTEComponent} 添加一条监听** ✓，而**不是**在类声明上
-     * `implements` 某个接口 ✗ —— 后者正是用户点名的方向错误（`SanTE` 早已是组件 ⇒ 硬规矩 R-1：
+     * `implements` 某个接口 ✗ —— 后者正是用户点名的方向错误（`SanTE` 早已是组件 ⇒
      * **不得再为它新增能力接口** ✗）。
-     * <p><b>时机 = {@code start()}</b>（R-4：`awake()` 只做构造期自检 / 只读自身，**不得取用其他组件** ✗），
+     * <p><b>时机 = {@code start()}</b>（`awake()` 只做构造期自检 / 只读自身，**不得取用其他组件** ✗），
      * 并与 {@link #stop()} 的移除成对 ✓（`addListener` 幂等 ⇒ 重复 start 不会重复登记 ✓）。
      * <p><b>通知顺序</b> = **添加先后** = 容器 `start()` 广播序（= 组件装配序）。
  * <b>与 {@code awake()} 是否同序需另证</b>（未做运行级取证）⇒ 不再宣称"awake 序" ✗。
@@ -108,7 +108,7 @@ public class RedDeeplySorrowSkill extends Skill {
         Player caster = svc().self().player();
 
         sante.decrease(10);
-        //药水记账（O-7）：经 **Buff 组件**的入口（与框架**同一条已记账路径**），clear() 时只回收本系统施加的效果
+        //药水记账：经 **Buff 组件**的入口（与框架**同一条已记账路径**），clear() 时只回收本系统施加的效果
         buff.applyPotionEffect(PotionEffectType.REGENERATION, 45, 5);
         buff.applyPotionEffect(PotionEffectType.STRENGTH, 45, 2);
         startCooldown();

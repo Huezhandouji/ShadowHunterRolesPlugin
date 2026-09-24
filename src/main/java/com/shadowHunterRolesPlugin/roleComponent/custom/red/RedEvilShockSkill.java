@@ -55,7 +55,7 @@ public class RedEvilShockSkill extends Skill{
                 p.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(61, 1));
                 p.addPotionEffect(PotionEffectType.SLOWNESS.createEffect(61, 3));
                 //结算5层流血：写账本的唯一公开入口（硬约束第 18 条前移）
-                //O-9：流血被动未注册时直接跳过，不能让本技能抛 NPE
+                //流血被动未注册时直接跳过，不能让本技能抛 NPE
                 if(bleed == null) continue;
                 bleed.requestResolve(p.getUniqueId(), 5);
             }
@@ -71,7 +71,7 @@ public class RedEvilShockSkill extends Skill{
 
     /**
      * **开始生效**：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
-     * <p>R-4：取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配后冻结 ⇒ 与按需解析恒等 ✓。
+     * <p>取组件只能在本钩子里做 ✗ —— 不得放 `awake()`；注册表装配后冻结 ⇒ 与按需解析恒等 ✓。
      */
     @Override
     public void start(){

@@ -8,7 +8,7 @@ package com.shadowHunterRolesPlugin.core.ports;
  * （{@code svc().components().get(...)} 或基类/组件的强类型读口），服务集不再转发它们。
  * <p>更早的三个成员（key/logger/hotbar）也早已删除：零使用者。
  * <p>
- * 由容器经 {@code roleComponent.ComponentFactory} 在**构造期**注入（阶段 4 收尾批⑤）：
+ * 由容器经 {@code roleComponent.ComponentFactory} 在**构造期**注入：
  * 组件在 {@code awake()} 之前即持有本记录，且不存在"创建后再注入"的中间态。
  */
 public record ComponentServices(

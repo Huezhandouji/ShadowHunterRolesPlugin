@@ -17,7 +17,7 @@ import java.util.List;
  * <p><b>查询语义（ · 用户新路线图第 1 条统一）</b>：类型条件 = **可赋值性**
  * （父类/接口查询命中子类实例），顺序 = **添加顺序**：
  * <ul>
- * <li>{@link #get(Class)} = 第一个符合条件的（**不是"具体类优先"** —— 旧措辞已按真实语义改正）；</li>
+ * <li>{@link #get(Class)} = 第一个符合条件的（**不是"具体类优先"** —— 已按真实语义改正）；</li>
  * <li>{@link #getAll(Class)} = 全部符合条件的（添加顺序；无人符合 ⇒ **空列表**）；</li>
  * <li>{@link #getById(String)} = 第一个 id 相等的（ 起 **id 可重复**）。</li>
  * </ul>
@@ -66,7 +66,7 @@ public interface ComponentLookup {
     RoleComponent getById(String id);
 
  /**
- * **按 id 取全部**（ · 用户裁定："`getById()` 返回找到的第一个，新增一个
+ * **按 id 取全部**："`getById()` 返回找到的第一个，新增一个
  * `getAllById()`，返回符合条件的组件的列表，**和 `get()` 和 `getAll()` 一样**"）。
  * <p>返回**全部** id 相等的组件，顺序 = **添加顺序**（容器当前序）；无人符合 ⇒ **空列表**（不是 null）；
  * 返回**不可变**列表。

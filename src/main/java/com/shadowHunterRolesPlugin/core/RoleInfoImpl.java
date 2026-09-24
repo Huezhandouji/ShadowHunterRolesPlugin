@@ -20,8 +20,6 @@ import java.util.List;
  * <p><b>（欠账 A 后半）</b>：{@code FactionComponent} **已整体删除** ⇒ 上面的
  * "照搬原组件"只作**历史沿革**读：本端口现在是**阵营读取的唯一入口** （{@link #faction()} 读聚合根
  * {@code Role#getFaction()}），且**不带写面** （R-1：写侧在 {@code Role#setFaction/resetFaction}）。
- * <p><b>旧口径原文</b>：「本卡纯加性：不删任何既有成员 /
- * 组件 / 端口」 —— 删除的那一半已由 落地（另一个旧原件见 {@link RoleInfo} 的 javadoc）。
  */
 final class RoleInfoImpl implements RoleInfo {
 

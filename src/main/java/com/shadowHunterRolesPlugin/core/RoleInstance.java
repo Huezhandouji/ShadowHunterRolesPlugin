@@ -74,8 +74,6 @@ public class RoleInstance {
  * `frameworkLevel.FactionComponent` 的**每实例持有已删除** —— 阵营不再是"每实例一个组件"的状态，
  * 而是**聚合根**（{@link Role}）上的一个声明值 ⇒ 读侧一律经 {@code roleInfo} 服务面
  * （{@link #roleInfo()}）、写侧经 {@link #setFaction} / {@link #resetFaction}（两者都转调到聚合根）。
- * <p><b>旧口径原文</b>：本处列的"能量 / SanTE / 阵营的真值
- * 都在组件里、本类不持有这些字段" —— 起 **faction 一项例外**。
  */
     private final HotbarRenderComponent hotbarRenderComponent;
 
@@ -139,29 +137,29 @@ public class RoleInstance {
  /**
  * **聚合根只读服务面**（ 建立；**成为阵营读取的唯一入口**）：
  * {@link Role} 的只读视图（id / 描述 / **阵营** / 两个行为）。
- * <p><b>本卡</b>：原 `RoleInstance#factionComponent()` 读口与它的
+ * <p><b>本组件</b>：原 `RoleInstance#factionComponent()` 读口与它的
  * **读侧视图**（{@code getFaction} + 三个 {@code isHostileTo}）**已删除** ⇒ 阵营读取一律走本端口
  * （组件侧 = {@code svc().roleInfo()}，框架侧 = {@link #roleInfo()}）。
  * <p><b>只读，不带写面</b>（R-1）：写入仍在**聚合根** {@link Role#setFaction} / {@link Role#resetFaction}。
  */
     private final RoleInfo roleInfo = new RoleInfoImpl(this);
  /**
- * **唯一的方法引用持有者**（阶段 5 判据 C-03）：供三条"程序化刷新"路径共用 ——
+ * **唯一的方法引用持有者**：供三条"程序化刷新"路径共用 ——
  * 冷却到点（启动时预约）、每 tick 到期扫描、显式结束冷却（S3）。
- * 它们都**不**额外产生裸直呼点（阶段 5 判据 C-02 的计数守恒：5 处直呼 + 1 处方法引用）。
+ * 它们都**不**额外产生裸直呼点（计数守恒：5 处直呼 + 1 处方法引用）。
  * <p><b></b>：本 Runable 的实现从"直呼渲染器"改为经**渲染组件**的
  * {@code requestRepaint()} 转调 ⇒ 框架自身置脏与组件请求**收敛到同一条通道**
  * （渲染组件再把置脏交给 {@code hotbarRenderer::markDirty} 这个 sink）。
  */
     private final Runnable markHotbarDirty = this::requestHotbarRepaint;
  /**
- * **组件侧"请求重绘"的唯一入口**（阶段 8 · 建立；** 收进渲染组件**）。
+ * **组件侧"请求重绘"的唯一入口**（收进渲染组件）。
  * <p><b> 的取代动作（不静默改写）</b>：旧形态是 <i>「组件实现 {@code RepaintRequestable}，
  * 框架在装配期把 {@code RepaintRequester} 绑给它」</i> —— 那是**两条并存的重绘通道**
  * （组件侧一条 + 框架侧 {@link #markHotbarDirty} 一条）。 把它们**收敛为一条**：
  * 组件与框架**都**经 {@link HotbarRenderComponent#requestRepaint()}，
  * 由该组件把置脏交给渲染器（{@code bindRepaintSink}） ⇒ **禁两套并存**。
- * 旧的两个类型（{@code RepaintRequestable} / {@code RepaintRequester}）**已删除**。
+ * 那两个类型（{@code RepaintRequestable} / {@code RepaintRequester}）**已删除**。
  * <p>边界逐字未变：它**只置脏**、不写物品 ⇒ 组件**只能请求、不能写**，
  * 「空闲 tick 零 setItem」与"写入仍由帧末 flush 完成"两条口径不变。
  */
@@ -251,12 +249,12 @@ public class RoleInstance {
  //启动 ticker / 构造期同步首刷；`BuffManager` 的每 tick 更新同样推迟到那一相
  //（⇒ **构造期不创建任何任务**，构造失败不留下永久运行的 ticker）。
  //**为什么**：构造失败（含**非依赖类**的组件构造异常）必须在玩家身上**零痕迹**，
- //`RoleManager#selectRole` 才可能"先构造成功、再清旧角色"（本卡要收口的那条残留）。
+ //`RoleManager#selectRole` 才可能"先构造成功、再清旧角色"（那条残留）。
     }
 
  /**
  * **框架自身的置脏入口**（）：经**物品渲染组件**转调 ⇒ 与组件侧请求
- * **收敛到同一条通道** （旧的独立 {@code markHotbarDirty → hotbarRenderer::markDirty} 直连已废止）。
+ * **收敛到同一条通道** （原先的独立 {@code markHotbarDirty → hotbarRenderer::markDirty} 直连已废止）。
  * <p>用方法引用（{@code this::requestHotbarRepaint}）而不是 lambda：字段初始化式里**不能**读
  * 尚未在构造器里赋值的 final 字段（Java 的 definite-assignment 规则）⇒ 方法引用把读取推迟到调用时。
  */
@@ -266,13 +264,13 @@ public class RoleInstance {
 
  /**
  * **第二相：激活**（ · P6 两阶段构造）—— 把原先写在构造器里、**有玩家可见副作用**的
- * 那一段原样搬到这里：语句、顺序、可见时机与迁移前**逐字一致**，唯一差别是**调用时机**
+ * 那一段原样搬到这里：语句、顺序、可见时机与既有实现**逐字一致**，唯一差别是**调用时机**
  * （由调用方在"新实例已构造成功、旧角色已清理"之后调用）。
- * <p><b>为什么必须拆两相</b>：旧写法是"先 {@code clear()} 旧角色、再裸构造新实例"⇒ 构造一旦失败，
+ * <p><b>为什么必须拆两相</b>：早先写法是"先 {@code clear()} 旧角色、再裸构造新实例"⇒ 构造一旦失败，
  * 玩家**先丢角色**。而字面意义的"先构造后清理"又会踩 实测的三条约束 ——
  * 旧实例的 {@code clear()} 会 ① 按**共享 key** 移除新实例刚加的 {@code role_health_modifier}
  * （最大生命掉回 20）② 清空新实例刚渲染的热键栏 ③ 移除同类型药水。那三条之所以成立，
- * 正是因为**旧写法的构造期就已经把这些可见状态写下去了**；拆出本相后，"清旧"发生在
+ * 正是因为**构造期就已经把这些可见状态写下去了**；拆出本相后，"清旧"发生在
  * **新实例写任何可见状态之前** ⇒ 三条约束全部落空（逐条对照见交付说明的 A3 一节）。
  * <p><b>幂等</b>：重复调用只生效一次（{@code activated} 护栏）—— 否则会重复启动 ticker、
  * 重复广播生命周期（{@code awake()} 约定幂等，但 {@code start()} 不约定）。
@@ -286,8 +284,8 @@ public class RoleInstance {
         if(!valid) return;
         activated = true;
 
- //① buff 记账表的每 tick 更新（原在构造期由 `BuffManager` 构造器启动，本卡移到这里）：
- // **提交顺序与迁移前相同** —— 先于实例 ticker 提交 ⇒ 同一 tick 内先跑记账、再跑组件 update。
+ //① buff 记账表的每 tick 更新（原在构造期由 `BuffManager` 构造器启动，现移到这里）：
+ // **提交顺序与既有实现相同** —— 先于实例 ticker 提交 ⇒ 同一 tick 内先跑记账、再跑组件 update。
         buffComponent.manager().startUpdater();
 
  //② 设置生命
@@ -312,12 +310,12 @@ public class RoleInstance {
                 1L
         );
 
- //④ 阶段 5 · 4.4：构造期**同步首刷一次**（与迁移前的可见时机逐字一致 = 选角色瞬间热键栏即就绪、零延迟）；
+ //④ 构造期**同步首刷一次**（可见时机与既有实现逐字一致 = 选角色瞬间热键栏即就绪、零延迟）；
  //首个 tick 因置脏初值为 true 还会再写一次同内容（不可见、且此后空闲 tick 不再写）。
         hotbarRenderer.render();
     }
 
- //平台上下文：阶段 2 的组件取用入口（阶段 4 起逐批收窄； 后服务集只剩三个成员）
+ //平台上下文：组件取用入口（逐批收窄后服务集只剩三个成员）
     public RolesContext rolesContext() { return platform; }
 
  //组件注册表（框架内部：装配、资源兜底、getComponent 查找）
@@ -361,7 +359,7 @@ public class RoleInstance {
     }
 
  /**
- * **按类型取本实例内的组件**（ · 冻结件 §4.6 的"按类型查找"读口；C-04）。
+ * **按类型取本实例内的组件**（"按类型查找"读口）。
  * <p>与 {@code componentRegistry().getByType(...)} 同源（同一实现点），语义：
  * 返回**添加顺序第一个**可赋值给 {@code type} 的组件（父类/接口查询命中子类实例）；未注册 ⇒ {@code null}；
  * **装配完成之前**调用 ⇒ 抛 {@code IllegalStateException}（既有装配期护栏）。
@@ -404,9 +402,9 @@ public class RoleInstance {
 
  /**
  * 组件与其**一对一**的服务集（ 后为三个成员：玩家实例面 / 组件查找 / 聚合根只读面）。
- * <p><b>阶段 8 前置</b>：冷却表已合并为**单一命名空间** ⇒ 本方法**不再需要 kind**
+ * <p><b>前置</b>：冷却表已合并为**单一命名空间** ⇒ 本方法**不再需要 kind**
  * （合并前"按 kind 选表"的构造期绑定，是"删 kind 枚举"的硬阻塞）。
- * 阶段 8 本卡把 kind 枚举整个删掉 ⇒ 注册处也不再承载任何"权威种类"。
+ * kind 枚举已整个删掉 ⇒ 注册处也不再承载任何"权威种类"。
  * <p><b></b>：{@code componentId} 形参**保留**（动态添加路径的服务集工厂签名不变：
  * {@code ComponentLookupImpl} 吃的就是 {@code Function<String, ComponentServices>}），
  * 但服务集本身**不再按 id 绑定任何资源** —— 资源归属一律由组件自己按请求者登记。
@@ -416,7 +414,7 @@ public class RoleInstance {
                 new SelfImpl(this),
  //：组件服务 = 查找 + **动态添加** —— 服务集工厂传进去，运行期新增的组件
  //与装配期组件走**同一条**构造路径（同一服务集口径）；日志用于 P2 的
- //"拒绝删除被依赖组件"留痕（点名被删组件 / 阻止者 / 缺的类型）
+ //"拒绝删除被依赖组件"的日志（点名被删组件 / 阻止者 / 缺的类型）
                 new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger()),
  //（A2）：角色信息服务（聚合根只读面）；
  //：构造点仍是**这一处** —— 本类持有同一实例并给出框架侧读口 {@link #roleInfo()}
@@ -437,7 +435,7 @@ public class RoleInstance {
                 component.getId(), entry.getProvidedType(), entry.getRequiredTypes()));
     }
 
- // ───────── 阶段 4：施放 / 攻击管道（新旧路径并存；开关默认旧路径 ⇒ 行为不变） ─────────
+ // ───────── 施放 / 攻击管道（单一入口 = handleCast/handleAttack） ─────────
 
  /**
  * 新路径施放入口。返回 {@code true} = 本次已由管道处理（旧路径不再插手）；
@@ -490,11 +488,11 @@ public class RoleInstance {
     }
 
  /**
- * 组件初始化（阶段 6 · 统一装配）：**只遍历 {@code role.getComponents()} 一次** ——
- * 遍历顺序 = `Builder.add*` 的调用顺序 = **纯注册序**（旧的三段遍历
+ * 组件初始化（统一装配）：**只遍历 {@code role.getComponents()} 一次** ——
+ * 遍历顺序 = `Builder.add*` 的调用顺序 = **纯注册序**（早先的三段遍历
  * 「技能 → 被动 → 主武器」已删除，见交付说明的派发序申报）。
- * <p>阶段 8：**没有任何"种类"值**需要传递或读取（kind 枚举已删）；
- * **服务集构造也不再需要 kind**（阶段 8 前置：冷却表已合并为单一命名空间）。
+ * <p>**没有任何"种类"值**需要传递或读取（kind 枚举已删）；
+ * **服务集构造也不再需要 kind**（冷却表已合并为单一命名空间）。
  */
     private void initComponents(){
         for(Map.Entry<String, Role.ComponentEntry> entry : role.getComponents().entrySet()){
@@ -713,7 +711,7 @@ public class RoleInstance {
     private void triggerLifecycleAwake(){
         if(player == null ) return;
 
- //阶段 4（B②-c）：为**注册表内组件**广播新基类钩子 awake()。
+ //为**注册表内组件**广播新基类钩子 awake()。
  //广播给"全部注册组件"：所有组件的新钩子由各组件自行实现（基类提供默认空实现）；
  //按迁移状态分支会引入第二套判据（与硬约束 §20 删总闸的教训同类）。legacy 生命周期扇出已在 T-1 ④ 删除。
  //遍历窗口（）：广播期间**禁止**增/删/插位（注册表在窗口内拒绝写口）
@@ -729,7 +727,7 @@ public class RoleInstance {
     private void triggerLifecycleStart(){
         if(player == null ) return;
 
- //阶段 4（B②-c）：为注册表内组件广播新基类钩子 start()（顺序 = 注册表顺序；理由同 awake 处注释）
+ //为注册表内组件广播新基类钩子 start()（顺序 = 注册表顺序；理由同 awake 处注释）
  //遍历窗口（）：同 awake 处；：同 awake 处（唯一受保护调用）
         withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
@@ -742,9 +740,9 @@ public class RoleInstance {
     private void triggerLifecycleStop(){
         if(player == null ) return;
 
- //阶段 4（B②-c）：为注册表内组件广播新基类钩子 stop()。
+ //为注册表内组件广播新基类钩子 stop()。
  //**顺序说明**：新钩子按**注册表顺序**停止（legacy 逆序扇出已在 T-1 ④ 删除）。
- //两者不会对同一组件双触发同一逻辑 —— 迁移后的组件**不再实现 legacy 生命周期接口**，
+ //两者不会对同一组件双触发同一逻辑 —— 组件**不再实现 legacy 生命周期接口**，
  //未迁移组件则对基类 stop() 是**默认空实现** ⇒ 任一组件在任一时刻只被"真实逻辑"处理一次。
  //**幂等说明**：若组件在 stop() 里自行取消任务，随后 clear() 的 cancelAllAndClear() 仍会取消其
  //资源表内的同一句柄 ⇒ 重复 cancel 幂等（Task.cancel() 对已取消句柄是 no-op）。
@@ -769,7 +767,7 @@ public class RoleInstance {
     private int sanTEPendingValue = Integer.MIN_VALUE;
 
  /**
- * SanTE 变更的**唯一派发点**（阶段 4 追补 I-15 容器直派 + I-14 重入护栏）。
+ * SanTE 变更的**唯一派发点**（容器直派 + 重入护栏）。
  * <ul>
  * <li><b>真变化才派发</b>（{@code pre == now} 直接返回）—— B⑨ 口径不变：SanTE 已为 0 时再扣不再通知组件；</li>
  * <li><b>禁止嵌套派发</b>：派发期间组件再次改写 SanTE ⇒ 只把最新值记为待发并立即返回；</li>
@@ -824,7 +822,7 @@ public class RoleInstance {
  * **凡关注点已是组件 ⇒ 不得再为它新增能力接口** （SanTE 的家就是 `SanTEComponent`）。
  * <p>遍历的是**监听器名单**（`santeComponent.forEachListener`），**不是**容器注册表
  * ⇒ 「谁关心」由**订阅**表达，不再由接口/继承表达。
- * <p><b>未改的两件</b>（`` 已确立、本卡原样保留）：**逐个**经 {@code guardedCall}
+ * <p><b>未改的两件</b>（已确立、原样保留）：**逐个**经 {@code guardedCall}
  * （异常 ⇒ 只隔离抛异常的那一个、其余照常收到）· 整段在 {@link #withinIterationWindow} 里
  * （⇒ 真四步在窗口关闭后执行）。
  * <p><b>顺带</b>：派发完再调 {@code broadcastChange} —— 「订阅者派发」与「平台侧通道」都归本组件
@@ -853,9 +851,9 @@ public class RoleInstance {
  //：已隔离 ⇒ 本实例已死（组件已全部移除、角色已被清空）⇒ 不再派发
         if(quarantined) return;
 
- //阶段 4（B⑤）：为**注册表内组件**广播新基类钩子 update()。
+ //为**注册表内组件**广播新基类钩子 update()。
  //**顺序说明**：按**注册表顺序**遍历（legacy 三段扇出已在 T-1 ④ 删除，无先后关系）；
- //所有组件都对基类 update() 自行实现（基类默认空实现）；本批组件均已迁移（T-2 ① 后无迁移标记）
+ //所有组件都对基类 update() 自行实现（基类默认空实现）；组件均已迁移（无迁移标记）
  //**不再实现 legacy 更新接口** ⇒ 只被这一条路径调用，不会双触发。
  //遍历窗口（）：**update() 广播期间禁止增/删/插位**（"禁止遍历中修改"的落点）
  //：唯一受保护调用 —— 组件在 update() 里抛 ⇒ 整实例隔离（窗口关闭后执行四步）
@@ -869,9 +867,9 @@ public class RoleInstance {
         if(quarantined) return;
 
 
- //阶段 5 · 4.4 帧末 flush（落点 = tick 末尾，紧接组件更新与到期扫描之后）：
+ //帧末 flush（落点 = tick 末尾，紧接组件更新与到期扫描之后）：
  //① 判脏 → ② 写物品（唯一写点 = HotbarRenderer.render）→ ③ 清脏（此顺序不可交换）
- //入口条件并入 B-2（阶段 8 口径，**与冻结口径等价**）：**外观含秒数**的占栏位组件在冷却
+ //入口条件（**与冻结口径等价**）：**外观含秒数**的占栏位组件在冷却
  //⇒ 每 tick 至少刷一次（否则技能名里的 " x.xs" 不再逐 tick 递减 = 可见行为变化）。
  //**主武器不让入口因它而变**（冷却名不带秒数 ⇒ 冻结差异；见 hasCoolingTickingComponent）。
         if(hotbarRenderer.isDirty() || hasCoolingTickingComponent()){
@@ -902,19 +900,19 @@ public class RoleInstance {
     }
 
  /**
- * B-2 谓词（阶段 8 口径；**与冻结口径等价**）：是否存在**外观依赖活状态**的**占栏位**组件正在冷却。
+ * 帧入口谓词（**与冻结口径等价**）：是否存在**外观依赖活状态**的**占栏位**组件正在冷却。
  * <p>作用 = 让"冷却中每刻至少刷一次"成立：技能名里的 {@code x.xs} 才会逐刻递减
  * （装饰搬进组件之后，框架只剩 {@link ActiveComponent#isCoolingDown()} 这条读口）。
  * <p><b>判据由「{@code instanceof Skill}」下沉为「组件自报的值」</b> ——
  * 渲染组件的读口 {@code dependsOnLiveStateOf(component)}。理由（C-15 第三个实例测试）：
- * 旧写法把"外观含秒数"**写死成具体类** ⇒ ① 第三类带倒计时外观的组件加进来**必须改框架文件**；
+ * 早先写法把"外观含秒数"**写死成具体类** ⇒ ① 第三类带倒计时外观的组件加进来**必须改框架文件**；
  * ② 覆写掉秒数外观的 {@code Skill} 子类**仍被每 tick 重绘**。现在框架**不再点名任何具体组件类**，
  * 接受集由组件自报 ⇒ 新组件只加新文件（默认 {@code false}，需要就覆写 {@code true}）。
  * <p><b>等价性（与旧判据逐字相同）</b>：{@code core/Skill} 覆写为 {@code true}，主武器与被动保持默认
  * {@code false} ⇒ 既有 16 个组件的真值表不变（两侧对拍见交付说明）。
  * <p><b>边界（A12）</b>：主武器**不得**让帧入口因它而变 —— {@code core/MainWeapon} 家族的冷却名
  * **不带**秒数（冻结差异）⇒ 自报值为 {@code false} ⇒ 本谓词对它恒 {@code false} ⇒ 主武器冷却不驱动
- * 每 tick 刷新，与迁移前一致。
+ * 每 tick 刷新，与既有实现一致。
  * <p>接受集成立性：占栏位组件全是主动组件家族（该家族同时提供声明面与
  * {@link ActiveComponent#isCoolingDown()} 的冷却读口）⇒ 被本谓词检查到的组件一定能回答
  * {@code dependsOnLiveState()} 与 {@code isCoolingDown()}。
@@ -1124,7 +1122,7 @@ public class RoleInstance {
         while (guard++ < 512) {
             RoleComponent pick = null;
             for (RoleComponent component : componentRegistry.all()) {
- //：反向依赖按**实例**现算（旧写法 requiredBy(id) 在重复 id 下算的是"第一个同 id 者"
+ //：反向依赖按**实例**现算（既有写法 requiredBy(id) 在重复 id 下算的是"第一个同 id 者"
  //⇒ 被检查的组件可能不是挑出来的那一个）。移除仍走动态删除路径（按 id ⇒ 第一个同 id 者）；
  //若因此被 P2 拒绝，下面的 catch 会记 SEVERE 并强制移除 ⇒ 失败面仍然干净。
                 if (componentRegistry.requiredBy(component).isEmpty()) {
@@ -1157,7 +1155,7 @@ public class RoleInstance {
         return player == null || player.getName() == null ? "<unknown>" : player.getName();
     }
 
- //阶段 5 · 4.4：旧的两条每 tick 轮询判定（"检测是否应该更新物品"）已删 ——
+ //两条每 tick 轮询判定（"检测是否应该更新物品"）已删 ——
  //其中一条是恒假死路径，另一条的语义（B-2）并入 triggerUpdate 末尾的帧末 flush 入口条件。
 
  //清除这个实例时使用，重置玩家状态
@@ -1169,7 +1167,7 @@ public class RoleInstance {
 
         triggerLifecycleStop();
 
- //阶段 4：框架兜底回收组件登记的全部资源（定时器等）——组件忘了取消也不会泄漏
+ //框架兜底回收组件登记的全部资源（定时器等）——组件忘了取消也不会泄漏
         componentRegistry.cancelAllAndClear();
 
         if(updateTask != null){

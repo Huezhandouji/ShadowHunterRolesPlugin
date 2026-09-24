@@ -13,9 +13,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 统一热键栏渲染器（**阶段 5 · 4.4 起为唯一渲染者**；**阶段 8 起只保留管道职责**）。
+ * 统一热键栏渲染器（**唯一渲染者**；**只保留管道职责**）。
  * <p>
- * 契约（指南 §3.5 / §3.5.1，阶段 8 修订）：
+ * 契约：
  * <ul>
  * <li><b>什么时候写</b>：只有 {@link #markDirty()} 被调用后（或"有占栏位组件在冷却"，见下）帧末 flush
  * 才会写物品；<b>空闲 tick 零 setItem</b>（无脏、无冷却）；</li>
@@ -27,7 +27,7 @@ import java.util.Map;
  * <li>组件**不参与**渲染调度：没有 HotbarPort，也没有组件可调用的 markDirty。</li>
  * </ul>
  * <p>
- * <b>阶段 8 · 归属迁移（对照）</b>：本类原来自己做六步装饰（{@code buildIcon} + {@code applySkill} /
+ * <b>归属迁移（对照）</b>：本类原来自己做六步装饰（{@code buildIcon} + {@code applySkill} /
  * {@code applyMainWeapon} + {@code stateOf}）；现在这些**全部搬进组件基类**
  * （`core/Skill#buildItem()` 与 `core/MainWeapon#buildItem()`），本类退化为
  * 「按注册序遍历 → 取 {@code buildItem()} → 唯一写点落位」。由此，八串冻结字面量
@@ -87,7 +87,7 @@ public final class HotbarRenderer {
 
  /**
  * **变化判据的纯函数（判据骨架）**（ · B3）：**不含任何 Bukkit 类型** ⇒ 可**离线**单测
- * （B5 要求"基线 + 本卡新增"用例 ⇒ 本函数就是新增用例的被测对象）。
+ * （它是"基线 + 新增"用例的被测对象）。
  * <p>它只回答**判据的决策形状**，把"两个内容是否相等"留给调用方（`incomingDifferent`）——
  * 因为"相等"必须用项目既有的 L2 值语义（{@link ItemStack#equals}）判定，那属**运行期**，
  * 不该为了好测而在生产代码里塞一个假的等于号。
@@ -131,7 +131,7 @@ public final class HotbarRenderer {
  * 帧末 flush 的**写物品段**（全仓唯一渲染写点）：**按注册序遍历组件表**，遇带栏位者落位，
  * 物品由渲染组件的读口 {@code buildItemOf(component)} 产出。
  * <p>遍历的是 {@code Role.getComponents()}（`LinkedHashMap` = 装配调用序）：**每个栏位至多被写一次**
- * （装配期已禁止重复栏位）⇒ 落位结果与旧实现逐格相同；「注册序 = 渲染序」因此不依赖槽位表的迭代顺序。
+ * （装配期已禁止重复栏位）⇒ 落位结果与既有实现逐格相同；「注册序 = 渲染序」因此不依赖槽位表的迭代顺序。
  * <p>只对**已注册**的组件生效（未知 id 跳过）；**不占栏位者跳过**（被动天然走这一支）；
  * **不产出物品者跳过**（读口回 {@code null}；仓内 = 只 extends RoleComponent 且不上热键栏的组件）。
  * <p>本方法**不判断状态、不拼文案、不写识别键、不读任何表现 getter** —— 那些都是组件画法的一部分。

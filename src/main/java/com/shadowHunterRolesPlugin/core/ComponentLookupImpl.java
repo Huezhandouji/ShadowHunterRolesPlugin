@@ -67,7 +67,7 @@ final class ComponentLookupImpl implements ComponentLookup {
     }
 
  /**
- * **按 id 取全部**（ · 用户裁定）：与 {@link #getAll(Class)} 对称。
+ * **按 id 取全部**：与 {@link #getAll(Class)} 对称。
  * <p><b>实现只用 {@code registry} 的公开读口</b>（{@code all()} 线性过滤）⇒ **不改 {@code core/dispatch/}**
  * （它在 out of scope）；顺序 = 容器当前序 = **添加顺序**；无人符合 ⇒ **空列表**；
  * {@code id == null} ⇒ 空列表（与 {@code getById(null) == null} 同口径：都不抛）。
@@ -113,7 +113,7 @@ final class ComponentLookupImpl implements ComponentLookup {
             throw new IndexOutOfBoundsException("Component index " + index + " is out of range [0, " + registry.size() + "].");
         }
  //（用户新路线图第 2 条）：**id 唯一性护栏已删除** —— 同一个 id 可以添加多次。
- //（旧写法在这里抛 "Component id already registered: " + id；只删 ComponentRegistry 里那一条
+ //（这里抛 "Component id already registered: " + id；只删 ComponentRegistry 里那一条
  // 是不够的，因为运行期 add 走的是本方法 ⇒ 两处都必须放开）
 
  //声明来源 = 描述符（与装配期同一个 freeze() 快照）

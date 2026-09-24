@@ -11,8 +11,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 组件注册表（设计 §5.1 / §9 / 阶段 10 §4.6）：**组件集合（动态序）** + **每组件资源表** + 组件查找。
- * <p><b>：容器语义放开</b>（裁定④ + 冻结件 §4.6）。改前是"装配即冻"——
+ * 组件注册表：**组件集合（动态序）** + **每组件资源表** + 组件查找。
+ * <p><b>容器语义放开</b>（改前是"装配即冻"）——
  * {@code register()} 在 {@code frozen} 之后抛、{@code get/getById} 在**非** frozen 时抛 ⇒
  * 运行期**不可能**增删组件。现在改成**写放开、读始终可用**：
  * <ul>
@@ -36,7 +36,7 @@ import java.util.Map;
  * <li>{@link #getById(String)} = **第一个** id 相等的（重复 id 下与 {@link #removeById} 同口径）。</li>
  * </ul>
  * <p><b>顺序语义</b>：{@link #all()} 的返回顺序 = **容器内当前序**（装配序 + 运行期追加/插位的实际位置）
- * ⇒ 它就是**渲染序与派发序**（冻结件 §5 第 8 项"动态序"）。{@link #all()} 返回**不可变快照**
+ * ⇒ 它就是**渲染序与派发序**（动态序）。{@link #all()} 返回**不可变快照**
  * （写时复制），因此框架遍历期间即使有并发修改请求（会被窗口护栏拒绝）也不会破坏本次遍历。
  */
 public final class ComponentRegistry {
@@ -78,7 +78,7 @@ public final class ComponentRegistry {
 
  /**
  * **在指定下标插入**一个组件并登记其依赖声明（运行期"插位"；{@code index == size()} 等价于追加）。
- * <p>护栏（按序检查，失败一律不留痕）：① null ⇒ {@code NullPointerException}；
+ * <p>护栏（按序检查，失败即拒）：① null ⇒ {@code NullPointerException}；
  * ② **遍历窗口内** ⇒ {@code IllegalStateException}；③ 下标越界 ⇒ {@code IndexOutOfBoundsException}。
  * <p><b>（用户新路线图第 2 条）：id 唯一性已放开</b> —— 同一个 id **可以**在容器内出现多次
  * （旧护栏 ④"id 已存在 ⇒ {@code IllegalArgumentException}" 已删除）。随之而来的两条口径：
@@ -195,11 +195,11 @@ public final class ComponentRegistry {
 
  /**
  * **反向依赖表（现算）· 按实例**：谁把 {@code target} 提供的类型声明为**必需**依赖。
- * <p><b>★ 的实质修正</b>：旧实现"自己不算提供者"是**按 id 排除**的
+ * <p><b>实质修正</b>：既有实现"自己不算提供者"是**按 id 排除**的
  * （{@code if (id.equals(component.getId())) continue;}）⇒ id 可重复之后，它会**把另一个同 id 的
  * 依赖者也一并跳过** ⇒ 反向依赖表**漏掉真正的阻止者** ⇒ 删除守卫误判"无人依赖"。
  * 现在改为**按实例排除**（{@code component == target}）。
- * <p>阻止者**按 id 入表**（与旧口径一致：一个阻止者只记一条）；当**多个阻止者共享同一 id** 时，
+ * <p>阻止者**按 id 入表**（与既有口径一致：一个阻止者只记一条）；当**多个阻止者共享同一 id** 时，
  * 第 2 个起加 `#2`/`#3`… 后缀 ⇒ **一个阻止者都不会被静默合并掉**
  * （判据：两个同 id 组件各自被他人必需 ⇒ 表里两条）。
  */
@@ -242,7 +242,7 @@ public final class ComponentRegistry {
  /**
  * **候选声明的缺必需依赖清单（现算）**：{@code 缺的类型全名 → 该类型}（空 = 齐）。
  * <p>口径与装配期同源：候选**自己不算提供者**。
- * <p><b>（id 可重复）的实质修正</b>：旧实现把"自己不算提供者"写成
+ * <p><b>id 可重复的实质修正</b>：既有实现把"自己不算提供者"写成
  * {@code if (candidate.id().equals(component.getId())) continue;} —— 而候选此刻**还不在容器里**
  * （本方法只在 {@code add}/{@code insertAt} 的注册**之前**调用）⇒ 那条跳过从来只可能排除
  * **另一个同 id 的既有组件** ⇒ id 可重复之后会**误报"缺依赖"**（把一个真实的提供者当成自己跳过）。
@@ -336,8 +336,8 @@ public final class ComponentRegistry {
  * 而用户第 1 条明写"父类**或接口**查询命中子类实例" ⇒ 改为无上界 {@code <T>} + {@code type.cast(...)}
  * （匹配时才 cast ⇒ 对任意 {@code type} 都**安全**：不匹配就返回 null / 空列表）。
  * 既有调用点（{@code T extends RoleComponent} 的实参）**源码级不变**。
- * <p><b>不是"具体类优先"</b>（ 修正旧措辞）：旧 javadoc 写着"具体类优先"，而实现一直是
- * 纯线性扫描 ⇒ 那是对**行为撒谎的值**家族 ⇒ 本卡按真实语义改写 →。
+ * <p><b>不是"具体类优先"</b>：早先的 javadoc 写着"具体类优先"，而实现一直是
+ * 纯线性扫描 ⇒ 那是对**行为撒谎的值**家族 ⇒ 已按真实语义改写。
  * <p>未注册 → {@code null}；冻结前调用 → 抛异常。
  */
     public <T> T getByType(Class<T> type) {

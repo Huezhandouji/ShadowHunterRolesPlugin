@@ -13,7 +13,7 @@ import org.bukkit.entity.Player;
  * <p><b>两个行为</b>（{@link #isHostile(Player)} / {@link #hasEnemyInRange(double)}）逐字沿用原
  * 阵营组件里的实现；**关系表仍留平台**（{@code platform.FactionLookup}：interface + 构造期注入 +
  * 静态数据，不随实例复制）。
- * <p><b>本卡为纯加性</b>：只新增本端口与它的实现，并把它挂进 {@code ComponentServices}；
+ * <p><b>纯加性</b>：只新增本端口与它的实现，并把它挂进 {@code ComponentServices}；
  * **不删**任何既有成员 / 组件 / 端口 —— 删除与消费者接线由后续两张卡承担（见说明件 §3）。
  */
 public interface RoleInfo {

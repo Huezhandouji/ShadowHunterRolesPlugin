@@ -11,7 +11,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.util.List;
 
 /**
- * 热键栏**表现规格 + 带栏位描述符**（阶段 6 立、阶段 7 · A 步改全拼并升格为描述符、**阶段 8 收敛为纯声明**）：
+ * 热键栏**表现规格 + 带栏位描述符**（**纯声明**）：
  * 把过去分散在基类里的表现字段收敛成一个不可变值对象，并**同时**承担
  * {@link RoleComponent.Specification} 的"怎么造这个组件"的职责（两者**合一**，不并列）。
  * <p>
@@ -32,15 +32,15 @@ import java.util.List;
  * <p>
  * 命名沿用工程的 JavaBean 风格（设计 §4.3：不引入 record 风格访问器）；
  * 旧短名 {@code HotbarSpec} 保留为 `@Deprecated` 别名（见该类）。
- * <p><b> 说明</b>：上面的旧口径**** —— 该类（`HotbarSpec`）**已删除**；
- * 全拼 {@link HotbarSpecification} 是**唯一**入口。（旧口径原文保留不删，便于回溯。）
+ * <p><b>说明</b>：`HotbarSpec` 类**已删除**；
+ * 全拼 {@link HotbarSpecification} 是**唯一**入口。
  */
 public class HotbarSpecification<T extends RoleComponent>
         extends RoleComponent.Specification<T> {
 
  /**
  * **声明的 id**（{@link #of} 传入，可为 {@code null}）。
- * <p>阶段 7 · C 步起：{@link #getId()} **优先**返回**装配期绑定的注册 id**
+ * <p>{@link #getId()} **优先**返回**装配期绑定的注册 id**
  * （{@link RoleComponent.Specification#bindId(String)}，由装配入口写入）；只有未经装配的描述符
  * （例如探针直接构造的）才回落到这里 ⇒ **字段不再撒谎**。
  */
@@ -89,7 +89,7 @@ public class HotbarSpecification<T extends RoleComponent>
 
  /**
  * **失败关闭（fail-fast）**：本类的默认创建体不造任何组件 —— 具体组件由**组件自己声明的嵌套
- * `Specification`** 覆写本方法给出（阶段 7 · B 步落地）。把裸的 {@link HotbarSpecification}
+ * `Specification`** 覆写本方法给出。把裸的 {@link HotbarSpecification}
  * 交给装配入口会立刻在这里抛异常，而不是造出一个语义不明的组件。
  * <p>本类的另一半职责是"组件内部的声明值对象"：主动组件基类的 {@code specification()}
  * 返回它、基类默认画法读它，那条路径**从不调用本方法**。
@@ -104,7 +104,7 @@ public class HotbarSpecification<T extends RoleComponent>
  /**
  * 组件 id：**优先**取装配期绑定的注册 id（{@link RoleComponent.Specification#bindId(String)}），
  * 未绑定时才回落到 {@link #of} 传入的声明 id。
- * <p>阶段 7 · C 步的修法（A7 · 选 (a)）：B 步后组件自带的描述符一律走"不带 id 的构造"，若只留声明 id，
+ * <p>修法：组件自带的描述符一律走"不带 id 的构造"，若只留声明 id，
  * 这个字段就会**恒为 null 而仍可被读**⇒ 现在装配入口把注册 id
  * 绑进描述符，字段与注册处**同源同值**。
  */
@@ -114,9 +114,9 @@ public class HotbarSpecification<T extends RoleComponent>
     }
 
  /**
- * **基础物品**（阶段 7 · C 步 · 默认实现）：由图标 / 显示名 / 描述生成热键栏物品底稿 ——
+ * **基础物品**（默认实现）：由图标 / 显示名 / 描述生成热键栏物品底稿 ——
  * 材质 = {@link #getIcon()}、显示名 = {@link #getDisplayName()}、lore = 单行 {@link #getDescription()}。
- * <p><b>阶段 8 起</b>：它只提供**底稿**（材质 / 名称 / 描述），状态装饰
+ * <p><b>它只提供底稿**（材质 / 名称 / 描述），状态装饰
  * （三态材质覆盖 / 名称颜色与加粗 / 冷却秒数或后缀 / 状态行 lore / 分隔线 / 两个 PDC 键）
  * 由 `core/Skill#buildItem()` 与 `core/MainWeapon#buildItem()` 施加，因此本方法**不碰**这些冻结面。
  * <p>需要特殊底稿的组件：在自己的嵌套 `Specification` 里覆写本方法即可。

@@ -45,14 +45,14 @@ public class Role {
     private final int maxSanTE;
 
  /**
- * **唯一有序组件表**（阶段 6）：`LinkedHashMap` ⇒ **声明顺序 = 装配调用顺序**，
+ * **唯一有序组件表**：`LinkedHashMap` ⇒ **声明顺序 = 装配调用顺序**，
  * 它就是生命周期/事件广播的**派发序载体**（纯注册序；不再是"技能 → 被动 → 主武器"三段序）。
- * <p>阶段 8：条目里的"种类"由**描述符类型**表达（旧的 `kind 枚举` 已删）——
+ * <p>条目里的"种类"由**描述符类型**表达（`kind 枚举` 已删）——
  * 行为分支不再读任何"种类"值。
  */
     private final Map<String, ComponentEntry> components;
  /**
- * 三个按**描述符类型**过滤的**有序** id 视图（组内保持声明序；旧的公共访问器语义不变）：
+ * 三个按**描述符类型**过滤的**有序** id 视图（组内保持声明序；公共访问器语义不变）：
  * 技能 = {@link Skill.Specification} 一支 · 被动 = {@link PassiveSkill.Specification} · 主武器 =
  * {@link MainWeapon.Specification}。
  */
@@ -60,7 +60,7 @@ public class Role {
     private final Set<String> passiveIds;
     private final Set<String> mainWeaponIds;
  /**
- * **栏位视图（派生）**（阶段 7 · B 步）：栏位归属**不再由本类维护** —— 它随组件自己的描述符走
+ * **栏位视图（派生）**：栏位归属**不再由本类维护** —— 它随组件自己的描述符走
  * （装配点只写 {@code setSlot}）。本表是构造期**一次性从组件表派生**出来的只读视图，
  * 只为公开 API {@link #getSlotMap()} 保留（签名与语义不变）。
  */
@@ -71,7 +71,7 @@ public class Role {
  /**
  * **角色模板声明的阵营**（）：构造期由描述符给出、**此后只读** ⇒ 它就是
  * {@link #resetFaction()} 的回落目标。
- * <p>与 {@link #faction}（可变、{@code setFaction} 的写入点）分开持有是**必需**的：旧口径下
+ * <p>与 {@link #faction}（可变、{@code setFaction} 的写入点）分开持有是**必需**的：既有口径下
  * 回落目标住在**每实例**的阵营组件（原 `frameworkLevel/FactionComponent`， 起已删除）
  * 的默认阵营字段里（构造期取 {@code role.getFaction()}）
  * ⇒ 若只保留一个可变字段，"复位"会变成"把当前值写回自己"的**空操作**，与旧行为不等价。
@@ -106,8 +106,8 @@ public class Role {
     }
 
  /**
- * **装配期一次性派生栏位视图**（阶段 7 · B 步）：遍历组件表，把**占栏位**的条目收成 `栏位 → id`。
- * <p>遍历顺序 = 注册序 ⇒ 同一栏位不可能出现两次（装配期已校验），派生结果与旧实现写入的那张表逐项相同。
+ * **装配期一次性派生栏位视图**：遍历组件表，把**占栏位**的条目收成 `栏位 → id`。
+ * <p>遍历顺序 = 注册序 ⇒ 同一栏位不可能出现两次（装配期已校验），派生结果与既有实现写入的那张表逐项相同。
  */
     private static Map<Integer, String> deriveSlotMap(Map<String, ComponentEntry> components){
         Map<Integer, String> derived = new HashMap<>();
@@ -122,7 +122,7 @@ public class Role {
 
  /**
  * 按**描述符类型**过滤出**保持声明序**的 id 视图（`LinkedHashSet`）。
- * <p>阶段 8：旧口径是"按权威 kind 过滤"（`kind 枚举` 已删）；新口径 = **描述符类型**——
+ * <p>早先口径是"按权威 kind 过滤"（`kind 枚举` 已删）；现口径 = **描述符类型**——
  * 技能/主武器来自带栏位描述符的两个家族支，被动来自 {@code PassiveSkill.Specification}
  * （装配入口 {@code addPassive} 按工厂类型归到它）。仓内读数逐条相同。
  */
@@ -195,7 +195,7 @@ public class Role {
  * <p><b>清单 = 7 个框架级服务组件</b>（与 {@code ComponentServices} 的 8 个端口成员同族；
  * 它们是**每角色实例一份**的框架服务，不是角色内容）：能量 / SanTE / 生命 / buff / 计时 /
  * 阵营 / 伤害。它们**不进 `Role` 模板**（模板组件表逐格不变），因此只能由本白名单在模板侧豁免。
- * <p><b>两侧分工（本卡的验收口径）</b>：
+ * <p><b>两侧分工</b>：
  * <ul>
  * <li><b>模板侧</b> = 本白名单：让 {@code requires(这些类型)} **能通过**装配期检查（否则误拒注册）；</li>
  * <li><b>实例侧</b> = 框架真的提供了它们：组件在 {@code awake()} 里
@@ -254,7 +254,7 @@ public class Role {
  // 删除后**不变**的东西（边界，防止误读）：
  // * 自环（A 的某个必需类型由 A 自己提供）：A **不算自己的提供者** ⇒ 仍落成**缺依赖**硬失败。
  // 这是匹配规则的一部分，**不是**环检测的残留 —— 删环检测**没有**放松它。
- // * 互环（A↔B）与更长的环：装配**通过**（这正是本卡要的）。
+ // * 互环（A↔B）与更长的环：装配**通过**（这正是预期）。
  // * 运行期 awake() 顺序 = 容器按插入序，与依赖图无关 ⇒ 环内"谁先醒"**未定义**（见
  // {@link #verifyDependencies()} 的 A3 段）。
 
@@ -277,10 +277,10 @@ public class Role {
     }
 
  /**
- * **唯一组件创建点**（阶段 6 起对全部 kind 生效）：全仓**创建路径**只有这里调用
+ * **唯一组件创建点**：全仓**创建路径**只有这里调用
  * {@link ComponentFactory#create(String, ComponentServices)}；装配表按 id 查条目的工厂。
  * <p>服务集**在构造期**交给组件：组件返回时即已持有它，容器随后立刻登记。
- * 阶段 8：**没有任何"种类"值**需要传给组件（旧的权威 kind 已随 kind 枚举删除，
+ * **没有任何"种类"值**需要传给组件（权威 kind 已随 kind 枚举删除，
  * 服务集构造也不再需要它）。
  */
     public RoleComponent createComponent(String id, ComponentServices services){
@@ -294,7 +294,7 @@ public class Role {
     }
 
  /**
- * 装配条目：`(工厂, 栏位?, 描述符类型, 提供类型, 必需依赖, 可选依赖)`（阶段 7 · A 步；**阶段 8 去掉 kind**；
+ * 装配条目：`(工厂, 栏位?, 描述符类型, 提供类型, 必需依赖, 可选依赖)`（**不含 kind**；
  * ** 增加依赖声明**）。
  * <p><b>不占栏位 = 栏位的缺失</b>：栏位用**可空的 {@link Integer}** 表达（`null` = 不占热键栏，
  * 不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它）。
@@ -302,7 +302,7 @@ public class Role {
  * 想表达"不占栏位"只剩一条路：装配一个**没有栏位**的描述符（如 `PassiveSkill.Specification`）。
  * <p>本条目是装配期从描述符取到的**不可变快照**：只持有几个值，**不持有描述符对象** ⇒
  * 同一份描述符实例被两个角色共享时，后手改动影响不到先手。
- * <p>阶段 8：`descriptorType` = 描述符的**类型**（旧 `kind` 的唯一职责改由它承担：三个 id 视图按
+ * <p>`descriptorType` = 描述符的**类型**（原 `kind` 的唯一职责改由它承担：三个 id 视图按
  * 类型归类）；它**不参与任何行为分支**。
  * <p>：`providedType` / `requiredTypes` / `optionalTypes` 是**依赖检查的三元组** ——
  * 提供类型是"我能被谁依赖"，必需/可选是"我依赖谁"。它们只被
@@ -370,7 +370,7 @@ public class Role {
         private int maxSanTE = 100;
         private Faction faction = Faction.UNKNOWN;
 
- /** 唯一有序组件表（声明序 = 装配调用序）—— 阶段 6 的派发序载体，也是**栏位的唯一来源**（阶段 7 · B 步）。 */
+ /** 唯一有序组件表（声明序 = 装配调用序）—— 派发序载体，也是**栏位的唯一来源**。 */
         private final Map<String, ComponentEntry> components = new LinkedHashMap<>();
 
         private Material icon;
@@ -436,7 +436,7 @@ public class Role {
         }
 
  /**
- * **统一装配入口（描述符口径，阶段 7 · A 步新增；阶段 8 去掉 kind）**：吃一个**装配期描述符**
+ * **统一装配入口（描述符口径，不含 kind）**：吃一个**装配期描述符**
  * （{@link com.shadowHunterRolesPlugin.roleComponent.RoleComponent.Specification}），
  * 栏位从描述符读，**不再由调用点传值**；也不再有任何"种类"形参。
  * <p>占不占栏位由**描述符的类型**决定：带栏位的描述符（`HotbarSpecification` 一支）用
@@ -449,7 +449,7 @@ public class Role {
  */
         public Builder addComponent(String id, RoleComponent.Specification<?> specification){
             Objects.requireNonNull(specification);
- //阶段 7 · C 步（A7 选 (a)）：**把注册 id 绑进描述符**再冻结 —— 组件自带的描述符用
+ //**把注册 id 绑进描述符**再冻结 —— 组件自带的描述符用
  //"不带 id 的构造"声明，不绑定的话描述符里的 id 字段会恒为 null。
             specification.bindId(id);
             RoleComponent.Specification.Snapshot snapshot = specification.freeze();
@@ -460,7 +460,7 @@ public class Role {
         }
 
  /**
- * **无栏位装配入口**（阶段 8 起为被动唯一的入口；旧的 kind 形参已随 `kind 枚举` 删除）：
+ * **无栏位装配入口**（被动唯一的入口；kind 形参已随 `kind 枚举` 删除）：
  * 不占热键栏 ⇒ 不进 `slotMap` ⇒ 渲染器遍历时天然看不到它，也不会被要求画物品。
  * <p>"是被动"由**工厂形参的类型**表达（{@code ComponentFactory<PassiveSkill>}）⇒
  * 三个 id 视图按 `PassiveSkill.Specification` 归类；其余语义与描述符入口一致（同一条内部路径）。
@@ -476,14 +476,14 @@ public class Role {
         }
 
  /**
- * **唯一内部装配路径**（阶段 6 立、阶段 7 · A 步改为"栏位可有可无"、B 步改为"栏位随组件走"、
- * **阶段 8 去掉 kind**、** 增加依赖三元组**）：描述符入口与无栏位入口都只调用这里
+ * **唯一内部装配路径**（栏位可有可无、"栏位随组件走"、
+ * **不含 kind**、**增加依赖三元组**）：描述符入口与无栏位入口都只调用这里
  * ⇒ 校验、id 去重、入表各只有一处实现。
  * <p>本类**不再维护栏位表**：栏位只作为条目的一个值存在（{@code ComponentEntry.slot}），
  * 角色构造期再一次性派生出 {@code slotMap} 视图。
  * @param slot 栏位；{@code null} = **不占栏位**（不占热键栏）——旧版用 {@code -1} 哨兵表达同一件事
  * @param descriptorType 描述符**类型**（旧 kind 的唯一职责承担者：三个 id 视图按它归类）
- * @param descriptorLabel 诊断标签（只用于重复 id 的异常文案，与迁移前逐字相同）
+ * @param descriptorLabel 诊断标签（只用于重复 id 的异常文案，逐字相同）
  * @param providedType 本组件**提供**的类型（依赖检查的供给面）
  * @param requiredTypes **必需**依赖类型（缺任一 ⇒ {@link Role#verifyDependencies()} 抛异常）
  * @param optionalTypes **可选**依赖类型（缺失不报错）
@@ -494,7 +494,7 @@ public class Role {
                                              Class<? extends RoleComponent> providedType,
                                              List<Class<? extends RoleComponent>> requiredTypes,
                                              List<Class<? extends RoleComponent>> optionalTypes){
- // 与迁移前临时实例取 id 的 fail-fast 等价：null 工厂在**装配期**立刻 NPE，而不是拖到实例创建
+ // 与临时实例取 id 的 fail-fast 等价：null 工厂在**装配期**立刻 NPE，而不是拖到实例创建
             Objects.requireNonNull(factory);
 
             if(id == null || id.trim().isEmpty()){
@@ -533,7 +533,7 @@ public class Role {
 
  /**
  * O-12：槽位冲突 fail-fast（§10 裁决 1）—— 抛异常、该角色不注册，不再"告警 + 覆盖"。
- * <p>阶段 7 · B 步：冲突判定改为**扫组件表里已占栏位的条目**（本类不再另存栏位表），
+ * <p>冲突判定改为**扫组件表里已占栏位的条目**（本类不再另存栏位表），
  * 异常类型与文案**逐字不变**。
  */
         private void validateSlot(int slot){
@@ -579,7 +579,7 @@ public class Role {
     }
 
  /**
- * **唯一有序组件表**（阶段 6）：遍历顺序 = 装配调用顺序 ⇒ 生命周期/事件广播的派发序。
+ * **唯一有序组件表**：遍历顺序 = 装配调用顺序 ⇒ 生命周期/事件广播的派发序。
  * 容器的组件初始化只遍历本表**一次**（纯注册序）。
  */
     public Map<String, ComponentEntry> getComponents(){
@@ -587,8 +587,8 @@ public class Role {
     }
 
  /**
- * 按 id 取**描述符类型**（阶段 8）：仅供"三个 id 视图的归类"等装配期用途；
- * 组件的**行为分支不再读任何种类**（旧的 {@code componentKindOf} 已随 kind 枚举删除，
+ * 按 id 取**描述符类型**：仅供"三个 id 视图的归类"等装配期用途；
+ * 组件的**行为分支不再读任何种类**（{@code componentKindOf} 已随 kind 枚举删除，
  * 它的两个消费者改为按**组件类型**判定：{@code roleComponent.ActiveComponent} / 占栏位组件）。
  * 未注册 ⇒ {@code null}。
  */
@@ -604,7 +604,6 @@ public class Role {
  * <p>① **管理级 / 模板级**语义：这是**角色模板**上的声明值，不是每玩家状态；
  * ② 影响**该角色的所有实例**（已实例化的玩家实例下一次经 `RoleInfo#faction()` 读取时即生效）；
  * ③ 阵营的**读取唯一入口仍是 `roleInfo` 服务面** ⇒ 外部不直改、组件不直读（R-6）。
- * <p><b>旧口径原文</b>：「faction 为 final ⇒ 仅构造期由描述符写入」。
  * <p><b>（欠账 A 后半）</b>：本方法即旧
  * `frameworkLevel/FactionComponent#setFaction` 的**唯一接替落点** —— 该组件已整体删除，
  * 写侧经 `RoleInstance#setFaction` 转调到本方法；读侧一律走 `roleInfo` 服务面（不读本字段的裸值）。
@@ -616,23 +615,22 @@ public class Role {
  * <p>语义 = 旧 `frameworkLevel/FactionComponent#reset()` **逐字等价**（当时写作
  * {@code this.faction = defaultFaction;}） —— 回落目标就是构造期由描述符给出的
  * {@link #defaultFaction}（只读），因此连续复位是幂等的。
- * <p>旧口径的差异只有一处：回落目标从**每实例组件字段**搬到**角色模板字段** ⇒ 同一角色的实例
+ * <p>差异只有一处：回落目标从**每实例组件字段**搬到**角色模板字段** ⇒ 同一角色的实例
  * 共享同一回落目标 （阵营本就"一个角色一份、全局静态"）。
- * <p><b>旧口径原文</b>：复位落点在
  * `FactionComponent#reset()`、真值在组件里。
- * <p><b>后续（本卡不改）</b>：`api/RoleAPI` 的第三片把 `setFaction` / `resetFaction` 两条
- * 改为空实现后，`RoleInstance` 上的两个**写视图**届时可一并删除 （读侧已于本卡删除）。
+ * <p><b>后续</b>：`api/RoleAPI` 把 `setFaction` / `resetFaction` 两条
+ * 改为空实现后，`RoleInstance` 上的两个**写视图**可一并删除（读侧已删除）。
  */
     public void resetFaction(){ this.faction = defaultFaction; }
 
  /**
- * 栏位视图（**派生**，阶段 7 · B 步）：`栏位 → 组件 id`，由构造期一次性从组件表派生。
- * 签名与语义与迁移前**完全一致**（公开 API，只增不改）；栏位归属本身随组件自己的描述符走。
+ * 栏位视图（**派生**）：`栏位 → 组件 id`，由构造期一次性从组件表派生。
+ * 签名与语义**完全一致**（公开 API，只增不改）；栏位归属本身随组件自己的描述符走。
  */
     public Map<Integer, String> getSlotMap() { return slotMap; }
 
  /**
- * 按栏位取组件 id（**新增**，阶段 7 · B 步）：走与渲染器**同一趟**组件表遍历
+ * 按栏位取组件 id：走与渲染器**同一趟**组件表遍历
  * （`栏位 → id` 的唯一来源是条目里的栏位值），未占用 ⇒ {@code null}。
  * <p>给 {@code DebugCooldownCommand} 的"纯数字 = 热键栏槽位"解析用，避免它去读第二套栏位表。
  */

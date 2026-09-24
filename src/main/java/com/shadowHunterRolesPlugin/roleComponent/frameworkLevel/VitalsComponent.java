@@ -9,22 +9,22 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 /**
- * 生命组件（阶段 10 · t63 · A1 改正；**t73 Part A 合并**）：
+ * 生命组件：
  * 系统级能力「生命 / 治疗 / 伤害」的**组件形态**（每角色实例一个，裁定③）。
  * <p><b>★ 本组件持有行为</b>：clamp 策略（{@code min(当前 + amount, Attribute.MAX_HEALTH)}）的**唯一实现**，
  * 以及**四个伤害原语**（Part A 从原 {@code DamageComponent} 并入 ⇒ 该类**已删除** ✓
  * ⇒ 伤害与生命**只有一个持有者** ✓）。
  * <p><b>状态归属如实申报</b>：生命的真值是 **Bukkit 玩家属性**（{@code player.getHealth()} /
- * {@code Attribute.MAX_HEALTH}）⇒ 不属"组件内部字段"而是**外部平台状态**（冻结件『〇之八』：
+ * {@code Attribute.MAX_HEALTH}）⇒ 不属"组件内部字段"而是**外部平台状态**（
  * 组件**允许**依赖真正外部的东西 = Bukkit API ✓）。本组件**不复制**一份生命字段 ✗（那会立刻
  * 与客户端/服务端的真实生命值不同步 ⇒ 属"会撒谎的值"）。
- * <p><b>为什么这里可以直调静态工具</b>（沿 t63 的申报）：用户明文裁定「组件的实现设计**不必**不依赖任何
- * 外部的东西，比如一个伤害组件，它仍然可以**依赖我原来的静态伤害工具**」；队长更正后的口径把
- * 「薄封装」许可**收窄为"仅限真正外部的东西"**（静态工具 / 单例 / Bukkit API ✓），
+ * <p><b>为什么这里可以直调静态工具</b>：组件的实现设计**不必**不依赖任何
+ * 外部的东西，比如一个伤害组件，它仍然可以**依赖既有的静态伤害工具**；而"薄封装"许可被
+ * **收窄为"仅限真正外部的东西"**（静态工具 / 单例 / Bukkit API ✓），
  * **不适用于框架自己的服务端口** ✗ —— {@code DamageUtil} 属**真正外部**（它不依赖
  * {@code ComponentServices}，也不把"谁提供能力"这件事藏起来）。
  *
- * <h2>阶段 10 · t73 Part A：两个统一入口（用户裁定）</h2>
+ * <h2>两个统一入口</h2>
  * <ul>
  *   <li>{@link #damage(Player, double)} / {@link #heal(Player, double)}：**自己也是一种目标** ——
  *       传自己的 {@code player} 即"伤害自己 / 治疗自己"，传别人的即"他人" ✓</li>
@@ -35,15 +35,15 @@ import org.bukkit.entity.Player;
  *       （只有 {@code Player} 能保证找到角色实例）✓；{@code UUID} 重载日后可**只增** ✓</li>
  * </ul>
  *
- * <h2>★ t73 Part A 的边界（**阶段 11 · t83 起已部分解除**）</h2>
- * Part A 落地时本卡的 {@code damage} / {@code heal} **只做结算**；其中一项**仍然成立**，其余已由 t83 解除：
+ * <h2>★ 本入口的边界（逐条）</h2>
+ * {@code damage} / {@code heal} **只做结算**；其中一项**仍然成立**，其余已解除：
  * <ul>
  *   <li><b>【仍成立】本入口不投递回调</b> ✓ —— 受伤 / 受治疗由
  *       {@code listener/DamageHookListener} 在**平台事件**面派发（见 {@link Participant}）✓</li>
- *   <li><b>【t83 已解除】两钩子</b> ⇒ {@link Participant#onDamaged(Player, double)} /
+ *   <li><b>【已解除】两钩子</b> ⇒ {@link Participant#onDamaged(Player, double)} /
  *       {@link Participant#onHealed(double)} 已提供（经目标实例的受保护入口派发）✓</li>
- *   <li><b>【t83 已解除】伤害类型</b> ⇒ 三参 {@link #damage(Player, double, DamageKind)} ✓</li>
- *   <li><b>【t83 未做】跨实例运行级读数与主线程前提</b> ⇒ 属 **B-窗口半**（另立卡）✗</li>
+ *   <li><b>【已解除】伤害类型</b> ⇒ 三参 {@link #damage(Player, double, DamageKind)} ✓</li>
+ *   <li><b>【未做】跨实例运行级读数与主线程前提</b> ⇒ 需运行级取证 ✗</li>
  * </ul>
  */
 public class VitalsComponent extends RoleComponent {
@@ -57,12 +57,12 @@ public class VitalsComponent extends RoleComponent {
         return svc().self().player();
     }
 
-    // ───────────── 承受方回调（t83 · B-静态半）─────────────
+    // ───────────── 承受方回调 ─────────────
 
     /**
-     * **可参与"承受方"回调的组件**（阶段 11 · t83）：实现本接口的组件在**自己被伤害 / 被治疗**时收到通知。
+     * **可参与"承受方"回调的组件**：实现本接口的组件在**自己被伤害 / 被治疗**时收到通知。
      * <p>两个方法都是 <b>{@code void}</b> ⇒ **改量与否决在类型上不可表达** ✓
-     * （用户裁定：只通知、不可否决）。
+     * （只通知、不可否决）。
      * <p><b>调用者</b>：{@code listener/DamageHookListener}（平台事件面）—— 它按
      * {@code targetInstance.getAllByType(Participant.class)} **扇出**（容器的组件查取入口 ✓），
      * 且整段扇出经 {@code RoleInstance.deliverHook} ⇒ 内部走唯一受保护入口 {@code guardedCall} ✓。
@@ -86,7 +86,7 @@ public class VitalsComponent extends RoleComponent {
         void onHealed(double amount);
     }
 
-    // ───────────── 两个统一入口（t73 Part A 结算；t83 加类型 + 钩子）─────────────
+    // ───────────── 两个统一入口（结算；含伤害类型与钩子）─────────────
 
     /**
      * **造成伤害**（按 {@link DamageKind} 选原语；含 {@link DamageUtil} 既有的 PDC 副作用与守卫）。
@@ -116,7 +116,7 @@ public class VitalsComponent extends RoleComponent {
     }
 
     /**
-     * **旧两参签名的兼容入口**（阶段 10 · t73 Part A 落地；**保留不破公开面** ✓）：
+     * **两参签名的兼容入口**（**保留不破公开面** ✓）：
      * 逐字等价于 {@code damage(target, amount, DamageKind.TRUE)}。
      * <p>保留理由（P4 同族）：Part A 已把它作为公开面发布 ⇒ 删它属 API 收缩 ✗；
      * 而它的语义（真伤）与 {@code TRUE} 完全一致 ⇒ 委托即可，**没有第二套实现** ✓。
@@ -154,7 +154,7 @@ public class VitalsComponent extends RoleComponent {
         heal(self(), amount);
     }
 
-    // ───────────── 四个伤害原语（t73 Part A 从 DamageComponent 并入）─────────────
+    // ───────────── 四个伤害原语（与生命同属本组件）─────────────
 
     /** 真实伤害（无视护甲；含既有 PDC 副作用）。 */
     public void trueDamage(LivingEntity victim, LivingEntity source, double amount) {

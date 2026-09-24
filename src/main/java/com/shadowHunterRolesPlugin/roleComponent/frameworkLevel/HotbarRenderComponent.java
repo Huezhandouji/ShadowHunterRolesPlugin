@@ -10,7 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * **框架级物品渲染组件**（阶段 12 · t86 · 拆分 (a) 的骨架）。
+ * **框架级物品渲染组件**。
  *
  * <h2>它是什么 / 不是什么（★ 边界，先看这条）</h2>
  * 本组件把过去散在框架里、"由渲染器与角色实例各自持有"的**渲染意图面**收拢成一个**组件形态**：
@@ -26,7 +26,7 @@ import org.bukkit.inventory.ItemStack;
  * 二者以 {@code RoleInstance} 的一条置脏通道相连（见 {@link #requestRepaint()}）。
  *
  * <h2>为什么要有它（归属理由，非"为整洁而重构"）</h2>
- * 阶段 8 起，渲染器的**管道职责**只剩"按注册序遍历 → 取 {@code buildItem()} → 唯一写点落位"；
+ * 渲染器的**管道职责**只剩"按注册序遍历 → 取 {@code buildItem()} → 唯一写点落位"；
  * 而**意图面**（谁在什么时候要求重绘）此前**没有组件形态**，只能挂在 `RoleInstance` 的私有字段上
  * （{@code markHotbarDirty} / {@code repaintRequester} 两处）。把意图面收进一个**框架级组件**后：
  * <ul>
@@ -34,16 +34,16 @@ import org.bukkit.inventory.ItemStack;
  *       后续 (b) 的"不可动物品保护"与回调有明确的挂载点 ✓；</li>
  *   <li>它与其他框架级服务组件**同构** ✓（同包同族：{@code VitalsComponent} / {@code EnergyComponent} /
  *       {@code SanTEComponent} / {@code BuffComponent} / {@code TimerComponent}）✓ ——
- *       阶段 13 · t123 现算 **5** 个 ✗←✓（【已作废】原清单第 6 项 = {@code FactionComponent}，
- *       该组件已整体删除 ✗、阵营真值改住聚合根 {@code core/Role}）。</li>
+ *       同族服务组件共 **5** 个（阵营**不是**容器里的服务组件 ——
+ *       它的真值住在聚合根 {@code core/Role}）。</li>
  *   <li>它是 {@code RoleComponent} 的子类 ⇒ 受既有**生命周期**与**故障隔离**（{@code guardedCall}）管辖 ✓。</li>
  * </ul>
  *
- * <h2>本卡未做的（逐条申报，见说明件）</h2>
+ * <h2>本组件不做的事（边界）</h2>
  * <ul>
- *   <li><b>不可动物品的保护</b>（Inventory 指定位置不可动）—— 属拆分 **(b)** ✗；</li>
- *   <li><b>受伤 / 治疗之外的渲染回调面</b>（"物品被点击 / 被移动"等）—— 属 **(b)** ✗；</li>
- *   <li><b>冻结面迁移与代际对拍</b> —— 属 **(c)** ✗。</li>
+ *   <li><b>不可动物品的保护</b>（Inventory 指定位置不可动）—— 不在本组件的职责内 ✗；</li>
+ *   <li><b>受伤 / 治疗之外的渲染回调面</b>（"物品被点击 / 被移动"等）—— 同上 ✗；</li>
+ *   <li><b>冻结面迁移与代际对拍</b> —— 不在本组件的职责内 ✗。</li>
  * </ul>
  */
 public class HotbarRenderComponent extends RoleComponent {
@@ -70,7 +70,7 @@ public class HotbarRenderComponent extends RoleComponent {
 
     /**
      * **装配期绑定**（构造之后、{@code awake()} 之前）—— 与既有【装配期解析】同一条纪律
-     * （原『创建后绑定』机制已随 t118/t112 整体删除 ✗）。
+     * （『创建后绑定』机制已整体删除 ✗：绑定一律在构造期完成）。
      * <p>由 {@code RoleInstance} 在 {@code initComponents} 里调用（见该处注释）。
      */
     public void bindRepaintSink(RepaintSink sink) {
@@ -96,13 +96,13 @@ public class HotbarRenderComponent extends RoleComponent {
     }
 
     /**
-     * **渲染回调（读侧：只通知、不可否决）**（阶段 12 · t88 · B3）。
+     * **渲染回调（读侧：只通知、不可否决）**。
      *
      * <h2>形态（照 {@code VitalsComponent.Participant}）</h2>
      * 方法**返回 {@code void}** ⇒ "**改量**"与"**否决**"**在类型上不可表达** ✓ ——
      * 实现者只能观察，不能干预渲染结果 ✗。
      *
-     * <h2>★ 触发点：{@code HotbarRenderer.render()} **真正完成一次刷新之后**（用户裁定 A）</h2>
+     * <h2>★ 触发点：{@code HotbarRenderer.render()} **真正完成一次刷新之后**</h2>
      * 这是**唯一**能覆盖"**内容变了但槽位没变**"的时机 ✓（例：同一个技能格从"可用"变"冷却中" ——
      * 槽位没动、物品换了 ⇒ 按槽位变化判会漏 ✗）。
      *
@@ -110,14 +110,14 @@ public class HotbarRenderComponent extends RoleComponent {
      * 触发**不**等于"每帧都回调" ✗：渲染器维护**上一帧实际写入的槽位内容**基线，
      * 只有"本帧与上一帧**真的不同**"才算一次变化 ✓；**无变化的那一帧回调 0 次** ✗。
      * <ul>
-     *   <li>判据来源 = {@code HotbarRenderer} 的逐槽位内容比较（记 slot + {@code ItemStack}）✓</li>
-     *   <li>**不能**拿脏标记当判据 ✗：脏标记只表示"有人请求过重绘"，请求之后重建的物品**可能逐字相同** ⇒ 会**多报** ✓（已在该处 javadoc 写明）</li>
+     *   <li>判据 = {@code HotbarRenderer} 的逐槽位内容比较（记 slot + {@code ItemStack}）✓</li>
+     *   <li>**不能**拿脏标记当判据 ✗：脏标记只表示"有人请求过重绘"，请求之后重建的物品**可能逐字相同** ⇒ 会**多报** ✓</li>
      *   <li>首帧（无基线）视作"有变化" ⇒ 首刷**会**回调 1 次 ✓</li>
      * </ul>
      *
      * <h2>顺序（逐条，不可交换）</h2>
      * <ol>
-     *   <li>判脏 ⇒ ② **写物品**（唯一写点）⇒ ③ **清脏**（既有三段，**本卡未改** ✗）</li>
+     *   <li>判脏 ⇒ ② **写物品**（唯一写点）⇒ ③ **清脏** ✓</li>
      *   <li>然后：**若本帧有真实变化** ⇒ 按 {@code getAllByType(RenderCallback.class)} **扇出**，
      *       每个实现者**逐个**经 {@code RoleInstance.deliverHook} 调用 ✓（某个抛异常 ⇒ 按**故障隔离**语义只隔离它、
      *       其余照常收到 ✓）</li>
@@ -177,7 +177,7 @@ public class HotbarRenderComponent extends RoleComponent {
      * **读"外观是否依赖活状态"**：{@code true} = 它的外观会在**没有框架置脏事件**的情况下自己变
      * （例如技能冷却名里的 {@code x.xs} 秒数每刻都在变）⇒ 只要它在冷却中，框架就必须**每 tick**
      * 至少刷一次，否则玩家看到的是陈旧外观。
-     * <p><b>为什么是自报值、而不是框架里的一句 {@code instanceof Skill}</b>：旧判据把「外观含秒数」
+     * <p><b>为什么是自报值、而不是框架里的一句 {@code instanceof Skill}</b>：把「外观含秒数」
      * **写死成具体类** ⇒ ① 第三类"带倒计时外观"的组件加进来时**必须改框架文件** ✗；
      * ② 覆写掉秒数外观的子类**仍会被每 tick 重绘**（白写）✗。改为自报后：新组件**只加新文件**即可
      * （默认 {@code false}，需要就覆写 {@code true}）✓，而"覆写掉活状态外观"的子类可以覆写成

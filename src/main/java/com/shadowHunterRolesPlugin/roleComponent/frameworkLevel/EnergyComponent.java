@@ -18,11 +18,11 @@ import java.util.function.Consumer;
  * 组件只负责"真值怎么变"，容器只负责"变了之后对平台说什么"。这条分界让组件**不需要**
  * {@code svc()} 就能完整实现能力语义（唯一的 {@code svc()} 用途 = {@code self()} 取玩家）。
  *
- * <h2>订阅面：<b>JDK {@code Consumer} 监听器列表</b>（用户裁定 ✓）</h2>
+ * <h2>订阅面：<b>JDK {@code Consumer} 监听器列表</b></h2>
  * <b>旧形态</b>：本组件曾嵌套一个 {@code public interface ChangeSink}（唯一方法
  * {@code onEnergyChanged(int previous, int current, int max)}），并由一个**单播字段**持有它 ✗ ——
  * 现算**没有任何类 {@code implements} 它**（唯一实现形态 = 容器构造期传的 lambda ⇒ 它其实是"单播字段"，
- * 而不是被其他类实现的接口 ✗）。用户裁定改为**监听器列表**：「一个函数式接口的列表，其他类只需要添加
+ * 而不是被其他类实现的接口 ✗）。**监听器列表**的形态是：「一个函数式接口的列表，其他类只需要添加
  * {@code Consumer} 即可」✓。
  * <p><b>新形态</b>：本组件持有 {@code List<Listener>}（{@link Listener} = {@code owner} +
  * {@code Consumer<Change>} 的**成对**登记，record ✓），对外只暴露 {@link #addListener(RoleComponent, Consumer)} ✓；
@@ -51,7 +51,7 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
      * **一次能量变更的载荷**（**record，不是接口** ✓）。
      *
      * <h2>为什么需要它</h2>
-     * 旧 {@code ChangeSink#onEnergyChanged(int previous, int current, int max)} 有三个入参；用户裁定的
+     * 一次变更携带三个值（{@code previous} / {@code current} / {@code max}）；本组件的
      * 监听器列表用 JDK {@code Consumer} ⇒ 需要一个**载体**把这三个值一起交出去 ✓。
      * 取**最小充分类型**：逐字保留旧载荷的三个值 ✓（监听器据此置脏 + 发布事件 ✓）。
      */
@@ -72,7 +72,7 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
 
     /**
      * **「这个组件耗能量」的能力接口**：耗能是**能量面**的声明 ⇒ 本接口归能量组件所有
-     * （用户裁定"能力各归其家"）。
+     * （能力各归其家：耗能声明与能量真值同属能量面）。
      * <p><b>【已作废】旧口径原文（逐字保留）</b>：「这个组件耗能量」的能力接口，
      * 其**顶层形态位于 `core/hotbar/` 包**（顶层文件已删除 ✗）—— 其后改为**本嵌套形态**，
      * 原 5 处引用已全部改为嵌套限定名 ✓。

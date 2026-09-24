@@ -6,7 +6,7 @@ import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 
 /**
- * 计时组件（阶段 10 · t63 · A1 改正 + A6 请求者语义）：系统级能力
+ * 计时组件（**归属按请求者**）：系统级能力
  * 「组件资源表（任务登记 / 取消）」的**组件形态**（每角色实例一个，裁定③）。
  * <p><b>★ 本组件持有行为，并且**归属按请求者**</b>：
  * <ul>
@@ -19,17 +19,17 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
  * </ul>
  * <p><b>★ A6：调用方 {@code stop()} ⇒ 其请求的任务全部取消</b>：{@link #cancelAllOf(RoleComponent)}
  * 是这条语义的入口，容器在 {@code triggerLifecycleStop()} 里**每个组件 {@code stop()} 之后**调用一次
- * ⇒ "谁请求的计时，谁停止时被取消" ✓（旧实现只在实例 {@code clear()} 的兜底里取消 ⇒ 单独 {@code stop()}
- * 会漏；本卡把这一点补上，见说明件的偏离留痕）。
- * <p><b>不再转调任何旧端口</b> ✗（原实现是经服务集转发的形态；阶段 13 · t102 起调用点一律
- * **直接用本组件**，阶段 13 · t106 起那一族端口**已整体删除** ⇒ 全库零残留）。
+ * ⇒ "谁请求的计时，谁停止时被取消" ✓（只在实例 {@code clear()} 的兜底里取消是不够的 ⇒ 单独 {@code stop()}
+ * 会漏 ⇒ 本方法把这一点补上）。
+ * <p><b>调用点一律直接用本组件</b> ✓（不经服务集转发；
+ * 那一族端口**已整体删除** ⇒ 全库零残留）。
  */
 public class TimerComponent extends RoleComponent {
 
     /**
      * 资源表接入口（容器在构造期注入）：**就是** {@code ComponentRegistry} 的每组件资源表
      * （{@code registry::track} / {@code registry::cancelAll}）。
-     * <p>刻意做成接口而不是直接用 {@code ComponentRegistry}：{@code core/dispatch/**} 不在本卡 inScope，
+     * <p>刻意做成接口而不是直接用 {@code ComponentRegistry}：{@code core/dispatch/**} 不是本组件的依赖面，
      * 且"组件不该反向依赖容器的具体实现类"是组件化的本意 ✓。
      */
     public interface TaskSink {

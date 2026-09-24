@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * SanTE 组件（阶段 10 · t63 · A1 改正）：系统级能力「SanTE」的**组件形态**（每角色实例一个，裁定③）。
+ * SanTE 组件：系统级能力「SanTE」的**组件形态**（每角色实例一个）。
  * <p><b>★ 本组件持有状态与行为</b>：SanTE 真值 {@code current} 与上限 {@code max} 都在本组件里，
  * clamp 与 increase/decrease/set 的语义全在本组件内实现 —— **不再转调任何旧端口** ✗。
  * <p><b>与容器的分工</b>：写后对平台说两句话 —— 发布 {@code SanTEChangeEvent} 与
@@ -18,12 +18,12 @@ import java.util.function.Consumer;
  * 后者由容器在**派发边界**逐个经受保护调用完成；组件只负责真值怎么变。
  * <p><b>状态唯一</b>：容器侧**不再**持有 {@code currentSanTE} 字段 ✗（只保留视图方法）。
  * <p><b>归零惩罚的钉 0 语义不变</b>：惩罚组件（{@code DefaultSanTEZeroPunishment}）仍按既有方式
- * 调**组件自身**的 {@code set(0)} 逐 tick 钉 0（阶段 13 · t109：取用形态统一为"字段 + 在 `start()` 内赋值" ✗）⇒ 走的还是这一条 clamp + 派发路径。
+ * 调**组件自身**的 {@code set(0)} 逐 tick 钉 0（协作组件引用在 `start()` 内一次取好、存进字段 ✓）⇒ 走的还是这一条 clamp + 派发路径。
  *
- * <h2>订阅面：<b>JDK {@code Consumer} 监听器列表</b>（用户裁定 ✓）</h2>
+ * <h2>订阅面：<b>JDK {@code Consumer} 监听器列表</b></h2>
  * <b>旧形态</b>：本组件曾嵌套一个 {@code public interface Subscriber}（唯一方法
  * {@code onSanTEChange(int pre, int now)}，带默认空实现）⇒ 消费者必须在**类声明上** {@code implements
- * SanTEComponent.Subscriber} ✗。用户裁定改为**监听器列表**：「一个函数式接口的列表，其他类只需要添加
+ * SanTEComponent.Subscriber} ✗。**监听器列表**的形态是：「一个函数式接口的列表，其他类只需要添加
  * {@code Consumer} 即可」✓。
  * <p><b>新形态</b>：本组件持有 {@code List<Listener>}（{@link Listener} = {@code owner} + {@code Consumer<Change>}
  * 的**成对**登记，record ✓），对外只暴露 {@link #addListener(RoleComponent, Consumer)} ✓；
@@ -47,7 +47,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
      * **一次 SanTE 变更的载荷**（**record，不是接口** ✓）。
      *
      * <h2>为什么需要它</h2>
-     * 旧 {@code Subscriber#onSanTEChange(int pre, int now)} 有两个入参；用户裁定的监听器列表用 JDK
+     * 一次变更有两个值（{@code previous} / {@code current}）；本组件的监听器列表用 JDK
      * {@code Consumer} ⇒ 需要一个**载体**把这两个值一起交出去 ✓。取**最小充分类型**：
      * 只带两个既有消费者真正用到的值 ✓（{@code max} 不进载荷 ✗ —— 它不随"变化"而变）。
      *
@@ -108,7 +108,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
     /**
      * **移除监听器**（按**引用相等**；不在名单里 ⇒ no-op 且返回 {@code false} ✓）——
      * 调用方必须持有**同一个** {@code Listener} 实例（把 {@link #addListener} 的返回值存进私有字段即可 ✓）。
-     * <p>与旧 {@code unsubscribe(subscriber)} 的语义**逐字等价**（旧实现也是
+     * <p>按引用移除与"按身份退订"的语义**逐字等价**（同样按
      * {@code List.remove(Object)} ⇒ 不在名单里是 no-op ✓）。
      */
     public boolean removeListener(Listener entry) {
@@ -229,7 +229,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
         set(current - amount);
     }
     /**
-     * **组件操作面（阶段 13 · t136）**：把外部字符串指令**薄适配**到本组件既有强类型方法（零新增状态通道 ✓）。
+     * **组件操作面**：把外部字符串指令**薄适配**到本组件既有强类型方法（零新增状态通道 ✓）。
      * <p><b>grammar（首 token 必为动词，大小写敏感；参数以单个空格分隔）</b>：
      * <ul>
      *   <li>{@code current} —— 读：回**当前 SanTE**（无参 ✓，越界参数 ⇒ 未识别）；</li>

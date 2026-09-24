@@ -13,18 +13,18 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * buff 组件（阶段 10 · t63 · A1 改正）：系统级能力「buff 施加 / 查询 / 闸门 / 药水记账」的
+ * buff 组件：系统级能力「buff 施加 / 查询 / 闸门 / 药水记账」的
  * **组件形态**（每角色实例一个，裁定③）。
  * <p><b>★ 本组件持有状态与行为</b>：
  * <ul>
  *   <li><b>buff 记账表</b> = {@link BuffManager} 实例（容器在构造期创建并交给本组件；该类属
- *       {@code manager/} 包、**不在本卡 inScope** ⇒ 不改它，只把它"归谁持有"搬过来）✓；</li>
+ *       {@code manager/} 包、**不是组件** ⇒ 本组件只持有它、不改它）✓；</li>
  *   <li><b>药水记账**账本**</b> = {@link #appliedPotionTypes}（原 {@code RoleInstance} 的字段搬进本组件）
  *       ⇒ {@code clear()} 时只回收账本内的类型（O-7 语义逐字保留）✓；</li>
  *   <li><b>施加路径</b> = {@link #applyPotionEffect(PotionEffect)}（{@code player.addPotionEffect} +
  *       记账）：Bukkit API = 允许依赖的"外部东西" ✓。</li>
  * </ul>
- * <b>不再转调任何旧端口</b> ✗（原实现是经服务集端口的转发形态；阶段 13 · t103 起调用点一律**直接用本组件**）。
+ * <b>调用点一律直接用本组件</b> ✓（不经服务集端口转发）。
  */
 public class BuffComponent extends RoleComponent implements OperationProvider {
 

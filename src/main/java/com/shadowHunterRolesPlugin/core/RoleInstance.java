@@ -282,7 +282,7 @@ public class RoleInstance {
  /**
  * **调试用读口**：取某组件一对一的服务集（调试探针按 id 定位组件用，例如 {@code /role debug sched}
  * 的组件链实测取请求者与计时组件）。
- * <p><b></b>：服务集只剩三个成员（{@code self} / {@code components} / {@code roleInfo}）
+ * <p><b>服务集三成员</b>：服务集只剩三个成员（{@code self} / {@code components} / {@code roleInfo}）
  * ⇒ 本方法不再是"取端口实例"的手段（冷却自管理的冒烟入口已随其端口一并删除）。
  */
     public ComponentServices servicesOf(String componentId){
@@ -295,7 +295,7 @@ public class RoleInstance {
  * <p><b>前置</b>：冷却表已合并为**单一命名空间** ⇒ 本方法**不再需要 kind**
  * （合并前"按 kind 选表"的构造期绑定，是"删 kind 枚举"的硬阻塞）。
  * kind 枚举已整个删掉 ⇒ 注册处也不再承载任何"权威种类"。
- * <p><b></b>：{@code componentId} 形参**保留**（动态添加路径的服务集工厂签名不变：
+ * <p><b>形参保留</b>：{@code componentId} 形参**保留**（动态添加路径的服务集工厂签名不变：
  * {@code ComponentLookupImpl} 吃的就是 {@code Function<String, ComponentServices>}），
  * 但服务集本身**不再按 id 绑定任何资源** —— 资源归属一律由组件自己按请求者登记。
  */

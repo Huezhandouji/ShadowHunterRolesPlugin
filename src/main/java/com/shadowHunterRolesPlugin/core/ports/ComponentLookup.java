@@ -60,7 +60,7 @@ public interface ComponentLookup {
  /**
  * 按**组件 id** 取组件（id 是资源表键与热键栏查表键）。
  * 未注册 → {@code null}；**注册表冻结前调用 → 抛 {@code IllegalStateException}**。
- * <p><b></b>：id **可重复** ⇒ 本口返回**添加顺序第一个**同 id 者
+ * <p><b>id 可重复</b>：id **可重复** ⇒ 本口返回**添加顺序第一个**同 id 者
  * （与 {@link #remove(String)} 同目标；要拿**全部**同 id 者请用 {@link #getAllById(String)}）。
  */
     RoleComponent getById(String id);

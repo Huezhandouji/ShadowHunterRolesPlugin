@@ -672,12 +672,10 @@ public class RoleInstance {
         withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
                 guardedCall(component, "stop", component::stop);
- //（A6 · ②）：**调用方 stop() ⇒ 其请求的计时全部取消**
- //任务按请求者登记 ⇒ 这里逐组件回收，堵住"单独 stop() 不清理 ⇒ 生命周期泄漏"的缺口；
- //clear() 末尾的 cancelAllAndClear() 仍是最后的兜底（两者幂等）。
- //★ 走**基类通用面**：各组件覆写 `cancelOwnTimers()` 取消自己名下的计时
- // ⇒ 本类不必认识计时组件 ✓（默认空实现 ⇒ 不请求计时的组件天然跳过）。
-                component.cancelOwnTimers();
+ //★ **Bukkit 任务由计时组件全权负责** —— 本类**不再**逐组件回收计时：
+ // ① 需要即时取消的组件在自己的 `stop()` 里取消（组件自己知道它请求了什么）；
+ // ② 兜底 = `clear()` 末尾的 `cancelAllAndClear()`（按每组件资源表逐个取消 ⇒ 不泄漏）。
+ //  ⇒ 本类既不认识计时组件、也不再插手中途回收 ✓
             }
         });
     }
@@ -984,12 +982,6 @@ public class RoleInstance {
                         "Role '" + role.getId() + "' component '" + component.getId()
                                 + "' threw while terminating during quarantine; the remaining components are still terminated.",
                         failure);
-            }
-            try {
-                //★ 同基类通用面（见 `triggerLifecycleStop` 的同款处置）
-                component.cancelOwnTimers();
-            } catch (Throwable ignored) {
- //终止阶段不得让"回收计时时的异常"打断其余组件的终止
             }
         }
         return terminated;

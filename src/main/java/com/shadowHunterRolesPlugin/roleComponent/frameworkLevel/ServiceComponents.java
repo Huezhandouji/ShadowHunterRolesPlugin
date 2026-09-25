@@ -6,6 +6,7 @@ import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.Scheduler;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 
 import java.util.ArrayList;
@@ -238,6 +239,19 @@ public final class ServiceComponents {
     public static void heal(RoleComponent component, double amount) {
         if (component instanceof VitalsComponent vitals) {
             vitals.heal(amount);
+        }
+    }
+
+    /**
+     * **恢复满血**（读到什么就设成什么 —— 上限的修改由调用方在此之前施加）。
+     * <p>供**框架侧**在激活期调用，使「生命的一切写入」都经生命组件（见
+     * {@link VitalsComponent#restoreFull(Player)})。未命中该组件 ⇒ 无操作。
+     * @param component 生命组件的通用面（按 {@link #ID_VITALS} 取到）
+     * @param target    目标玩家
+     */
+    public static void vitalsRestoreFull(RoleComponent component, Player target) {
+        if (component instanceof VitalsComponent vitals) {
+            vitals.restoreFull(target);
         }
     }
 

@@ -154,6 +154,23 @@ public class VitalsComponent extends RoleComponent {
         heal(self(), amount);
     }
 
+    /**
+     * **恢复满血**（把当前生命置为 {@code Attribute.MAX_HEALTH} 的当前值）。
+     * <p>语义 = 激活期「把新上限**就地**应用给当前生命」那一步（原实现住在
+     * {@code RoleInstance#activate()} 内，直接调 Bukkit 的 {@code setHealth} ⇒
+     * **生命的写入点越过了组件** ✗）。现收进本组件 ⇒ 生命的一切写入（治疗 / 恢复满血 / 伤害）
+     * **只有本组件一个持有者** ✓。
+     * <p>读的是**属性当前值**（而非角色模板声明值）⇒ 与既有行为逐字一致：上限的修改由调用方
+     * 在此之前经 {@code AttributeModifier} 施加，本入口只负责"读到什么就设成什么" ✓。
+     * @param target 目标玩家；{@code null} ⇒ 无操作
+     */
+    public void restoreFull(Player target) {
+        if (target == null) {
+            return;
+        }
+        target.setHealth(target.getAttribute(Attribute.MAX_HEALTH).getValue());
+    }
+
     // ───────────── 四个伤害原语（与生命同属本组件）─────────────
 
     /** 真实伤害（无视护甲；含既有 PDC 副作用）。 */

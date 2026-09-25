@@ -208,6 +208,17 @@ public abstract class ActiveComponent extends RoleComponent
     public void onCast(CastSignal signal) {
     }
 
+    /**
+     * **物品使用入口（攻击）**：默认不做事（与 {@link #onCast(CastSignal)} 同族）。
+     * <p>★ **本方法的位置**：原先只声明在 {@code roleComponent/base/MainWeapon} ⇒ 容器侧派发时必须
+     * `instanceof MainWeapon` 强转（= 框架**点名具体家族**，与 {@code t6}/{@code t7} 消灭的
+     * 「容器强转」同族 ✗）。上提到本类后，容器侧与施放路径**同构**：判据 = **声明了主动入口的组件**
+     * （{@code instanceof ActiveComponent}），具体组件（技能 / 主武器）自行覆写 ✓。
+     * <p>签名与默认体**逐字未变**；{@code MainWeapon} 侧保留其声明（覆写者与 javadoc 一字未动）✓。
+     */
+    public void onAttack(AttackSignal signal) {
+    }
+
     //冷却结束回调（原 CooldownAware）与框架侧派发点已整体删除 ——
     //  组件自持冷却状态后，"到期/被结束/被重启"都不再由框架通知（框架不持有、也不派发 ✓）。
 }

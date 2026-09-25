@@ -40,7 +40,6 @@ public class Role {
     private final List<Component> description;
 
     private final double maxHP;
-    private final double baseATK;
     private final int maxEnergy;
     private final int maxSanTE;
 
@@ -87,7 +86,6 @@ public class Role {
         this.displayName = builder.displayName;
         this.description = builder.description;
         this.maxHP = builder.maxHP;
-        this.baseATK = builder.baseATK;
         this.maxEnergy = builder.maxEnergy;
         this.maxSanTE = builder.maxSanTE;
         this.faction = builder.faction;
@@ -360,7 +358,6 @@ public class Role {
  // 默认空表，addLineOfDescription 在 description(...) 之前调用时不再 NPE
         private List<Component> description = new ArrayList<>();
         private double maxHP = 20d;
-        private double baseATK = 10d;
         private int maxEnergy = 100;
         private int maxSanTE = 100;
         private Faction faction = Faction.UNKNOWN;
@@ -398,14 +395,6 @@ public class Role {
                 throw new IllegalArgumentException("Role maxHP cannot be negative.");
             }
             this.maxHP = maxHP;
-            return this;
-        }
-
-        public Builder baseATK(double baseATK) {
-            if (baseATK < 0) {
-                throw new IllegalArgumentException("Role baseATK cannot be negative.");
-            }
-            this.baseATK = baseATK;
             return this;
         }
 
@@ -560,7 +549,6 @@ public class Role {
     public Component getDisplayName() { return displayName; }
     public List<Component> getDescription() { return description; }
     public double getMaxHP() { return maxHP; }
-    public double getBaseATK() { return baseATK; }
     public int getMaxEnergy() { return maxEnergy; }
     public int getMaxSanTE() { return maxSanTE; }
     public Set<String> getSkillIds(){

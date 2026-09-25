@@ -140,7 +140,6 @@ public class RoleLoader {
                         Component.text("三技能圆弧斩，范围真伤")
                 ))
                 .maxHP(40)
-                .baseATK(10)
                 .maxEnergy(100)
                 .maxSanTE(100)
                 //表现值（名字/描述/冷却/耗能/图标）随组件自己的 Specification 走，
@@ -168,7 +167,6 @@ public class RoleLoader {
                         Component.text("一技能捅人恢复生命")
                 ))
                 .maxHP(40)
-                .baseATK(10)
                 .maxEnergy(0)
                 .maxSanTE(100)
                 .faction(Faction.SHADOW)
@@ -200,7 +198,6 @@ public class RoleLoader {
                         Component.text("组件只请求、不写：写入仍由框架在帧末 flush 完成")
                 ))
                 .maxHP(20)
-                .baseATK(0)
                 .maxEnergy(0)
                 .maxSanTE(100)
                 .faction(Faction.SHADOW)

@@ -199,8 +199,8 @@ public class RoleInstance {
         );
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(am);
         player.getAttribute(Attribute.MAX_HEALTH).addModifier(am);
- //就地读属性（**同一读数**，行为逐字不变）
-        player.setHealth(player.getAttribute(Attribute.MAX_HEALTH).getValue());
+ //就地读属性（**同一读数**，行为逐字不变）—— 写入经**生命组件**（生命的唯一持有者）
+        ServiceComponents.vitalsRestoreFull(resolve(ServiceComponents.ID_VITALS), player);
 
  //③ 生命周期时序：全部组件创建完成 -> awake全部 -> start全部 -> 启动ticker -> 渲染热键栏
         triggerLifecycleAwake();
@@ -384,9 +384,10 @@ public class RoleInstance {
         if(id == null) return false;
 
         RoleComponent component = componentRegistry.getById(id);
- //：同 handleCast —— 判据 = **声明 onAttack 的那个组件**（原能力接口已随吸收删除；
- //接受集逐字不变：那个接口的唯一实现者就是本类）。
-        if(!(component instanceof MainWeapon hook)) return false;
+ //：判据与 {@link #handleCast} **同构** = **声明了主动入口的组件**（{@code ActiveComponent}）；
+ //★ 原先此处是 {@code instanceof MainWeapon} 强转 ⇒ 框架点名具体家族（与 t6/t7 消灭的
+ //「容器强转」同族 ✗）⇒ onAttack 已上提到 {@code ActiveComponent}，本处不再点名任何家族。
+        if(!(component instanceof ActiveComponent hook)) return false;
 
  //冷却自管理（D1）：框架不再代启动冷却（同 handleCast）
  //：唯一受保护调用（攻击同属派发边界）

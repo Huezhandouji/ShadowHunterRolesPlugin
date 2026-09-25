@@ -1,6 +1,9 @@
 package com.shadowHunterRolesPlugin.command;
 
+import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -96,7 +99,7 @@ public class EnergyCommand implements SubCommand {
             sender.sendMessage(Component.text(target.getName() + " has no role!"));
             return;
         }
-        sender.sendMessage(Component.text("The current energy level of [" + target.getName() + "] is: " + roleManager.getRoleInstance(target).getCurrentEnergy()));
+        sender.sendMessage(Component.text("The current energy level of [" + target.getName() + "] is: " + energyOf(roleManager, target)));
     }
 
     private void handleSetEnergy(Player sender, String energyLevel, String targetName){
@@ -120,10 +123,32 @@ public class EnergyCommand implements SubCommand {
 
         try{
             int el = Integer.parseInt(energyLevel);
-            roleManager.getRoleInstance(target).setCurrentEnergy(el);
+            writeEnergy(roleManager, target, el);
         }
         catch (NumberFormatException e){
             return;
         }
+    }
+
+
+    /**
+     * **读数 / 设值都自己按 id 取能量组件**（★ 容器已删两个能量视图 —— 它不再指名任何组件）。
+     * <p>取到通用面后调基类通用面：`readCurrentEnergy()` / `writeCurrentEnergy(...)` ✓
+     */
+    private static int energyOf(RoleManager roleManager, Player target){
+        RoleComponent energy = energyComponentOf(roleManager, target);
+        return energy == null ? 0 : energy.readCurrentEnergy();
+    }
+
+    private static void writeEnergy(RoleManager roleManager, Player target, int amount){
+        RoleComponent energy = energyComponentOf(roleManager, target);
+        if (energy != null) {
+            energy.writeCurrentEnergy(amount);
+        }
+    }
+
+    private static RoleComponent energyComponentOf(RoleManager roleManager, Player target){
+        RoleInstance instance = roleManager.getRoleInstance(target);
+        return instance == null ? null : instance.componentRegistry().getById(EnergyComponent.ID);
     }
 }

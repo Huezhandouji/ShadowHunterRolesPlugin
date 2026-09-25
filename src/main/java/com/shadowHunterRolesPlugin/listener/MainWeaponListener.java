@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
@@ -72,7 +73,8 @@ public class MainWeaponListener implements Listener {
 
     /** **请求热键栏重绘**（★ 按 id 取渲染组件后调它的通用面；容器不再代劳）。 */
     private void requestRepaint(RoleInstance instance){
-        RoleComponent render = instance.hotbarRender();
+        //★ 渲染组件**由本 listener 自己按 id 取**（容器不持有它、也不认识它）
+        RoleComponent render = instance.componentRegistry().getById(HotbarRenderComponent.ID);
         if(render != null) render.requestRepaint();
     }
 

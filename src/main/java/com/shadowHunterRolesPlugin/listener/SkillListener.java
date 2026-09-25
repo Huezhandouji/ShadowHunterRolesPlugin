@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.*;
@@ -191,7 +192,8 @@ public class SkillListener implements Listener {
         if(!(component instanceof ActiveComponent active)) return false;
         if(active.isCoolingDown()) return false;
         instance.invokeComponentHook(component, "onCast", () -> active.onCast(new CastSignal(trigger)));
-        RoleComponent render = instance.hotbarRender();
+        //★ 渲染组件**由本 listener 自己按 id 取**（容器不持有它、也不认识它）
+        RoleComponent render = instance.componentRegistry().getById(HotbarRenderComponent.ID);
         if(render != null) render.requestRepaint();
         return true;
     }

@@ -14,12 +14,6 @@ import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 //框架级服务组件的**清单**（类 + id + 构造顺序 + 接线 + 容器侧的服务取用入口都在那一件里）——
 //本类只引用它的 `ID_*` 常量与静态服务入口。
-import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -85,10 +79,8 @@ public class RoleInstance {
  //★ 热键栏渲染组件的 **id 字面量**（纯数据 ⇒ 本类不算"认识组件"，只是按 id 取通用面）。
  // 取用后一律调**基类通用面**（`RoleComponent#requestRepaint` 等），不 cast、不写 `.class` ✓。
  //★ 只保留**本类真正要用**的 id：置脏目标与两个能量视图
-    private static final String HOTBAR_RENDER_ID = "hotbarRender";
-    private static final String ENERGY_ID = "energy";
 
- //★ 生命上限修饰符的密钥**已随该状态迁入生命组件**（`VitalsComponent.HEALTH_MODIFIER_KEY`）——
+ //★ 生命上限修饰符的密钥**已随该状态迁入生命组件**（组件自己持有）——
  // 本类不再持有它（持有它 = 容器必须认识生命组件）⇒ 字段与本类内的取用一并删除 ✓。
 
  //组件注册表（组件集合 + 每组件资源表 + getComponent 查找）
@@ -211,7 +203,7 @@ public class RoleInstance {
  * **按类型取本实例内的全部组件**：返回全部可赋值给 `type` 的组件，顺序 = **添加顺序**；
  * 无人符合 ⇒ **空列表**（不是 null）；**装配完成之前**调用 ⇒ 抛 `IllegalStateException`。
  * <p>类型形参**无上界** ⇒ 支持**接口**查询；返回**不可变**列表。
- * <p>消费者 = `listener/hook/DamageHookListener`（承受方扇出）与 `VitalsComponent`。
+ * <p>消费者 = `listener/hook/DamageHookListener`（承受方扇出）与生命组件（内部读口）。
  * ★ 「取第一个」的版本（`getByType`）**已删除** —— 消费者 0（组件侧取组件走
  * `RoleComponent#getComponent(Class)`）✓
  */
@@ -276,20 +268,9 @@ public class RoleInstance {
         return componentRegistry.getById(id);
     }
 
-    /**
-     * **请求热键栏重绘**（派发边界之后的"无条件置脏一次"）。
-     *
-     * <p>★ 走**基类通用面** {@link RoleComponent#requestRepaint()}（默认空实现、由渲染组件覆写）
-     * ⇒ 本类只用一个 **id 字面量**取到通用面，**不认识**是哪个组件提供的 ✓。
-     * 未命中（id 不存在）⇒ 不做任何事（与既有静默语义逐字一致 ✓）。
-     */
- /**
- * **请求热键栏重绘**（★ 通用面：调用方自己按 id 取渲染组件后调它，容器**不代劳**）。
- * <p>未命中（id 不存在）⇒ `null` ⇒ 调用方自行跳过。
- */
-    public RoleComponent hotbarRender() {
-        return resolve(HOTBAR_RENDER_ID);
-    }
+ //★ **`hotbarRender()` 已整体删除** —— 它让容器**指名渲染组件**（`"hotbarRender"` 字面量）。
+ // 现在：调用方（listener / 命令）自己按组件的 `ID` 从 `componentRegistry()` 取通用面 ✓
+ // ⇒ 容器内**不存任何组件、不写任何组件 id**。
 
  // ───────── 派发入口（★ 通用面：容器只提供「受保护调用 + 立即隔离」这一件事）─────────
 
@@ -317,7 +298,7 @@ public class RoleInstance {
 
  //★ **施放 / 攻击管道已整体删除** —— 那两个入口让容器认识「技能 / 主武器」这件事。
  // 现在：listener 自己读物品 id → 按 id 取通用面 → 判冷却 → 经 {@link #invokeComponentHook} 受保护调用
- //       → 经 {@link #hotbarRender()} 请求重绘 ✓（容器只提供通用设施，不认识任何具体组件）。
+ //       → 自己按渲染组件的 ID 取通用面并请求重绘 ✓（容器只提供通用设施，不认识任何具体组件）。
 
 
  /**
@@ -337,7 +318,7 @@ public class RoleInstance {
 
  //：组件侧不再被绑定一条**独立**的重绘通道 —— 需要请求重绘的组件改为
  //经**渲染组件**这一条通道：`svc().components().get(...)`
- //（按 id 取 —— id 常量归组件自己：`HotbarRenderComponent.ID`）拿到它，再调 requestRepaint()。
+ //（按 id 取 —— id 常量归组件自己）拿到它，再调 requestRepaint()。
  //⇒ 组件侧与框架侧**收敛到同一条通道**（禁两套并存）；
  // 旧 `RepaintRequestable` / `RepaintRequester` 两条通道**已删除**。
  //绑定时机的纪律不变：渲染组件本身在构造器里就已 bindRepaintSink（早于任何 awake/start）。
@@ -379,23 +360,10 @@ public class RoleInstance {
  // 消费者 0：生命的持有者是**生命组件**，需要时走它自己（`svc().components().get(...)` 或基类通用面）。
 
 
- //能量（**视图**：真值与 clamp/检查扣减的行为都在能量组件里）
- //`getMaxEnergy` / `decreaseEnergy` / `increaseEnergy` 三个转发访问器
- //**已删除** （消费者 0：`api/` 侧 38 个老方法做空后，原先的
- //`instance.increaseEnergy(...)` 一类调用已消失）；`getCurrentEnergy` / `setCurrentEnergy`
- //仍是**活码**（`command/EnergyCommand` 的读数与设值路径）。
-
-    public int getCurrentEnergy() {
-        RoleComponent energy = resolve(ENERGY_ID);
-        return energy == null ? 0 : energy.readCurrentEnergy();
-    }
-
-    public void setCurrentEnergy(int amount){
-        RoleComponent energy = resolve(ENERGY_ID);
-        if (energy != null) {
-            energy.writeCurrentEnergy(amount);
-        }
-    }
+ //★ **能量视图（`getCurrentEnergy` / `setCurrentEnergy`）已整体删除** —— 它们让容器**指名能量组件**
+ // （`"energy"` 字面量）。现在：调用方自己按能量组件的 `ID` 从 `componentRegistry()` 取通用面，
+ // 再调基类通用面 `readCurrentEnergy()` / `writeCurrentEnergy(...)` ✓
+ //（更早的三个转发访问器 `getMaxEnergy` / `decreaseEnergy` / `increaseEnergy` 早已删除 —— 消费者 0）。
 
  //SanTE（**视图**：真值与 clamp 都在 SanTE 组件里；派发边界由容器**给出的平台侧监听**触发）
  //`getCurrentSanTE` / `setCurrentSanTE` / `increaseSanTE` / `decreaseSanTE` /
@@ -558,16 +526,25 @@ public class RoleInstance {
  * 派发边界**不再**回调平台侧通道（那会造成同一监听被通知两次，而第二次的派发会被重入闸门吞掉 ⇒ 只是空转）。
  */
     private void broadcastSanTEChange(int preSanTE, int newSanTE){
-        RoleComponent provider = resolve(SanTEComponent.ID);
-        if (!(provider instanceof ChangeListenerSource source)) {
+ //★ **容器不指名任何组件**：按**能力面**（{@link ChangeListenerSource}）在注册表里找提供者 ——
+ // 谁是提供者由**组件自己是否实现该接口**决定，不由容器写死 id ✓
+        List<ChangeListenerSource> providers = new ArrayList<>();
+        for (RoleComponent candidate : componentRegistry.all()) {
+            if (candidate instanceof ChangeListenerSource source) {
+                providers.add(source);
+            }
+        }
+        if (providers.isEmpty()) {
             return;
         }
  //遍历窗口：可嵌套（update() 广播期间改 SanTE ⇒ 本方法再次进入窗口）
  //：唯一受保护调用（异常 ⇒ 窗口关闭后执行隔离四步）
         withinIterationWindow(() -> {
+            for (ChangeListenerSource source : providers) {
  //条目由提供者逐个交回（归属组件由它随条目一并给出）⇒ 仍能**逐个**经 guardedCall 做故障隔离 ✓
-            source.forEachChangeListener(preSanTE, newSanTE,
-                    entry -> guardedCall(entry.owner(), "onSanTEChange", entry.action()));
+                source.forEachChangeListener(preSanTE, newSanTE,
+                        entry -> guardedCall(entry.owner(), "onSanTEChange", entry.action()));
+            }
         });
  //★ 到此为止：**不再**回调平台侧通道 —— 那次回调产生的第二次通知会被重入闸门收下、
  //补偿分支又因 `notified == target` 跳过 ⇒ 空转；同一监听被通知两次也会让"命中次数"失真。

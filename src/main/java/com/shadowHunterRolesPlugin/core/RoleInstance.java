@@ -4,9 +4,6 @@ import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
-import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
-import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
-import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 //：聚合根只读服务面 —— 阵营读取的唯一入口（框架侧读口 {@link #roleInfo()} 的类型）。
@@ -112,7 +109,7 @@ public class RoleInstance {
  */
     private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
 
- //所有组件**无条件**走新管道（单一入口 = handleCast/handleAttack）。
+ //★ 施放 / 攻击的管道**已整体移出容器**（归 listener）—— 容器不认识「技能 / 主武器」这两类东西。
 
     public RoleInstance(Player player, Role role, RolesContext platform){
         this.player = player;
@@ -286,11 +283,30 @@ public class RoleInstance {
      * ⇒ 本类只用一个 **id 字面量**取到通用面，**不认识**是哪个组件提供的 ✓。
      * 未命中（id 不存在）⇒ 不做任何事（与既有静默语义逐字一致 ✓）。
      */
-    private void requestRepaintOfHotbar() {
-        RoleComponent repaintTarget = resolve(HOTBAR_RENDER_ID);
-        if (repaintTarget != null) {
-            repaintTarget.requestRepaint();
-        }
+ /**
+ * **请求热键栏重绘**（★ 通用面：调用方自己按 id 取渲染组件后调它，容器**不代劳**）。
+ * <p>未命中（id 不存在）⇒ `null` ⇒ 调用方自行跳过。
+ */
+    public RoleComponent hotbarRender() {
+        return resolve(HOTBAR_RENDER_ID);
+    }
+
+ // ───────── 派发入口（★ 通用面：容器只提供「受保护调用 + 立即隔离」这一件事）─────────
+
+ /**
+ * **受保护地调用一次组件钩子**（施放 / 攻击等派发边界都用它）。
+ *
+ * <p>容器**不认识**具体组件：调用方自己按 id 取到通用面、自己决定调哪个钩子，
+ * 本方法只负责两件**框架级**的事：① 经 {@link #guardedCall} 调用（异常 ⇒ 故障隔离）
+ * ② 调用后立即执行待处理的隔离（本入口不在遍历窗口内）。
+ *
+ * @param component 目标组件（通用面）
+ * @param phase 阶段名（进日志与隔离消息，如 `onCast` / `onAttack`）
+ * @param action 实际调用体
+ */
+    public void invokeComponentHook(RoleComponent component, String phase, Runnable action) {
+        guardedCall(component, phase, action);
+        runPendingQuarantine();
     }
 
  // ───────── 组件取用：一律「按 id 取到通用面 + 调基类方法」（本类不 cast、不写 `.class`）─────────
@@ -299,64 +315,10 @@ public class RoleInstance {
  // ⇒ 本类不需要 `Class<T>` 参数，也就不需要任何具体组件类的**类字面量** ✓。
  // 静默语义不变：id 取不到 ⇒ 不做任何事；读口回基类既定回退值（见 `RoleComponent` 各视图方法）。
 
- // ───────── 施放 / 攻击管道（单一入口 = handleCast/handleAttack） ─────────
+ //★ **施放 / 攻击管道已整体删除** —— 那两个入口让容器认识「技能 / 主武器」这件事。
+ // 现在：listener 自己读物品 id → 按 id 取通用面 → 判冷却 → 经 {@link #invokeComponentHook} 受保护调用
+ //       → 经 {@link #hotbarRender()} 请求重绘 ✓（容器只提供通用设施，不认识任何具体组件）。
 
- /**
- * 新路径施放入口。返回 {@code true} = 本次已由管道处理（旧路径不再插手）；
- * 开关关闭、或该 id 尚未迁移到 {@link RoleComponent} 时返回 {@code false}，交回旧路径。
- */
-    public boolean handleCast(CastTrigger trigger, Player caster){
-        if(caster == null) return false;
-
-        ItemStack item = caster.getInventory().getItemInMainHand();
-        String id = Skill.Utils.getSkillId(item);
-        if(id == null) id = MainWeapon.Utils.getWeaponId(item);
-        if(id == null) return false;
-
-        RoleComponent component = componentRegistry.getById(id);
- //：判据 = **物品支持组件本身** —— 原能力接口已随吸收删除；
- //接受集**逐字不变**（那个接口的唯一实现者就是本类），本处只用到 onCast。
-        if(!(component instanceof ActiveComponent active)) return false;
-
- //冷却自管理（D1）：框架**不再**代启动冷却 —— 组件在施放成功处自行 startCooldown()（状态归组件、框架只转问）；
- //声明值仍是唯一真值来源，启动点与启动值都与旧框架代启动逐字一致 ⇒ 可观察行为不变。
- //：**唯一受保护调用**（施放是框架派发边界之一）⇒ 组件抛异常 = 整实例隔离
-        guardedCall(component, "onCast", () -> active.onCast(new CastSignal(trigger)));
- //本入口不在遍历窗口内 ⇒ 立即执行待处理的隔离
-        runPendingQuarantine();
- //**仍返回 true**：本次已由管道"处理"（组件确实被调用过，只是抛了）⇒ 若返回 false，
- //调用方会回落到旧路径 ⇒ **二次派发**（组件已被隔离，二次派发是新的错误面）
- //施放后**无条件**置脏一次（与既有实现逐字一致：这次置脏**不在**帧末入口条件里
- // ⇒ 即使本次施放没有可见变化，也照旧请求一次重绘）
- //★ 走**基类通用面**（`RoleComponent#requestRepaint`，默认空实现、由渲染组件覆写）
- // ⇒ 本类按 id 取到通用面即可请求，**不必认识**是哪个组件提供的 ✓
-        requestRepaintOfHotbar();
-        return true;
-    }
-
- /** 新路径攻击入口（主武器）。语义同 {@link #handleCast}。 */
-    public boolean handleAttack(Player victim, Player attacker){
-        if(victim == null || attacker == null) return false;
-
-        ItemStack item = attacker.getInventory().getItemInMainHand();
-        String id = MainWeapon.Utils.getWeaponId(item);
-        if(id == null) return false;
-
-        RoleComponent component = componentRegistry.getById(id);
- //：判据与 {@link #handleCast} **同构** = **声明了主动入口的组件**（{@code ActiveComponent}）；
- //★ 原先此处是 {@code instanceof MainWeapon} 强转 ⇒ 框架点名具体家族（与 t6/t7 消灭的
- //「容器强转」同族 ✗）⇒ onAttack 已上提到 {@code ActiveComponent}，本处不再点名任何家族。
-        if(!(component instanceof ActiveComponent hook)) return false;
-
- //冷却自管理（D1）：框架不再代启动冷却（同 handleCast）
- //：唯一受保护调用（攻击同属派发边界）
-        guardedCall(component, "onAttack", () -> hook.onAttack(new AttackSignal(victim)));
-        runPendingQuarantine();
- //同 handleCast：攻击后**无条件**置脏一次（这次置脏不在帧末入口条件里）
- //★ 同走基类通用面 ✓
-        requestRepaintOfHotbar();
-        return true;
-    }
 
  /**
  * 组件初始化（统一装配）：**只遍历 {@code role.getComponents()} 一次** ——
@@ -392,29 +354,9 @@ public class RoleInstance {
  //（buff 记账表的持有者本来就是 **buff 组件**；需要它的人走组件本身，不经聚合根转发）。
 
 
- //技能相关
- /**
- * 就绪判定（**单一冷却命名空间**的视图）：无条目/已到期 ⇒ {@code true}。
- * <p><b>判定就地转问组件</b>：原实现经 `isCooldownReady(skillId)` 转发，现改为就地转问组件
- * ⇒ 框架不持有冷却状态，只转问（口径不变）。
- * 行为**逐字等价**：无冷却能力 ⇒ 恒就绪。
- */
-    public boolean isSkillReady(String skillId){
-        RoleComponent component = componentRegistry.getById(skillId);
-        return !(component instanceof ActiveComponent active) || !active.isCoolingDown();
-    }
+ //★ **就绪判定（`isSkillReady` / `isMainWeaponReady`）已整体删除** —— 它们让容器认识「技能 / 主武器」。
+ // 现在：调用方按 id 取到通用面后**直接问组件**（`ActiveComponent#isCoolingDown()`），不经容器转发 ✓。
 
- //冷却**剩余量视图**（技能 2 件 + 主武器 2 件）与它们唯一的下游
- //`remainingCooldownTicks` / `isCooldownReady` **转发访问器已删除** —— 消费者 0
- //（冷却状态自 归 `ActiveComponent`：读侧直接问组件，不经聚合根转发；
- // 就绪判定仍由**活码** `isSkillReady` / `isMainWeaponReady` 提供 ⇒ 能力未失去入口）。
-
-
- /** 就绪判定（：同 {@link #isSkillReady(String)} —— 就地转问组件，转发访问器已删）。 */
-    public boolean isMainWeaponReady(String weaponId){
-        RoleComponent component = componentRegistry.getById(weaponId);
-        return !(component instanceof ActiveComponent active) || !active.isCoolingDown();
-    }
 
 
  //（代码卫生）：原先这里的三个成员 —— 按 id 解析的**回落入口**、那条口径的

@@ -34,15 +34,16 @@ public class SetRoleCommand implements SubCommand {
 
     @Override
     public String getUsage(){
-        return "set <roleId> [playerName]";
+        return "set <roleId> <player|@s>";
     }
 
     @Override
     public boolean execute(CommandSender sender, String[] args){
         if(!(sender instanceof Player player)) return true;
 
+        //★ **目标必填**：`/role set <roleId>` 不再默认给自己
         if(args.length == 1){
-            handleSet(player, args[0], null);
+            player.sendMessage(Component.text(PlayerTargets.targetRequired("/role set <roleId> <player|@s>")));
             return true;
         }
         if(args.length == 2){
@@ -65,25 +66,18 @@ public class SetRoleCommand implements SubCommand {
             return;
         }
 
-        //选择角色：省略目标 ⇒ 自己；否则经统一解析（裸名 / @s / 选择器，且必须恰好命中 1 名在线玩家）
-        Player target;
-        if(targetName == null){
-            target = sender; // 默认是自己
-        }
-        else{
-            PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
-            target = resolved.player();
-            if(target == null || !target.isOnline()){
-                sender.sendMessage(Component.text(PlayerTargets.rejection(targetName, resolved,
-                        "Cannot find the player you provided: " + targetName)));
-                return;
-            }
+        //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
+        PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
+        Player target = resolved.player();
+        if(target == null || !target.isOnline()){
+            sender.sendMessage(Component.text(PlayerTargets.rejection(targetName, resolved,
+                    "Cannot find the player you provided: " + targetName)));
+            return;
         }
 
         boolean success = roleManager.selectRole(target, roleId);
         if(success){
-            if(targetName == null) sender.sendMessage(Component.text("Your role has been set: " + roleRegistry.get(roleId).getId()));
-            else sender.sendMessage(Component.text("The role of player [ " + targetName + "] has been set: " + roleRegistry.get(roleId).getId()));
+            sender.sendMessage(Component.text("The role of player [ " + target.getName() + "] has been set: " + roleRegistry.get(roleId).getId()));
         }
         else{
             sender.sendMessage(Component.text("Role set operation failed."));

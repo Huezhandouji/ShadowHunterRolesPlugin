@@ -86,7 +86,7 @@ public final class ComponentOperationDispatcher {
             return refuse(sender, auditTarget, componentId, payload, known ? "target-offline" : "target-not-found",
                     known
                             ? "Player '" + targetToken + "' is not online."
-                            : "No online player named '" + targetToken + "'. (Omit the player to target yourself.)");
+                            : "No online player named '" + targetToken + "'. (Use @s for yourself.)");
         }
 
         //② UUID → RoleInstance（无实例 ⇒ 回绝 ✓）

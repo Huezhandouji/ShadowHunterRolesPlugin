@@ -299,10 +299,10 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
      *
      * <h2>可直接照抄的指令</h2>
      * <pre>
-     * /role operation query  @s energy current
-     * /role operation modify @s energy add 5        ⇒ "5"（写后值）
-     * /role operation modify @s energy add -5       ⇒ null（负数 ⇒ 参数不合法）
-     * /role operation query  @s energy current 1    ⇒ null（只读动词不得带参数）
+     * /role operation @s @s energy current
+     * /role operation @s @s energy add 5        ⇒ "5"（写后值）
+     * /role operation @s @s energy add -5       ⇒ null（负数 ⇒ 参数不合法）
+     * /role operation @s @s energy current 1    ⇒ null（只读动词不得带参数）
      * </pre>
      * ★ 反例说明：第 3 条走**参数不合法**分支（{@code parseNonNegative} 见负值 ⇒ 回 {@code -1} ⇒ 拒绝）；第 4 条走**只读动词带参**分支。
      */

@@ -12,8 +12,12 @@ import java.util.List;
  * 玩家目标解析：四条带玩家目标参数的子指令（{@code set} / {@code clear} / {@code energy} / {@code operation}）
  * 共用的**唯一**解析入口。
  *
- * <p><b>接受集</b>：省略目标（{@code null} / 空白）与 {@code @s} ⇒ 执行者自己；以 {@code @} 开头的 token ⇒ 交
+ * <p><b>接受集</b>：{@code @s} ⇒ 执行者自己；以 {@code @} 开头的 token ⇒ 交
  * {@link Bukkit#selectEntities(CommandSender, String)}；其余 ⇒ 裸玩家名（先精确匹配，再宽松匹配）。
+ *
+ * <p>★ **调用方必须要求目标非空**（本工程强制目标选择器）：{@code null} / 空白 token 会被解析成
+ * "执行者自己"，那是**兼容旧语法的回落**，调用方**不得**依赖它 —— 缺目标时应先回
+ * {@link #targetRequired(String)} 并返回。
  *
  * <p><b>唯一的接收判据</b>：解析结果**恰好 1 名在线玩家**。选择器命中 0 名、命中的不是玩家（{@code @e} 落在
  * 实体上）、或命中多于一名，一律拒绝 —— **不静默取第一个**。判定不按 token 内容分流（同一个 token 只有一把尺），
@@ -60,8 +64,7 @@ final class PlayerTargets {
     }
 
     /** 解析一段目标 token；任何失败或歧义 ⇒ 失败结果（**不抛**）。 */
-    static Result resolve(CommandSender sender, String raw) {
-        if (raw == null || raw.isBlank()) {
+    static Result resolve(CommandSender sender, String raw) {        if (raw == null || raw.isBlank()) {
             return selfOrMiss(sender);
         }
         if (ComponentOperationDispatcher.SELF_TOKEN.equalsIgnoreCase(raw)) {
@@ -79,6 +82,18 @@ final class PlayerTargets {
             return Result.miss(Failure.NOT_FOUND, 0);
         }
         return Result.hit(lenient);
+    }
+
+    /**
+     * **目标缺失时的统一回绝句**（★ 本工程**强制**目标选择器：任何面向玩家的命令都必须给目标，且恰好 1 名）。
+     *
+     * <p>调用方判定"目标 token 缺失或不是目标"时，用本方法回一句**统一文案**，不要各写一套。
+     *
+     * @param commandName 命令用法提示（例如 {@code "/role set <roleId> <player|@s>"}）
+     */
+    static String targetRequired(String commandName) {
+        return "The target is required: pass a player name or a selector (use @s for yourself)."
+                + "  Usage: " + commandName;
     }
 
     /**

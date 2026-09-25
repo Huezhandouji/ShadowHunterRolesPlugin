@@ -227,10 +227,10 @@ public class BuffComponent extends RoleComponent implements OperationProvider {
      *
      * <h2>可直接照抄的指令</h2>
      * <pre>
-     * /role operation query  @s buffs count
-     * /role operation modify @s buffs add STUN 100  ⇒ 施加后剩余刻数
-     * /role operation modify @s buffs add stun 100  ⇒ null（大小写不符 ⇒ 严格 valueOf 拒绝）
-     * /role operation query  @s buffs remaining NOPE   ⇒ null（未知 buff id ⇒ 严格 valueOf 拒绝）
+     * /role operation @s @s buffs count
+     * /role operation @s @s buffs add STUN 100  ⇒ 施加后剩余刻数
+     * /role operation @s @s buffs add stun 100  ⇒ null（大小写不符 ⇒ 严格 valueOf 拒绝）
+     * /role operation @s @s buffs remaining NOPE   ⇒ null（未知 buff id ⇒ 严格 valueOf 拒绝）
      * </pre>
      * ★ 反例说明：第 3 条走**严格 {@code valueOf}** 分支（{@code SILENCE}/{@code STUN}/{@code IMMUNE} 必须逐字相符）；第 4 条走**未知 buff id** 分支。
      */

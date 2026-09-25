@@ -38,6 +38,6 @@ public class HelpCommand implements SubCommand {
         sender.sendMessage(Component.text("/role energy get [playerName]  --read energy"));
         sender.sendMessage(Component.text("/role energy set <value> [playerName]  --set energy"));
         sender.sendMessage(Component.text("/role debug <cooldown|sched> ...  --debug tools"));
-        sender.sendMessage(Component.text("/role operation <query|modify> [player] <componentId[#index]> [payload]  --operate a component"));
+        sender.sendMessage(Component.text("/role operation <player|@s> <componentId[#index]> [payload]  --operate a component"));
     }
 }

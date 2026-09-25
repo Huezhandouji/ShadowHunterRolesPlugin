@@ -322,11 +322,11 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
      *
      * <h2>可直接照抄的指令</h2>
      * <pre>
-     * /role operation query  @s sante current
-     * /role operation query  @s sante max
-     * /role operation modify @s sante gain 20       ⇒ 写后值
-     * /role operation modify @s sante gain -1       ⇒ null（负数 ⇒ 参数不合法）
-     * /role operation query  @s sante max 1         ⇒ null（只读动词不得带参数）
+     * /role operation @s @s sante current
+     * /role operation @s @s sante max
+     * /role operation @s @s sante gain 20       ⇒ 写后值
+     * /role operation @s @s sante gain -1       ⇒ null（负数 ⇒ 参数不合法）
+     * /role operation @s @s sante max 1         ⇒ null（只读动词不得带参数）
      * </pre>
      * ★ 反例说明：第 4 条走**参数不合法**分支（负数 ⇒ 拒绝）；第 5 条走**只读动词带参**分支。
      */

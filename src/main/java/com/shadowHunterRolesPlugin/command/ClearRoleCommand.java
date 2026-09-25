@@ -25,15 +25,16 @@ public class ClearRoleCommand implements SubCommand {
 
     @Override
     public String getUsage(){
-        return "clear [playerName]";
+        return "clear <player|@s>";
     }
 
     @Override
     public boolean execute(CommandSender sender, String[] args){
         if(!(sender instanceof Player player)) return true;
 
+        //★ **目标必填**：`/role clear` 不再默认给自己
         if(args.length == 0){
-            handleClear(player, null);
+            player.sendMessage(Component.text(PlayerTargets.targetRequired("/role clear <player|@s>")));
             return true;
         }
         if(args.length == 1){
@@ -45,19 +46,13 @@ public class ClearRoleCommand implements SubCommand {
     }
 
     private void handleClear(Player sender, String targetName){
-        // 确定目标玩家：省略目标 ⇒ 自己；否则经统一解析（裸名 / @s / 选择器，且必须恰好命中 1 名在线玩家）
-        Player target;
-        if(targetName == null){
-            target = sender; // 默认自己
-        }
-        else{
-            PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
-            target = resolved.player();
-            if(target == null || !target.isOnline()){
-                sender.sendMessage(Component.text(PlayerTargets.rejection(targetName, resolved,
-                        "Cannot find the player you provided: " + targetName)));
-                return;
-            }
+        //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
+        PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
+        Player target = resolved.player();
+        if(target == null || !target.isOnline()){
+            sender.sendMessage(Component.text(PlayerTargets.rejection(targetName, resolved,
+                    "Cannot find the player you provided: " + targetName)));
+            return;
         }
 
         //检查是否有角色

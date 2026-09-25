@@ -11,42 +11,25 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * 主动组件基类（设计 §4.3）：= 原 `Skill` + `MainWeapon` 去重后的并集，不多一个成员。
+ * **主动组件基类**（技能与主武器的并集）：声明「能施放 / 能攻击」的组件。
  *
- * <h2>本类在装配里的位置</h2>
- * 本类降级为**可选的便利实现** —— 它只做一件事：把构造参数装进
- * {@link HotbarSpecification} 并给出 {@link #specification()}（**唯一实现点**）。
+ * <h2>本类做什么</h2>
+ * 只做两件事：① 把装配期描述符装进字段并给出 {@link #specification()}；
+ * ② 持有**每实例一份**的冷却状态与就绪判定 {@link #isCoolingDown()}。
  *
- * <h2>热键栏能力：由本类**自己声明**，不再是"实现某个能力接口"</h2>
- * 本类**不实现**任何热键栏能力接口 ✗ —— 那三个接口已随"能力 = 渲染组件读的数据"这一口径整体删除 ✗
- * （见 {@code HotbarRenderComponent} 的读口 {@code specificationOf} / {@code buildItemOf} /
- * {@code dependsOnLiveStateOf}）。现在：
- * <ul>
- *   <li><b>声明数据</b>（图标 / 显示名 / 描述 / 冷却声明值 / 耗能声明值 / 基础物品）住在
- *       {@link HotbarSpecification}（装配期描述符）✓，本类只把其中**组件侧仍需要的几个**转出去
- *       （见下：家族基类与外部读数点要用）；</li>
- *   <li><b>物品产出</b> = {@link #buildItem()}：本类**保持抽象** ✗ —— 默认画法由两个家族基类给出
- *       （{@code Skill} 带秒数、{@code MainWeapon} 不带）；画物品要读运行期状态，做不到在这里按家族分叉；</li>
- *   <li><b>外观是否依赖活状态</b> = {@link #dependsOnLiveState()}：默认 {@code false}，
- *       只有"外观每刻自己变"的家族覆写为 {@code true}。</li>
- * </ul>
+ * <h2>声明数据从哪来</h2>
+ * 图标 / 显示名 / 描述 / 冷却声明值 / 耗能声明值 / 基础物品都住在 {@link HotbarSpecification}
+ * （装配期描述符，由组件自己的嵌套 `Specification` 声明）；本类只把**组件侧仍需要的几个**转出去。
+ * <p>{@link #buildItem()} **保持抽象**：默认画法由两个家族基类给出（技能带秒数、主武器不带）。
+ * <p>{@link #dependsOnLiveState()} 默认 `false`；「外观每刻自己变」的组件覆写为 `true`。
  *
- * <h2>表现规格是装配期描述符</h2>
- * 表现规格**不由构造实参内联**，而是由组件自己的嵌套 `Specification` 声明、经装配入口
- * {@code Role.Builder.addComponent(id, specification)} 交给容器，容器再经
- * {@code Specification.create(id, services)} 把它交给本构造器。
- * <p>本类持有的这一份同时是**基类默认画法的读面**（{@link #specification()}）；它由装配期
- * {@code freeze()} 置为只读 ⇒ 同一实例被多个玩家实例共享也不会被串改。
- * <p>表现规格类改全拼（`HotbarSpec` → {@link HotbarSpecification}；旧短名类已删除 ✓）。
- * 本类持有的这一份是**声明值对象**：它没有栏位（栏位由装配器在描述符上设置），
- * 也从不由装配入口消费 —— 因此这条路径与更早的形态逐字等价。
+ * <h2>冷却</h2>
+ * 状态与判断都在本类，**框架不登记、不派发、不落表** —— 需要读数时**转问组件**。
+ * <p>★ **施放成功才调** {@link #startCooldown()}（失败时不要调）。
  *
- * <h2>冷却：状态与判断都在本类</h2>
- * 每实例一份 {@code cooldownUntilTick}（同 id 的两个实例**各自独立** ✓），框架既不登记、也不派发、
- * 更不落表；框架侧只在需要读数时**转问组件**（{@link #isCoolingDown()} / 读数口），公开面一条不删 ✓。
- * <p>"冷却结束回调"已随能力接口一并删除 —— 全库**零覆写点** ⇒ 删除**零行为变化** ✓。
- * <p>物品使用入口（{@link #onCast(CastSignal)}）与入口词汇（{@link CastTrigger} / {@link CastSignal} /
- * {@link AttackSignal}）都归本组件：施放与攻击由「物品支持类组件」处理 ✓。
+ * <h2>入口词汇</h2>
+ * {@link #onCast(CastSignal)} / {@link #onAttack(AttackSignal)} 与 {@link CastTrigger} /
+ * {@link CastSignal} / {@link AttackSignal} 都归组件 —— 施放与攻击由**物品支持类组件**处理。
  */
 public abstract class ActiveComponent extends RoleComponent
         implements EnergyComponent.EnergyCosting {

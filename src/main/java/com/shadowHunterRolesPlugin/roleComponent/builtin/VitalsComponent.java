@@ -12,42 +12,30 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 /**
- * 生命组件：
- * 系统级能力「生命 / 治疗 / 伤害」的**组件形态**（每角色实例一个）。
- * <p><b>★ 本组件持有行为</b>：clamp 策略（{@code min(当前 + amount, Attribute.MAX_HEALTH)}）的**唯一实现**，
- * 以及**四个伤害原语**（Part A 从原 {@code DamageComponent} 并入 ⇒ 该类**已删除** ✓
- * ⇒ 伤害与生命**只有一个持有者** ✓）。
- * <p><b>状态归属</b>：生命的真值是 **Bukkit 玩家属性**（{@code player.getHealth()} /
- * {@code Attribute.MAX_HEALTH}）⇒ 不属"组件内部字段"而是**外部平台状态**（
- * 组件**允许**依赖真正外部的东西 = Bukkit API ✓）。本组件**不复制**一份生命字段 ✗（那会立刻
- * 与客户端/服务端的真实生命值不同步 ⇒ 属"会撒谎的值"）。
- * <p><b>为什么这里可以直调静态工具</b>：组件的实现设计**不必**不依赖任何
- * 外部的东西，比如一个伤害组件，它仍然可以**依赖既有的静态伤害工具**；而"薄封装"许可被
- * **收窄为"仅限真正外部的东西"**（静态工具 / 单例 / Bukkit API ✓），
- * **不适用于框架自己的服务端口** ✗ —— {@code DamageUtil} 属**真正外部**（它不依赖
- * {@code ComponentServices}，也不把"谁提供能力"这件事藏起来）。
+ * **生命组件**：生命 / 治疗 / 伤害的持有者（每角色实例一个）。
+ *
+ * <h2>状态归属</h2>
+ * 生命的真值是 **Bukkit 玩家属性**（`player.getHealth()` / `Attribute.MAX_HEALTH`）⇒ 属**外部平台状态**。
+ * ★ 本组件**不复制**一份生命字段（那会与真实生命值不同步 ⇒ 属"会撒谎的值"）。
+ *
+ * <h2>行为归属</h2>
+ * clamp 策略（`min(当前 + amount, Attribute.MAX_HEALTH)`）的**唯一实现**，以及**四个伤害原语**
+ * （伤害与生命**只有一个持有者**）。
+ * <p>★ **可以直调静态工具**（如 {@code DamageUtil}）—— 它属**真正外部**（不依赖服务集、也不藏"谁提供能力"）。
  *
  * <h2>两个统一入口</h2>
  * <ul>
  *   <li>{@link #damage(Player, double)} / {@link #heal(Player, double)}：**自己也是一种目标** ——
- *       传自己的 {@code player} 即"伤害自己 / 治疗自己"，传别人的即"他人" ✓</li>
- *   <li>**不提供** {@code healSelf} / {@code healOther} / {@code damageSelf} / {@code damageOther}
- *       四个组合入口 ✗ —— 理由是**组合爆炸**：将来加"群体治疗"还要再加方法 ✗</li>
- *   <li>{@code target} 类型 = <b>{@link Player}</b>（**不是** {@code LivingEntity}）：与平台既有惯例一致
- *       （{@code RoleAPI.healPlayer(Player|UUID, …)}）✓，且为 Part B 的**按实例路由**预留了前提
- *       （只有 {@code Player} 能保证找到角色实例）✓；{@code UUID} 重载日后可**再补** ✓</li>
+ *       传自己的 player 即"伤害 / 治疗自己"；</li>
+ *   <li>★ **不提供** `healSelf` / `healOther` / `damageSelf` / `damageOther` 四个组合入口
+ *       （理由：**组合爆炸** —— 将来加"群体治疗"还要再加方法）；</li>
+ *   <li>`target` 类型 = {@link Player}（不是 `LivingEntity`）：与平台既有惯例一致，且只有 `Player`
+ *       能保证找到角色实例。</li>
  * </ul>
  *
- * <h2>★ 本入口的边界（逐条）</h2>
- * {@code damage} / {@code heal} **只做结算**；其中一项**仍然成立**，其余已解除：
- * <ul>
- *   <li><b>【仍成立】本入口不投递回调</b> ✓ —— 受伤 / 受治疗由
- *       {@code listener/DamageHookListener} 在**平台事件**面派发（见 {@link Participant}）✓</li>
- *   <li><b>【已解除】两钩子</b> ⇒ {@link Participant#onDamaged(Player, double)} /
- *       {@link Participant#onHealed(double)} 已提供（经目标实例的受保护入口派发）✓</li>
- *   <li><b>【已解除】伤害类型</b> ⇒ 三参 {@link #damage(Player, double, DamageKind)} ✓</li>
- *   <li><b>【未做】跨实例运行级读数与主线程前提</b> ⇒ 需运行级取证 ✗</li>
- * </ul>
+ * <h2>边界</h2>
+ * `damage` / `heal` **只做结算**：★ **不投递回调** —— 受伤 / 受治疗由
+ * {@code listener/DamageHookListener} 在**平台事件**面派发（见 {@link Participant}）。
  */
 public class VitalsComponent extends RoleComponent {
 

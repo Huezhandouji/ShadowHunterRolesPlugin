@@ -6,10 +6,12 @@ import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.Scheduler;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import org.bukkit.potion.PotionEffect;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -167,5 +169,110 @@ public final class ServiceComponents {
         ordered.add(buffs);
         ordered.add(timers);
         return List.copyOf(ordered);
+    }
+
+    // ───────── 容器侧的**服务取用入口**：容器只按 id 取到通用面，具体动作在这里完成 ─────────
+    // ★ 为什么放在本文件：它是**唯一**知道"哪个 id 是哪个组件类"的地方（组件集合的清单）⇒
+    //   容器侧因此不再出现任何具体组件类的 `.class` 字面量，也不再有第二份同值 id 常量 ✓。
+    // ★ 语义与容器此前的"按 id 取 + 类型不符即跳过"**逐字等价**：id 取不到 / 类型不符 ⇒ 不做任何事；
+    //   读口在未命中时回各自既定的回退值（见各方法的 {@code @return}）✓。
+
+    /** 置脏渲染（幂等；**不写物品**）。未命中 ⇒ 无操作。 */
+    public static void renderMarkDirty(RoleComponent component) {
+        if (component instanceof HotbarRenderComponent render) {
+            render.markDirty();
+        }
+    }
+
+    /** 帧末刷新（判脏 → 写物品 → 清脏；顺序不可交换）。未命中 ⇒ 无操作。 */
+    public static void renderFlush(RoleComponent component) {
+        if (component instanceof HotbarRenderComponent render) {
+            render.flush();
+        }
+    }
+
+    /** 同步首刷（选角色瞬间热键栏即就绪、零延迟）。未命中 ⇒ 无操作。 */
+    public static void renderFirstFlush(RoleComponent component) {
+        if (component instanceof HotbarRenderComponent render) {
+            render.firstFlush();
+        }
+    }
+
+    /** 取"本帧真的改了东西"这一读数并**清除**它。未命中 ⇒ {@code false}。 */
+    public static boolean renderConsumeChanged(RoleComponent component) {
+        return component instanceof HotbarRenderComponent render && render.consumeChanged();
+    }
+
+    /**
+     * 把**本帧渲染完成的通知**逐个交给调用方（{@code owner} + 该条通知动作）。
+     * <p><b>类型扫描在本文件完成</b>（"谁订阅了渲染通知"属于组件集合的知识）⇒ 容器侧不必点名那个内嵌类型；
+     * **怎么调、怎么护仍由容器决定**（逐个经它自己的受保护入口 ⇒ 只隔离抛异常的那一个）。
+     * @param components 容器要扫描的组件集（顺序 = 容器的注册序）
+     * @param delivery   逐条投递口（容器侧实现）
+     */
+    public static void forEachRenderNotice(List<RoleComponent> components,
+                                           BiConsumer<RoleComponent, Runnable> delivery) {
+        if (components == null || delivery == null) {
+            return;
+        }
+        for (RoleComponent component : components) {
+            if (component instanceof HotbarRenderComponent.RenderCallback callback) {
+                delivery.accept(component, callback::onHotbarRendered);
+            }
+        }
+    }
+
+    /** 当前能量读数。未命中 ⇒ {@code 0}（与容器既有回退值相同）。 */
+    public static int energyCurrent(RoleComponent component) {
+        return component instanceof EnergyComponent energy ? energy.current() : 0;
+    }
+
+    /** 写当前能量（clamp 在组件内）。未命中 ⇒ 无操作。 */
+    public static void energySet(RoleComponent component, int value) {
+        if (component instanceof EnergyComponent energy) {
+            energy.set(value);
+        }
+    }
+
+    /** 治疗（clamp 策略在生命组件内）。未命中 ⇒ 无操作。 */
+    public static void heal(RoleComponent component, double amount) {
+        if (component instanceof VitalsComponent vitals) {
+            vitals.heal(amount);
+        }
+    }
+
+    /** 启动 buff 记账表的每 tick 更新。未命中 ⇒ 无操作。 */
+    public static void startBuffUpdater(RoleComponent component) {
+        if (component instanceof BuffComponent buffs) {
+            buffs.manager().startUpdater();
+        }
+    }
+
+    /** 施加药水效果并记入账本。未命中 ⇒ 无操作。 */
+    public static void applyPotionEffect(RoleComponent component, PotionEffect effect) {
+        if (component instanceof BuffComponent buffs) {
+            buffs.applyPotionEffect(effect);
+        }
+    }
+
+    /** 只回收本系统记账过的药水效果。未命中 ⇒ 无操作。 */
+    public static void clearAppliedPotionEffects(RoleComponent component) {
+        if (component instanceof BuffComponent buffs) {
+            buffs.clearAppliedPotionEffects();
+        }
+    }
+
+    /** 清空 buff 记账表。未命中 ⇒ 无操作。 */
+    public static void clearBuffLedger(RoleComponent component) {
+        if (component instanceof BuffComponent buffs) {
+            buffs.manager().clearAll();
+        }
+    }
+
+    /** 按请求者取消其名下的全部计时句柄（返回值沿用既有调用点的"不看返回值"口径）。未命中 ⇒ 无操作。 */
+    public static void cancelTimersOf(RoleComponent component, RoleComponent requester) {
+        if (component instanceof TimerComponent timers) {
+            timers.cancelAllOf(requester);
+        }
     }
 }

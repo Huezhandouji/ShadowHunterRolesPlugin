@@ -188,3 +188,99 @@ $lines = [IO.File]::ReadAllLines($ri)                      # 权威读取（不�
 2. **不实施** §4 的两条路线（它们的落点超出本卡 inScope）。
 3. **不把"改名"当"去耦合"**：`dispatchRenderedNotice` 仍是框架侧的扇出，`§3.3` 的阻塞点**依旧存在**，只是名字不再绑定某个组件。
 4. **不隐瞒口径差**：§2.2 的「18 行」与旧记「14 行」的差已给根因（旧口径漏数 `pickValue` 两处、且未把内嵌接口与注释分行计）—— 后续卡必须重算。
+
+---
+
+## 8. 更正注记（截至 `3147239`）
+
+> **本节由 `t29` 追加**，上文 §0–§7 **一字不动**。追加理由：§1 的结论「**不可达（no-go）**」**已被后续结构卡 `t7` 消解** —— 若继续按原文执行，下一个上下文会绕过已经达成的结构去"再解一遍"。
+
+### 8.1 原判与现状
+
+| 项 | 原文（§1 / §3） | 现算（截至 `3147239`） |
+|---|---|---|
+| 总目标「`RoleInstance` 内不出现任何具体组件类名（含 import）= 0」 | **不可达** | **已达成**（`RoleInstance` 现 **1083 行**） |
+| §3.1 阻塞点：`pickApply` / `pickValue` 的 `Class<T>` 签名迫使调用点点名 | 主阻塞 | **已解除**：两个取用口**整体删除**，动作改由框架级清单的服务入口完成 ⇒ 调用点不再需要写 `Class<T>` |
+| §3.3 阻塞点：渲染回调的内嵌契约归属 | 不可达 | **已解除**：类型扫描（`instanceof … RenderCallback`）搬进 `ServiceComponents.forEachRenderNotice`，容器侧只保留**逐个受保护投递** `deliverHook(...)` |
+
+⇒ **`t7`（提交 `3147239`）之后，§1 的 no-go 结论、§3.1 与 §3.3 两条阻塞点、§4 的两条"若要清零"路线，全部是过期信息**：§4 的两条路线**不必再实施**（目标已达成），原文保留仅为记录当时的推理。
+
+### 8.2 达成的**范围**（逐维给现算值）
+
+| 维度 | 判据 | 现算 |
+|---|---|---|
+| **构造维度** | `new (.*)Component(` | **0**（六件服务组件的构造全在 `ServiceComponents.build`） |
+| **取用维度** | `.class` 字面量 | **0 行** |
+| | `SERVICE_ID_` | **0**（6 个常量声明 + 相邻两条历史注释已删） |
+| | `pickApply\|pickValue` | **0**（连同 javadoc 整体删除） |
+| | **对具体服务组件类**的引用（`BuffComponent` / `EnergyComponent` / `VitalsComponent` / `TimerComponent` / `HotbarRenderComponent` / `SanTEComponent`，含 import） | **0** |
+| 三条派发不变量 | 真变化闸门 / 逐监听器隔离 / 重入合并 | **1 / 1 / 10**（`:692` / `:766` / 10 行） |
+| 写点与平台侧通道 | `inv.setItem(` / `notifyPlatform`（全库） | **2** / **3** |
+
+### 8.3 代价：耦合**集中在 `ServiceComponents` 一件（非消灭）**
+
+- 组件集合的知识 —— **类 + id + 取用动作** —— 全部集中在 `roleComponent/frameworkLevel/ServiceComponents.java`（框架级清单）。
+- 这正是交接文档 §5.2 认可的定位（"哪些组件、什么顺序、怎么接线"全在那个框架级清单里）⇒ **本目标是达标，不是绕过**：容器侧不再认识任何具体服务组件类，而清单侧**本来就该**知道。
+- ★ **不要把这条读成"耦合被消灭了"**：它是**从容器搬进清单**；清单件从此是这类知识的**唯一落点**，改组件集合必须改它。
+
+### 8.4 新增公共面（请独立复核）
+
+| 新增项 | 位置 | 说明 |
+|---|---|---|
+| **14 个 `public static` 方法**（含原有的 `build`）⇒ **净新增 13 个** | `ServiceComponents.java`（共 14 处：`:122` `:181` `:188` `:195` `:202` `:213` `:226` `:231` `:238` `:245` `:252` `:259` `:266` `:273`） | 容器侧的服务取用入口（置脏 / 帧末刷新 / 首刷 / 取变化读数 / 渲染通知扫描 / 能量读与写 / 治疗 / buff 记账四项 / 取消计时）；**未命中 ⇒ 无操作**，两处读口回退值与旧路径逐字相同（→ `0` / → `false`） |
+| 嵌套面 `ChangeListenerSource` + `ChangeDelivery` | `core/RoleInstance.java` | `t6` 引入的「变更通知的通用来源面」（替代对具体组件的强转与直接遍历） |
+
+- **快照 58 未破** ✓（`RoleApiSurfaceTest` 2/2 pass；`FROZEN_SIGNATURES` 逐条数 = **58**）
+- **`api/` 零改动** ✓（`api/` 与 `internal/api/` 不在 `t6` / `t7` 的改动面内）
+
+### 8.5 ★★ 标准措辞（全队唯一口径，不得改写）
+
+> `RoleInstance` 内**对具体服务组件类**的引用 = **0**；仅剩 1 处**已裁定的静态支持类** `HotbarItems`（`:18` import / `:1069` 注释 / `:1070` 调用；`public final class`、不实现 `RoleComponent`、容器内无字段）—— 按用户 q8 裁定接受其位置，**不属残余**。
+
+### 8.6 ★★ 判据边界（不得推广）
+
+> **`.class` 字面量 = 0 是文本判据**（含注释）；**「服务组件类名 = 0」是类名判据**。两者都真，但**都不得推广成「零类名」**。
+
+补充：`HotbarItems` 是**物品关注点的静态支持类**（`public final class` + `public static void clearFrom(Player)`，不实现 `RoleComponent`，容器内无字段声明）⇒ 它**落在两个判据之外**。
+
+### 8.7 复核命令（逐行读盘；照抄可复现本节任一数字）
+
+```powershell
+$repo  = (Resolve-Path 'ShadowHunterRoles').Path
+$ri    = "$repo\src\main\java\com\shadowHunterRolesPlugin\core\RoleInstance.java"
+$lines = [IO.File]::ReadAllLines($ri)                  # 权威读取（不要用 Get-Content 数行）
+
+# ① 取用维度的四个零（现算 0 / 0 / 0 / 0）
+($lines | Select-String '\.class').Count                                  # 0
+($lines | Select-String 'SERVICE_ID_').Count                              # 0
+($lines | Select-String 'pickApply|pickValue').Count                      # 0
+($lines | Select-String 'BuffComponent|EnergyComponent|VitalsComponent|TimerComponent|HotbarRenderComponent|SanTEComponent').Count  # 0
+
+# ② 已裁定的例外（现算 3 处）
+$lines | Select-String 'HotbarItems' | ForEach-Object { $_.LineNumber }   # 18 / 1069 / 1070
+
+# ③ 构造维度（现算 0）
+($lines | Select-String 'new \(.*\)Component\(').Count                    # 0
+
+# ④ 三条不变量（现算 1 / 1 / 10）
+($lines | Select-String 'preSanTE == newSanTE').Count                     # 1
+($lines | Select-String 'guardedCall\(entry\.owner\(').Count              # 1
+($lines | Select-String 'sanTEDispatching|sanTEPendingValue').Count       # 10
+
+# ⑤ 新增公共面（现算 14 个 public static 方法 + 6 个原有 ID_* 常量）
+$sc = [IO.File]::ReadAllLines("$repo\src\main\java\com\shadowHunterRolesPlugin\roleComponent\frameworkLevel\ServiceComponents.java")
+@($sc | Where-Object { $_ -cmatch '^    public static (?!final)' }).Count # 14
+@($sc | Where-Object { $_ -cmatch '^    public static final ' }).Count    # 6
+```
+
+> ★ **不得用 `git grep` 扫 `debug-logs/**`**：该目录被库内 `.gitignore:47`（`debug-logs`）+ `:85`（`debug-logs/**`）覆盖 ⇒ `git grep` 对它**恒空**（会判出假红）。本件涉及该目录的取证一律改走逐行读盘。
+> ★ 行数必须写清口径：**全文行数**与"非空内容行数"是两个数；`RoleInstance` 现算 **1083 行**（全文口径）。
+
+### 8.8 与 `t13` 验证口径的对应
+
+`t13`（V-B 独立验证）按下列三条复核本节与 `t6` / `t7` 的交付面：
+
+1. **快照 58 未破**（`RoleApiSurfaceTest` 2/2）；
+2. **`api/` 零改动**；
+3. **新面的未命中语义与旧路径逐字等价** —— 逐条对照表见 `debug-logs/测试记录/阶段13/阶段13-注释沿革-B1-追加.md` §B1-3（15 个取用点；该目录 gitignored ⇒ **只能逐行读盘**）。
+

@@ -92,6 +92,17 @@ public class TimerComponent extends RoleComponent {
     }
 
     /**
+     * **基类通用面的实现**（由 `RoleComponent` 每个实例各自覆写 ⇒ 请求者 = 调用的那个组件自己）。
+     *
+     * <p>★ 语义 = "取消**我**名下的计时" —— 这就是各组件覆写时的 `this` ✓。
+     * 容器不再需要认识本组件：按 id 取到通用面、调 `cancelOwnTimers()` 即可 ✓。
+     */
+    @Override
+    public void cancelOwnTimers() {
+        sink.cancelAll(this);
+    }
+
+    /**
      * 请求者归一：{@code null} ⇒ **本组件自己**（无请求者信息的句柄仍然可回收 ⇒ 不制造"无人认领的任务"）。
      * 端口侧永远给出真实请求者（按组件 id 解析），故本分支只在补全路径上生效。
      */

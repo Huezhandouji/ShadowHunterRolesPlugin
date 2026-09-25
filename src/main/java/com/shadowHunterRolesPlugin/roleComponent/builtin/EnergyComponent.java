@@ -178,6 +178,20 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
         return max;
     }
 
+    // ───────── 基类通用面（框架按 id 取到通用面即可读/写，不必认识本组件）─────────
+
+    /** {@inheritDoc} —— 框架视图的读数落点。 */
+    @Override
+    public int readCurrentEnergy() {
+        return current;
+    }
+
+    /** {@inheritDoc} —— 框架视图的写入落点（clamp 与通知仍在 {@link #set(int)} 里）。 */
+    @Override
+    public void writeCurrentEnergy(int value) {
+        set(value);
+    }
+
     /** 直接写入（组件内 clamp；写后通知监听器）。 */
     public void set(int value) {
         int previous = current;

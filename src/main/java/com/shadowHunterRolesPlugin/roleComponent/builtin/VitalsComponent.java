@@ -222,9 +222,15 @@ public class VitalsComponent extends RoleComponent {
         target.setHealth(newHealth);
     }
 
-    // ───────────── 旧单参入口（保留兼容；= target 为自己）─────────────
+    // ───────────── 单参入口（= target 为自己；★ 同时是基类通用面的实现）─────────────
 
-    /** 治疗**自己**（内部按最大生命 clamp）—— 与原 {@code RoleInstance#heal} 逐字等价。 */
+    /**
+     * 治疗**自己**（内部按最大生命 clamp）—— 与原 {@code RoleInstance#heal} 逐字等价。
+     *
+     * <p>★ **本方法覆写 {@link RoleComponent#heal(double)}** ⇒ 框架按 id 取到通用面即可治疗，
+     * **不必认识本组件** ✓（签名与语义与既有实现逐字相同）。
+     */
+    @Override
     public void heal(double amount) {
         heal(self(), amount);
     }

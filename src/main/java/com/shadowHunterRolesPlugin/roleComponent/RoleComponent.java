@@ -86,6 +86,45 @@ public abstract class RoleComponent {
     public void requestRepaint() {
     }
 
+    /**
+     * **取消本组件名下的全部计时任务**（调用方 `stop()` / 终止阶段逐组件回收）。
+     *
+     * <p><b>为什么这个方法在基类上</b>：容器需要在「组件 `stop()` 之后」逐组件回收它请求过的计时
+     * —— 那是**生命周期纪律**，不是某个组件的业务。声明在基类 ⇒ 框架按 **id** 取到通用面即可回收，
+     * **不必认识**是哪个组件提供的 ✓。
+     *
+     * <p><b>默认空实现</b>：不请求计时的组件无需覆写 ✓（由计时组件覆写为真正的取消）。
+     */
+    public void cancelOwnTimers() {
+    }
+
+    /**
+     * **当前能量读数**（框架视图；默认 {@code 0} = "未命中时的既有回退值"）。
+     *
+     * <p>声明在基类 ⇒ 框架按 id 取到通用面即可读，**不必认识**能量组件 ✓。
+     *
+     * <p>★ **方法名不带 `currentEnergy`**：那个名字已被 {@code base/Skill} 家族的
+     * `protected abstract int currentEnergy()` 占用（"下放给子类回答"的抽象义务）⇒
+     * 两者不得同名（否则 protected 无法覆盖 public）。
+     */
+    public int readCurrentEnergy() {
+        return 0;
+    }
+
+    /**
+     * **写当前能量**（框架视图；clamp 在组件内部；默认空实现）。
+     * <p>声明在基类 ⇒ 框架按 id 取到通用面即可写，**不必认识**能量组件 ✓。
+     */
+    public void writeCurrentEnergy(int value) {
+    }
+
+    /**
+     * **治疗**（框架视图；clamp 策略的唯一实现在生命组件里；默认空实现）。
+     * <p>声明在基类 ⇒ 框架按 id 取到通用面即可治疗，**不必认识**生命组件 ✓。
+     */
+    public void heal(double amount) {
+    }
+
     /** 停止生效：与 start 严格对称。返回后框架自动回收本组件登记的资源。 */
     public void stop() {
     }

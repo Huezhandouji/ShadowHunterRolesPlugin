@@ -88,6 +88,10 @@ public class RoleInstance {
  //★ 热键栏渲染组件的 **id 字面量**（纯数据 ⇒ 本类不算"认识组件"，只是按 id 取通用面）。
  // 取用后一律调**基类通用面**（`RoleComponent#requestRepaint` 等），不 cast、不写 `.class` ✓。
     private static final String HOTBAR_RENDER_ID = "hotbarRender";
+    private static final String ENERGY_ID = "energy";
+    private static final String VITALS_ID = "vitals";
+    private static final String BUFFS_ID = "buffs";
+    private static final String TIMERS_ID = "timers";
 
  //★ 生命上限修饰符的密钥**已随该状态迁入生命组件**（`VitalsComponent.HEALTH_MODIFIER_KEY`）——
  // 本类不再持有它（持有它 = 容器必须认识生命组件）⇒ 字段与本类内的取用一并删除 ✓。
@@ -492,8 +496,12 @@ public class RoleInstance {
  //⇒ 需要时走组件本身；`heal(double)` 仍为**活码**（视图口，组件在用））。
 
     public void heal(double amount){
- //：clamp 策略的唯一实现已搬到生命组件（本方法保留为**视图**，调用点一字未动）
-        ServiceComponents.heal(resolve(ServiceComponents.ID_VITALS), amount);
+ //★ 走**基类通用面**（`RoleComponent#heal`，默认空实现、由生命组件覆写）
+ // ⇒ 本类按 id 取到通用面即可，**不必认识**生命组件 ✓（clamp 策略的唯一实现仍在组件里）
+        RoleComponent vitals = resolve(VITALS_ID);
+        if (vitals != null) {
+            vitals.heal(amount);
+        }
     }
 
 
@@ -503,10 +511,16 @@ public class RoleInstance {
  //`instance.increaseEnergy(...)` 一类调用已消失）；`getCurrentEnergy` / `setCurrentEnergy`
  //仍是**活码**（`command/EnergyCommand` 的读数与设值路径）。
 
-    public int getCurrentEnergy() { return ServiceComponents.energyCurrent(resolve(ServiceComponents.ID_ENERGY)); }
+    public int getCurrentEnergy() {
+        RoleComponent energy = resolve(ENERGY_ID);
+        return energy == null ? 0 : energy.readCurrentEnergy();
+    }
 
     public void setCurrentEnergy(int amount){
-        ServiceComponents.energySet(resolve(ServiceComponents.ID_ENERGY), amount);
+        RoleComponent energy = resolve(ENERGY_ID);
+        if (energy != null) {
+            energy.writeCurrentEnergy(amount);
+        }
     }
 
  //SanTE（**视图**：真值与 clamp 都在 SanTE 组件里；派发边界由容器**给出的平台侧监听**触发）
@@ -579,10 +593,11 @@ public class RoleInstance {
             for(RoleComponent component : componentRegistry.all()){
                 guardedCall(component, "stop", component::stop);
  //（A6 · ②）：**调用方 stop() ⇒ 其请求的计时全部取消**
- //任务按请求者登记（**计时组件**的请求者语义）⇒ 这里逐组件回收，堵住
- //"单独 stop() 不清理 ⇒ 生命周期泄漏"的缺口；clear() 末尾的 cancelAllAndClear()
- //仍是最后的兜底（两者幂等，重复 cancel 对已取消句柄是 no-op）。
-                ServiceComponents.cancelTimersOf(resolve(ServiceComponents.ID_TIMERS), component);
+ //任务按请求者登记 ⇒ 这里逐组件回收，堵住"单独 stop() 不清理 ⇒ 生命周期泄漏"的缺口；
+ //clear() 末尾的 cancelAllAndClear() 仍是最后的兜底（两者幂等）。
+ //★ 走**基类通用面**：各组件覆写 `cancelOwnTimers()` 取消自己名下的计时
+ // ⇒ 本类不必认识计时组件 ✓（默认空实现 ⇒ 不请求计时的组件天然跳过）。
+                component.cancelOwnTimers();
             }
         });
     }
@@ -891,7 +906,8 @@ public class RoleInstance {
                         failure);
             }
             try {
-                ServiceComponents.cancelTimersOf(resolve(ServiceComponents.ID_TIMERS), component);
+                //★ 同基类通用面（见 `triggerLifecycleStop` 的同款处置）
+                component.cancelOwnTimers();
             } catch (Throwable ignored) {
  //终止阶段不得让"回收计时时的异常"打断其余组件的终止
             }

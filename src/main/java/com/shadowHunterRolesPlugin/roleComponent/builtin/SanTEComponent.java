@@ -48,6 +48,10 @@ import java.util.function.Consumer;
  */
 public class SanTEComponent extends RoleComponent implements OperationProvider, RoleInstance.ChangeListenerSource {
 
+    /** 本组件的日志（逐监听器隔离时报出**是谁**抛了）。 */
+    private static final java.util.logging.Logger LOG =
+            java.util.logging.Logger.getLogger("ShadowHunterRoles.sante");
+
     /**
      * **一次 SanTE 变更的载荷**（**record，不是接口** ✓）。
      *
@@ -187,7 +191,20 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         if (change == null) {
             return;
         }
-        forEachListener(entry -> entry.listener().accept(change));
+ //★ **逐监听器故障隔离由本组件自持**（原在容器侧 `guardedCall` 里）——
+ // 异常 ⇒ **只记日志并继续**，其余监听器照常收到 ✓。
+ // ★ 刻意**不**在循环外层套 try：那会让首个异常吞掉排在其后的全部监听器。
+        forEachListener(entry -> {
+            if (entry.owner() == this) {
+                return;                             //平台侧那一条：写入路径直调 ⇒ 不属于订阅者
+            }
+            try {
+                entry.listener().accept(change);
+            } catch (RuntimeException listenerFailure) {
+                LOG.warning("[sante] listener failed (owner=" + entry.owner().getId() + "): "
+                        + listenerFailure);
+            }
+        });
     }
 
     private final int max;

@@ -14,7 +14,7 @@ import java.util.List;
  * {@link #add(String, RoleComponent.Specification)} ·
  * {@link #insertAt(int, String, RoleComponent.Specification)} · {@link #remove(String)}。</li>
  * </ul>
- * <p><b>查询语义（ · 用户新路线图第 1 条统一）</b>：类型条件 = **可赋值性**
+ * <p><b>查询语义</b>：类型条件 = **可赋值性**
  * （父类/接口查询命中子类实例），顺序 = **添加顺序**：
  * <ul>
  * <li>{@link #get(Class)} = 第一个符合条件的（**不是"具体类优先"** —— 已按真实语义改正）；</li>
@@ -28,7 +28,7 @@ import java.util.List;
  * <p><b>依赖面（两个方向都不得静默失效）</b>：
  * <ol>
  * <li><b>添加时</b>：候选声明的必需依赖若在容器内**无人提供** ⇒ 拒绝（与装配期检查同一口径）；</li>
- * <li><b>删除时</b>（ P2）：先算**反向依赖**（谁把它声明为 {@code requires}）—— 非空 ⇒
+ * <li><b>删除时</b>：先算**反向依赖**（谁把它声明为 {@code requires}）—— 非空 ⇒
  * **拒绝删除** + **记一条日志**（点名：被删组件 / 阻止者 / 缺的类型），因为删掉之后
  * "必需"就会静默失效。</li>
  * </ol>
@@ -43,13 +43,13 @@ public interface ComponentLookup {
  * <p><b> 语义修正</b>：旧 javadoc 写"具体类优先"，而实现一直是纯线性扫描 ⇒ 那是对行为
  * 撒谎的值 ⇒ 已按真实语义（**添加顺序第一个**）改写。{@link #getAll(Class)} 的首元素恒等于本方法的结果。
  * <p><b>类型形参无上界</b>：旧签名 {@code <T extends RoleComponent>} 让**纯接口**无法作为实参，
- * 与用户第 1 条"父类**或接口**查询"冲突 ⇒ 改为无上界 + 匹配时 {@code type.cast(...)}（安全）。
+ * 与"父类**或接口**查询"冲突 ⇒ 改为无上界 + 匹配时 {@code type.cast(...)}（安全）。
  * 既有调用点源码级不变。
  */
     <T> T get(Class<T> type);
 
  /**
- * **取全部符合条件的组件**（ · 用户新路线图第 1 条新增）：类型条件 = 可赋值性，
+ * **取全部符合条件的组件**：类型条件 = 可赋值性，
  * 顺序 = **添加顺序**；无人符合 ⇒ **空列表**（不是 null）；返回不可变列表。
  * <p>与 {@link #get(Class)} 同一条件、同一顺序，只是不截断 ⇒ `getAll(T).isEmpty()` ⟺ `get(T) == null`。
  * 支持**接口**查询（`getAll(Tag.class)` 返回全部实现者）。
@@ -66,8 +66,7 @@ public interface ComponentLookup {
     RoleComponent getById(String id);
 
  /**
- * **按 id 取全部**："`getById()` 返回找到的第一个，新增一个
- * `getAllById()`，返回符合条件的组件的列表，**和 `get()` 和 `getAll()` 一样**"）。
+ * **按 id 取全部**（"`getById()` 返回找到的第一个，新增一个 `getAllById()`，返回符合条件的组件的列表，**和 `get()` 和 `getAll()` 一样**"）。
  * <p>返回**全部** id 相等的组件，顺序 = **添加顺序**（容器当前序）；无人符合 ⇒ **空列表**（不是 null）；
  * 返回**不可变**列表。
  * <p>与 {@link #getById(String)} **同一条件、同一顺序**，只是不截断 ⇒
@@ -105,7 +104,7 @@ public interface ComponentLookup {
     <T extends RoleComponent> T insertAt(int index, String id, RoleComponent.Specification<T> specification);
 
  /**
- * **运行期动态删除**：先算**反向依赖**（P2）—— 若仍有组件把它声明为必需 ⇒
+ * **运行期动态删除**：先算**反向依赖** —— 若仍有组件把它声明为必需 ⇒
  * **拒绝删除** + **记日志** + 抛异常；否则 {@code stop()} → 回收该组件资源 → 移出容器。
  * <p><b>（id 可重复）</b>：本口删的是**添加顺序第一个**同 id 者，
  * 反向依赖表也**按那一个**实例计算（见 {@code ComponentRegistry#requiredBy(String)}）；

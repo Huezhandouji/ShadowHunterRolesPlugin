@@ -23,15 +23,14 @@ import java.util.logging.Logger;
  * ④ 取该 id 的服务集（servicesFactory，与装配期同一个工厂 ⇒ 组件拿到一对一端口）
  * ⑤ 构造 → ⑥ 注册/插位（连声明一起登记）→ ⑦ awake() → ⑧ start()
  * ⑨ 任一步失败 ⇒ 回滚（stop + 回收资源 + 移出容器）后原样抛出
- * remove : ① 按 id 找（**添加顺序第一个**）→ ② **反向依赖检查**（P2）：有阻止者 ⇒ 记日志 + 抛异常
+ * remove : ① 按 id 找（**添加顺序第一个**）→ ② **反向依赖检查**：有阻止者 ⇒ 记日志 + 抛异常
  * ③ stop() → ④ 回收该组件资源 → ⑤ 移出容器
  * </pre>
- * <p><b>（用户新路线图第 1/2 条）</b>：
- * ① 校验里**删掉了"id 未被占用"那一条** ⇒ **同一 id 可添加多次** （用户第 2 条）；
+ * ① 校验里**删掉了"id 未被占用"那一条** ⇒ **同一 id 可添加多次**；
  * ② 新增 {@link #getAll(Class)} 转发；③ {@link #get(Class)} 的语义按真实行为（**添加顺序第一个**）写明。
  * <p><b>为什么服务集由工厂注入而不是本类自造</b>：服务集与组件**一对一**（冷却端口按 id 选表、定时器端口
  * 按 id 定位资源表）⇒ 必须与装配期走**同一条**构造路径（{@code RoleInstance#createServices}）。
- * <p><b>为什么删除前必须算反向依赖</b>（ P2）：删掉一个被他人 {@code requires} 的组件后，
+ * <p><b>为什么删除前必须算反向依赖</b>：删掉一个被他人 {@code requires} 的组件后，
  * 运行期 {@code getComponent} 就取不到它 ⇒ "必需"会**静默失效**。反向依赖表**从声明求得**
  * （{@code ComponentRegistry#requiredBy}），不手工维护。
  * <p><b>可测性</b>：本类只依赖 {@code ComponentRegistry} + 一个 {@code String -> ComponentServices} 函数 +

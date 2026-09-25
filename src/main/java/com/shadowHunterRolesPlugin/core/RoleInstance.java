@@ -85,7 +85,8 @@ public class RoleInstance {
 
     private Task updateTask;
 
-    private final NamespacedKey roleHealthModifierKey;
+ //★ 生命上限修饰符的密钥**已随该状态迁入生命组件**（`VitalsComponent.HEALTH_MODIFIER_KEY`）——
+ // 本类不再持有它（持有它 = 容器必须认识生命组件）⇒ 字段与本类内的取用一并删除 ✓。
 
  //组件注册表（组件集合 + 每组件资源表 + getComponent 查找）
     private final ComponentRegistry componentRegistry = new ComponentRegistry();
@@ -114,7 +115,6 @@ public class RoleInstance {
         this.player = player;
         this.role = role;
         this.platform = platform;
-        this.roleHealthModifierKey = platform.keys().of("role_health_modifier");
 
  // ──：**服务的持有者先于角色组件存在** ────────────────────────────────
  //① buff 管理器（原在 freeze() 之后构造）：它对实例的引用只在方法体里使用 ⇒ 提前构造零行为差异；
@@ -189,10 +189,9 @@ public class RoleInstance {
  // **提交顺序与既有实现相同** —— 先于实例 ticker 提交 ⇒ 同一 tick 内先跑记账、再跑组件 update。
         ServiceComponents.startBuffUpdater(resolve(ServiceComponents.ID_BUFFS));
 
- //② 设置生命上限：**上限与写入都归生命组件**（`role.getMaxHP()` 已随角色模板去 HP 化而删除）
-        ServiceComponents.vitalsApplyHealthModifier(resolve(ServiceComponents.ID_VITALS), roleHealthModifierKey);
- //就地读属性（**同一读数**，行为逐字不变）—— 写入经**生命组件**（生命的唯一持有者）
-        ServiceComponents.vitalsRestoreFull(resolve(ServiceComponents.ID_VITALS), player);
+ //② 生命上限：**已由生命组件自己在 `start()` 里装** ✓ ——
+ // ★ 本类**不再代劳**（那会让容器必须认识生命组件与其密钥）。
+ // 时序安全性已核：`start()` 由下面的 `triggerLifecycleStart()` 广播，而它发生时旧实例已被清完。
 
  //③ 生命周期时序：全部组件创建完成 -> awake全部 -> start全部 -> 启动ticker -> 渲染热键栏
         triggerLifecycleAwake();
@@ -971,7 +970,8 @@ public class RoleInstance {
             updateTask = null;
         }
 
-        ServiceComponents.vitalsRemoveHealthModifier(resolve(ServiceComponents.ID_VITALS), roleHealthModifierKey);
+ //生命上限修饰符：**已由生命组件自己在 `stop()` 里摘掉** ✓ ——
+ // ★ 本类不再代劳；上面的 `triggerLifecycleStop()` 就是它的执行时机（既有语句，未新增调用点）。
 
  //药水记账：**账本随 buff 组件持有** ⇒ 由它只移除本系统记账过的效果，
  //不再无条件清空玩家身上的所有药水效果（返回移除的类型数，供诊断）

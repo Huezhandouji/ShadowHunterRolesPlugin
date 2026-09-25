@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
 import com.shadowHunterRolesPlugin.core.util.DamageUtil;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.roleComponent.DamageKind;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import org.bukkit.NamespacedKey;
@@ -69,8 +70,61 @@ public class VitalsComponent extends RoleComponent {
      */
     public static final double ROLE_HEALTH_CAP = 40d;
 
+    /**
+     * **本组件自己的上限修饰符键**（★ 自己的状态自己管）。
+     *
+     * <p><b>为什么键归本组件</b>：上限修饰符是**本组件的状态**（上限的唯一持有者就是本组件）。
+     * 此前这把键由容器持有（`RoleInstance.roleHealthModifierKey`）再转手交进来
+     * ⇒ 容器因此不得不认识本组件；现改为**本组件自持** ⇒ 容器不必认识它 ✓。
+     *
+     * <p><b>键值逐字不变</b>（`"role_health_modifier"`）⇒ 既有的属性修饰符仍被同一个键识别与移除 ✓。
+     */
+    public static final NamespacedKey HEALTH_MODIFIER_KEY =
+            KeyFactory.Registry.of("role_health_modifier");
+
     public VitalsComponent(String id, ComponentServices services) {
         super(id, services);
+    }
+
+    /**
+     * **开始生效：把生命上限装到玩家身上**（★ 本组件自己实现，不再由容器代劳）。
+     *
+     * <p><b>为什么放在 {@code start()} 而不是 {@code awake()}</b>：写上限是**玩家可见**的副作用，
+     * 而 `awake()` 的契约是"不得改动任何玩家可见状态"⇒ 只能放这里 ✓。
+     *
+     * <p><b>时序安全性（已核）</b>：`start()` 由 `RoleInstance.activate()` 广播，而
+     * `RoleManager.selectRole` 的次序是
+     * 「构造（不可见）→ 清旧角色 → `activate()`」⇒ 本方法写入时**旧实例已被清完**
+     * ⇒ 不会重新踩上 A3 那三条「旧实例按共享键误伤新实例」的坑 ✓
+     * （逐条：① 上限修饰符 ② 热键栏 ③ 同类型药水）。
+     */
+    @Override
+    public void start() {
+        Player target = self();
+        if (target == null) {
+            return;
+        }
+        applyHealthModifier(HEALTH_MODIFIER_KEY, ROLE_HEALTH_CAP);
+        //就地读属性（**同一读数**，行为逐字不变）—— 写入经本组件（生命的唯一持有者）
+        restoreFull(target);
+    }
+
+    /**
+     * **停止生效：把生命上限修饰符摘下来**（★ 本组件自己回收自己的状态）。
+     *
+     * <p><b>时序</b>：`stop()` 由 `RoleInstance.clear()` 经 `triggerLifecycleStop()` 广播
+     * （`clear()` 的既有语句，本组件**不新增**任何框架侧调用点）⇒ 与"实例被销毁"同一时机，
+     * 与既有行为逐字一致 ✓。
+     *
+     * <p>★ 只移除**本组件自己登记的**那把键（值逐字不变）⇒ 不会误伤别人的修饰符 ✓。
+     */
+    @Override
+    public void stop() {
+        Player target = self();
+        if (target == null) {
+            return;
+        }
+        removeHealthModifier(HEALTH_MODIFIER_KEY);
     }
 
     /** 本组件的"自己"（= 生命真值所在的那个玩家）。 */

@@ -40,7 +40,7 @@ import java.util.logging.Logger;
  * </ul>
  * <p>换句话说：本组件是"**要重绘**"这件事的拥有者，"**怎么写**"归它**自己持有的**
  * {@link HotbarRenderer}（组件把本帧计划交出去、渲染器负责落位）⇒ 二者是**内部**调用，
- * 框架侧只跟本组件打交道（见 {@link #flush()} / {@link #firstFlush()}）。
+ * 框架侧只跟本组件打交道（见 {@link #flush()}）。
  *
  * <h2>为什么要有它（归属理由，非"为整洁而重构"）</h2>
  * 渲染器的**管道职责**只剩"按注册序取计划 → 唯一写点落位"；
@@ -122,7 +122,7 @@ public class HotbarRenderComponent extends RoleComponent {
 
     /**
      * **置脏标记**。初值 = {@code true} ⇒ 即便无人置脏，首位 flush 也会完成首刷
-     * （构造期另有一次同步首刷，见 {@link #firstFlush()}）。
+     * （另有**第一帧一次**同步首刷，见 {@link #firstFlush()}）。
      */
     private boolean dirty = true;
 
@@ -140,6 +140,9 @@ public class HotbarRenderComponent extends RoleComponent {
      * <p>⇒ 本集合记住"上一帧谁在冷却"，凡是**这一帧已不在冷却**的 ⇒ **强制置脏一次**（恰好一次）。
      */
     private final Set<String> coolingLastFrame = new LinkedHashSet<>();
+
+    /** 首刷是否已完成（★ 由第一帧 `update()` 完成 —— 见 {@link #start()} 的说明）。 */
+    private boolean firstFlushDone = false;
 
     /**
      * **「本帧真的刷新了」的通知名单**（★ 函数式接口 · 使用者自己的函数）。
@@ -243,8 +246,9 @@ public class HotbarRenderComponent extends RoleComponent {
     }
 
     /**
-     * **同步首刷一次**（选角色瞬间热键栏即就绪、零延迟）：与 {@link #flush()} 的**写物品段**同源，
-     * 但**不看入口条件** —— 首刷的必要性由 {@link #dirty} 的初值表达。
+     * **同步首刷一次**（写物品段，不看入口条件）。
+     *
+     * <p>★ **由本组件自己的第一帧 `update()` 调用** —— 见 {@link #start()} 与 {@link #update()} 的说明。
      */
     public void firstFlush() {
         renderNow();
@@ -343,30 +347,40 @@ public class HotbarRenderComponent extends RoleComponent {
     // ───────── 生命周期：本组件自己的两个节拍（容器不再代劳）─────────
 
     /**
-     * **开始生效：同步首刷一次**（选角色瞬间热键栏即就绪、零延迟）。
+     * **开始生效：不在这里首刷**。
      *
-     * <p><b>为什么在 {@code start()}</b>：首刷会**写玩家的热键栏** ⇒ 属**玩家可见**副作用
-     * ⇒ 只能在 `start()`（`awake()` 的契约禁止可见改动）。
+     * <p>★ **为什么不能在这里首刷**（实证的 NPE）：`start()` 是**逐组件广播**的，而本组件在注册表
+     * **最前**（内建块先于角色组件注册）⇒ 本组件 `start()` 跑的时候，**其余组件一个都还没轮到
+     * `start()`**。而组件普遍在**自己的 `start()`** 里解析依赖字段（例：`RedSanctifiedBladeMainWeapon`
+     * 在 `start()` 里取 `BuffComponent`）⇒ 此刻取画法会拿到 `null` 字段 ⇒ NPE。
      *
-     * <p><b>时序（已核）</b>：本组件在注册表**末位**（服务组件在角色组件之后注册）⇒
-     * `triggerLifecycleStart()` 遍历到本组件时，其余组件都已初始化完 ⇒ 首刷取到的画法齐全 ✓。
+     * <p>⇒ 首刷推迟到**第一帧 {@code update()}**（那时所有组件的 `awake()` / `start()` 都已执行完），
+     * 见 {@link #update()}。代价 = 热键栏晚**最多 1 tick**（50 ms）就绪。
      */
     @Override
     public void start() {
-        firstFlush();
+        // 首刷不在这里 —— 见方法 javadoc
     }
 
     /**
      * **每 tick：帧末刷新**（判脏 → 写物品 → 清脏 → 扇出"真的刷新了"）。
      *
+     * <p><b>第一帧先做首刷</b>：那时所有组件的 `awake()` / `start()` 都已执行完 ⇒ 取画法安全
+     * （这也是首刷不能放在 {@link #start()} 里的原因）。
+     *
      * <p><b>为什么在 {@code update()}</b>：契约里本组件的刷新点 = **tick 末尾、其余组件更新之后**
-     * ⇒ 而注册序恰好把它排在最末（服务组件后注册）⇒ 本组件的 `update()` **天然最后跑** ✓
-     * ⇒ 时序与既有"容器在 update 广播之后调 flush"**逐字等价** ✓。
+     * ⇒ 本组件的 `update()` **天然最后跑** ⇒ 时序与"容器在 update 广播之后调 flush"**逐字等价** ✓。
      *
      * <p>★ 入口条件在 {@link #flush()} 内部（未置脏且无占栏位者冷却 ⇒ **本帧零 `setItem`**）✓
      */
     @Override
     public void update() {
+        if (!firstFlushDone) {
+            firstFlushDone = true;
+            firstFlush();
+            rememberCooling();
+            return;
+        }
         flush();
     }
 

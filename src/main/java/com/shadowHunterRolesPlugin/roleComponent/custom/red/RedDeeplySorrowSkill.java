@@ -81,7 +81,7 @@ public class RedDeeplySorrowSkill extends Skill {
                     600, 0, Material.REDSTONE_BLOCK);
             requires(BuffComponent.class);
             //sante 实取于 start()（:66）但代码自带 null 兜底（:67 订阅 / :141 退订）⇒ 按「实取但可为空」声明为**可选**；
-            //它在 FRAMEWORK_PROVIDED_TYPES 白名单内、ServiceComponents.build 无条件构造 ⇒ 生产环境永不缺失（optional 与实际效果等价）
+            //它在装配期的「已被提供类型」清单内、由容器无条件构造 ⇒ 生产环境永不缺失（optional 与实际效果等价）
             requiresOptional(SanTEComponent.class);
         }
 

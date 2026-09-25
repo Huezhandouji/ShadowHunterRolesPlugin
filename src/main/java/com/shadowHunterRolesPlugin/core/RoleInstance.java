@@ -157,7 +157,7 @@ public class RoleInstance {
 
  //服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
  //登记在冻结点**之后**：登记按 id 调用查取入口（本类不保留任何组件字段）
-        registerServiceComponents(builtIns);
+        registerBuiltIns(builtIns);
 
  // ── 第一相到此结束（P6 两阶段构造）───────────────────────────────
  //构造器**只做不可见的事**：装配（组件 / 服务集 / 窄类型视图 / 服务组件登记）+ 注册表冻结
@@ -321,8 +321,8 @@ public class RoleInstance {
  * <p><b>顺序</b>：登记在 {@link #initComponents()} **之后**、{@link ComponentRegistry#freeze()} **之后**
  * ⇒ 容器序 = 模板组件在前、内建组件在后（逐格不变）。
  */
-    private void registerServiceComponents(List<RoleComponent> serviceComponents) {
-        for (RoleComponent component : serviceComponents) {
+    private void registerBuiltIns(List<RoleComponent> builtIns) {
+        for (RoleComponent component : builtIns) {
             if (component != null) {
                 componentRegistry.register(component);
             }

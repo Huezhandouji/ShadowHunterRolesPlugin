@@ -6,7 +6,7 @@ import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import net.kyori.adventure.text.Component;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
@@ -17,7 +17,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.Collection;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 public class MeiqiheziCircleSlashSkill extends Skill {
@@ -26,10 +26,10 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     private BuffComponent buff;
     private EnergyComponent energy;
     private VitalsComponent vitals;
-    private TimerComponent timer;
+    private TaskComponent timer;
 
     //前摇任务句柄化：stop 时取消（平台 Task）
-    private Task castTask;
+    private ScheduledHandle castTask;
 
 
     public MeiqiheziCircleSlashSkill(String id, ComponentServices services, Specification specification){
@@ -50,7 +50,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
                     15,
                     Material.GOLD_INGOT
             );
-            requires(BuffComponent.class).requires(EnergyComponent.class).requires(VitalsComponent.class).requires(TimerComponent.class);
+            requires(BuffComponent.class).requires(EnergyComponent.class).requires(VitalsComponent.class).requires(TaskComponent.class);
         }
 
         @Override
@@ -64,7 +64,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
         buff = svc().components().get(BuffComponent.class);
         energy = svc().components().get(EnergyComponent.class);
         vitals = svc().components().get(VitalsComponent.class);
-        timer = svc().components().get(TimerComponent.class);
+        timer = svc().components().get(TaskComponent.class);
     }
 
     /**
@@ -92,7 +92,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
 
 
 
-        castTask = timer.runLater(this, 20L, new Runnable(){
+        castTask = timer.addScheduleLater(this, 20L, new Runnable(){
 
             @Override
             public void run() {

@@ -48,7 +48,7 @@ import java.util.logging.Logger;
  *   <li>它在**容器里可见、可查询**（{@code getAllByType} / {@code getComponent}）✓ ——
  *       后续 (b) 的"不可动物品保护"与回调有明确的挂载点 ✓；</li>
  *   <li>它与其他框架级服务组件**同构** ✓（同包同族：{@code VitalsComponent} / {@code EnergyComponent} /
- *       {@code SanTEComponent} / {@code BuffComponent} / {@code TimerComponent}）✓ ——
+ *       {@code SanTEComponent} / {@code BuffComponent} / {@code TaskComponent}）✓ ——
  *       同族服务组件共 **5** 个（阵营**不是**容器里的服务组件 ——
  *       它的真值住在聚合根 {@code core/Role}）。</li>
  *   <li>它是 {@code RoleComponent} 的子类 ⇒ 受既有**生命周期**与**故障隔离**（{@code guardedCall}）管辖 ✓。</li>

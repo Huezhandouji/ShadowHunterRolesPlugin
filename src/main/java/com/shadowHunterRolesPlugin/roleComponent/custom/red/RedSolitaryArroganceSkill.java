@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.red;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
-import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -16,16 +16,16 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.List;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 public class RedSolitaryArroganceSkill extends Skill {
 
-    private TimerComponent timer;
+    private TaskComponent timer;
     private BuffComponent buff;
 
     //任务句柄化：stop 时取消（平台 Scheduler 提供；不再误用 Folia 全局调度器）
-    private Task attackTask;
+    private ScheduledHandle attackTask;
 
     //生命能力改向**组件本身**取用，引用缓存在 start()。
  //既有写法经服务集的白名单端口成员取用；该端口是**纯转发**（同一组件的同一方法）⇒ 逐字等价。
@@ -46,7 +46,7 @@ public class RedSolitaryArroganceSkill extends Skill {
             super(Component.text("孤妄自赏"),
                     Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命"),
                     200, 0, Material.FERMENTED_SPIDER_EYE);
-            requires(TimerComponent.class).requires(BuffComponent.class).requires(VitalsComponent.class);
+            requires(TaskComponent.class).requires(BuffComponent.class).requires(VitalsComponent.class);
         }
 
         @Override
@@ -58,7 +58,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     /**
      * 迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
  * `canCastSkill` 不满足 → **直接返回**（**直接 return、不启冷却**，已现场核）；
-     * 循环任务由 `timer.runRepeating(this, 1L, 6, …)` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）；
+     * 循环任务由 `timer.addScheduleRepeating(this, 1L, 6, …)` 创建（**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）；
      * `:57` 射线几何仍用**静态** `SkillUtil.getPlayersInSightLine`（无状态工具，不进端口白名单）；
      * 伤害 8 与回血 4 **逐字不变**；冷却由本组件在施放成功处按声明值 **200** 启动。
      * <p>`isValid()` 守卫按四步等价链删除：任务登记进资源表 ⇒ `clear()` 的 `cancelAllAndClear()` 必取消它 ⇒
@@ -69,7 +69,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
         if(!buff.canCastSkill()) return;
-        attackTask = timer.runRepeating(this, 1L, 6,
+        attackTask = timer.addScheduleRepeating(this, 1L, 6,
                 new Runnable() {
                     private Player cas = caster;
                     private int cnt = 0;
@@ -129,7 +129,7 @@ public class RedSolitaryArroganceSkill extends Skill {
      */
     @Override
     public void start() {
-        timer = svc().components().get(TimerComponent.class);
+        timer = svc().components().get(TaskComponent.class);
         buff = svc().components().get(BuffComponent.class);
         vitals = svc().components().get(VitalsComponent.class);
     }

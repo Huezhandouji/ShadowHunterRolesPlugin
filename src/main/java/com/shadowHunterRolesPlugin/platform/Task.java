@@ -20,9 +20,11 @@ package com.shadowHunterRolesPlugin.platform;
  * <p>说明（不含原句，避免 grep 假阳性）：早期文档对本接口的包装对象有一处描述已被上面口径取代；
  * 早期文本提到的 {@code org.bukkit.scheduler.Cancellable} 在本版 paper-api **确实不存在**（已用 {@code javap} 复核）。
  */
-public interface Task {
+public interface Task extends com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle {
 
+    @Override
     void cancel();
 
+    @Override
     boolean isCancelled();
 }

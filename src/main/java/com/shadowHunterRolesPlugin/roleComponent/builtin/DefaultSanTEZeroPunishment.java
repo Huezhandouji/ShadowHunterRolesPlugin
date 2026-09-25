@@ -4,7 +4,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import net.kyori.adventure.text.Component;
@@ -18,7 +18,7 @@ import org.bukkit.entity.Player;
 
 import java.time.Duration;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 /**
@@ -45,7 +45,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
  *   <li>**忽略重入**：{@code onSanTEChange} 顶部守卫 {@code if (inSanTEPunishment) return;}
  *       ⇒ 惩罚进行中**不取消、不重启、不刷新 {@code count}、不重放标题/粒子、不重复上 STUN**；</li>
  *   <li>**结束回满（推迟到 STUN 结束）**：在**施加 STUN 的那一跳**（{@code count == 1}）预约
- *       {@code timer.runLater(this, 100L, …)} ⇒ **STUN 100 刻到期那一刻**清标记并把 SanTE 恢复至 {@code max}
+ *       {@code timer.addScheduleLater(this, 100L, …)} ⇒ **STUN 100 刻到期那一刻**清标记并把 SanTE 恢复至 {@code max}
  *       （**Q2 = A**：此前在第 3 跳 ≈4.05 s 就回满、而 STUN 到 5 s 才结束
  *       ⇒ 存在约 1 秒「已回满但仍在眩晕」的窗口 ⇒ 现已消除；回满在**同一处一次性**完成）。</li>
  * </ol>
@@ -62,7 +62,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
  */
 public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
-    private TimerComponent timer;
+    private TaskComponent timer;
     private VitalsComponent vitals;
     private BuffComponent buff;
     private SanTEComponent sante;
@@ -92,7 +92,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
         public Specification(){
             super(null, null);
-            requires(TimerComponent.class).requires(VitalsComponent.class).requires(BuffComponent.class);
+            requires(TaskComponent.class).requires(VitalsComponent.class).requires(BuffComponent.class);
             //sante 实取但代码自带 null 兜底（`start()` 的 if (sante != null) 订阅 / `stop()` 的退订）⇒ 按「实取但可为空」声明为**可选**
             requiresOptional(SanTEComponent.class);
         }
@@ -104,9 +104,9 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
     }
 
     //任务句柄（平台 Task；null = 没有任务在跑）
-    private Task punishmentTask;
+    private ScheduledHandle punishmentTask;
     //回满任务句柄（Q2 = A：STUN 100 刻结束时一次性回满；与上面同属本组件资源表）
-    private Task punishmentRestoreTask;
+    private ScheduledHandle punishmentRestoreTask;
 
     /**
      * **订阅 SanTE 变更**：**向 {@code SanTEComponent} 添加一条监听** ✓，
@@ -123,7 +123,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
      */
     @Override
     public void start() {
-        timer = svc().components().get(TimerComponent.class);
+        timer = svc().components().get(TaskComponent.class);
         vitals = svc().components().get(VitalsComponent.class);
         buff = svc().components().get(BuffComponent.class);
         sante = svc().components().get(SanTEComponent.class);
@@ -175,7 +175,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
         //(1) 进入即标记：必须先于起任务（消除"起任务与标记之间"的重入窗口）
         inSanTEPunishment = true;
 
-        punishmentTask = timer.runRepeating(this, 0L, 40L, new Runnable() {
+        punishmentTask = timer.addScheduleRepeating(this, 0L, 40L, new Runnable() {
 
                     int count = 0;
                     Player player = svc().self().player();
@@ -217,7 +217,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                             //(4) 回满推迟到 STUN 结束（Q2 = A）：STUN 在本跳施加、持续 100 刻
                             //    ⇒ 自本跳起 100 刻后（= STUN 到期那一刻）清标记并一次性回满。
                             //    ⇒ 惩罚期间 SanTE 全程真正为 0（逐 tick 钉 + 结束后才回满），消除"已回满但仍眩晕"的窗口。
-                            punishmentRestoreTask = timer.runLater(DefaultSanTEZeroPunishment.this, 100L, () -> {
+                            punishmentRestoreTask = timer.addScheduleLater(DefaultSanTEZeroPunishment.this, 100L, () -> {
                                 //(5-⑤ 正常结束) 若标记已被中止路径复位 ⇒ 不再回满（防越权恢复）
                                 if (!inSanTEPunishment) return;
                                 //先清标记：否则同一 tick 的逐 tick 钉 0 会把刚回满的值立刻抹回 0

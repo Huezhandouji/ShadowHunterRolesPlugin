@@ -13,7 +13,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.core.ports.RoleInfo;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
-import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 //框架级服务组件的**清单**（类 + id + 构造顺序 + 接线 + 容器侧的服务取用入口都在那一件里）——
 //本类只引用它的 `ID_*` 常量与静态服务入口。
@@ -21,7 +21,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -88,7 +88,7 @@ public class RoleInstance {
  //动态删除路径入口（"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + 删除守卫）
     private final ComponentLookup componentLookup;
 
-    private Task updateTask;
+    private ScheduledHandle updateTask;
 
  //★ 热键栏渲染组件的 **id 字面量**（纯数据 ⇒ 本类不算"认识组件"，只是按 id 取通用面）。
  // 取用后一律调**基类通用面**（`RoleComponent#requestRepaint` 等），不 cast、不写 `.class` ✓。
@@ -258,7 +258,7 @@ public class RoleInstance {
         types.add(SanTEComponent.class);
         types.add(VitalsComponent.class);
         types.add(BuffComponent.class);
-        types.add(TimerComponent.class);
+        types.add(TaskComponent.class);
         return Set.copyOf(types);
     }
 
@@ -285,19 +285,9 @@ public class RoleInstance {
         BuffComponent buffs =
                 new BuffComponent(BuffComponent.ID, createServices(BuffComponent.ID), buffManager);
 
-        // ⑥ 计时：任务的创建在组件里、登记归属按请求者
-        TimerComponent timers = new TimerComponent(TimerComponent.ID, createServices(TimerComponent.ID),
-                platform.scheduler(), new TimerComponent.TaskSink() {
-            @Override
-            public void track(RoleComponent requester, Task task) {
-                componentRegistry.track(requester, task);
-            }
-
-            @Override
-            public int cancelAll(RoleComponent requester) {
-                return componentRegistry.cancelAll(requester);
-            }
-        });
+        // ⑥ 任务：★ 零注入 —— 构造签名与普通组件一字不差；任务表与回收全归它自己
+        //（组件编写者忘了取消也不会泄漏：实例销毁必经它的 `stop()`）
+        TaskComponent tasks = new TaskComponent(TaskComponent.ID, createServices(TaskComponent.ID));
 
         List<RoleComponent> ordered = new ArrayList<>(6);
         ordered.add(hotbarRender);
@@ -305,7 +295,7 @@ public class RoleInstance {
         ordered.add(sante);
         ordered.add(vitals);
         ordered.add(buffs);
-        ordered.add(timers);
+        ordered.add(tasks);
         return List.copyOf(ordered);
     }
 

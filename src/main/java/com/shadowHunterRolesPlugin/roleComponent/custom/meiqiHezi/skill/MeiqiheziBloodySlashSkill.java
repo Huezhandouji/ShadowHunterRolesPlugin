@@ -2,12 +2,12 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.platform.Task;
+import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.DamageKind;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.*;
@@ -20,7 +20,7 @@ import java.util.*;
 public class MeiqiheziBloodySlashSkill extends Skill {
 
     //技能任务句柄化：stop 时取消，避免角色被清除后仍结算伤害（平台 Task）
-    private Task attackTask;
+    private ScheduledHandle attackTask;
 
     // ───────── 四个协作组件引用**缓存在 start()** ─────────
     //`awake()` 只做构造期自检 / 只读自身 ⇒ 容器查找**不得**放 `awake()`；`start()` 相容器已冻结
@@ -29,7 +29,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
     //（容器里它们每实例恰好一个 ⇒ 与旧路径拿到的是**同一批实例** ✓）。
     private EnergyComponent energy;
     private BuffComponent buffs;
-    private TimerComponent timers;
+    private TaskComponent timers;
     private VitalsComponent vitals;
 
 
@@ -51,7 +51,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
                     8,
                     Material.IRON_INGOT
             );
-            requires(EnergyComponent.class).requires(BuffComponent.class).requires(TimerComponent.class).requires(VitalsComponent.class);
+            requires(EnergyComponent.class).requires(BuffComponent.class).requires(TaskComponent.class).requires(VitalsComponent.class);
         }
 
         @Override
@@ -77,7 +77,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
     public void start() {
         energy = svc().components().get(EnergyComponent.class);
         buffs = svc().components().get(BuffComponent.class);
-        timers = svc().components().get(TimerComponent.class);
+        timers = svc().components().get(TaskComponent.class);
         vitals = svc().components().get(VitalsComponent.class);
     }
 
@@ -101,7 +101,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
         if(!buffs.canCastSkill()) return;
         energy.tryConsume(getEnergyCost());
 
-        attackTask = timers.runRepeating(this, 0L, 2L, new Runnable() {
+        attackTask = timers.addScheduleRepeating(this, 0L, 2L, new Runnable() {
 
             private int count = 0;
             private final Player player = caster;

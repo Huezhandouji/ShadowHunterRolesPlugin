@@ -266,25 +266,6 @@ public final class ServiceComponents {
         return component instanceof HotbarRenderComponent render && render.consumeChanged();
     }
 
-    /**
-     * 把**本帧渲染完成的通知**逐个交给调用方（{@code owner} + 该条通知动作）。
-     * <p><b>类型扫描在本文件完成</b>（"谁订阅了渲染通知"属于组件集合的知识）⇒ 容器侧不必点名那个内嵌类型；
-     * **怎么调、怎么护仍由容器决定**（逐个经它自己的受保护入口 ⇒ 只隔离抛异常的那一个）。
-     * @param components 容器要扫描的组件集（顺序 = 容器的注册序）
-     * @param delivery   逐条投递口（容器侧实现）
-     */
-    public static void forEachRenderNotice(List<RoleComponent> components,
-                                           BiConsumer<RoleComponent, Runnable> delivery) {
-        if (components == null || delivery == null) {
-            return;
-        }
-        for (RoleComponent component : components) {
-            if (component instanceof HotbarRenderComponent.RenderCallback callback) {
-                delivery.accept(component, callback::onHotbarRendered);
-            }
-        }
-    }
-
     /** 当前能量读数。未命中 ⇒ {@code 0}（与容器既有回退值相同）。 */
     public static int energyCurrent(RoleComponent component) {
         return component instanceof EnergyComponent energy ? energy.current() : 0;

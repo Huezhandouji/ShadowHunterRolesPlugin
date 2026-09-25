@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -123,6 +124,20 @@ public class HotbarRenderComponent extends RoleComponent {
     private boolean changed;
 
     /**
+     * **「本帧真的刷新了」的通知名单**（★ 函数式接口 · 使用者自己的函数）。
+     *
+     * <p><b>登记方式</b>：想收通知的组件在**自己的 {@code start()}** 里调
+     * {@link #addRenderListener(Runnable)} 把**自己的函数**加进来 ✓。
+     * 本组件**不按类型匹配使用者** ✗ —— 那会要求使用者实现本组件的嵌套接口
+     * （= 机制面替使用者规定形状）。用 JDK 的 {@code Runnable} ⇒ 零自定义接口 ✓。
+     *
+     * <p><b>顺序</b>= 登记序（`CopyOnWriteArrayList` 的遍历语义）⇒ 与既有"按注册序扇出"逐字一致 ✓。
+     * <p><b>回执</b>：{@code add} 返回**同一条函数**（引用相等）⇒ 需要注销者把它存起来调
+     * {@link #removeRenderListener(Runnable)} 即可 ✓。
+     */
+    private final List<Runnable> renderListeners = new CopyOnWriteArrayList<>();
+
+    /**
      * **上一帧真正写入的槽位内容**（**变化基线**）。
      * <p>{@code null} = 尚无基线（首次渲染）⇒ 视作"有变化"（首刷应当被通知）。
      */
@@ -151,6 +166,11 @@ public class HotbarRenderComponent extends RoleComponent {
         }
         renderNow();
         dirty = false;
+ //★ "本帧真的刷新了"的通知由**本组件自己**扇出（名单 = 使用者 `addRenderListener` 登记的函数）
+ // —— 容器不再逐组件匹配类型去通知 ✓（那要求使用者实现本组件的嵌套接口）。
+        if (consumeChanged()) {
+            notifyRendered();
+        }
     }
 
     /**
@@ -190,6 +210,60 @@ public class HotbarRenderComponent extends RoleComponent {
      */
     public void markDirty() {
         this.dirty = true;
+    }
+
+    // ───────── 回调面：函数式接口名单（使用者自己 add 自己的函数）─────────
+
+    /**
+     * **登记「本帧真的刷新了」的通知**（★ 函数式接口：传一个 {@code Runnable} 即可）。
+     *
+     * <p><b>谁调</b>：想收通知的组件**在自己的 {@code start()}** 里调一次 ✓。
+     * 本组件**不按类型匹配使用者** ✗ ⇒ 使用者**不必**实现本组件的任何接口。
+     *
+     * <p><b>时机</b>：只在**本帧真的有变化**时被调（写入完成之后）；改不了这一帧的结果 ✓。
+     *
+     * <p><b>故障隔离</b>：逐个调用，某个抛异常 ⇒ **只记日志并继续**，
+     * 其余监听器照常收到 ✓（不在循环外层套一层 try ⇒ 那会让首异常吞掉后续全部）。
+     *
+     * @param listener 使用者的函数（{@code null} ⇒ 忽略）
+     * @return **同一条函数**（引用相等）⇒ 需要注销者把它存进字段，交给 {@link #removeRenderListener(Runnable)}
+     */
+    public Runnable addRenderListener(Runnable listener) {
+        if (listener != null) {
+            renderListeners.add(listener);
+        }
+        return listener;
+    }
+
+    /**
+     * **注销通知**（按**引用相等**，与 {@link List#remove(Object)} 的既有语义一致）。
+     *
+     * @param listener {@link #addRenderListener(Runnable)} 当时返回的同一条函数
+     * @return 是否真的移除了
+     */
+    public boolean removeRenderListener(Runnable listener) {
+        return listener != null && renderListeners.remove(listener);
+    }
+
+    /** 当前登记的监听器条数（诊断读口；不参与任何行为决策）。 */
+    public int renderListenerCount() {
+        return renderListeners.size();
+    }
+
+    /**
+     * **把"本帧真的刷新了"通知给全部登记的函数**（逐个调用 + 逐个故障隔离）。
+     *
+     * <p><b>调用者</b>：帧末 flush 的尾部（本组件自己）—— 容器**不再**逐组件扇出通知 ✓。
+     * <p><b>顺序</b>= 登记序；★ **不用**外层 try：首异常只隔离它自己，后续照常收到 ✓。
+     */
+    private void notifyRendered() {
+        for (Runnable listener : renderListeners) {
+            try {
+                listener.run();
+            } catch (RuntimeException listenerFailure) {
+                LOG.warning("[hotbar] render listener failed: " + listenerFailure);
+            }
+        }
     }
 
     /** 是否已置脏（帧末入口条件之一）。 */
@@ -303,24 +377,20 @@ public class HotbarRenderComponent extends RoleComponent {
      * <h2>顺序（逐条，不可交换）</h2>
      * <ol>
      *   <li>判脏 ⇒ ② **写物品**（唯一写点）⇒ ③ **清脏** ✓</li>
-     *   <li>然后：**若本帧有真实变化** ⇒ 按 {@code getAllByType(RenderCallback.class)} **扇出**，
-     *       每个实现者**逐个**经 {@code RoleInstance.deliverHook} 调用 ✓（某个抛异常 ⇒ 按**故障隔离**语义只隔离它、
-     *       其余照常收到 ✓）</li>
+     *   <li>然后：**若本帧有真实变化** ⇒ 把本组件自持的**监听器名单**逐个调一遍 ✓
+     *       （某个抛异常 ⇒ 按**故障隔离**语义只隔离它、其余照常收到 ✓）</li>
      *   <li><b>只读不取消</b> ✗：回调**不**参与"写什么"的决策 ⇒ 它**改不了**这一帧的渲染结果 ✓</li>
      * </ol>
+     *
+     * <h2>★ 通知面 = 函数式接口名单（不再让使用者实现本组件的嵌套接口）</h2>
+     * 想收通知的组件**自己**在 {@code start()} 里调 {@link #addRenderListener(Runnable)}
+     * 把自己的函数登记进来 ✓ —— 本组件**不按类型去匹配使用者**（那要求使用者实现本组件的接口 =
+     * 框架/机制面替使用者规定形状）。
      *
      * <h2>边界（如实申报）</h2>
      * 回调**只在"有变化"时**响 ✓ ⇒ 想"每帧都做事"的组件**不该**用它（那不是它的语义）✗。
      * 另：回调**不**保证"物品已被玩家看到" —— 它紧跟写入，客户端同步由平台负责 ✓。
      */
-    public interface RenderCallback {
-
-        /**
-         * **本帧热键栏内容真的变了**（在写入完成之后调用）。
-         * <p>**只通知**：改不了这一帧的渲染结果（返回 {@code void}）✗。
-         */
-        void onHotbarRendered();
-    }
 
     // ───────── 提交面：其他组件提交物品 → 机制面绑身份 → 返回句柄 ─────────
 

@@ -696,32 +696,13 @@ public class RoleInstance {
 
 
  //帧末 flush（落点 = tick 末尾，紧接组件更新与到期扫描之后）：
- //渲染组件自己判定"要不要刷"（判脏 → 写物品 → 清脏 → 取变更，**顺序不可交换**）——
- //入口条件与写物品段都在它内部，本类只转问它一个问题："本帧真的改了东西吗？"
- //**主武器不让入口因它而变**（冷却名不带秒数 ⇒ 冻结差异；判据同样在组件内部）。
+ //渲染组件自己判定"要不要刷"（判脏 → 写物品 → 清脏，**顺序不可交换**）——
+ //入口条件与写物品段都在它内部。
+ //★ **"本帧真的刷新了"的通知也已归它自己扇出**：想收通知的组件在自己的 `start()` 里
+ //  `addRenderListener(...)` 登记**自己的函数**（函数式接口）⇒ 本类**不再**逐组件匹配类型去通知 ✓
+ //  —— 那要求使用者实现渲染组件的嵌套接口（本类也不再需要 `dispatchRenderedNotice`）。
         ServiceComponents.renderFlush(resolve(ServiceComponents.ID_HOTBAR_RENDER));
- //渲染回调（读侧、只通知）—— 触发点 = 上面"真正完成一次刷新之后"
- //★ 变化判据：只有**本帧真的改了东西**才回调（consumeChanged 一次性读取并清除）⇒ 无变化的那一帧 **0 次**
- //★ 派发：按能力接口扇出，**逐个**经 deliverHook（内含 guardedCall + 外裹 withinIterationWindow）
- // —— 不在此处裸调组件方法（否则抛异常时隔离四步不会被安排）
-        if(ServiceComponents.renderConsumeChanged(resolve(ServiceComponents.ID_HOTBAR_RENDER))){
-            dispatchRenderedNotice();
-        }
 
-    }
-
- /**
- * **"本帧真的变了"的通用通知**：按**渲染通知的订阅面**（谁登记了通知谁收）**扇出**，
- * 逐个经 {@link #deliverHook} 调用；订阅面的类型扫描在框架级清单里完成（本类不点名它）。
- * <p><b>只通知、不可否决</b>：回调返回 {@code void} ⇒ 改不了这一帧的渲染结果。
- * <p><b>为何逐个 deliverHook 而不是把整个循环塞进一次调用</b>：那样首个异常会让"本次派发"里
- * 排在其后的组件**收不到通知**；逐个 ⇒ 只隔离抛异常的那个，其余照常收到。
- * <p><b>命名与职责边界</b>：本方法只做"帧末渲染完成后的**通用**通知"（不绑定某个具体组件的业务）——
- * 置脏 / 写物品 / 清脏全部在渲染组件自己内部完成，框架不替它做这些事。
- */
-    private void dispatchRenderedNotice(){
-        ServiceComponents.forEachRenderNotice(componentRegistry.all(),
-                (owner, action) -> deliverHook(owner, "onHotbarRendered", action));
     }
 
 

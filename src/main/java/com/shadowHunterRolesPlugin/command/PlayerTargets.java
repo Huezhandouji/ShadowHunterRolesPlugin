@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.command;
 
+import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
@@ -34,7 +35,7 @@ final class PlayerTargets {
         NO_MATCH,
         /** 选择器命中多于一名。 */
         MULTIPLE,
-        /** 非选择器输入（裸名 / UUID）：两查皆空，或命中的玩家已离线。 */
+        /** 非选择器输入（裸玩家名）：两查皆空，或命中的玩家已离线。 */
         NOT_FOUND
     }
 
@@ -63,7 +64,7 @@ final class PlayerTargets {
         if (raw == null || raw.isBlank()) {
             return selfOrMiss(sender);
         }
-        if (ComponentOperationDispatcher.SELF_TOKEN.equals(raw)) {
+        if (ComponentOperationDispatcher.SELF_TOKEN.equalsIgnoreCase(raw)) {
             return selfOrMiss(sender);
         }
         if (raw.startsWith("@")) {
@@ -102,6 +103,11 @@ final class PlayerTargets {
         try {
             selected = Bukkit.selectEntities(sender, raw);
         } catch (IllegalArgumentException malformed) {
+            ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
+            if (plugin != null) {
+                plugin.getLogger().info("[target-selector] rejected token=" + raw
+                        + " exception=" + malformed.getClass().getName());
+            }
             return Result.miss(Failure.MALFORMED, 0);
         }
         if (selected == null || selected.isEmpty()) {

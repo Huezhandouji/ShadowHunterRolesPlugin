@@ -27,8 +27,6 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 //（欠账 A 后半）：`frameworkLevel.FactionComponent` 的 **import 已删除** ——
 //该组件本体已整体删除，阵营的真值改住聚合根 `core/Role` 的 `faction` 字段
 //（读侧 = `roleInfo` 服务面，见下方 `roleInfo()` 读口；写侧 = `Role#setFaction/resetFaction`）。
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
 //框架级服务组件的**清单**（类 + id + 构造顺序 + 接线都在那一件里）—— 本类只按 id 装配与登记。
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.ServiceComponents;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
@@ -131,15 +129,6 @@ public class RoleInstance {
  */
     private final RoleInfo roleInfo = new RoleInfoImpl(this);
  /**
- * **唯一的方法引用持有者**：供三条"程序化刷新"路径共用 ——
- * 冷却到点（启动时预约）、每 tick 到期扫描、显式结束冷却（S3）。
- * 它们都**不**额外产生裸直呼点（计数守恒：5 处直呼 + 1 处方法引用）。
- * <p><b></b>：本 Runable 的实现从"直呼渲染器"改为经**渲染组件**的
- * {@code requestRepaint()} 转调 ⇒ 框架自身置脏与组件请求**收敛到同一条通道**
- * （置脏的落点就是渲染组件自己的脏标记）。
- */
-    private final Runnable markHotbarDirty = this::requestHotbarRepaint;
- /**
  * **组件侧"请求重绘"的唯一入口**（收进渲染组件）。
  * <p><b>现行形态</b>：组件与框架**都**经 {@link HotbarRenderComponent#requestRepaint()} 请求重绘，
  * 置脏落点就是渲染组件自己的脏标记（帧末由它决定写不写物品）⇒ **只有一条重绘通道**
@@ -202,16 +191,6 @@ public class RoleInstance {
  //（⇒ **构造期不创建任何任务**，构造失败不留下永久运行的 ticker）。
  //**为什么**：构造失败（含**非依赖类**的组件构造异常）必须在玩家身上**零痕迹**，
  //`RoleManager#selectRole` 才可能"先构造成功、再清旧角色"（那条残留）。
-    }
-
- /**
- * **框架自身的置脏入口**：经**物品渲染组件**转调 ⇒ 与组件侧请求
- * **收敛到同一条通道** （原先的"直连渲染器置脏"这条独立路径已废止）。
- * <p>用方法引用（{@code this::requestHotbarRepaint}）而不是 lambda：字段初始化式里**不能**读
- * 尚未在构造器里赋值的 final 字段（Java 的 definite-assignment 规则）⇒ 方法引用把读取推迟到调用时。
- */
-    private void requestHotbarRepaint() {
-        pickApply(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, HotbarRenderComponent::requestRepaint);
     }
 
  /**
@@ -486,7 +465,7 @@ public class RoleInstance {
  //：组件侧不再被绑定一条**独立**的重绘通道 —— 需要请求重绘的组件改为
  //经**渲染组件**这一条通道：`svc().components().get(HotbarRenderComponent.class)`
  //（或按 id "hotbarRender"）拿到它，再调 requestRepaint()。
- //⇒ 框架侧（markHotbarDirty）与组件侧**收敛到同一条通道**（禁两套并存）；
+ //⇒ 组件侧与框架侧**收敛到同一条通道**（禁两套并存）；
  // 旧 `RepaintRequestable` / `RepaintRequester` 两条通道**已删除**。
  //绑定时机的纪律不变：渲染组件本身在构造器里就已 bindRepaintSink（早于任何 awake/start）。
  //：原"创建后绑定"的**装配期落点已整体删除** （它唯一的绑定目标是计时端口，
@@ -785,37 +764,52 @@ public class RoleInstance {
     }
 
  /**
+ * **一条投递条目**（框架侧**通用**形态）：{@code owner} = 该条归属的组件；{@code action} = 该条的通知动作。
+ * <p>提供变更的组件把"逐条投递"交回来时用它作载体 ⇒ 框架据此**逐个**做故障隔离，
+ * **不需要**知道组件自己的登记类型（登记类型由组件自持）。
+ */
+    public record ChangeDelivery(RoleComponent owner, Runnable action) {
+    }
+
+ /**
+ * **变更通知的通用来源面**：提供变更的组件实现它，把本轮变更**逐条**交给框架。
+ * <p><b>分工</b>：组件只回答"有哪些条目"（遍历它自己的名单；平台侧那一条由组件自己排除 ⇒
+ * 类型匹配在组件侧完成）；框架负责"怎么调、怎么护"（逐个经 {@link #guardedCall} 做故障隔离、
+ * 整段在遍历窗口里、以及真变化闸门与重入合并）⇒ 框架**不点名任何具体组件类** ✓。
+ */
+    public interface ChangeListenerSource {
+
+        /**
+         * 逐条交回本轮变更的通知条目（**平台侧那一条不属于订阅者** ⇒ 实现方自行排除）。
+         * @param previous 变化前的值
+         * @param current  变化后的值
+         * @param delivery 框架的投递口（实现方对**每一条**条目调用一次）
+         */
+        void forEachChangeListener(int previous, int current, Consumer<ChangeDelivery> delivery);
+    }
+
+ /**
  * 把 SanTE 真值变化**派发给订阅者**（顺序 = **订阅先后** = 组件装配序）。
- * <p><b> · C2（回退 `` 的方向错误）</b>：接受集的决定方式从
- * 「**实现了某个能力接口的组件**」 改为
- * 「**向 {@code SanTEComponent} 订阅过的组件**」 ——
- * **凡关注点已是组件 ⇒ 不得再为它新增能力接口** （SanTE 的家就是 `SanTEComponent`）。
- * <p>遍历的是**监听器名单**（{@code SanTEComponent#forEachListener}），**不是**容器注册表
- * ⇒ 「谁关心」由**订阅**表达，不再由接口/继承表达。
+ * <p><b>接受集由订阅表达</b>：遍历的是**提供者自持的订阅名单**（{@link ChangeListenerSource}），
+ * **不是**容器注册表 ⇒ 「谁关心」由**订阅**表达，不再由接口/继承表达；框架只提供投递与保护。
  * <p><b>未改的两件</b>（已确立、原样保留）：**逐个**经 {@code guardedCall}
  * （异常 ⇒ 只隔离抛异常的那一个、其余照常收到）· 整段在 {@link #withinIterationWindow} 里
  * （⇒ 真四步在窗口关闭后执行）。
- * <p><b>平台侧通道</b>：**唯一入口 = 写入路径的直接通知**（`SanTEComponent#set` → `notifyPlatform` →
- * 它自己那条 owner 为本组件的监听 ⇒ 本方法）⇒ **一次真变化恰好一次** ✓。
- * 派发边界**不再**回调平台侧通道（那会造成同一监听被通知两次，而第二次的派发会被重入闸门吞掉 ⇒
- * 只是空转）。
+ * <p><b>平台侧通道</b>：**唯一入口 = 写入路径的直接通知**（写入组件在 {@code set} 里经 `notifyPlatform`
+ * 直调它自己那条 owner 为自身的监听 ⇒ 交给容器登记的那条接收者 ⇒ 本方法）⇒ **一次真变化恰好一次** ✓。
+ * 派发边界**不再**回调平台侧通道（那会造成同一监听被通知两次，而第二次的派发会被重入闸门吞掉 ⇒ 只是空转）。
  */
     private void broadcastSanTEChange(int preSanTE, int newSanTE){
-        SanTEComponent sante = (SanTEComponent) resolve(SERVICE_ID_SANTE);
-        if (sante == null) {
+        RoleComponent provider = resolve(SERVICE_ID_SANTE);
+        if (!(provider instanceof ChangeListenerSource source)) {
             return;
         }
  //遍历窗口：可嵌套（update() 广播期间改 SanTE ⇒ 本方法再次进入窗口）
  //：唯一受保护调用（异常 ⇒ 窗口关闭后执行隔离四步）
         withinIterationWindow(() -> {
-            sante.forEachListener(entry -> {
- //平台侧登记（owner = 组件自身）由写入路径直调 ⇒ 不在此列（否则平台侧会多收一次）
-                if (entry.owner() == sante) return;
- //监听器判据（不是接口判据）—— 只通知"订阅过"的组件；
- //归属组件由注册方随监听器一并给出（entry.owner()）⇒ 仍能**逐个**经 guardedCall 做故障隔离 ✓
-                guardedCall(entry.owner(), "onSanTEChange",
-                        () -> entry.listener().accept(new SanTEComponent.Change(preSanTE, newSanTE)));
-            });
+ //条目由提供者逐个交回（归属组件由它随条目一并给出）⇒ 仍能**逐个**经 guardedCall 做故障隔离 ✓
+            source.forEachChangeListener(preSanTE, newSanTE,
+                    entry -> guardedCall(entry.owner(), "onSanTEChange", entry.action()));
         });
  //★ 到此为止：**不再**回调平台侧通道 —— 那次回调产生的第二次通知会被重入闸门收下、
  //补偿分支又因 `notified == target` 跳过 ⇒ 空转；同一监听被通知两次也会让"命中次数"失真。
@@ -853,19 +847,21 @@ public class RoleInstance {
  //★ 派发：按能力接口扇出，**逐个**经 deliverHook（内含 guardedCall + 外裹 withinIterationWindow）
  // —— 不在此处裸调组件方法（否则抛异常时隔离四步不会被安排）
         if(pickValue(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, component -> component.consumeChanged(), false)){
-            dispatchHotbarRendered();
+            dispatchRenderedNotice();
         }
 
     }
 
  /**
- * **热键栏"本帧真的变了"的通知**：按
- * {@link HotbarRenderComponent.RenderCallback} **扇出**，逐个经 {@link #deliverHook} 调用。
+ * **"本帧真的变了"的通用通知**：按 {@link HotbarRenderComponent.RenderCallback} **扇出**，
+ * 逐个经 {@link #deliverHook} 调用。
  * <p><b>只通知、不可否决</b>：回调返回 {@code void} ⇒ 改不了这一帧的渲染结果。
  * <p><b>为何逐个 deliverHook 而不是把整个循环塞进一次调用</b>：那样首个异常会让"本次派发"里
  * 排在其后的组件**收不到通知**；逐个 ⇒ 只隔离抛异常的那个，其余照常收到。
+ * <p><b>命名与职责边界</b>：本方法只做"帧末渲染完成后的**通用**通知"（不绑定某个具体组件的业务）——
+ * 置脏 / 写物品 / 清脏全部在渲染组件自己内部完成，框架不替它做这些事。
  */
-    private void dispatchHotbarRendered(){
+    private void dispatchRenderedNotice(){
         for(HotbarRenderComponent.RenderCallback callback : getAllByType(HotbarRenderComponent.RenderCallback.class)){
             deliverHook((RoleComponent) callback, "onHotbarRendered", callback::onHotbarRendered);
         }

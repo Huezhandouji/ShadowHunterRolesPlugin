@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
 
+import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
@@ -15,6 +16,9 @@ import java.util.function.Consumer;
  * <p><b>与容器的分工</b>：写后对平台说两句话 —— ① 把变更交给**平台侧通道**（容器**以本组件名义**登记的那一条
  * 监听；它是**平台侧通知的唯一入口**，只在写入路径里被调到），② 再由容器在**派发边界**向
  * 监听器列表派发（含真变化闸门 · 逐监听器隔离 · 重入护栏）；组件只负责真值怎么变。
+ * <p><b>容器侧不点名本类</b>：派发边界要"逐条通知条目"时走的是**通用来源面**
+ * （{@link RoleInstance.ChangeListenerSource}，见 {@link #forEachChangeListener}）⇒ 容器既不强转、
+ * 也不接触本类的登记类型 ✓；平台侧那一条由本组件在交回时自行排除 ✓。
  * <p><b>两条通道各通知一次</b>：① 每次写入（含无变化的写入）各一次；② 只在**真变化**时一次
  * ⇒ 同一次真变化对容器侧是"写入路径 1 次 + 派发边界 0 次"（派发边界**不**再回调平台侧）。
  * <p><b>状态唯一</b>：容器侧**不再**持有 {@code currentSanTE} 字段 ✗（只保留视图方法）。
@@ -42,7 +46,7 @@ import java.util.function.Consumer;
  * ✓ —— 调用方须持有**同一个** {@link Listener} 实例（{@link #addListener(RoleComponent, Consumer)} **返回**该实例
  * ⇒ 消费者存进私有字段即可 ✓）。不做"按身份查询"的 {@code unsubscribe(this)} ✗（{@code Consumer} 无身份标识）。
  */
-public class SanTEComponent extends RoleComponent implements OperationProvider {
+public class SanTEComponent extends RoleComponent implements OperationProvider, RoleInstance.ChangeListenerSource {
 
     /**
      * **一次 SanTE 变更的载荷**（**record，不是接口** ✓）。
@@ -143,14 +147,37 @@ public class SanTEComponent extends RoleComponent implements OperationProvider {
     }
 
     /**
+     * **把本轮变更的通知条目逐个交回框架**（{@link RoleInstance.ChangeListenerSource} 的实现）。
+     * <p><b>分工</b>：派发边界（真变化闸门 · 逐监听器故障隔离 · 重入合并）全部在容器侧 ✓，
+     * 本方法只回答"这轮该通知哪些条目、每条该做什么" ⇒ 容器**不必知道**本组件的登记类型 ✓。
+     * <p><b>平台侧那一条不在此列</b>：它的 {@code owner} 就是本组件自身，写入路径已经直调过它
+     * ⇒ 这里必须排除（否则平台侧会多收一次）。
+     * <p><b>遍历安全性</b>沿用 {@link #forEachListener(Consumer)} 的快照语义 ✓（遍历中增删不影响本趟）。
+     */
+    @Override
+    public void forEachChangeListener(int previous, int current, Consumer<RoleInstance.ChangeDelivery> delivery) {
+        if (delivery == null) {
+            return;
+        }
+        Change change = new Change(previous, current);
+        forEachListener(entry -> {
+            if (entry.owner() == this) {
+                return;                             //平台侧那一条：写入路径直调 ⇒ 不属于订阅者
+            }
+            delivery.accept(new RoleInstance.ChangeDelivery(entry.owner(), () -> entry.listener().accept(change)));
+        });
+    }
+
+    /**
      * **通知全部监听器**（一趟直调）—— 本方法就是"派发"这件事的**薄实现**：
      * {@code forEachListener(entry -> entry.listener().accept(change))} ✓。
      *
      * <h2>谁在什么时机调它</h2>
      * <ul>
      *   <li><b>生产路径</b>：容器（{@code RoleInstance.broadcastSanTEChange}）**不**用本方法 ✗ ——
-     *       它走 {@link #forEachListener(Consumer)} 并**逐个**套 {@code guardedCall} ✓（那是"逐监听器故障隔离"
-     *       的唯一实现点 ✓）；</li>
+     *       它走本组件实现的 {@link RoleInstance.ChangeListenerSource 通用来源面}（{@link #forEachChangeListener}，
+     *       内部经 {@link #forEachListener(Consumer)} 把条目逐个交回），由容器**逐个**套 {@code guardedCall} ✓
+     *       （那是"逐监听器故障隔离"的唯一实现点 ✓）；</li>
      *   <li><b>本方法的存在理由</b>：给"没有容器"的**离线单元测试**一条与生产同源的派发路径 ✓
      *       （否则测试只能自己写循环，验的就成了测试自己的循环 ✗）。</li>
      * </ul>

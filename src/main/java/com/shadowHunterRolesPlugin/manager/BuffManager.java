@@ -5,7 +5,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffType;
 
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.core.RoleInstance;
+import com.shadowHunterRolesPlugin.platform.Scheduler;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.Task;
 import org.bukkit.NamespacedKey;
@@ -27,29 +27,18 @@ public class BuffManager {
     private final Map<BuffType, Buff> activeBuffs = new HashMap<>();
     private Task updaterTask;
 
-    private final RoleInstance instance;
+    private final RoleComponent owner;
 
-    /**
-     * **账本的持有者**（= buff 组件）—— 记账动作一律走它，**不再回容器转发** ✓。
-     *
-     * <p>由 {@link #bindOwner(RoleComponent)} 在 buff 组件构造期接上（那时 `this` 只是被存引用、
-     * 尚未被调用 ⇒ 无"构造期逃逸"风险）。
-     *
-     * <p>`RoleInstance` 仍保留用于两件**非组件**的事：取调度器（`rolesContext()`）。
-     */
-    private RoleComponent owner;
+    /** 调度端口（★ 平台面，不是容器）—— 本类**不再依赖 `RoleInstance`**。 */
+    private final Scheduler scheduler;
 
-    public BuffManager(Player player, RoleInstance instance){
+    public BuffManager(Player player, RoleComponent owner, Scheduler scheduler){
         this.player = player;
-        this.instance = instance;
+        this.owner = owner;
+        this.scheduler = scheduler;
         //**构造期不启动每 tick 更新** —— 第一相（构造）不得创建任何任务，
         //否则构造中途抛错（例如某个组件构造器抛）会泄漏一个永久运行的 ticker。
         //启动点改为 buff 组件的 `start()`（第二相）⇒ {@link #startUpdater()}。
-    }
-
-    /** 接上**账本的持有者**（由 buff 组件在构造期调用一次）。 */
-    public void bindOwner(RoleComponent owner){
-        this.owner = owner;
     }
 
     public void addBuff(BuffType type, int durationTicks){
@@ -165,12 +154,12 @@ public class BuffManager {
 
     /**
      * 启动记账表的每 tick 更新（两阶段构造的第二相）。
-     * <p>**调用方 = {@code core/RoleInstance#activate()}（第二相）**，不再是本类构造器 —— 见构造器处注释。
+     * <p>**调用方 = buff 组件的 `start()`（第二相）**，不再是本类构造器 —— 见构造器处注释。
      * <p>**幂等**：重复调用只保留一个任务（`clearAll()` 会把句柄置回 `null`，此后可再次启动）。
      */
     public void startUpdater(){
         if(updaterTask != null) return;
-        updaterTask = instance.rolesContext().scheduler().runRepeating(
+        updaterTask = scheduler.runRepeating(
                 this::tickAllBuffs,
                 0L,
                 1L

@@ -51,7 +51,7 @@ public class BuffComponentOperationTest {
         private final Map<BuffType, Integer> ticks = new LinkedHashMap<>();
 
         StubBuffManager() {
-            super(null, null); // 基类构造只赋两个字段 ⇒ 零解引用 ✓
+            super(null, null, null); // 基类构造只赋三个字段 ⇒ 零解引用 ✓
         }
 
         @Override

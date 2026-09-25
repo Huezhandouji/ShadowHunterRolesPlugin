@@ -11,7 +11,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 //：聚合根只读服务面 —— 阵营读取的唯一入口（框架侧读口 {@link #roleInfo()} 的类型）。
 import com.shadowHunterRolesPlugin.core.ports.RoleInfo;
-import com.shadowHunterRolesPlugin.manager.BuffManager;
+
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
@@ -130,14 +130,12 @@ public class RoleInstance {
         this.platform = platform;
 
  // ──：**服务的持有者先于角色组件存在** ────────────────────────────────
- //① buff 管理器（原在 freeze() 之后构造）：它对实例的引用只在方法体里使用 ⇒ 提前构造零行为差异；
- // 它的**持有者**现在是 buff 组件（聚合根上的 `getBuffManager()` 转发读口
- // **已删除** ⇒ 需要它的人走组件本身）。
-        BuffManager buffManager = new BuffManager(player, this);
+ //① buff 记账表：★ **已由 buff 组件自己创建**（账本与持有者成对建立）——
+ // 容器不再 `new BuffManager`，也不再持有它 ✓（原 `getBuffManager()` 转发读口早已删除）。
 
- //② 内建组件的装配：**由本类的 `buildBuiltIns(...)` 直接构造**（各组件自己声明 id ⇒
- // 本处只写「id + 工厂」的**纯数据**，不再经过任何「框架级服务清单」聚合类 ✓）。
-        List<RoleComponent> builtIns = buildBuiltIns(buffManager);
+ //② 内建组件的装配：**由本类的 `buildBuiltIns()` 直接构造**（各组件自己声明 id ⇒
+ // 本处只写「id + 工厂」的**纯数据**，不再经过任何「聚合清单」类 ✓）。
+        List<RoleComponent> builtIns = buildBuiltIns();
 
  //③ 阵营：**原 FactionComponent 已整体删除** ——
  // 阵营的真值就是聚合根 `Role` 的 `faction` 字段（构造期由描述符写入）；
@@ -248,7 +246,7 @@ public class RoleInstance {
      * 误报成「缺必需依赖」。装配方把本清单**作为数据**交给 `Role.Builder#providedTypes(...)` ⇒ 校验放行 ✓
      * （{@code Role} 只吃数据、不认类型名 ⇒ 那条边界仍然守住）。
      *
-     * <p>★ **本方法与 {@link #buildBuiltIns(BuffManager)} 是同源的两面**：那里构造了哪几件，
+     * <p>★ **本方法与 {@link #buildBuiltIns()} 是同源的两面**：那里构造了哪几件，
      * 这里就报哪几类 ⇒ 增删组件时**只改一处**（不再是「构造一处、清单另写一处」）。
      */
     public static Set<Class<? extends RoleComponent>> providedComponentTypes() {
@@ -262,7 +260,7 @@ public class RoleInstance {
         return Set.copyOf(types);
     }
 
-    private List<RoleComponent> buildBuiltIns(BuffManager buffManager) {        // ① 物品渲染：**最先**构造（置脏通道要先存在）
+    private List<RoleComponent> buildBuiltIns() {        // ① 物品渲染：**最先**构造（置脏通道要先存在）
         HotbarRenderComponent hotbarRender =
                 new HotbarRenderComponent(HotbarRenderComponent.ID, createServices(HotbarRenderComponent.ID));
         hotbarRender.bindRepaintSink(hotbarRender::markDirty);
@@ -283,7 +281,7 @@ public class RoleInstance {
 
         // ⑤ buff：记账表（与容器共享同一实例）与药水账本都归它持有
         BuffComponent buffs =
-                new BuffComponent(BuffComponent.ID, createServices(BuffComponent.ID), buffManager);
+                new BuffComponent(BuffComponent.ID, createServices(BuffComponent.ID));
 
         // ⑥ 任务：★ 零注入 —— 构造签名与普通组件一字不差；任务表与回收全归它自己
         //（组件编写者忘了取消也不会泄漏：实例销毁必经它的 `stop()`）
@@ -305,7 +303,7 @@ public class RoleInstance {
  * 登记后它们可被**按 id** 取到（组件侧 = {@code svc().components().get(...)}）
  * （= "角色实例 = 组件的容器"的落点）。
  * <p>装配清单为 **6 件**（物品渲染 / 能量 / SanTE / 生命 / buff / 计时），由
- * {@link #buildBuiltIns(BuffManager)} 构造并接线完成。
+ * {@link #buildBuiltIns()} 构造并接线完成。
  * <p>★ **每个组件自己声明 id**（`XxxComponent.ID`）⇒ 本类只写「id + 工厂」的**纯数据**，
  * 不再经过任何「框架级服务清单」聚合类 ✓。
  * <p><b>顺序</b>：登记在 {@link #initComponents()} **之后**、{@link ComponentRegistry#freeze()} **之后**

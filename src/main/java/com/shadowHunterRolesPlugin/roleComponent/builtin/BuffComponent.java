@@ -3,6 +3,8 @@ package com.shadowHunterRolesPlugin.roleComponent.builtin;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffType;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
+import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
+import org.bukkit.Bukkit;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import org.bukkit.entity.Player;
@@ -39,14 +41,28 @@ public class BuffComponent extends RoleComponent implements OperationProvider {
     /** ★ 药水记账账本（原 {@code RoleInstance#appliedPotionTypes} 的持有者搬到这里）。 */
     private final Set<PotionEffectType> appliedPotionTypes = new LinkedHashSet<>();
 
-    public BuffComponent(String id, ComponentServices services, BuffManager buffManager) {
+    /**
+     * **生产构造**：记账表由本组件**自建**（★ 不再由容器 `new` 好再交进来）。
+     *
+     * <p>它与本组件**成对**存在：账本需要"持有者"这个引用才能在不回容器的前提下请求重绘 / 交药水记账
+     * ⇒ 构造期一次建好并接上（`this` 在此只被存引用、未被调用 ⇒ 无构造期逃逸）。
+     *
+     * <p>调度器 = 平台面（{@link BukkitSchedulerAdapter}，底层 Paper 的
+     * {@code GlobalRegionScheduler}）—— **不是容器** ⇒ 本组件不依赖 `RoleInstance` ✓。
+     */
+    public BuffComponent(String id, ComponentServices services) {
         super(id, services);
- //★ 账本与持有者**成对**建立：`BuffManager` 需要"账本的持有者"这个引用才能在不回容器的前提下
- // 请求重绘 / 交药水记账 ⇒ 构造期把它接上（本组件的 `this` 在此已可安全传出：只存引用、不调用）。
-        this.buffManager = buffManager;
-        if (buffManager != null) {
-            buffManager.bindOwner(this);
-        }
+        this.buffManager = new BuffManager(svc().self().player(), this, new BukkitSchedulerAdapter(
+                Bukkit.getPluginManager().getPlugin("ShadowHunterRolesPlugin")));
+    }
+
+    /**
+     * **测试接缝**（包私有）：注入一个替身记账表，供离线单测构造（不需要活 Player）。
+     * <p>★ 生产路径**只用上面的公开构造** ⇒ 记账表由本组件自建 ✓。
+     */
+    BuffComponent(String id, ComponentServices services, BuffManager stub) {
+        super(id, services);
+        this.buffManager = stub;
     }
 
     /** buff 记账表本体（容器 {@code clear()} 仍需它做 {@code clearAll()} ⇒ 提供读口）。 */

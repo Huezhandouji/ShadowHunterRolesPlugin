@@ -19,7 +19,7 @@ import java.util.List;
  * <ul>
  * <li>{@link #get(Class)} = 第一个符合条件的（**不是"具体类优先"** —— 已按真实语义改正）；</li>
  * <li>{@link #getAll(Class)} = 全部符合条件的（添加顺序；无人符合 ⇒ **空列表**）；</li>
- * <li>{@link #getById(String)} = 第一个 id 相等的（起 **id 可重复**）。</li>
+ * <li>{@link #getById(String)} = 第一个 id 相等的，**id 可重复**。</li>
  * </ul>
  * <p><b>实现点唯一</b>：{@code core/ComponentLookupImpl}（把 {@code core.dispatch.ComponentRegistry} 与
  * 容器的服务集工厂、日志接起来）。{@link RoleComponent#getComponent(Class)} 走本端口的 {@link #get(Class)}。

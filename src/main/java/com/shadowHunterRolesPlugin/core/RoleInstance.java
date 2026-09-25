@@ -593,7 +593,7 @@ public class RoleInstance {
  * （初值 = 本次 {@code newSanTE}；每补发一次更新为 {@code target}）与 {@code target} 比较：
  * **无重入 ⇒ 不补发（与旧行为逐字一致）**；**有重入 ⇒ 恰好补发末次一次**；
  * 循环退出条件 = {@code sanTEPendingValue == Integer.MIN_VALUE}（哨兵 = 无待发值）；</li>
- * <li>异常隔离走 {@link #guardedCall}（起：**唯一受保护调用** ⇒ 抛异常 = 故障隔离）。</li>
+ * <li>异常隔离走 {@link #guardedCall}：**唯一受保护调用** ⇒ 抛异常 = 故障隔离。</li>
  * </ul>
  * 现存两个实现者（{@code DefaultSanTEZeroPunishment} / {@code RedDeeplySorrowSkill} 的
  * {@code onSanTEChange}）都**不在钩子内同步写 SanTE**（前者只调度任务、后者只起冷却）

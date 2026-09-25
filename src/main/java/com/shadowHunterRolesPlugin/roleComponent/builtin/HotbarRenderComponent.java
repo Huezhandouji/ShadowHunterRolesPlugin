@@ -584,6 +584,33 @@ public class HotbarRenderComponent extends RoleComponent {
         return (submission != null && submission.live) ? submission.uuid : null;
     }
 
+    /**
+     * **按槽位反查组件 id**（★ 栏位知识的归属：本组件）。
+     *
+     * <p>遍历给定的组件集，返回**第一个**描述符声明了该槽位的组件的 id；未占用 ⇒ {@code null}。
+     * 与 {@link #renderPlan()} 读槽位**同一来源**（描述符的 {@code slot()}）⇒ 不会与渲染结果脱节 ✓。
+     *
+     * <p>★ **组件集由调用方传入**（本组件不自持"全部组件"）⇒ 它不依赖容器，只吃一份数据 ✓。
+     *
+     * @param components 要扫的组件集（顺序 = 调用方给的顺序；命中即返回）
+     * @param slot       槽位（0..8）
+     */
+    public static String componentIdAtSlot(List<RoleComponent> components, int slot) {
+        if (components == null) {
+            return null;
+        }
+        for (RoleComponent component : components) {
+            if (component == null) {
+                continue;
+            }
+            HotbarSpecification<?> specification = specificationOf(component);
+            if (specification != null && specification.hasSlot() && specification.slot() == slot) {
+                return component.getId();
+            }
+        }
+        return null;
+    }
+
     /** 活跃句柄数（诊断读口）。 */
     public int liveHandleCount() {
         return liveSubmissions.size();

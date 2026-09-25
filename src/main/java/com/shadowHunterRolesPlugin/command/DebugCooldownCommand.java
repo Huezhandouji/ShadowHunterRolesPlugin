@@ -6,6 +6,7 @@ import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -127,15 +128,16 @@ public class DebugCooldownCommand implements SubCommand {
     }
 
     /**
-     * 目标解析：纯数字 = 热键栏槽位（走与渲染器**同一趟**组件表遍历：{@code Role.componentIdAtSlot(int)}），
-     * 否则按组件 id（须在注册表内）。
-     * <p>栏位随组件自己的描述符走 ⇒ 这里**不再**读 `Role.getSlotMap()` 那张派生视图，
-     * 但仍与它同源（都来自条目里的栏位值）⇒ 数字解析不会因栏位来源改变而静默失效。
+     * 目标解析：纯数字 = 热键栏槽位，否则按组件 id（须在注册表内）。
+     *
+     * <p>★ **槽位反查走渲染组件**（`HotbarRenderComponent.componentIdAtSlot(components, slot)`）——
+     * 「物品栏位置」的持有者就是它；聚合根 `Role` 的那张派生视图（`getSlotMap()` /
+     * `componentIdAtSlot(int)`）**已整体删除** ⇒ 本命令不再经聚合根解析槽位 ✓。
      */
     private String resolveComponentId(RoleInstance instance, String target){
         if(target.matches("\\d+")){
             int slot = Integer.parseInt(target);
-            return instance.getRole().componentIdAtSlot(slot);
+            return HotbarRenderComponent.componentIdAtSlot(instance.componentRegistry().all(), slot);
         }
         return instance.componentRegistry().getById(target) != null ? target : null;
     }

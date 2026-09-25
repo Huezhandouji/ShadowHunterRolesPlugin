@@ -140,7 +140,7 @@ public class TaskComponent extends RoleComponent {
     }
 
     private org.bukkit.plugin.Plugin plugin() {
-        return Bukkit.getPluginManager().getPlugin(PLUGIN_NAME);
+        return ShadowHunterRolesPlugin.getInstance();
     }
 
     /**

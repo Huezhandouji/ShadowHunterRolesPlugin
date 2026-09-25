@@ -67,7 +67,7 @@ public class AssemblyValidationTest {
         assertEquals("Slot 1 is already occupied by 'c_a'.", e.getMessage());
     }
 
-    /** 正常装配：build() 成功、栏位视图正确、组件数正确。 */
+    /** 正常装配：build() 成功、条目栏位正确、组件数正确。 */
     @Test
     public void validAssemblySucceeds() {
         Role.Builder b = builder("r");
@@ -76,13 +76,10 @@ public class AssemblyValidationTest {
         Role role = b.build();
         assertNotNull(role);
         assertEquals(2, role.getComponents().size());
-        Map<Integer, String> slotMap = role.getSlotMap();
-        assertEquals(2, slotMap.size());
-        assertEquals("c_a", slotMap.get(1));
-        assertEquals("c_b", slotMap.get(2));
-        assertEquals("c_a", role.componentIdAtSlot(1));
-        assertEquals("c_b", role.componentIdAtSlot(2));
-        assertEquals(null, role.componentIdAtSlot(5));
+ //★ 栏位视图已从聚合根删除（`getSlotMap` / `componentIdAtSlot`）⇒ 改读**条目携带的栏位值**
+ //（与渲染组件读描述符的 `slot()` 同一来源）
+        assertEquals(1, role.getComponents().get("c_a").getSlot());
+        assertEquals(2, role.getComponents().get("c_b").getSlot());
         assertTrue(role.getSkillIds().contains("c_a"));
         assertTrue(role.getSkillIds().contains("c_b"));
     }
@@ -94,6 +91,7 @@ public class AssemblyValidationTest {
         spec.setSlot(5);
         Role r1 = builder("r1").addComponent("c_x", spec).build();
         assertThrows(IllegalStateException.class, () -> spec.setSlot(6));
-        assertEquals("c_x", r1.componentIdAtSlot(5));
+ //★ 同上：改读条目携带的栏位值
+        assertEquals(5, r1.getComponents().get("c_x").getSlot());
     }
 }

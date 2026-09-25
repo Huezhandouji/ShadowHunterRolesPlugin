@@ -45,17 +45,15 @@ public class RegistrationOrderTest {
         expectedOrder.add("c_9_no_slot");
         assertEquals("遍历序必须等于登记序（LinkedHashMap 的语义）", expectedOrder, actualOrder);
 
-        Map<Integer, String> slotMap = role.getSlotMap();
-        assertEquals("无栏位者不得进 slotMap", IDS.length, slotMap.size());
-        assertFalse(slotMap.containsValue("c_9_no_slot"));
+ //★ 栏位视图已从聚合根删除 ⇒ 改为断言**条目携带的栏位值**（与渲染组件读描述符同一来源）
         for (int i = 0; i < IDS.length; i++) {
-            assertEquals("栏位 " + i + " 必须指向登记时给出的那个 id", IDS[i], slotMap.get(i));
-            assertEquals(IDS[i], role.componentIdAtSlot(i));
+            assertEquals("栏位 " + i + " 必须写在登记时给出的那个条目上",
+                    i, role.getComponents().get(IDS[i]).getSlot());
         }
-        assertEquals("未占用栏位必须返回 null", null, role.componentIdAtSlot(8));
+        assertFalse("无栏位者不得带栏位值", role.getComponents().get("c_9_no_slot").hasSlot());
     }
 
-    /** 栏位 0..8 全覆盖：9 个条目都能各占一格，且反向查表逐格正确。 */
+    /** 栏位 0..8 全覆盖：9 个条目都能各占一格。 */
     @Test
     public void everySlotCanBeOccupiedExactlyOnce() {
         Role.Builder b = new Role.Builder("r");
@@ -63,9 +61,8 @@ public class RegistrationOrderTest {
             b.addComponent("slot_" + i, new MeiqiheziBloodySlashSkill.Specification().setSlot(i));
         }
         Role role = b.build();
-        assertEquals(9, role.getSlotMap().size());
         for (int i = 0; i <= 8; i++) {
-            assertEquals("slot_" + i, role.componentIdAtSlot(i));
+            assertEquals("栏位 " + i + " 必须写在条目上", i, role.getComponents().get("slot_" + i).getSlot());
         }
     }
 
@@ -79,14 +76,10 @@ public class RegistrationOrderTest {
         Role role = b.build();
         assertEquals("组件表遍历序 = 登记序（不是字母序）",
                 Arrays.asList("zzz", "aaa", "mmm"), new ArrayList<>(role.getComponents().keySet()));
-        // 栏位视图是 `栏位 → id` 的派生表（HashMap），只断言**内容**，不断言它的迭代序（那不是冻结面）
-        assertEquals(3, role.getSlotMap().size());
-        assertEquals("zzz", role.getSlotMap().get(3));
-        assertEquals("aaa", role.getSlotMap().get(1));
-        assertEquals("mmm", role.getSlotMap().get(2));
-        assertEquals("zzz", role.componentIdAtSlot(3));
-        assertEquals("aaa", role.componentIdAtSlot(1));
-        assertEquals("mmm", role.componentIdAtSlot(2));
+ //★ 栏位视图已删除 ⇒ 逐条断言**条目携带的栏位值**
+        assertEquals(3, role.getComponents().get("zzz").getSlot());
+        assertEquals(1, role.getComponents().get("aaa").getSlot());
+        assertEquals(2, role.getComponents().get("mmm").getSlot());
     }
 
     /** 样本判别力守卫：同一批 id 的 {@link HashMap} 迭代序与登记序**不同** ⇒ 上面对顺序的断言不可能是恒真。 */

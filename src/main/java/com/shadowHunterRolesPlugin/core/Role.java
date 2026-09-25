@@ -47,12 +47,10 @@ public class Role {
     private final Set<String> skillIds;
     private final Set<String> passiveIds;
     private final Set<String> mainWeaponIds;
- /**
- * **栏位视图（派生）**：栏位归属**不再由本类维护** —— 它随组件自己的描述符走
- * （装配点只写 {@code setSlot}）。本表是构造期**一次性从组件表派生**出来的只读视图，
- * 只为公开 API {@link #getSlotMap()} 保留（签名与语义不变）。
- */
-    private final Map<Integer, String> slotMap;
+
+ //★ **栏位视图已整体删除**（`slotMap` / `deriveSlotMap` / `getSlotMap()` / `componentIdAtSlot()`）——
+ // 「物品栏位置」的持有者是**渲染组件**（它自己读描述符的 `slot()` 做落位），聚合根不再持有派生视图。
+ // 条目仍携带栏位值（`ComponentEntry.slot`）—— 那是**数据**（描述符快照的一部分），不是本类的视图。
 
     private Faction faction;
 
@@ -83,7 +81,7 @@ public class Role {
         this.skillIds = Collections.unmodifiableSet(filterIds(this.components, Skill.Specification.class));
         this.passiveIds = Collections.unmodifiableSet(filterIds(this.components, PassiveSkill.Specification.class));
         this.mainWeaponIds = Collections.unmodifiableSet(filterIds(this.components, MainWeapon.Specification.class));
-        this.slotMap = Collections.unmodifiableMap(deriveSlotMap(this.components));
+ //★ 栏位视图已删除 ⇒ 构造期不再派生 slotMap
 
         this.icon = builder.icon;
 
@@ -97,17 +95,6 @@ public class Role {
  * **装配期一次性派生栏位视图**：遍历组件表，把**占栏位**的条目收成 `栏位 → id`。
  * <p>遍历顺序 = 注册序 ⇒ 同一栏位不可能出现两次（装配期已校验），派生结果与既有实现写入的那张表逐项相同。
  */
-    private static Map<Integer, String> deriveSlotMap(Map<String, ComponentEntry> components){
-        Map<Integer, String> derived = new HashMap<>();
-        for(Map.Entry<String, ComponentEntry> entry : components.entrySet()){
-            ComponentEntry component = entry.getValue();
-            if(component.hasSlot()){
-                derived.put(component.getSlot(), entry.getKey());
-            }
-        }
-        return derived;
-    }
-
  /**
  * 按**描述符类型**过滤出**保持声明序**的 id 视图（`LinkedHashSet`）。
  * <p>早先口径是"按权威 kind 过滤"（`kind 枚举` 已删）；现口径 = **描述符类型**——
@@ -246,7 +233,7 @@ public class Role {
  * 装配条目：`(工厂, 栏位?, 描述符类型, 提供类型, 必需依赖, 可选依赖)`（**不含 kind**；
  * ** 增加依赖声明**）。
  * <p><b>不占栏位 = 栏位的缺失</b>：栏位用**可空的 {@link Integer}** 表达（`null` = 不占热键栏，
- * 不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它）。
+ * 不占栏位 ⇒ 渲染组件取计划时天然看不到它）。
  * 旧版的 `-1` 哨兵已删除 —— {@link #getSlot()} 在无栏位时**抛异常**，而不是返回一个能参与算术的值；
  * 想表达"不占栏位"只剩一条路：装配一个**没有栏位**的描述符（如**无栏位的被动描述符支**）。
  * <p>本条目是装配期从描述符取到的**不可变快照**：只持有几个值，**不持有描述符对象** ⇒
@@ -303,7 +290,7 @@ public class Role {
             return slot;
         }
 
- /** 占不占热键栏（`false` ⇒ 不进 `slotMap`）。 */
+ /** 占不占热键栏（`false` ⇒ 渲染组件取计划时会跳过它）。 */
         public boolean hasSlot() { return slot != null; }
     }
 
@@ -400,7 +387,7 @@ public class Role {
  * **不含 kind**、**增加依赖三元组**）：描述符入口与无栏位入口都只调用这里
  * ⇒ 校验、id 去重、入表各只有一处实现。
  * <p>本类**不再维护栏位表**：栏位只作为条目的一个值存在（{@code ComponentEntry.slot}），
- * 角色构造期再一次性派生出 {@code slotMap} 视图。
+ * ★ 栏位视图（`slotMap`）已删除 —— 落位由渲染组件读本值完成。
  * @param slot 栏位；{@code null} = **不占栏位**（不占热键栏）——旧版用 {@code -1} 哨兵表达同一件事
  * @param descriptorType 描述符**类型**（旧 kind 的唯一职责承担者：三个 id 视图按它归类）
  * @param descriptorLabel 诊断标签（只用于重复 id 的异常文案，逐字相同）
@@ -453,8 +440,9 @@ public class Role {
 
  /**
  * 槽位冲突 fail-fast —— 抛异常、该角色不注册，不再"告警 + 覆盖"。
- * <p>冲突判定改为**扫组件表里已占栏位的条目**（本类不再另存栏位表），
- * 异常类型与文案**逐字不变**。
+ * <p>★ **栏位合法性校验仍在装配期**（此处），但**本类不再持有栏位视图** ——
+ * 它只扫「条目携带的栏位值」做**冲突判定**（条目仍持有那个值：它是描述符快照的一部分，
+ * 渲染组件要读它做落位）。异常类型与文案**逐字不变**。
  */
         private void validateSlot(int slot){
             if(slot < 0 || slot > 8){
@@ -539,25 +527,8 @@ public class Role {
  */
     public void resetFaction(){ this.faction = defaultFaction; }
 
- /**
- * 栏位视图（**派生**）：`栏位 → 组件 id`，由构造期一次性从组件表派生。
- * 签名与语义**完全一致**（公开 API，只增不改）；栏位归属本身随组件自己的描述符走。
- */
-    public Map<Integer, String> getSlotMap() { return slotMap; }
-
- /**
- * 按栏位取组件 id：走与渲染器**同一趟**组件表遍历
- * （`栏位 → id` 的唯一来源是条目里的栏位值），未占用 ⇒ {@code null}。
- * <p>给 {@code DebugCooldownCommand} 的"纯数字 = 热键栏槽位"解析用，避免它去读第二套栏位表。
- */
-    public String componentIdAtSlot(int slot){
-        for(Map.Entry<String, ComponentEntry> entry : components.entrySet()){
-            ComponentEntry component = entry.getValue();
-            if(component.hasSlot() && component.getSlot() == slot){
-                return entry.getKey();
-            }
-        }
-        return null;
-    }
+ //★ **栏位视图与按槽位反查已整体删除**（`getSlotMap()` / `componentIdAtSlot(int)`）——
+ // 「物品栏位置」的持有者是**渲染组件**：它自己读描述符的 `slot()` 做落位，
+ // 数字目标解析也由它提供（`HotbarRenderComponent.identityOf(int)`）。
 }
 

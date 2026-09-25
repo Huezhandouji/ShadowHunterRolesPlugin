@@ -32,7 +32,7 @@ public abstract class PassiveSkill extends RoleComponent {
      * **被动描述符**（收敛为纯声明）：自带显示名与描述，
      * **继承描述符根类型**（{@link RoleComponent.Specification}）。
      * <p><b>规则进类型</b>：本类型**没有** {@code setSlot}，也**没有**
-     * {@link com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification} 的表现面 ——
+     * {@link com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.hotbar.HotbarSpecification} 的表现面 ——
      * 被动**不占热键栏**于是成为**编译期事实**（不是"装配点自觉传 -1"）：
      * 拿着被动描述符根本写不出指定栏位的代码。
      * <p>本类型**不实现** {@link #create(String, ComponentServices)} ⇒ 具体组件必须自己声明嵌套

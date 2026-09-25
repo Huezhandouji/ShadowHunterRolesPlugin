@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.core.hotbar;
+package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.hotbar;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;

@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
 
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarRenderer;
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.hotbar.HotbarRenderer;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;

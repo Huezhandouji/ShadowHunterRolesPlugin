@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
-import com.shadowHunterRolesPlugin.core.hotbar.HotbarSpecification;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 import net.kyori.adventure.text.Component;

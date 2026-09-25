@@ -1,7 +1,7 @@
 # ai-generated/ · 本项目的文档（写给 AI 读）
 
 > **这份文档集面向 AI**：每条规则给【做 / 不做】+ 反例 + **可复跑命令**；不写协作过程、不含易变身份量。
-> **基线**：本目录三份文档的现算读数（口径 = 顶层目录**含直属 `.java`** 才算「包」）= 顶层 **9 包**（顶层目录共 **10** 个，其中 `internal/` 无直属 `.java`、只有 `internal/api/` 子包）· `core/` **13 件** · `roleComponent/` **38 件** · `core/ports/` **4 件**（端口接口 3 + 服务集记录 1）· `src/main` **89 件** · `src/test` **17 件** / `@Test` **117**。每条口径与取数见三件文档各自的命令块。**与代码不一致处以代码为准**。
+> **基线**：本目录三份文档的现算读数（口径 = 顶层目录**含直属 `.java`** 才算「包」）= 顶层 **9 包** · 未过滤的**顶层目录共 10 个**（差额 = `internal/`：它**没有直属 `.java`**、只有 `internal/api/` 子包；★ **按「顶层目录」数会得 10**，两个数都对、只是口径不同）· 任意层级**末级包共 23 个**（该口径的取数命令见下方「基线取数命令」块①）· `core/` **13 件** · `roleComponent/` **38 件** · `core/ports/` **4 件**（端口接口 3 + 服务集记录 1）· `src/main` **89 件** · `src/test` **17 件** / `@Test` **117**。每条口径与取数见三件文档各自的命令块。**与代码不一致处以代码为准**。
 
 ## 阅读顺序（也是信任顺序）
 
@@ -55,6 +55,7 @@ $S    = "$repo\src\main\java\com\shadowHunterRolesPlugin"
 #① 顶层包数（口径：顶层目录**含直属 .java** 才算「包」）
 "顶层目录 = $((Get-ChildItem $S -Directory).Count)"                                                   # 10
 "顶层包   = $((Get-ChildItem $S -Directory | Where-Object { (Get-ChildItem $_.FullName -File -Filter *.java).Count -gt 0 }).Count)"   # 9（internal/ 只有 internal/api/ 子包）
+"末级包     = $((Get-ChildItem $S -Recurse -Directory | Where-Object { (Get-ChildItem $_.FullName -File -Filter *.java).Count -gt 0 }).Count + 1)"            # 23（任意层级末级包，含仓库根包名）
 #② 件数
 "core/         = $((Get-ChildItem "$S\core" -Recurse -File -Filter *.java).Count)"                    # 13
 "roleComponent = $((Get-ChildItem "$S\roleComponent" -Recurse -File -Filter *.java).Count)"           # 38

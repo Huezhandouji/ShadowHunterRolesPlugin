@@ -122,28 +122,24 @@ public class Role {
 
  /**
  * **装配期依赖检查**（唯一实现点）：**必需依赖必须齐**。
- * <p><b>时机</b>（A2）：由调用方在 {@code Role.build()} **之后**、**任何 {@code awake()} 之前**调用 ——
- * 框架里有两处：{@code registry/RoleLoader#loadInto}（**注册之前** ⇒ 坏模板根本不进注册表）与
- * {@link #createInstance(Player, RolesContext)}（**实例化之前** ⇒ 任何路径都绕不过去）。
- * <p><b>失败形态</b>（硬失败，不降级）：抛 {@link ComponentDependencyException}；调用方
- * {@code RoleLoader} 记一条 {@code SEVERE} 并**跳过该角色**（其余角色继续装配）。
- * <p><b>匹配规则（写死）</b>：组件 A 的必需类型 R 被满足 ⟺ 存在**另一个**组件 B（B 的 id ≠ A 的 id）
- * 使 {@code R.isAssignableFrom(B.providedType())}。**A 自己不算提供者** —— 用户原话是"检查自己需要的
- * 依赖（**其他组件**）"，因此"只有自己提供该类型"按**缺依赖**处理。
- * <p><b>为什么不用反射去"扫"组件实例</b>：装配期**还没有任何实例**（实例化发生在
- * {@code RoleInstance} 的构造期）⇒ 检查只能基于描述符声明的类型，这也是它能在"注册之前"完成的原因。
- * <p><b>不检查什么（如实申报）</b>：可选依赖缺失不报错；提供类型是**族级**的组件（三个家族描述符的
- * 泛型实参是家族基类）无法满足"按具体类"的依赖声明，除非该描述符覆写
- * {@code providedType()}（见 {@code RoleComponent.Specification#providedType()}）。
- * <p><b>取代指向（不静默改写）</b>：本方法**曾**同时检查"依赖图不得有环"
- *。**明确改为"允许组件环形
- * 依赖"** ⇒ 环检测的**硬失败已删除**（{@code dependencyCycles()} 与其 DFS 一并移除）。
- * **只放开环，不动另一半**：「缺必需依赖 ⇒ 抛异常 + 阻止该角色加载注册」**原样保留**。
- * 因此本方法的失败面**只有一种**：缺必需依赖。
- * <p><b>运行期初始化顺序（A3）</b>：环存在时，组件 {@code awake()} 的调用顺序 = **容器按插入序**，
- * 与依赖图**无关** ⇒ 环内"谁先醒"**未定义**（本工程**不承诺**任何依赖驱动或拓扑序）。
- * 这是**显式申报**，不是遗漏：任何依赖"环内某组件先于另一个 awake"的写法都是**靠巧合**，不得依赖。
- * @throws ComponentDependencyException 缺必需依赖（消息里点名角色 / 组件 id / 缺的类型）
+ *
+ * <p><b>时机</b>：`build()` 之后、任何 `awake()` 之前 —— 两处调用：`registry/RoleLoader#loadInto`
+ * （注册之前 ⇒ 坏模板不进注册表）与 {@link #createInstance(Player, RolesContext)}（实例化之前）。
+ * 之所以能在"还没有实例"时做：检查只看**描述符声明的类型**，不需要反射扫实例。
+ *
+ * <p><b>匹配规则</b>：A 的必需类型 R 被满足 ⟺ 存在**另一个**组件 B（id ≠ A）使
+ * {@code R.isAssignableFrom(B.providedType())}。**A 自己不算提供者** ⇒ "只有自己提供"按缺依赖处理。
+ *
+ * <p><b>失败形态</b>：抛 {@link ComponentDependencyException}；`RoleLoader` 记 `SEVERE` 并**跳过该角色**。
+ * 本方法的失败面**只有这一种**（环检测已删除 ⇒ 允许组件环形依赖）。
+ *
+ * <p><b>不检查什么</b>：可选依赖缺失不报错；提供类型是**族级**的组件无法满足"按具体类"的声明，
+ * 除非其描述符覆写 {@code providedType()}。
+ *
+ * <p><b>★ 运行期初始化顺序</b>：组件 `awake()` 的调用顺序 = **容器插入序**，与依赖图**无关** ⇒
+ * 环内"谁先醒"**未定义**（本工程不承诺任何拓扑序）。依赖它 = 靠巧合，**不得依赖**。
+ *
+ * @throws ComponentDependencyException 缺必需依赖（消息点名角色 / 组件 id / 缺的类型）
  */
     public void verifyDependencies(){
         List<String> problems = new ArrayList<>(missingRequiredDependencies());
@@ -211,20 +207,17 @@ public class Role {
     }
 
  /**
- * 装配条目：`(工厂, 栏位?, 描述符类型, 提供类型, 必需依赖, 可选依赖)`（**不含 kind**；
- * ** 增加依赖声明**）。
- * <p><b>不占栏位 = 栏位的缺失</b>：栏位由**描述符**表达（带栏位的描述符必须 {@code setSlot}；
- * 无栏位的描述符天然不占）⇒ 渲染组件取计划时天然看不到无栏位者。
- * 想表达"不占栏位"只有一条路：装配一个**没有栏位**的描述符（如**无栏位的被动描述符支**）。
- * <p>★ **本条目不再持有栏位值** —— 栏位只住在描述符快照里（`Specification.Snapshot#getSlot()`），
- * 渲染组件读那一份做落位 ✓。
- * <p>本条目是装配期从描述符取到的**不可变快照**：只持有几个值，**不持有描述符对象** ⇒
+ * 装配条目：`(工厂, 描述符类型, 提供类型, 必需依赖, 可选依赖)`（**不含 kind、不持有栏位值**）。
+ *
+ * <p>它是装配期从描述符取到的**不可变快照**：只持有几个值、**不持有描述符对象** ⇒
  * 同一份描述符实例被两个角色共享时，后手改动影响不到先手。
- * <p>`descriptorType` = 描述符的**类型**（原 `kind` 的唯一职责改由它承担：三个 id 视图按
- * 类型归类）；它**不参与任何行为分支**。
- * <p>：`providedType` / `requiredTypes` / `optionalTypes` 是**依赖检查的三元组** ——
- * 提供类型是"我能被谁依赖"，必需/可选是"我依赖谁"。它们只被
- * {@link Role#verifyDependencies()} 读取（**不参与任何运行期行为分支**）。
+ *
+ * <p><b>栏位在哪</b>：只住在描述符里（`Specification#slotOrNull()` / `Snapshot#getSlot()`）；
+ * 渲染组件读那一份做落位，装配期冲突判定也读它 ⇒ 本条目**不再重复持有** ✓。
+ *
+ * <p>`descriptorType` = 描述符的**类型**（三个 id 视图按它归类；**不参与行为分支**）。
+ * <p>依赖三元组（`providedType` / `requiredTypes` / `optionalTypes`）**只被**
+ * {@link #verifyDependencies()} 读取（不参与任何运行期行为分支）。
  */
     public static final class ComponentEntry{
 
@@ -314,16 +307,14 @@ public class Role {
  //★ `Builder#providedTypes(...)` 已删除 —— 见类内「豁免机制已整体删除」的说明。
 
  /**
- * **统一装配入口（描述符口径，不含 kind）**：吃一个**装配期描述符**
- * （{@link com.shadowHunterRolesPlugin.roleComponent.RoleComponent.Specification}），
- * 栏位从描述符读，**不再由调用点传值**；也不再有任何"种类"形参。
- * <p>占不占栏位由**描述符的类型**决定：带栏位的描述符（`HotbarSpecification` 一支）用
- * {@code setSlot} 指定位置，装配期未设栏位 ⇒ 此处抛异常；不带栏位的描述符
- * （**无栏位的被动描述符**）**没有** {@code setSlot} ⇒ 天然不占栏位。
- * <p>本方法对传入描述符取**不可变快照**（{@code Specification#freeze()}）：条目只留
- * `(栏位, 工厂, 描述符类型, 提供类型, 必需依赖, 可选依赖)`，**不持有描述符对象**。
- * <p>：描述符上的依赖声明（{@code requires(...)} / {@code requiresOptional(...)}）与
- * **提供类型**（{@code providedType()}）随快照进入条目，供 {@link Role#verifyDependencies()} 在装配期检查。
+ * **统一装配入口（描述符口径）**：吃一个装配期描述符，栏位与依赖都从它读，**调用点不传值**。
+ *
+ * <p>占不占栏位由**描述符的类型**决定：带栏位的描述符必须 {@code setSlot}（未设 ⇒ 装配期抛异常）；
+ * 不带栏位的描述符没有 {@code setSlot} ⇒ 天然不占。
+ *
+ * <p>本方法对描述符取**不可变快照**（{@code Specification#freeze()}）：条目只留
+ * `(工厂, 描述符类型, 提供类型, 必需依赖, 可选依赖)`，**不持有描述符对象**。
+ * 依赖声明随快照进入条目，供 {@link #verifyDependencies()} 在装配期检查。
  */
         public Builder addComponent(String id, RoleComponent.Specification<?> specification){
             Objects.requireNonNull(specification);

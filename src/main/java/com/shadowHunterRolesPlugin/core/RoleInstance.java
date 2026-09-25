@@ -87,11 +87,9 @@ public class RoleInstance {
 
  //★ 热键栏渲染组件的 **id 字面量**（纯数据 ⇒ 本类不算"认识组件"，只是按 id 取通用面）。
  // 取用后一律调**基类通用面**（`RoleComponent#requestRepaint` 等），不 cast、不写 `.class` ✓。
+ //★ 只保留**本类真正要用**的 id：置脏目标与两个能量视图
     private static final String HOTBAR_RENDER_ID = "hotbarRender";
     private static final String ENERGY_ID = "energy";
-    private static final String VITALS_ID = "vitals";
-    private static final String BUFFS_ID = "buffs";
-    private static final String TIMERS_ID = "timers";
 
  //★ 生命上限修饰符的密钥**已随该状态迁入生命组件**（`VitalsComponent.HEALTH_MODIFIER_KEY`）——
  // 本类不再持有它（持有它 = 容器必须认识生命组件）⇒ 字段与本类内的取用一并删除 ✓。
@@ -213,24 +211,12 @@ public class RoleInstance {
 
 
  /**
- * **按类型取本实例内的组件**（"按类型查找"读口）。
- * <p>语义：返回**添加顺序第一个**可赋值给 `type` 的组件（父类/接口查询命中子类实例）；
- * 未注册 ⇒ `null`；**装配完成之前**调用 ⇒ 抛 `IllegalStateException`。
- * <p>生产侧 0 调用点（组件侧取组件一律走 `RoleComponent#getComponent(Class)`）—— 本口保留给
- * 仓外探针与后续依赖注入路径。
- */
-    public <T> T getByType(Class<T> type) {
-        return componentRegistry.getByType(type);
-    }
-
- /**
- * **按类型取本实例内的全部组件**（新增的公开读口）：
- * 返回全部可赋值给 {@code type} 的组件，顺序 = **添加顺序**；无人符合 ⇒ **空列表**（不是 null）。
- * <p>与 {@link #getByType(Class)} 同一条件、同一顺序 ⇒ 其首元素恒等于 {@code getByType(type)}；
- * 空列表 ⟺ {@code getByType(type) == null}。
- * <p>**调用点申报**：仓内 0 调用点（与 {@code getByType} 同类：公开读口，消费者是后续卡与仓外探针）。
- * **装配完成之前**调用 ⇒ 抛 {@code IllegalStateException}。
- * <p>类型形参**无上界**⇒ 支持**接口**查询；返回**不可变**列表。
+ * **按类型取本实例内的全部组件**：返回全部可赋值给 `type` 的组件，顺序 = **添加顺序**；
+ * 无人符合 ⇒ **空列表**（不是 null）；**装配完成之前**调用 ⇒ 抛 `IllegalStateException`。
+ * <p>类型形参**无上界** ⇒ 支持**接口**查询；返回**不可变**列表。
+ * <p>消费者 = `listener/hook/DamageHookListener`（承受方扇出）与 `VitalsComponent`。
+ * ★ 「取第一个」的版本（`getByType`）**已删除** —— 消费者 0（组件侧取组件走
+ * `RoleComponent#getComponent(Class)`）✓
  */
     public <T> java.util.List<T> getAllByType(Class<T> type) {
         return componentRegistry.getAll(type);
@@ -447,20 +433,8 @@ public class RoleInstance {
     public Player getPlayer() { return player; }
     public Role getRole() { return role; }
 
-
- //生命
- //原三个**生命视图转发访问器**（`getCurrentHealth` / `setCurrentHealth` /
- //`getMaxHealth`）**已删除** —— 消费者 0（生命状态 = Bukkit 玩家属性，持有者是**生命组件**
- //⇒ 需要时走组件本身；`heal(double)` 仍为**活码**（视图口，组件在用））。
-
-    public void heal(double amount){
- //★ 走**基类通用面**（`RoleComponent#heal`，默认空实现、由生命组件覆写）
- // ⇒ 本类按 id 取到通用面即可，**不必认识**生命组件 ✓（clamp 策略的唯一实现仍在组件里）
-        RoleComponent vitals = resolve(VITALS_ID);
-        if (vitals != null) {
-            vitals.heal(amount);
-        }
-    }
+ //★ 生命视图（`getCurrentHealth` / `setCurrentHealth` / `getMaxHealth` / `heal`）**已整体删除** ——
+ // 消费者 0：生命的持有者是**生命组件**，需要时走它自己（`svc().components().get(...)` 或基类通用面）。
 
 
  //能量（**视图**：真值与 clamp/检查扣减的行为都在能量组件里）

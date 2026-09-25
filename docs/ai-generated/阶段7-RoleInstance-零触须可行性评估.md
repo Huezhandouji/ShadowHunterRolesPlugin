@@ -30,6 +30,8 @@
    6 个具体组件类（见 §3.1）。
 4. **渲染通知维度：不可达（在本卡 inScope 内）** —— 通知的接受集由「**实现了组件内嵌接口** `RenderCallback` 的组件」
    表达 ⇒ 框架要扫它们就必须点名那个内嵌类型（见 §3.3）。
+★ 本题结论已被 `t7`（`3147239`）消解 ⇒ **以 §8 为准**；本节及 §3/§4 保留为当时的推理记录。
+
 5. ⇒ 综合判定：**「含 import 全为 0」= no-go**；但在**不改公共面/不改组件基类**的前提下，
    本卡已把「框架替具体组件做它自己的事」这一类触须里的**三处**清掉（§5 给出 0 命中证据）。
 
@@ -164,11 +166,11 @@ $lines = [IO.File]::ReadAllLines($ri)                      # 权威读取（不�
 ($lines | Select-String '\(SanTEComponent\) resolve').Count                                   # 0
 ($lines | Select-String 'sante\.forEachListener').Count                                       # 0
 
-# ③ 类名字面量清点（§2.2 的 18 行）
-($lines | Select-String '\.class').Count                                       # 18
+# ③ 类名字面量清点（★ 本节数字为**本卡编辑前**的值；编辑后现值见 §8.1）
+($lines | Select-String '\.class').Count                                       # 编辑前 18 / 编辑后现值 0（§8.1）
 
 # ④ 构造维度（§1.1 已达成）
-($lines | Select-String 'new \(.*\)Component\(').Count                         # 0
+($lines | Select-String 'new \(.*\)Component\(').Count                         # 0（编辑前后同为 0）
 
 # ⑤ 写点与平台侧通道（全库）
 (Get-ChildItem "$repo\src" -Recurse -Filter *.java | ForEach-Object {
@@ -193,13 +195,14 @@ $lines = [IO.File]::ReadAllLines($ri)                      # 权威读取（不�
 
 ## 8. 更正注记（截至 `3147239`）
 
+> ★ **本节行号取数锚点** = HEAD `c45bf9c`（取数时刻 2026-09-25 11:29）；**行号会漂，判据请以内容锚点为准** —— 同一事实在本阶段三次卡内漂了三次，照抄行号极易失效。
 > **本节由 `t29` 追加**，上文 §0–§7 **一字不动**。追加理由：§1 的结论「**不可达（no-go）**」**已被后续结构卡 `t7` 消解** —— 若继续按原文执行，下一个上下文会绕过已经达成的结构去"再解一遍"。
 
 ### 8.1 原判与现状
 
 | 项 | 原文（§1 / §3） | 现算（截至 `3147239`） |
 |---|---|---|
-| 总目标「`RoleInstance` 内不出现任何具体组件类名（含 import）= 0」 | **不可达** | **已达成**（`RoleInstance` 现 **1083 行**） |
+| 总目标「`RoleInstance` 内不出现任何具体组件类名（含 import）= 0」 | **不可达** | **已达成**（`RoleInstance` 现 **995 行**） |
 | §3.1 阻塞点：`pickApply` / `pickValue` 的 `Class<T>` 签名迫使调用点点名 | 主阻塞 | **已解除**：两个取用口**整体删除**，动作改由框架级清单的服务入口完成 ⇒ 调用点不再需要写 `Class<T>` |
 | §3.3 阻塞点：渲染回调的内嵌契约归属 | 不可达 | **已解除**：类型扫描（`instanceof … RenderCallback`）搬进 `ServiceComponents.forEachRenderNotice`，容器侧只保留**逐个受保护投递** `deliverHook(...)` |
 
@@ -214,7 +217,7 @@ $lines = [IO.File]::ReadAllLines($ri)                      # 权威读取（不�
 | | `SERVICE_ID_` | **0**（6 个常量声明 + 相邻两条历史注释已删） |
 | | `pickApply\|pickValue` | **0**（连同 javadoc 整体删除） |
 | | **对具体服务组件类**的引用（`BuffComponent` / `EnergyComponent` / `VitalsComponent` / `TimerComponent` / `HotbarRenderComponent` / `SanTEComponent`，含 import） | **0** |
-| 三条派发不变量 | 真变化闸门 / 逐监听器隔离 / 重入合并 | **1 / 1 / 10**（`:692` / `:766` / 10 行） |
+| 三条派发不变量 | 真变化闸门 / 逐监听器隔离 / 重入合并 | **1 / 1 / 10**（`:604` / `:678` / 10 行） |
 | 写点与平台侧通道 | `inv.setItem(` / `notifyPlatform`（全库） | **2** / **3** |
 
 ### 8.3 代价：耦合**集中在 `ServiceComponents` 一件（非消灭）**
@@ -227,7 +230,7 @@ $lines = [IO.File]::ReadAllLines($ri)                      # 权威读取（不�
 
 | 新增项 | 位置 | 说明 |
 |---|---|---|
-| **14 个 `public static` 方法**（含原有的 `build`）⇒ **净新增 13 个** | `ServiceComponents.java`（共 14 处：`:122` `:181` `:188` `:195` `:202` `:213` `:226` `:231` `:238` `:245` `:252` `:259` `:266` `:273`） | 容器侧的服务取用入口（置脏 / 帧末刷新 / 首刷 / 取变化读数 / 渲染通知扫描 / 能量读与写 / 治疗 / buff 记账四项 / 取消计时）；**未命中 ⇒ 无操作**，两处读口回退值与旧路径逐字相同（→ `0` / → `false`） |
+| **16 个 `public static`（非 `final`）方法**（含原有的 `build`，以及 `t32` 引入的**既存入口** `renderRequestRepaint` / `scheduleRepeating`）⇒ **净新增 13 个** | `ServiceComponents.java`（共 16 处：`:122` `:181` `:188` `:195` `:202` `:213` `:226` `:231` `:238` `:245` `:252` `:259` `:266` `:273` `:284` `:299`） | 容器侧的服务取用入口（置脏 / 帧末刷新 / 首刷 / 取变化读数 / 渲染通知扫描 / 能量读与写 / 治疗 / buff 记账四项 / 取消计时 / 请求重绘 / 周期任务）；**未命中 ⇒ 无操作**，两处读口回退值与旧路径逐字相同（→ `0` / → `false`） |
 | 嵌套面 `ChangeListenerSource` + `ChangeDelivery` | `core/RoleInstance.java` | `t6` 引入的「变更通知的通用来源面」（替代对具体组件的强转与直接遍历） |
 
 - **快照 58 未破** ✓（`RoleApiSurfaceTest` 2/2 pass；`FROZEN_SIGNATURES` 逐条数 = **58**）
@@ -235,7 +238,7 @@ $lines = [IO.File]::ReadAllLines($ri)                      # 权威读取（不�
 
 ### 8.5 ★★ 标准措辞（全队唯一口径，不得改写）
 
-> `RoleInstance` 内**对具体服务组件类**的引用 = **0**；仅剩 1 处**已裁定的静态支持类** `HotbarItems`（`:18` import / `:1069` 注释 / `:1070` 调用；`public final class`、不实现 `RoleComponent`、容器内无字段）—— 按用户 q8 裁定接受其位置，**不属残余**。
+> `RoleInstance` 内**对具体服务组件类**的引用 = **0**；仅剩 1 处**已裁定的静态支持类** `HotbarItems`（`:17` import / `:981` 注释 / `:982` 调用；`public final class`、不实现 `RoleComponent`、容器内无字段）—— 按用户 q8 裁定接受其位置，**不属残余**。
 
 ### 8.6 ★★ 判据边界（不得推广）
 
@@ -257,7 +260,7 @@ $lines = [IO.File]::ReadAllLines($ri)                  # 权威读取（不要�
 ($lines | Select-String 'BuffComponent|EnergyComponent|VitalsComponent|TimerComponent|HotbarRenderComponent|SanTEComponent').Count  # 0
 
 # ② 已裁定的例外（现算 3 处）
-$lines | Select-String 'HotbarItems' | ForEach-Object { $_.LineNumber }   # 18 / 1069 / 1070
+$lines | Select-String 'HotbarItems' | ForEach-Object { $_.LineNumber }   # 17 / 981 / 982
 
 # ③ 构造维度（现算 0）
 ($lines | Select-String 'new \(.*\)Component\(').Count                    # 0
@@ -267,14 +270,14 @@ $lines | Select-String 'HotbarItems' | ForEach-Object { $_.LineNumber }   # 18 /
 ($lines | Select-String 'guardedCall\(entry\.owner\(').Count              # 1
 ($lines | Select-String 'sanTEDispatching|sanTEPendingValue').Count       # 10
 
-# ⑤ 新增公共面（现算 14 个 public static 方法 + 6 个原有 ID_* 常量）
+# ⑤ 新增公共面（现算 16 个 public static 非 final 方法 + 6 个原有 ID_* 常量）
 $sc = [IO.File]::ReadAllLines("$repo\src\main\java\com\shadowHunterRolesPlugin\roleComponent\frameworkLevel\ServiceComponents.java")
-@($sc | Where-Object { $_ -cmatch '^    public static (?!final)' }).Count # 14
+@($sc | Where-Object { $_ -cmatch '^    public static (?!final)' }).Count # 16
 @($sc | Where-Object { $_ -cmatch '^    public static final ' }).Count    # 6
 ```
 
 > ★ **不得用 `git grep` 扫 `debug-logs/**`**：该目录被库内 `.gitignore:47`（`debug-logs`）+ `:85`（`debug-logs/**`）覆盖 ⇒ `git grep` 对它**恒空**（会判出假红）。本件涉及该目录的取证一律改走逐行读盘。
-> ★ 行数必须写清口径：**全文行数**与"非空内容行数"是两个数；`RoleInstance` 现算 **1083 行**（全文口径）。
+> ★ 行数必须写清口径：**全文行数**与"非空内容行数"是两个数；`RoleInstance` 现算 **995 行**（全文口径）。
 
 ### 8.8 与 `t13` 验证口径的对应
 

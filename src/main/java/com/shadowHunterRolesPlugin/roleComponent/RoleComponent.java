@@ -137,14 +137,14 @@ public abstract class RoleComponent {
         private String boundId;
 
         /**
-         * **必需的依赖类型**：{@link #requires(Class[])} 写入；装配期由
+         * **必需的依赖类型**：{@link #requires(Class)} 写入；装配期由
          * {@code core/Role#verifyDependencies()} 检查 —— 缺任一 ⇒ 抛 {@link ComponentDependencyException}
          * ⇒ 该角色**不注册**。
          */
         private final List<Class<? extends RoleComponent>> requiredTypes = new ArrayList<>();
 
         /**
-         * **可选的依赖类型**：{@link #requiresOptional(Class[])} 写入；缺失**不报错**（组件运行期自行处理
+         * **可选的依赖类型**：{@link #requiresOptional(Class)} 写入；缺失**不报错**（组件运行期自行处理
          * 查不到的情况）。可选与必需**不得声明同一个类型**（那是自相矛盾的声明 ⇒ 装配期报错）。
          */
         private final List<Class<? extends RoleComponent>> optionalTypes = new ArrayList<>();
@@ -185,25 +185,29 @@ public abstract class RoleComponent {
          * <p><b>声明面的边界（如实申报）</b>：本方法只在**描述符**上；走
          * {@code Role.Builder#addPassive(id, factory)}（无描述符入口）的组件**没有**声明面。
          *
-         * @param types 必需依赖的组件类型（可一次给多个；重复声明是幂等的）
+         * <p><b>一次只声明一个类型</b>：需要多个依赖时**链式调用** ——
+         * {@code requires(A.class).requires(B.class)} ✓；重复声明同一类型是**幂等**的 ✓。
+         *
+         * @param type 必需的依赖组件类型（**不得为 null**）
          */
-        @SafeVarargs
-        public final Specification<T> requires(Class<? extends RoleComponent>... types) {
-            addDependencyTypes(requiredTypes, "requires", types);
+        public final Specification<T> requires(Class<? extends RoleComponent> type) {
+            addDependencyType(requiredTypes, "requires", type);
             return this;
         }
 
         /**
          * **声明"有的话更好，没有也不报错"的依赖**（可选依赖）：缺失**不**阻止装配。
-         * <p>与 {@link #requires(Class[])} 的唯一差别 = 缺失时的行为：必需 ⇒ 抛异常阻止注册；可选 ⇒ 放行。
+         * <p>与 {@link #requires(Class)} 的唯一差别 = 缺失时的行为：必需 ⇒ 抛异常阻止注册；可选 ⇒ 放行。
          * <p>同一个类型**不得**既必需又可选择（自相矛盾的声明 ⇒ {@code freeze()} 时抛
          * {@link IllegalStateException}）。
          *
-         * @param types 可选依赖的组件类型（可一次给多个；重复声明是幂等的）
+         * <p><b>一次只声明一个类型</b>：需要多个可选依赖时**链式调用** ——
+         * {@code requiresOptional(A.class).requiresOptional(B.class)} ✓；重复声明同一类型是**幂等**的 ✓。
+         *
+         * @param type 可选的依赖组件类型（**不得为 null**）
          */
-        @SafeVarargs
-        public final Specification<T> requiresOptional(Class<? extends RoleComponent>... types) {
-            addDependencyTypes(optionalTypes, "requiresOptional", types);
+        public final Specification<T> requiresOptional(Class<? extends RoleComponent> type) {
+            addDependencyType(optionalTypes, "requiresOptional", type);
             return this;
         }
 
@@ -250,20 +254,14 @@ public abstract class RoleComponent {
             return RoleComponent.class;
         }
 
-        /** 声明写入（两处共用）：空值 / null 元素一律抛，重复声明幂等。 */
-        @SafeVarargs
-        private static void addDependencyTypes(List<Class<? extends RoleComponent>> target, String entry,
-                                              Class<? extends RoleComponent>... types) {
-            if (types == null || types.length == 0) {
-                throw new IllegalArgumentException(entry + "(...) needs at least one component type.");
+        /** 声明写入（两处共用）：null 一律抛，重复声明幂等。 */
+        private static void addDependencyType(List<Class<? extends RoleComponent>> target, String entry,
+                                             Class<? extends RoleComponent> type) {
+            if (type == null) {
+                throw new IllegalArgumentException(entry + "(...) must not be null.");
             }
-            for (Class<? extends RoleComponent> type : types) {
-                if (type == null) {
-                    throw new IllegalArgumentException(entry + "(...) must not contain null types.");
-                }
-                if (!target.contains(type)) {
-                    target.add(type);
-                }
+            if (!target.contains(type)) {
+                target.add(type);
             }
         }
 

@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.hotbar;
+package com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar;
 
 import org.junit.Test;
 

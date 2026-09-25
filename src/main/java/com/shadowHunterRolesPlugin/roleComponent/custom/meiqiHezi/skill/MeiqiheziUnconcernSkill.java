@@ -1,5 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -9,7 +9,7 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 
 public class MeiqiheziUnconcernSkill extends Skill {

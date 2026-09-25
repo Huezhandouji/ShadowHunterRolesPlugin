@@ -2,9 +2,9 @@ package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 
 public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
 

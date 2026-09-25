@@ -17,7 +17,7 @@ import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 //框架级服务组件的**清单**（类 + id + 构造顺序 + 接线 + 容器侧的服务取用入口都在那一件里）——
 //本类只引用它的 `ID_*` 常量与静态服务入口。
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.ServiceComponents;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.ServiceComponents;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -189,15 +189,8 @@ public class RoleInstance {
  // **提交顺序与既有实现相同** —— 先于实例 ticker 提交 ⇒ 同一 tick 内先跑记账、再跑组件 update。
         ServiceComponents.startBuffUpdater(resolve(ServiceComponents.ID_BUFFS));
 
- //② 设置生命
-        AttributeModifier am = new AttributeModifier(
-                roleHealthModifierKey,
-                role.getMaxHP() - 20,
-                AttributeModifier.Operation.ADD_NUMBER
-
-        );
-        player.getAttribute(Attribute.MAX_HEALTH).removeModifier(am);
-        player.getAttribute(Attribute.MAX_HEALTH).addModifier(am);
+ //② 设置生命上限：**上限与写入都归生命组件**（`role.getMaxHP()` 已随角色模板去 HP 化而删除）
+        ServiceComponents.vitalsApplyHealthModifier(resolve(ServiceComponents.ID_VITALS), roleHealthModifierKey);
  //就地读属性（**同一读数**，行为逐字不变）—— 写入经**生命组件**（生命的唯一持有者）
         ServiceComponents.vitalsRestoreFull(resolve(ServiceComponents.ID_VITALS), player);
 
@@ -466,7 +459,7 @@ public class RoleInstance {
 
 
 
- //热键栏渲染：唯一写点在渲染组件持有的渲染器里（`roleComponent/frameworkLevel/hotbar` 内）；
+ //热键栏渲染：唯一写点在渲染组件持有的渲染器里（`roleComponent/builtin/hotbar` 内）；
  //本容器只提供查表与状态输入，**不持有**渲染器、也不对外提供任何渲染器 / 物品访问器。
 
     public Player getPlayer() { return player; }
@@ -978,7 +971,7 @@ public class RoleInstance {
             updateTask = null;
         }
 
-        player.getAttribute(Attribute.MAX_HEALTH).removeModifier(roleHealthModifierKey);
+        ServiceComponents.vitalsRemoveHealthModifier(resolve(ServiceComponents.ID_VITALS), roleHealthModifierKey);
 
  //药水记账：**账本随 buff 组件持有** ⇒ 由它只移除本系统记账过的效果，
  //不再无条件清空玩家身上的所有药水效果（返回移除的类型数，供诊断）

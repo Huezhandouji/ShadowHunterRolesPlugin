@@ -280,8 +280,8 @@ public class RoleManager {
  //清角色 ⇒ 一并清掉本系统写在热键栏里的物品（物品关注点归 roleComponent/HotbarItems ✓）。
  //★ 放在**管理器**而不是容器：容器只剩"容器职责"的对外面（查取入口 / 隔离 / 生命周期）✗，
  //  "清哪些物品"属物品关注点；此处是**所有在线清角色路径的汇聚点**（手动 /role clear · 死亡 · 重载）。
- //★ 本重载覆盖**在线**清角色路径；{@link #clearRole(UUID)} **不带**物品清理 ⇒ 掉线路径由
- //  {@code listener/PlayerListener#onPlayerQuit} 就地补回（那里 Player 实体仍可用）✓。
+ //★ 两个重载**都**清物品（这一"清角色"的语义不因取 Player 的方式而变）——
+ //  故三条走 UUID 的路径（换角色 / 隔离 / API 的 UUID 重载）与掉线路径**都不再需要各自补清** ✓。
             HotbarItems.clearFrom(player);
             return true;
         }
@@ -291,6 +291,15 @@ public class RoleManager {
         RoleInstance removed = playerRoleMap.remove(uuid);
         if(removed != null){
             removed.clear();
+ //清角色 ⇒ 一并清掉本系统写在热键栏里的物品（物品关注点归 roleComponent/HotbarItems ✓）。
+ //★ 与 {@link #clearRole(Player)} 的**唯一**差别只是取 Player 的方式：本重载用
+ //  {@code Bukkit.getPlayer(uuid)}（离线 ⇒ null ⇒ 无实体可清，跳过）。**清物品这一点两个重载必须一致** ——
+ //  否则三条走 UUID 的路径（换角色 / 隔离 / API 的 UUID 重载）会静默失去清理（掉线那处曾因此出现
+ //  「随存档持久化的残留」，见 t56 的行为空洞判定）。
+            Player online = Bukkit.getPlayer(uuid);
+            if(online != null){
+                HotbarItems.clearFrom(online);
+            }
             return true;
         }
         return false;

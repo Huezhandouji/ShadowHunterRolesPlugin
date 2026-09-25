@@ -1,5 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -9,8 +9,8 @@ import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 
 public class RedSanctifiedBladeMainWeapon extends MainWeapon {
 
@@ -39,7 +39,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
                     Material.IRON_SWORD,
                     100
             );
-            requires(VitalsComponent.class, BuffComponent.class);
+            requires(VitalsComponent.class).requires(BuffComponent.class);
         }
 
         @Override

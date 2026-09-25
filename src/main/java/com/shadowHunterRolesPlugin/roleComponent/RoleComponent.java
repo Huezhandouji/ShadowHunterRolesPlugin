@@ -106,7 +106,7 @@ public abstract class RoleComponent {
      *       （`setSlot` 之类一律抛异常）⇒ 同一个描述符实例被两个角色共享时不可能被串改；</li>
      *   <li>{@link #create(String, ComponentServices)} —— 抽象创建：由**具体描述符**决定造哪个类。</li>
      * </ul>
-     * <b>规则进类型</b>：带栏位的分支是 {@code roleComponent/frameworkLevel/hotbar/HotbarSpecification}
+     * <b>规则进类型</b>：带栏位的分支是 {@code roleComponent/builtin/hotbar/HotbarSpecification}
      * （它有 {@code setSlot}）；被动描述符 {@code PassiveSkill.Specification} **继承本根类型**、
      * 因此**没有** {@code setSlot} —— "被动不占栏位"于是成为**编译期事实**，不再靠装配点自觉。
      * <p><b>kind 已删</b>：kind 枚举（SKILL / MAIN_WEAPON / PASSIVE）与构造参数一起删除；

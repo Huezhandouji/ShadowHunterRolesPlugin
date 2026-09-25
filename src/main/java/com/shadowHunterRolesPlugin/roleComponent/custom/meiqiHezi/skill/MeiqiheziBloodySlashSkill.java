@@ -5,10 +5,10 @@ import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.DamageKind;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
@@ -51,7 +51,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
                     8,
                     Material.IRON_INGOT
             );
-            requires(EnergyComponent.class, BuffComponent.class, TimerComponent.class, VitalsComponent.class);
+            requires(EnergyComponent.class).requires(BuffComponent.class).requires(TimerComponent.class).requires(VitalsComponent.class);
         }
 
         @Override

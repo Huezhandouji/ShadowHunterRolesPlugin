@@ -1,12 +1,12 @@
 package com.shadowHunterRolesPlugin.roleComponent.builtin;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffType;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffType;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -17,9 +17,9 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 
 import java.time.Duration;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 /**
  * 默认的「SanTE 归零惩罚」被动（组件侧最后一批 B⑨ 迁移）。

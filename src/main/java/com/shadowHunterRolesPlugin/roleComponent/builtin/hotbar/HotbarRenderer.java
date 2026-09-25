@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.hotbar;
+package com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar;
 
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -12,7 +12,7 @@ import java.util.Map;
  * 热键栏渲染器：**按本帧计划把物品落位** —— **全仓唯一写点**就在 {@link #render} 里那一次槽位写入。
  *
  * <h2>谁持有它、谁驱动它</h2>
- * 持有者与驱动者都是 {@link com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent}：
+ * 持有者与驱动者都是 {@link com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent}：
  * 本类**不持有任何状态**（脏标记 / 帧入口条件 / 变化基线全在那个组件里），只吃它交来的计划并把
  * 结果（**本帧新基线** + **本帧是否真的改了东西**）交回去。
  *

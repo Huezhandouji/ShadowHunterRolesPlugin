@@ -1,6 +1,6 @@
-package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
+package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffType;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffType;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;

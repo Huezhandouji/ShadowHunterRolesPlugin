@@ -1,5 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -8,8 +8,8 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 public class RedEvilShockSkill extends Skill{
 
@@ -30,7 +30,7 @@ public class RedEvilShockSkill extends Skill{
             super(Component.text("煞气震赫"),
                     Component.text("对周围5格范围内的敌人造成3秒致盲和缓慢III，结算他们5层流血。恢复[红]的10点TE值"),
                     120, 0, Material.REDSTONE);
-            requires(BuffComponent.class, SanTEComponent.class);
+            requires(BuffComponent.class).requires(SanTEComponent.class);
         }
 
         @Override

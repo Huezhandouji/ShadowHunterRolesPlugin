@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.listener.hook;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;

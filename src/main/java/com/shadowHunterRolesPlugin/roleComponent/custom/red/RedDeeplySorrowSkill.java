@@ -1,15 +1,15 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 /**
  * 黯然销魂（红）：持续扣减红的 SanTE，归零前给自己回血与力量。

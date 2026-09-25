@@ -14,7 +14,7 @@ import java.util.List;
  * {@code *PortImpl} 家族同形。
  * <p><b>取值一律经聚合根</b>：{@link #faction()} 读 {@code Role#getFaction()}
  * （**不是**读某个组件实例的字段 ⇒ 阵营"一个角色一份、全局静态"）。
- * <p><b>两个行为照搬原阵营组件</b>（{@code frameworkLevel/FactionComponent} 的
+ * <p><b>两个行为照搬原阵营组件</b>（该组件已整体删除；它的
  * {@code isHostile} / {@code hasEnemyInRange}）—— 逐字等价，只把"自己的阵营"与"自己的位置"的
  * 取值路径改经本适配器持有的容器。
  * <p><b>（欠账 A 后半）</b>：{@code FactionComponent} **已整体删除** ⇒ 上面的

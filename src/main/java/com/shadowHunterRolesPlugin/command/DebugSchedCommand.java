@@ -7,7 +7,7 @@ import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.ServiceComponents;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.ServiceComponents;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;

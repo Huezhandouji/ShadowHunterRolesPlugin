@@ -9,13 +9,6 @@ import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.roleComponent.ComponentDependencyException;
 import com.shadowHunterRolesPlugin.roleComponent.ComponentFactory;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
-//：`frameworkLevel.FactionComponent` 的 **未使用 import 已删除** —— 该组件本体
-//已随 faction 迁移收尾整体删除（阵营的真值 = 本类的 `faction` 字段 ⇒ 见下方 getFaction/setFaction/resetFaction）。
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -38,10 +31,6 @@ public class Role {
     private final String id;
     private final Component displayName;
     private final List<Component> description;
-
-    private final double maxHP;
-    private final int maxEnergy;
-    private final int maxSanTE;
 
  /**
  * **唯一有序组件表**：`LinkedHashMap` ⇒ **声明顺序 = 装配调用顺序**，
@@ -71,7 +60,7 @@ public class Role {
  * **角色模板声明的阵营**：构造期由描述符给出、**此后只读** ⇒ 它就是
  * {@link #resetFaction()} 的回落目标。
  * <p>与 {@link #faction}（可变、{@code setFaction} 的写入点）分开持有是**必需**的：既有口径下
- * 回落目标住在**每实例**的阵营组件（原 `frameworkLevel/FactionComponent`， 起已删除）
+ * 回落目标住在**每实例**的阵营组件（原阵营组件，已整体删除）
  * 的默认阵营字段里（构造期取 {@code role.getFaction()}）
  * ⇒ 若只保留一个可变字段，"复位"会变成"把当前值写回自己"的**空操作**，与旧行为不等价。
  */
@@ -85,9 +74,6 @@ public class Role {
         this.id = builder.id;
         this.displayName = builder.displayName;
         this.description = builder.description;
-        this.maxHP = builder.maxHP;
-        this.maxEnergy = builder.maxEnergy;
-        this.maxSanTE = builder.maxSanTE;
         this.faction = builder.faction;
  //回落目标与可变值同源起步（builder.faction 由 Builder#faction 保证非 null
  //⇒ 与旧 FactionComponent 的 `faction = defaultFaction` 逐字一致）
@@ -100,6 +86,10 @@ public class Role {
         this.slotMap = Collections.unmodifiableMap(deriveSlotMap(this.components));
 
         this.icon = builder.icon;
+
+ //★ 由**装配方**注入的「已被提供的类型」数据 —— 本类**不知道**这些类型是什么组件，
+ //  也不 import 任何具体组件类 ✓（见下方 providedTypes 的说明）。
+        this.providedTypes = Collections.unmodifiableSet(new LinkedHashSet<>(builder.providedTypes));
 
     }
 
@@ -178,44 +168,28 @@ public class Role {
         }
     }
 
- // ─────────────：框架必然提供的服务类型（白名单） ─────────────
-
+ // ─────────────：装配方注入的「已被提供的类型」（本类不知道它们是什么组件） ─────────────
  /**
- * <b>「框架必然提供的服务类型」白名单</b>。
- * <p><b>它解决什么问题</b>（缺口）：{@link #verifyDependencies()} 只看
- * **模板的组件表**；而**框架级服务组件**是**按角色实例**装配的（每实例一个，见
- * {@code core/RoleInstance} 的 `registerServiceComponents()`）⇒ 模板侧永远看不见它们。
- * 于是任何组件写 {@code requires(EnergyComponent.class)} 这类声明都会被误报成"缺必需依赖"
- * ⇒ 该角色**被错误地拒绝注册**。
- * <p><b>语义（写死）</b>：列在本集合里的类型 = **框架保证在角色实例上必然提供**的类型
- * ⇒ 声明它们的组件**不算缺依赖**（检查放行）。它**只影响"供给面"的判定**，不影响任何运行期行为：
- * 组件仍按 {@code RoleComponent#getComponent(Class)} 自己去取（取不到是另一回事，属运行期）。
- * <p><b>清单 = 7 个框架级服务组件</b>（与 {@code ComponentServices} 的 8 个端口成员同族；
- * 它们是**每角色实例一份**的框架服务，不是角色内容）：能量 / SanTE / 生命 / buff / 计时 /
- * 阵营 / 伤害。它们**不进 `Role` 模板**（模板组件表逐格不变），因此只能由本白名单在模板侧豁免。
- * <p><b>两侧分工</b>：
- * <ul>
- * <li><b>模板侧</b> = 本白名单：让 {@code requires(这些类型)} **能通过**装配期检查（否则误拒注册）；</li>
- * <li><b>实例侧</b> = 框架真的提供了它们：组件在 {@code awake()} 里
- * {@code getComponent(EnergyComponent.class)} 等**取得到**（同一份实例）。</li>
- * </ul>
- * 两条都给了运行级读数（见交付说明 §4），缺一条就可能是"白名单放行了但实例上根本没有"的假绿。
- * <p><b>边界（如实申报，不静默放宽）</b>：白名单**只**列这 **5** 个框架级服务组件（`FactionComponent` 条目已移除 ⇒ **6 → 5**，与 faction 迁移收尾同趟）；
- * （技能 / 被动 / 主武器）一律不在此列 ⇒ 它们之间的依赖声明照旧按模板组件表判定。
+ * **已被提供的组件类型**（由**装配方**注入的数据；默认空集）。
+ *
+ * <p><b>为什么是数据而不是本类写死的一张清单</b>：『框架级组件』只是**提前写好的一些重要组件**，
+ * 它们**不代表可以碰到聚合根 / 本类** ✗。本类因此**不 import 任何具体组件类**、也不认识任何
+ * `ID_*`；它只回答一个纯数据问题：「组件表之外的这些类型，算不算已被提供」。
+ *
+ * <p><b>谁注入</b>：装配方（`registry/RoleLoader` = 模板注册链）在构造 `Role` 时把
+ * **当前确实被提供的类型**交进来。于是知识留在**组件层 / 装配层**，而依赖校验仍能正确放行
+ * 「`requires(某个已被提供的类型)`」—— 不会把合法声明误报成"缺必需依赖"。
+ *
+ * <p><b>默认空集的后果（如实申报）</b>：不经装配方构造的 `Role`（例如单测里直接
+ * `new Role.Builder(id)`）**不享受**任何豁免 ⇒ 声明了该类依赖的组件会被判为缺依赖。
+ * 这是**正确**的默认：那种上下文里确实没有任何组件被提供 ✓。
  */
-    public static final Set<Class<? extends RoleComponent>> FRAMEWORK_PROVIDED_TYPES = Set.of(
-            EnergyComponent.class,
-            SanTEComponent.class,
-            VitalsComponent.class,
-            BuffComponent.class,
-            TimerComponent.class);
+    private final Set<Class<? extends RoleComponent>> providedTypes;
 
  /**
  * **缺必需依赖的清单**（诊断用；空 = 齐）。每条都点名：组件 id · 该组件**提供**的类型 · **缺**的类型。
  * <p>{@link #verifyDependencies()} 的异常消息直接由它拼出 ⇒ 消息与清单**同源**，不会各说一套。
- * <p><b>（A3 白名单）</b>：列在 {@link #FRAMEWORK_PROVIDED_TYPES} 里的类型
- * （= 框架必然按实例提供的 **5** 个服务组件 —— 起 faction 不在其中）**不算缺** ⇒ 跳过。这是"框架级服务组件在模板里看不见"
- * 这个缺口的唯一修法。
+ * <p>判定供给面时，{@link #providedTypes}（装配方注入）里的类型**不算缺** ⇒ 跳过。
  */
     public List<String> missingRequiredDependencies(){
         List<String> problems = new ArrayList<>();
@@ -223,8 +197,8 @@ public class Role {
             String componentId = entry.getKey();
             ComponentEntry component = entry.getValue();
             for(Class<? extends RoleComponent> required : component.getRequiredTypes()){
- //框架必然提供的服务类型（按实例装配、不进模板）⇒ 声明它不算缺依赖（见 FRAMEWORK_PROVIDED_TYPES）
-                if(FRAMEWORK_PROVIDED_TYPES.contains(required)) continue;
+ //装配方注入的「已被提供的类型」（组件表之外的供给面）⇒ 声明它不算缺依赖 ✓
+                if(providedTypes.contains(required)) continue;
                 if(!hasProviderOtherThan(componentId, required)){
                     problems.add("component '" + componentId + "' (provides " + component.getProvidedType().getName()
                             + ") requires missing component type '" + required.getName() + "'");
@@ -357,13 +331,13 @@ public class Role {
         private Component displayName;
  // 默认空表，addLineOfDescription 在 description(...) 之前调用时不再 NPE
         private List<Component> description = new ArrayList<>();
-        private double maxHP = 20d;
-        private int maxEnergy = 100;
-        private int maxSanTE = 100;
         private Faction faction = Faction.UNKNOWN;
 
  /** 唯一有序组件表（声明序 = 装配调用序）—— 派发序载体，也是**栏位的唯一来源**。 */
         private final Map<String, ComponentEntry> components = new LinkedHashMap<>();
+
+ /** 装配方注入的「已被提供的类型」（默认空集 ⇒ 无豁免；见 {@link Role#providedTypes} 的说明）。 */
+        private final Set<Class<? extends RoleComponent>> providedTypes = new LinkedHashSet<>();
 
         private Material icon;
 
@@ -390,32 +364,28 @@ public class Role {
             return this;
         }
 
-        public Builder maxHP(double maxHP) {
-            if (maxHP <= 0) {
-                throw new IllegalArgumentException("Role maxHP cannot be negative.");
-            }
-            this.maxHP = maxHP;
-            return this;
-        }
-
-        public Builder maxEnergy(int maxEnergy) {
-            if (maxEnergy < 0) {
-                throw new IllegalArgumentException("Role maxEnergy cannot be negative.");
-            }
-            this.maxEnergy = maxEnergy;
-            return this;
-        }
-
-        public Builder maxSanTE(int maxSanTE) {
-            if (maxSanTE < 0) {
-                throw new IllegalArgumentException("Role maxSanTE cannot be negative.");
-            }
-            this.maxSanTE = maxSanTE;
-            return this;
-        }
-
         public Builder faction(Faction faction) {
             this.faction = faction != null ? faction : Faction.UNKNOWN;
+            return this;
+        }
+
+ /**
+ * **注入「已被提供的类型」**（装配方在构造角色模板时调用；默认空集）。
+ *
+ * <p><b>为什么由装配方注入</b>：『框架级组件』只是**提前写好的一些重要组件**，它们**不代表可以碰到
+ * 聚合根 / 本类** ⇒ 本类**不认识**任何具体组件类，只把这份清单当**数据**收下，用于依赖校验的供给面判定
+ * （见 {@link Role#providedTypes}）。
+ *
+ * <p><b>典型调用方</b>：`registry/RoleLoader`（模板注册链）—— 它把「当前确实被提供的类型」
+ * 交进来，使「`requires(某个已被提供的类型)`」不被误报成缺依赖 ✓。
+ *
+ * @param types 已被提供的组件类型（可为空/省略 ⇒ 无豁免）
+ */
+        public Builder providedTypes(Set<Class<? extends RoleComponent>> types){
+            this.providedTypes.clear();
+            if(types != null){
+                this.providedTypes.addAll(types);
+            }
             return this;
         }
 
@@ -548,9 +518,6 @@ public class Role {
     public String getId() { return id; }
     public Component getDisplayName() { return displayName; }
     public List<Component> getDescription() { return description; }
-    public double getMaxHP() { return maxHP; }
-    public int getMaxEnergy() { return maxEnergy; }
-    public int getMaxSanTE() { return maxSanTE; }
     public Set<String> getSkillIds(){
         return skillIds;
     }
@@ -588,14 +555,14 @@ public class Role {
  * ② 影响**该角色的所有实例**（已实例化的玩家实例下一次经 `RoleInfo#faction()` 读取时即生效）；
  * ③ 阵营的**读取唯一入口仍是 `roleInfo` 服务面** ⇒ 外部不直改、组件不直读。
  * <p><b>（欠账 A 后半）</b>：本方法即旧
- * `frameworkLevel/FactionComponent#setFaction` 的**唯一接替落点** —— 该组件已整体删除，
+ * 旧阵营组件的 `setFaction` 的**唯一接替落点** —— 该组件已整体删除，
  * 写侧经 `RoleInstance#setFaction` 转调到本方法；读侧一律走 `roleInfo` 服务面（不读本字段的裸值）。
  */
     public void setFaction(Faction faction){ this.faction = faction; }
 
  /**
  * **复位为角色模板声明的阵营**（`RoleAPI#resetFaction` 的落点）。
- * <p>语义 = 旧 `frameworkLevel/FactionComponent#reset()` **逐字等价**（当时写作
+ * <p>语义 = 旧阵营组件的 `reset()` **逐字等价**（当时写作
  * {@code this.faction = defaultFaction;}） —— 回落目标就是构造期由描述符给出的
  * {@link #defaultFaction}（只读），因此连续复位是幂等的。
  * <p>差异只有一处：回落目标从**每实例组件字段**搬到**角色模板字段** ⇒ 同一角色的实例

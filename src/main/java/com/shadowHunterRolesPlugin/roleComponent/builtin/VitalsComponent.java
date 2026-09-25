@@ -1,10 +1,12 @@
-package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
+package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
 import com.shadowHunterRolesPlugin.core.util.DamageUtil;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.DamageKind;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
@@ -47,6 +49,25 @@ import org.bukkit.entity.Player;
  * </ul>
  */
 public class VitalsComponent extends RoleComponent {
+
+    /**
+     * **玩家未装角色时的原版生命上限**（= 既有实现里那个字面量 {@code 20} 的命名化）。
+     * <p>它不是"角色配置"，而是**平台基线**：上限修饰符的值 = {@code cap - BASE_MAX_HEALTH} ⇒
+     * 本常量变则所有人的上限一起变 ⇒ **只在这里出现一次**，不得散落。
+     */
+    public static final double BASE_MAX_HEALTH = 20d;
+
+    /**
+     * **★ 角色的生命上限（组件侧配置 · 占位值）**。
+     *
+     * <p><b>真值应来自角色配置</b>——本值是在「角色模板不再持有 HP/SanTE/Energy」之后，
+     * 为不丢失既有行为而落的**占位**（可玩的 {@code meiqihezi} 与 {@code red} 的声明值都是 40）。
+     * 逐角色差异（见 {@link #applyHealthModifier} 的行为申报）需另立卡由**组件侧配置**恢复。
+     *
+     * <p><b>为什么常量落在组件而不是容器</b>：上限的持有权已归本组件（生命的唯一持有者）；
+     * 落在容器会让"上限"重新出现两个持有者。
+     */
+    public static final double ROLE_HEALTH_CAP = 40d;
 
     public VitalsComponent(String id, ComponentServices services) {
         super(id, services);
@@ -169,6 +190,58 @@ public class VitalsComponent extends RoleComponent {
             return;
         }
         target.setHealth(target.getAttribute(Attribute.MAX_HEALTH).getValue());
+    }
+
+    /**
+     * **角色的生命上限修饰符**（= 既有 {@code role_health_modifier}）—— 由**本组件**负责施加与移除。
+     *
+     * <p><b>为什么归本组件</b>：本组件的职责是「**生命的一切写入与上限**」。原先这一段住在
+     * {@code RoleInstance#activate()} 里、且**上限值取自角色模板**（当时写作"模板上限 − 20"）；
+     * 角色模板不再持有生命上限后，若把常量留在容器侧，上限的持有权就仍在容器 ⇒ 与已定的
+     * 「上限归组件」相反。故连**键**带**应用/移除**一起收进本组件。     *
+     * <p><b>作用对象 = 本组件自己的玩家</b>（{@link #self()}）—— **不接 {@code Player} 参数**：
+     * 上限永远只作用在"本实例的那个玩家"身上，传入可变目标会开一个「给别人的上限加修正」的口子 ✗
+     * （既有调用点也只传 {@code player} 且从不传别人）。
+     *
+     * <p><b>值语义（与既有行为逐字相同的部分）</b>：{@code mod = cap - BASE_MAX_HEALTH}，
+     * 口径 = {@code ADD_NUMBER} 加在上限上；{@code BASE_MAX_HEALTH} = 玩家**未装角色时的原版上限**
+     * （既有实现里那个字面量 {@code 20} 就是它的旧写法 ⇒ 现在给它一个名字）。
+     *
+     * <p><b>★ 一处已变更的行为（如实申报）</b>：上限值不再来自角色模板。可玩的三个角色里
+     * {@code meiqihezi}=40 / {@code red}=40 / {@code selfUpdateExample}=20 ⇒ 统一取 {@link #ROLE_HEALTH_CAP}
+     * 后，**前两者行为逐字不变**，而 {@code selfUpdateExample} 的 {@code mod} 由 {@code 0} 变为
+     * {@code 20}（满血 20 → 40）。该角色是**演示角色**（唯一目的 = 给「组件可请求重绘」一个生产使用点），
+     * 故本次按「统一上限」处理；若日后要恢复逐角色上限，须由组件侧配置重新引入（**不得**回到角色模板字段）。
+     *
+     * @param key 上限修饰符的键（容器侧经平台 keys 生成，与既有实现同一个键名）
+     * @param cap 角色生命上限（当前 = {@link #ROLE_HEALTH_CAP}）
+     */
+    public void applyHealthModifier(NamespacedKey key, double cap) {
+        Player target = self();
+        if (target == null || key == null) {
+            return;
+        }
+        AttributeModifier am = new AttributeModifier(
+                key,
+                cap - BASE_MAX_HEALTH,
+                AttributeModifier.Operation.ADD_NUMBER
+        );
+        target.getAttribute(Attribute.MAX_HEALTH).removeModifier(am);
+        target.getAttribute(Attribute.MAX_HEALTH).addModifier(am);
+    }
+
+    /**
+     * **移除角色的生命上限修饰符**（= 既有 {@code RoleInstance#clear()} 里那一处）。
+     *
+     * <p>与 {@link #applyHealthModifier} 同属「上限」这一件事 ⇒ 一并归本组件，
+     * 使「上限的施加与撤销」不再分散在容器与本组件两处。
+     */
+    public void removeHealthModifier(NamespacedKey key) {
+        Player target = self();
+        if (target == null || key == null) {
+            return;
+        }
+        target.getAttribute(Attribute.MAX_HEALTH).removeModifier(key);
     }
 
     // ───────────── 四个伤害原语（与生命同属本组件）─────────────

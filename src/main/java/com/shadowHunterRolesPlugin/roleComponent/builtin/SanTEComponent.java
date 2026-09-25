@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
+package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;

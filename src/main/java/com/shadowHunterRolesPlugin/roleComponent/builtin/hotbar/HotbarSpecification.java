@@ -1,8 +1,8 @@
-package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.hotbar;
+package com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;

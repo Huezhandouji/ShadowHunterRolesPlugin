@@ -1,4 +1,4 @@
-package com.shadowHunterRolesPlugin.roleComponent.frameworkLevel;
+package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -6,21 +6,30 @@ import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.Scheduler;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * **框架级服务组件的清单**：类 → 组件 id 的**唯一落点**。
+ * **提前写好的内建服务组件的清单**：类 → 组件 id 的**唯一落点**。
+ *
+ * <p>★ **命名与层级纪律（本类所在的 `builtin/` 就是为此改名）**：这些组件叫「**内建**」
+ * （提前写好的、随框架一起发布的组件），**不是「框架级」** —— 它们与 `custom/` 里的**角色内容组件**
+ * **没有层级之别**：都是 `RoleComponent` 的普通实现、都按角色实例装配、都只能经自己的服务集取用。
+ * ⇒ ★ **不得因为「名字带框架」就把它们当特例去碰聚合根 `Role`** —— 它们不持有也不得直改聚合根
+ * （这条曾是本仓库一处真实误判的来源：**本包改名前那个带「框架」字样的旧包名**曾让人以为它们可以越权，
+ * 并因此制造了一条 `core → 旧包` 的反向依赖 ✗ —— 改名就是为了让这类误判不再可能）。
  *
  * <h2>它解决什么</h2>
- * 容器（{@code RoleInstance}）需要**框架级服务组件**（能量 / SanTE / 生命 / buff / 计时 / 物品渲染），
+ * 容器（{@code RoleInstance}）需要**内建服务组件**（能量 / SanTE / 生命 / buff / 计时 / 物品渲染），
  * 但这些组件的**类名、构造顺序与接线**不该散在容器里 —— 否则"框架核心知道具体组件集合"。
  * 本类把那部分知识**收进一个文件**：
  * <ul>
@@ -112,11 +121,64 @@ public final class ServiceComponents {
     /** id：计时组件。 */
     public static final String ID_TIMERS = "timers";
 
+    /**
+     * **「框架必然提供的服务类型」清单**（原住在 `core/Role.FRAMEWORK_PROVIDED_TYPES`，已迁来 —— 本类
+     * 才是**内建服务组件**的**唯一落点**，这份知识不该留在角色模板里）。
+     * <p>★ **字段名保留**（`FRAMEWORK_PROVIDED_TYPES` = 既有公开面，不改名）；但**语义上它不是「框架级」**：
+     * 这些类型与角色内容组件**无层级之别**，本清单只用于「供给面判定」⇒ **不可据此碰聚合根** ✓。
+     *
+     * <p><b>它解决什么问题</b>：{@code core/Role#verifyDependencies()} 只看**模板的组件表**；而内建
+     * 服务组件是**按角色实例**装配的（每实例一份）⇒ 模板侧永远看不见它们。于是任何组件写
+     * {@code requires(EnergyComponent.class)} 这类声明都会被误报成"缺必需依赖" ⇒ 该角色**被错误地拒绝注册**。
+     *
+     * <p><b>语义（写死）</b>：列在本集合里的类型 = **框架保证在角色实例上必然提供**的类型 ⇒ 声明它们
+     * 的组件**不算缺依赖**（检查放行）。它**只影响"供给面"的判定**，不影响任何运行期行为：组件仍
+     * 按 {@code svc().components().get(...)} 自己去取（取不到是另一回事，属运行期）。
+     *
+     * <p><b>与本类的关系</b>：清单**逐条对应**上面 {@code ID_*} 所标识的内建服务组件（技能 / 被动 /
+     * 主武器等**角色内容**一律不在此列 ⇒ 它们之间的依赖声明照旧按模板组件表判定）。
+     */
+    public static final Set<Class<? extends RoleComponent>> FRAMEWORK_PROVIDED_TYPES = Set.of(
+            EnergyComponent.class,
+            SanTEComponent.class,
+            VitalsComponent.class,
+            BuffComponent.class,
+            TimerComponent.class);
+
+    /**
+     * **能量上限（组件侧配置 · 占位值）**。
+     *
+     * <p><b>真值应来自角色配置</b>：本值是在「角色模板不再持有 HP/SanTE/Energy」之后，
+     * 为不丢失既有行为而落的**占位**（可玩的 {@code meiqihezi} 声明值是 100 ⇒ 逐字不变）。
+     *
+     * <p><b>为什么统一取 100 没有可观察差异</b>（逐条论证，不只是一个结论）：
+     * <ol>
+     *   <li>只有 {@code meiqihezi} 声明了 100；{@code red} 与 {@code selfUpdateExample} 声明的是 <b>0</b>。</li>
+     *   <li>{@code EnergyComponent} 的构造是 {@code this.max = Math.max(0, max)} 且**构造期即置满**
+     *       （{@code current = this.max}）⇒ 上限定的是"满值"。</li>
+     *   <li>能量**只在被消耗时可见**：{@code red} 的四个主动件声明耗能全为 0，且
+     *       {@code energyCost} 的声明值**不参与** {@code tryConsume}（那是 {@code Skill} 家族的数据源）
+     *       ⇒ red 从不扣能 ⇒ 它的 {@code current} 恒为初值 ⇒ <b>0 → 100 不可观察</b>。</li>
+     *   <li>{@code selfUpdateExample} 只有一件自刷新示例技能（耗能 0）⇒ 同理不可观察。</li>
+     *   <li>{@code meiqihezi} 原本就是 100 ⇒ 逐字不变。</li>
+     * </ol>
+     * ⇒ 行为面：**无可观察差异**；配置面：逐角色上限需另立卡由组件侧配置恢复。
+     */
+    public static final int ENERGY_MAX = 100;
+
+    /**
+     * **SanTE 上限（组件侧配置 · 占位值）**。
+     *
+     * <p>三个角色的声明值**都是 100** ⇒ 统一取 100 ⇒ **行为逐字不变**（无任何差异可比）；
+     * 真值日后由组件侧配置提供。
+     */
+    public static final int SANTE_MAX = 100;
+
     private ServiceComponents() {
     }
 
     /**
-     * **构造全部框架级服务组件**（顺序见下方注释；返回**构造顺序**的不可变列表 ✓）。
+     * **构造全部内建服务组件**（顺序见下方注释；返回**构造顺序**的不可变列表 ✓）。
      * <p>返回后各组件**已接线完成**、但**尚未登记**进容器 ⇒ 登记由调用方按 id 逐个完成 ✓
      * （既有的"冻结后才登记"口径由此保持 ✓）。
      */
@@ -129,15 +191,15 @@ public final class ServiceComponents {
                 in.servicesFor().apply(ID_HOTBAR_RENDER));
         hotbarRender.bindRepaintSink(hotbarRender::markDirty);
 
-        // ② 能量：上限取角色模板的声明值；**一次变更 ⇒ 请求重绘一次**（无条件 ✓）。
+        // ② 能量：上限取**组件侧配置**（角色模板不再持有能量上限）；**一次变更 ⇒ 请求重绘一次**（无条件 ✓）。
         EnergyComponent energy = new EnergyComponent(ID_ENERGY, in.servicesFor().apply(ID_ENERGY),
-                in.role().getMaxEnergy(),
+                ENERGY_MAX,
                 change -> hotbarRender.markDirty());
 
         // ③ SanTE：以**本组件自身**为 owner 登记平台侧监听 ⇒ 写入路径直调这一条；
         //    订阅者仍归容器的派发边界（真变化闸门 / 逐监听器隔离 / 重入合并都在那里 ✓）。
         SanTEComponent sante = new SanTEComponent(ID_SANTE, in.servicesFor().apply(ID_SANTE),
-                in.role().getMaxSanTE());
+                SANTE_MAX);
         sante.addListener(sante, change -> in.santeChangeReporter()
                 .accept(new Change3(ID_SANTE, change.previous(), change.current())));
 
@@ -252,6 +314,29 @@ public final class ServiceComponents {
     public static void vitalsRestoreFull(RoleComponent component, Player target) {
         if (component instanceof VitalsComponent vitals) {
             vitals.restoreFull(target);
+        }
+    }
+
+    /**
+     * **施加角色的生命上限修饰符**（上限归生命组件；值取组件侧配置）。
+     * <p>作用对象 = 该组件自己的玩家（见 {@link VitalsComponent#applyHealthModifier})。未命中 ⇒ 无操作。
+     * @param component 生命组件的通用面（按 {@link #ID_VITALS} 取到）
+     * @param key       上限修饰符的键
+     */
+    public static void vitalsApplyHealthModifier(RoleComponent component, NamespacedKey key) {
+        if (component instanceof VitalsComponent vitals) {
+            vitals.applyHealthModifier(key, VitalsComponent.ROLE_HEALTH_CAP);
+        }
+    }
+
+    /**
+     * **移除角色的生命上限修饰符**（与施加同属"上限"⇒ 一并归生命组件）。未命中 ⇒ 无操作。
+     * @param component 生命组件的通用面（按 {@link #ID_VITALS} 取到）
+     * @param key       上限修饰符的键
+     */
+    public static void vitalsRemoveHealthModifier(RoleComponent component, NamespacedKey key) {
+        if (component instanceof VitalsComponent vitals) {
+            vitals.removeHealthModifier(key);
         }
     }
 

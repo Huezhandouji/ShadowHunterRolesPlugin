@@ -1,10 +1,10 @@
 package com.shadowHunterRolesPlugin.roleComponent.builtin;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;

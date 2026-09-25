@@ -3,7 +3,7 @@ package com.shadowHunterRolesPlugin.internal.api;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import org.junit.Test;
 
 import java.util.List;

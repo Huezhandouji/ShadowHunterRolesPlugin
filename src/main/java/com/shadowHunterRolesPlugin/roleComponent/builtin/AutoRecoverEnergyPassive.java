@@ -3,7 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.builtin;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 
 public class AutoRecoverEnergyPassive extends PassiveSkill {
 

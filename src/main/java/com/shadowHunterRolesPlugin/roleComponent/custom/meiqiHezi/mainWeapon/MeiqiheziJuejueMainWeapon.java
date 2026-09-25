@@ -1,5 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.destroystokyo.paper.ParticleBuilder;
@@ -14,9 +14,9 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
 import java.util.Collection;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 
 public class MeiqiheziJuejueMainWeapon extends MainWeapon {
 
@@ -44,7 +44,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
                     Material.DIAMOND_HOE,
                     20
             );
-            requires(VitalsComponent.class, EnergyComponent.class, BuffComponent.class);
+            requires(VitalsComponent.class).requires(EnergyComponent.class).requires(BuffComponent.class);
         }
 
         @Override

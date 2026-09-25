@@ -1,8 +1,8 @@
 package com.shadowHunterRolesPlugin.manager;
 
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffType;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.ServiceComponents;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffType;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.ServiceComponents;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.Task;

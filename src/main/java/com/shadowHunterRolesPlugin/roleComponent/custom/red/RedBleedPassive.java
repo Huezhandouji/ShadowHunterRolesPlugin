@@ -1,5 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
@@ -15,9 +15,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 /**
  * 红的流血被动。

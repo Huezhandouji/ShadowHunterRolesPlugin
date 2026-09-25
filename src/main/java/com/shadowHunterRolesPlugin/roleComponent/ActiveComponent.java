@@ -1,8 +1,8 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.hotbar.HotbarSpecification;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;

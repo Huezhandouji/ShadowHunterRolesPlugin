@@ -1,10 +1,10 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
@@ -16,8 +16,8 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.List;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 public class RedSolitaryArroganceSkill extends Skill {
 
@@ -46,7 +46,7 @@ public class RedSolitaryArroganceSkill extends Skill {
             super(Component.text("孤妄自赏"),
                     Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命"),
                     200, 0, Material.FERMENTED_SPIDER_EYE);
-            requires(TimerComponent.class, BuffComponent.class, VitalsComponent.class);
+            requires(TimerComponent.class).requires(BuffComponent.class).requires(VitalsComponent.class);
         }
 
         @Override

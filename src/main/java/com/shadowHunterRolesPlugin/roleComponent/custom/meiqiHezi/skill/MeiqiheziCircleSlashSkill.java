@@ -1,5 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 import com.shadowHunterRolesPlugin.core.util.ParticleUtil;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
@@ -15,10 +15,10 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Collection;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 public class MeiqiheziCircleSlashSkill extends Skill {
 
@@ -50,7 +50,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
                     15,
                     Material.GOLD_INGOT
             );
-            requires(BuffComponent.class, EnergyComponent.class, VitalsComponent.class, TimerComponent.class);
+            requires(BuffComponent.class).requires(EnergyComponent.class).requires(VitalsComponent.class).requires(TimerComponent.class);
         }
 
         @Override

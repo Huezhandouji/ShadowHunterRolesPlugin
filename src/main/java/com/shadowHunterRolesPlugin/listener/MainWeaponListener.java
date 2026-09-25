@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.listener;
 
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
@@ -40,8 +41,6 @@ public class MainWeaponListener implements Listener {
         if(instance == null) return;
 
         String weaponId = MainWeapon.Utils.getWeaponId(item);
-        MainWeapon weapon = instance.getMainWeaponById(weaponId);
-        if(weapon == null) return;
 
         //取消原版事件
         event.setCancelled(true);
@@ -58,7 +57,6 @@ public class MainWeaponListener implements Listener {
         if(action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) return;
 
 
-
         if(!MainWeapon.Utils.isMainWeapon(item)) return;
 
         RoleInstance instance = roleManager.getRoleInstance(player);
@@ -68,14 +66,12 @@ public class MainWeaponListener implements Listener {
 
 
         String weaponId = MainWeapon.Utils.getWeaponId(item);
-        MainWeapon weapon = instance.getMainWeaponById(weaponId);
-        if(weapon == null) return;
 
         event.setCancelled(true);
 
         if(!instance.isMainWeaponReady(weaponId)) return;
 
-        instance.castMainWeaponLeftClick(weaponId, player);
+        instance.handleCast(CastTrigger.LEFT_CLICK, player);
     }
 
     @EventHandler
@@ -92,14 +88,12 @@ public class MainWeaponListener implements Listener {
         if(instance == null) return;
 
         String weaponId = MainWeapon.Utils.getWeaponId(item);
-        MainWeapon weapon = instance.getMainWeaponById(weaponId);
-        if(weapon == null) return;
 
         event.setCancelled(true);
 
         if(!instance.isMainWeaponReady(weaponId)) return;
 
-        instance.castMainWeaponRightClick(weaponId, player);
+        instance.handleCast(CastTrigger.RIGHT_CLICK, player);
     }
 
     //ignoreCancelled：已取消的丢弃不重复取消、也不触发施法 ✓
@@ -117,8 +111,6 @@ public class MainWeaponListener implements Listener {
         if(instance == null) return;
 
         String weaponId = MainWeapon.Utils.getWeaponId(item);
-        MainWeapon weapon = instance.getMainWeaponById(weaponId);
-        if(weapon == null) return;
 
         //设置标记
         instance.setDroppingState(true);
@@ -128,13 +120,10 @@ public class MainWeaponListener implements Listener {
         }, 1L);
 
 
-
-
         if(!instance.isMainWeaponReady(weaponId)) return;
 
 
-
-        instance.castMainWeaponQDrop(weaponId, player);
+        instance.handleCast(CastTrigger.DROP, player);
 
     }
 

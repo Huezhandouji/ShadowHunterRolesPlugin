@@ -1,5 +1,4 @@
 package com.shadowHunterRolesPlugin.core;
-import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
@@ -67,9 +66,6 @@ public class RoleInstance {
     public boolean isDropping() { return isDropping; }
     public void setDroppingState(boolean dropping) { isDropping = dropping; }
 
-    private final Map<String, MainWeapon> mainWeaponMap = new HashMap<>();
-    private final Map<String, Skill> skillMap = new HashMap<>();
-    private final Map<String, PassiveSkill> passiveMap = new HashMap<>();
 
  //平台上下文（调度/日志/键/阵营查询）
     private final RolesContext platform;
@@ -425,10 +421,6 @@ public class RoleInstance {
  //：原"创建后绑定"的**装配期落点已整体删除** （它唯一的绑定目标是计时端口，
  // 端口面 已清理 ⇒ 该调用早已是 no-op）—— 状态一律归**组件实例本身**，不需要任何绑定动作。
 
- //旧窄类型视图（供既有公共访问器使用）：按**具体类型**归位，不按任何"种类"猜测
-            if(component instanceof Skill skill) skillMap.put(componentId, skill);
-            if(component instanceof MainWeapon weapon) mainWeaponMap.put(componentId, weapon);
-            if(component instanceof PassiveSkill passive) passiveMap.put(componentId, passive);
 
             registerCreated(component, services, entry.getValue());
         }
@@ -437,9 +429,6 @@ public class RoleInstance {
 
  //原 `getBuffManager()` **转发访问器已删除** —— 消费者 0
  //（buff 记账表的持有者本来就是 **buff 组件**；需要它的人走组件本身，不经聚合根转发）。
-
-
-
 
 
  //技能相关
@@ -460,50 +449,11 @@ public class RoleInstance {
  // 就绪判定仍由**活码** `isSkillReady` / `isMainWeaponReady` 提供 ⇒ 能力未失去入口）。
 
 
- //技能释放
-    public boolean castSkillLeftClick(String skillId, Player caster){
-        if(runComponentPipeline(CastTrigger.LEFT_CLICK, caster)) return true;
-        if(skillMap.get(skillId) == null){
-            caster.sendMessage(Component.text("unknown skill!"));
-        }
-        return false;
-    }
-
-    public boolean castSkillRightClick(String skillId, Player caster){
-        if(runComponentPipeline(CastTrigger.RIGHT_CLICK, caster)) return true;
-        Skill skill = skillMap.get(skillId);
-        if(skill == null){
-            caster.sendMessage(Component.text("unknown skill!"));
-        }
- //组件侧一律走新管道；可见刷新由 handleCast 的置脏 + 帧末 flush 保证。
-        return false;
-    }
-
-    public boolean castSkillQDrop(String skillId, Player caster){
-        if(runComponentPipeline(CastTrigger.DROP, caster)) return true;
-        if(skillMap.get(skillId) == null){
-            caster.sendMessage(Component.text("unknown skill!"));
-        }
-        return false;
-    }
-
- /** **纯委派** —— 组件一律走新管道，单一入口 = {@link #handleCast}。 */
-    private boolean runComponentPipeline(CastTrigger trigger, Player caster){
-        return handleCast(trigger, caster);
-    }
-
-
- //主武器相关
-    public MainWeapon getMainWeaponById(String weaponId){
-        return mainWeaponMap.getOrDefault(weaponId, null);
-    }
-
  /** 就绪判定（：同 {@link #isSkillReady(String)} —— 就地转问组件，转发访问器已删）。 */
     public boolean isMainWeaponReady(String weaponId){
         RoleComponent component = componentRegistry.getById(weaponId);
         return !(component instanceof ActiveComponent active) || !active.isCoolingDown();
     }
-
 
 
  //（代码卫生）：原先这里的三个成员 —— 按 id 解析的**回落入口**、那条口径的
@@ -516,37 +466,6 @@ public class RoleInstance {
 
 
 
-
-
-
-
- //释放主武器技能
-    public boolean castMainWeaponLeftClick(String weaponId, Player caster){
-        if(runComponentPipeline(CastTrigger.LEFT_CLICK, caster)) return true;
-        if(mainWeaponMap.get(weaponId) == null){
-            caster.sendMessage(Component.text("unknown mainWeapon!"));
-        }
-        return false;
-    }
-
-    public boolean castMainWeaponRightClick(String weaponId, Player caster){
-        if(runComponentPipeline(CastTrigger.RIGHT_CLICK, caster)) return true;
-        if(mainWeaponMap.get(weaponId) == null){
-            caster.sendMessage(Component.text("unknown mainWeapon!"));
-        }
-        return false;
-    }
-
-    public boolean castMainWeaponQDrop(String weaponId, Player caster){
-        if(runComponentPipeline(CastTrigger.DROP, caster)) return true;
-        if(mainWeaponMap.get(weaponId) == null){
-            caster.sendMessage(Component.text("unknown mainWeapon!"));
-        }
-        return false;
-    }
-
-
-
  //热键栏渲染：唯一写点在渲染组件持有的渲染器里（`core/hotbar` 内）；
  //本容器只提供查表与状态输入，**不持有**渲染器、也不对外提供任何渲染器 / 物品访问器。
 
@@ -554,23 +473,16 @@ public class RoleInstance {
     public Role getRole() { return role; }
 
 
-
  //生命
  //原三个**生命视图转发访问器**（`getCurrentHealth` / `setCurrentHealth` /
  //`getMaxHealth`）**已删除** —— 消费者 0（生命状态 = Bukkit 玩家属性，持有者是**生命组件**
- //⇒ 需要时走组件本身；`heal(double)` 与 `damage(...)` 仍为**活码**（组件/监听器在用））。
+ //⇒ 需要时走组件本身；`heal(double)` 仍为**活码**（视图口，组件在用））。
 
     public void heal(double amount){
  //：clamp 策略的唯一实现已搬到生命组件（本方法保留为**视图**，调用点一字未动）
         ServiceComponents.heal(resolve(ServiceComponents.ID_VITALS), amount);
     }
 
-    public void damage(double amount){
-        player.damage(amount);
-    }
-    public void damage(double amount, Entity source){
-        player.damage(amount, source);
-    }
 
  //能量（**视图**：真值与 clamp/检查扣减的行为都在能量组件里）
  //`getMaxEnergy` / `decreaseEnergy` / `increaseEnergy` 三个转发访问器

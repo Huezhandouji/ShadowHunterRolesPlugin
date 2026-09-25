@@ -1,4 +1,6 @@
 package com.shadowHunterRolesPlugin.listener;
+import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.*;
@@ -59,7 +61,11 @@ public class SkillListener implements Listener {
         if(!instance.isSkillReady(skillId)) return;
 
 
-        instance.castSkillRightClick(skillId, player);
+        if(instance.componentRegistry().getById(skillId) == null){
+            player.sendMessage(Component.text("unknown skill!"));
+            return;
+        }
+        instance.handleCast(CastTrigger.RIGHT_CLICK, player);
 
 
     }
@@ -100,7 +106,11 @@ public class SkillListener implements Listener {
         //没有冷却完return
         if(!instance.isSkillReady(skillId)) return;
 
-        instance.castSkillLeftClick(skillId, player);
+        if(instance.componentRegistry().getById(skillId) == null){
+            player.sendMessage(Component.text("unknown skill!"));
+            return;
+        }
+        instance.handleCast(CastTrigger.LEFT_CLICK, player);
 
     }
 
@@ -140,7 +150,11 @@ public class SkillListener implements Listener {
 
         if(!instance.isSkillReady(skillId)) return;
 
-        instance.castSkillQDrop(skillId, player);
+        if(instance.componentRegistry().getById(skillId) == null){
+            player.sendMessage(Component.text("unknown skill!"));
+            return;
+        }
+        instance.handleCast(CastTrigger.DROP, player);
     }
 
     //禁止玩家拿出技能物品

@@ -91,14 +91,8 @@ public class RoleInstance {
  * <p>**只读，不带写面**：写入仍在聚合根 {@link Role#setFaction} / {@link Role#resetFaction}。
  */
     private final RoleInfo roleInfo = new RoleInfoImpl(this);
- /**
- * **组件侧"请求重绘"的唯一入口**（收进渲染组件）。
- * <p><b>现行形态</b>：组件与框架**都**经**渲染组件**提供的 {@code requestRepaint()} 请求重绘，
- * 置脏落点就是渲染组件自己的脏标记（帧末由它决定写不写物品）⇒ **只有一条重绘通道**
- * （两个并存的老通道已删除）。
- * <p>边界逐字未变：它**只置脏**、不写物品 ⇒ 组件**只能请求、不能写**，
- * 「空闲 tick 零 setItem」与"写入仍由帧末 flush 完成"两条口径不变。
- */
+
+ /** 每组件一份的服务集（构造期建立，此后只读）。 */
     private final Map<RoleComponent, ComponentServices> componentServices = new HashMap<>();
 
  //★ 施放 / 攻击的管道**已整体移出容器**（归 listener）—— 容器不认识「技能 / 主武器」这两类东西。
@@ -452,8 +446,8 @@ public class RoleInstance {
  * <ul>
  * <li>**真变化才派发**（`pre == now` 直接返回）；</li>
  * <li>**禁止嵌套派发**：派发期间组件再次改写 ⇒ 只记最新待发值并立即返回；返回后对末次值**补发一次**；</li>
- * <li>★ `notified` 不能用 `currentSanTE` 代替：`setCurrentSanTE` **先写字段、后派发** ⇒ 派发期间字段已等于
- * 重入目标值 ⇒ 条件 `currentSanTE != target` **恒假**，补偿分支退化成死代码。故用局部 `notified` 比较。
+ * <li>★ `notified` 不能用「当前值」代替：SanTE 的写入是**先写字段、后派发**（在组件里）⇒ 派发期间字段已等于
+ * 重入目标值 ⇒ 条件「当前值 != target」**恒假**，补偿分支退化成死代码。故用局部 `notified` 比较。
  * 退出条件 = `sanTEPendingValue == Integer.MIN_VALUE`（哨兵）；</li>
  * <li>异常隔离走 {@link #guardedCall}。</li>
  * </ul>
@@ -633,16 +627,14 @@ public class RoleInstance {
  /**
  * **承受方钩子的交付口**：平台事件面把"受伤 / 受治疗"通知到**本实例**的组件。
  *
- * <p><b>为什么必须经这里</b>：钩子抛异常时要按 {@link #guardedCall} 的**故障隔离**语义处置，
- * 而那套语义只存在于本类 ⇒ 绕过它 = 开第二条调用路径。调用方按目标实例上实现了承受方标记的
- * 组件扇出后，逐个交给本方法。
+ * <p><b>为什么必须经这里</b>：钩子抛异常要按 {@link #guardedCall} 的**故障隔离**语义处置，而那套语义
+ * 只存在于本类 ⇒ 绕过它 = 开第二条调用路径。
  *
  * <p><b>为什么外面包 {@link #withinIterationWindow}</b>：`guardedCall` 只把异常**记成**
- * {@link #pendingQuarantine}，真四步在窗口的 `finally` 里跑 ⇒ 裸调 `guardedCall` 会让隔离请求
- * 被记下却**永不执行**。
+ * {@link #pendingQuarantine}，真四步在窗口的 `finally` 里跑 ⇒ 裸调会让隔离请求**永不执行**。
  *
  * <p><b>★ 主线程前提</b>：必须主线程调用（钩子改动玩家状态）。非主线程 ⇒ **记 SEVERE 并放弃投递**
- * （响亮失败，不静默忽略）。基线是 Paper（非 Folia）；若要支持 Folia，这套断言与调度都要重审。
+ * （响亮失败，不静默忽略）。
  *
  * @param component 用于隔离归因的组件
  * @param phase 阶段名（进日志与隔离消息）

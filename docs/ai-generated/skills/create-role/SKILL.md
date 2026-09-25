@@ -15,7 +15,16 @@ description: 在 ShadowHunterRolesPlugin 里**只做角色、不碰框架**地�
    ```powershell
    cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"
    ```
-3. **用例基线 = 91**（`../../../../src/test` 共 15 个测试文件）✓ —— 你**不得**删/停用任何测试 ✗；改了框架才会动它，而你**不该**改框架 ✓。
+3. **用例基线 = 117**（`../../../../src/test` 共 17 个测试文件，逐行读盘 `@Test` 计数 = 117）✓ —— 你**不得**删/停用任何测试 ✗；改了框架才会动它，而你**不该**改框架 ✓。
+   ```powershell
+   # 在仓库根（ShadowHunterRoles/）下跑；否则把 $repo 换成仓库根的绝对路径
+   $repo = (Resolve-Path '.').Path           # 仓库根 = ShadowHunterRoles/
+   $t = 0
+   Get-ChildItem "$repo\src\test" -Recurse -File -Filter *.java | ForEach-Object {
+     $n = [IO.File]::ReadAllLines($_.FullName)
+     for ($i = 0; $i -lt $n.Count; $i++) { if ($n[$i] -cmatch '@Test\b') { $t++ } } }
+   "@Test = $t / 测试件数 = $((Get-ChildItem "$repo\src\test" -Recurse -File -Filter *.java).Count)"   # 117 / 17
+   ```
 
 ## 1. 硬边界表（★ 本 skill 的核心 ✗）
 
@@ -32,7 +41,7 @@ description: 在 ShadowHunterRolesPlugin 里**只做角色、不碰框架**地�
 | `…/roleComponent/base/` | 组件基类（`Skill`/`MainWeapon`/`PassiveSkill`）—— 你 **extends** 它们 ✓ |
 | `…/roleComponent/`（根，除 §3 允许的读取 ✗） | `RoleComponent`/`ActiveComponent`/`OperationProvider`/`ComponentFactory` 等基座 —— 只读 ✓ |
 | `../../../../build.gradle.kts` · `../../../../settings.gradle.kts` · `../../../../src/main/resources/plugin.yml` · `config.yml` | 构建与插件清单；加角色**不需要**动它们 ✓（你**不新增依赖、不新增指令、不新增权限节点** ✓） |
-| `../../../../src/test`（**除 §6 自检** ✓） | 基线 91 不许降 ✗；给角色加测试**可选**（会改基线，需在结卡里申报 ✓） |
+| `../../../../src/test`（**除 §6 自检** ✓） | 基线 **117**（17 件）不许降 ✗；给角色加测试**可选**（会改基线，需在结卡里申报 ✓） |
 
 ### 允许新增 / 修改（**只有这些** ✓）
 | 路径 | 说明 |
@@ -124,7 +133,17 @@ private static Role.Builder myroleBuilder() {
 ```powershell
 cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"
 .\gradlew compileJava --rerun --no-build-cache --console=plain    # 期望：> Task :compileJava 执行态 + BUILD SUCCESSFUL
-.\gradlew test      --rerun --no-build-cache --console=plain      # 期望：> Task :test 执行态 + 91 tests / 0 failures
+.\gradlew test      --rerun --no-build-cache --console=plain      # 期望：> Task :test 执行态 + 117 tests / 0 failures
+```
+XML 的 `tests` 数与上面的 `@Test` 计数**同数**（逐份套件加起来复核）：
+```powershell
+# 在仓库根（ShadowHunterRoles/）下跑
+$repo = (Resolve-Path '.').Path; $dir = "$repo\build\test-results\test"
+$t = 0; $f = 0; $e = 0
+Get-ChildItem $dir -Filter *.xml | ForEach-Object {
+  $s = ([xml](Get-Content -Raw -Encoding UTF8 $_.FullName)).testsuite
+  $t += [int]$s.tests; $f += [int]$s.failures; $e += [int]$s.errors }
+"suites = $((Get-ChildItem $dir -Filter *.xml).Count) / tests = $t / failures = $f / errors = $e"   # 17 / 117 / 0 / 0
 ```
 ★ **不要**只跑 `build` ✗（全 up-to-date 的"真空绿"不算读数 ✗）。
 
@@ -136,7 +155,7 @@ cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.g
 | 用 `ChatColor` / 裸字符串做显示名 | 违反"外观一律 Adventure" ✗（用 `Component.text(...)` ✓） |
 | 自己去 `core/` 加冷却表 / 改 `RoleInstance` | 碰框架 ✗；冷却归组件自持（`startCooldown()` ✓） |
 | 在 `plugin.yml` 加指令/权限 | 不需要 ✗（`/role set <id>` 自动可用 ✓） |
-| 删/停用测试以让闸门变绿 | 违反 91 基线 ✗（真红就是真红 ✓） |
+| 删/停用测试以让闸门变绿 | 违反 **117** 基线 ✗（真红就是真红 ✓） |
 
 ## 5. 必须遵守的既有判据（**编号原文未入库**，下列为按代码与 ADR 复原的可复算判据 ✓）
 
@@ -149,7 +168,7 @@ cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.g
 | **归属原则** | 能力**各归其家**：能量→`EnergyComponent`、SanTE→`SanTEComponent`、生命→`VitalsComponent`、Buff→`BuffComponent`、计时→`TimerComponent`、热键栏→`HotbarRenderComponent` ✓ | 把能量状态写进自己的组件 ✗ |
 | **`OperationProvider`** | **可选加入**：`String onOperationCommand(String payload)` ✓ —— **单方法冻结** ✗（不得加方法/默认实现 ✓）；payload 首 token 必为动词 ✓，grammar 写进你的 javadoc ✓ | 给接口加第二个方法 ✗ |
 | **Adventure** | 一切玩家可见文本用 `net.kyori.adventure.text.Component` ✓ | `ChatColor` ✗ |
-| **基线 91** | `../../../../src/test` 15 件 / 91 用例 ✓ —— 不得降 ✗ | 删测试 ✗ |
+| **基线 117** | `../../../../src/test` **17 件 / `@Test` 117** ✓ —— 不得降 ✗（取数命令见 §0.3 与 §3 步骤 4） | 删测试 ✗ |
 | **两条闸门** | `compileJava` + `test`，**真执行态**（`--rerun --no-build-cache` ✓） | 只跑 `build` ✗ |
 
 ## 6. 自检清单（结卡前逐条 ✓）
@@ -158,7 +177,7 @@ cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.g
 - [ ] 组件依赖在 `start()` 取（R-4 ✓）；只用三端口（R-6 ✓）；冷却用 `startCooldown()`（R-7 ✓）
 - [ ] 显示名/描述全 Adventure（无 `ChatColor` ✓）
 - [ ] `addComponent` 的 spec 都 `setSlot(0..8)` ✓；`addPassive` 不带栏位 ✓
-- [ ] 两条闸门**真执行态**：`> Task :compileJava` / `> Task :test` 都出现 ✓，XML = **91 / 0 / 0** ✓
+- [ ] 两条闸门**真执行态**：`> Task :compileJava` / `> Task :test` 都出现 ✓，XML = **117 / 0 / 0** ✓
 - [ ] 未新增接口 ✗（除"确实不能成为组件"的关注点 ✓）、未改签名/注解 ✓、未动 `plugin.yml` ✓
 - [ ] 在结卡里申报：新组件路径 + `RoleLoader` 改动行数 + 两条闸门读数 + 未覆盖项 ✓
 

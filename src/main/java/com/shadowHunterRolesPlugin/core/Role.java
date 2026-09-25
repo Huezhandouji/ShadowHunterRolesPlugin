@@ -459,7 +459,7 @@ public class Role {
  * 不占热键栏 ⇒ 不进 `slotMap` ⇒ 渲染器遍历时天然看不到它，也不会被要求画物品。
  * <p>"是被动"由**工厂形参的类型**表达（{@code ComponentFactory<PassiveSkill>}）⇒
  * 三个 id 视图按 `PassiveSkill.Specification` 归类；其余语义与描述符入口一致（同一条内部路径）。
- * <p><b>的依赖面（如实申报）</b>：本入口**没有描述符** ⇒
+ * <p><b>依赖面（如实申报）</b>：本入口**没有描述符** ⇒
  * ① 提供类型只能是**族级** {@code PassiveSkill.class}（依赖检查按它匹配）；
  * ② **无法**声明依赖（{@code requires} 只在描述符上）。要按具体类被依赖或要声明依赖的被动，
  * 应改走描述符入口（给该被动加一个嵌套 {@code PassiveSkill.Specification}）—— 属逐组件迁移卡的范围。

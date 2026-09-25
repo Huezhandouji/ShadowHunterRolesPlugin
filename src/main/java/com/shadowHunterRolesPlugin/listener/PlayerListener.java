@@ -40,6 +40,9 @@ public class PlayerListener implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event){
         Player player = event.getPlayer();
         roleManager.clearRole(player.getUniqueId());
+ //★ 掉线路径必须**就地**清（本事件内 Player 实体仍可用）—— {@code clearRole(UUID)} 不带物品清理，
+ //  且此刻背包随后会被存档 ⇒ 不清就会**持久化残留**（t56 实测的行为空洞，已补回）。
+        HotbarItems.clearFrom(player);
     }
 
 }

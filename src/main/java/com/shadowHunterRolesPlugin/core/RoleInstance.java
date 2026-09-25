@@ -14,7 +14,6 @@ import com.shadowHunterRolesPlugin.core.ports.RoleInfo;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.platform.Task;
-import com.shadowHunterRolesPlugin.roleComponent.HotbarItems;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 //框架级服务组件的**清单**（类 + id + 构造顺序 + 接线 + 容器侧的服务取用入口都在那一件里）——
 //本类只引用它的 `ID_*` 常量与静态服务入口。
@@ -978,9 +977,6 @@ public class RoleInstance {
             updateTask.cancel();
             updateTask = null;
         }
-
- //清角色 ⇒ 一并清掉本系统写在热键栏里的物品（物品关注点归 roleComponent/HotbarItems ✓）
-        HotbarItems.clearFrom(player);
 
         player.getAttribute(Attribute.MAX_HEALTH).removeModifier(roleHealthModifierKey);
 

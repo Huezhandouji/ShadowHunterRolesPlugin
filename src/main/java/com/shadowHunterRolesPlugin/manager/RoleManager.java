@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.core.ports.RoleInfo;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
+import com.shadowHunterRolesPlugin.roleComponent.HotbarItems;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -276,6 +277,12 @@ public class RoleManager {
         RoleInstance removed = playerRoleMap.remove(player.getUniqueId());
         if(removed != null){
             removed.clear();
+ //清角色 ⇒ 一并清掉本系统写在热键栏里的物品（物品关注点归 roleComponent/HotbarItems ✓）。
+ //★ 放在**管理器**而不是容器：容器只剩"容器职责"的对外面（查取入口 / 隔离 / 生命周期）✗，
+ //  "清哪些物品"属物品关注点；此处是**所有在线清角色路径的汇聚点**（手动 /role clear · 死亡 · 重载）。
+ //★ 本重载覆盖**在线**清角色路径；{@link #clearRole(UUID)} **不带**物品清理 ⇒ 掉线路径由
+ //  {@code listener/PlayerListener#onPlayerQuit} 就地补回（那里 Player 实体仍可用）✓。
+            HotbarItems.clearFrom(player);
             return true;
         }
         return false;

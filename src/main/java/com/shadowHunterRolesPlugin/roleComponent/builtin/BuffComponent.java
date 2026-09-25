@@ -35,12 +35,53 @@ public class BuffComponent extends RoleComponent implements OperationProvider {
 
     public BuffComponent(String id, ComponentServices services, BuffManager buffManager) {
         super(id, services);
+ //★ 账本与持有者**成对**建立：`BuffManager` 需要"账本的持有者"这个引用才能在不回容器的前提下
+ // 请求重绘 / 交药水记账 ⇒ 构造期把它接上（本组件的 `this` 在此已可安全传出：只存引用、不调用）。
         this.buffManager = buffManager;
+        if (buffManager != null) {
+            buffManager.bindOwner(this);
+        }
     }
 
     /** buff 记账表本体（容器 {@code clear()} 仍需它做 {@code clearAll()} ⇒ 提供读口）。 */
     public BuffManager manager() {
         return buffManager;
+    }
+
+    // ───────── 生命周期：本组件自己的两个节拍（容器不再代劳）─────────
+
+    /**
+     * **开始生效：启动记账表的每 tick 更新**（两阶段构造的第二相）。
+     *
+     * <p><b>为什么在 {@code start()}</b>：构造期不得创建任何任务（构造中途抛错会泄漏永久 ticker）
+     * ⇒ 记账表的更新只能在可见相启动 ✓（与 `BuffManager` 自己的契约同源）。
+     *
+     * <p><b>提交顺序与既有实现相同</b>：本 `start()` 由 `triggerLifecycleStart()` 按**注册序**广播，
+     * 而记账表更新先于实例 ticker 启动 ⇒ 同一 tick 内先跑记账、再跑组件 `update()` ✓。
+     */
+    @Override
+    public void start() {
+        buffManager.startUpdater();
+    }
+
+    /**
+     * **停止生效：回收本组件持有的两本账**（药水账本 + buff 记账表）。
+     *
+     * <p><b>顺序逐字沿用既有实现</b>：① 先只移除**本系统记账过**的药水效果
+     * （不再无条件清空玩家身上的所有药水）② 再清账本 ✓。
+     */
+    @Override
+    public void stop() {
+        clearAppliedPotionEffects();
+        clearBuffLedger();
+    }
+
+    /**
+     * **清空 buff 记账表**（★ 本组件自己的状态自己回收；原由容器经转发入口代劳）。
+     * <p>语义与原转发入口**逐字一致**：`manager().clearAll()` ✓。
+     */
+    public void clearBuffLedger() {
+        buffManager.clearAll();
     }
 
     /** 技能闸门（可否施放技能）。 */

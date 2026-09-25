@@ -189,9 +189,9 @@ public class RoleInstance {
         if(!valid) return;
         activated = true;
 
- //① buff 记账表的每 tick 更新（原在构造期由 `BuffManager` 构造器启动，现移到这里）：
- // **提交顺序与既有实现相同** —— 先于实例 ticker 提交 ⇒ 同一 tick 内先跑记账、再跑组件 update。
-        ServiceComponents.startBuffUpdater(resolve(ServiceComponents.ID_BUFFS));
+ //① buff 记账表的每 tick 更新：**已由 buff 组件在自己的 `start()` 里启动** ✓ ——
+ // ★ 本类不再代劳（那会让容器必须认识 buff 组件）。顺序逐字不变：`start()` 由下面的
+ //   `triggerLifecycleStart()` 按注册序广播，仍先于实例 ticker 提交 ⇒ 同一 tick 内先记账、再 update。
 
  //② 生命上限：**已由生命组件自己在 `start()` 里装** ✓ ——
  // ★ 本类**不再代劳**（那会让容器必须认识生命组件与其密钥）。
@@ -517,11 +517,9 @@ public class RoleInstance {
  //原 `isValid()` 公开读口**已删除**（消费者 0：容器内一律
  //直接读私有字段 `valid`；字段本身保留：clear() / activate() / 组件隔离守卫都在用它）。
 
- //药水施加入口（记账）：施加到本实例玩家身上的效果记入账本，clear() 时只回收账本里的类型
- //：**账本的持有者 = buff 组件** ⇒ 本方法保留为视图（BuffManager 在用）。
-    public void applyPotionEffect(PotionEffect effect){
-        ServiceComponents.applyPotionEffect(resolve(ServiceComponents.ID_BUFFS), effect);
-    }
+ //药水施加入口（记账）：★ **已从容器删除** —— 账本的持有者 = buff 组件，
+ // 调用方（`BuffManager`）改为**自己按 id 取到该组件**再调它自己的 `applyPotionEffect` ✓
+ // ⇒ 容器不再需要这个转发视图，也不再认识 buff 组件。
 
  // ───────── 阵营（欠账 A 后半）：**读侧视图已删除** / 写侧视图保留 ─────────
  //★ 真值所在：聚合根 `Role` 的 `faction` 字段（原 `FactionComponent.faction` 组件字段已随组件删除）。
@@ -972,11 +970,9 @@ public class RoleInstance {
  //生命上限修饰符：**已由生命组件自己在 `stop()` 里摘掉** ✓ ——
  // ★ 本类不再代劳；上面的 `triggerLifecycleStop()` 就是它的执行时机（既有语句，未新增调用点）。
 
- //药水记账：**账本随 buff 组件持有** ⇒ 由它只移除本系统记账过的效果，
- //不再无条件清空玩家身上的所有药水效果（返回移除的类型数，供诊断）
-        ServiceComponents.clearAppliedPotionEffects(resolve(ServiceComponents.ID_BUFFS));
-
-        ServiceComponents.clearBuffLedger(resolve(ServiceComponents.ID_BUFFS));
+ //药水账本 + buff 记账表：**已由 buff 组件自己在 `stop()` 里回收** ✓ ——
+ // ★ 本类不再代劳。顺序逐字不变（先移除本系统记账过的药水、再清账本），
+ //   执行时机 = 上面的 `triggerLifecycleStop()`（既有语句，未新增调用点）。
 
 
     }

@@ -1,8 +1,10 @@
 package com.shadowHunterRolesPlugin.manager;
 
 import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffType;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.ServiceComponents;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.Task;
@@ -27,12 +29,27 @@ public class BuffManager {
 
     private final RoleInstance instance;
 
+    /**
+     * **账本的持有者**（= buff 组件）—— 记账动作一律走它，**不再回容器转发** ✓。
+     *
+     * <p>由 {@link #bindOwner(RoleComponent)} 在 buff 组件构造期接上（那时 `this` 只是被存引用、
+     * 尚未被调用 ⇒ 无"构造期逃逸"风险）。
+     *
+     * <p>`RoleInstance` 仍保留用于两件**非组件**的事：取调度器（`rolesContext()`）。
+     */
+    private RoleComponent owner;
+
     public BuffManager(Player player, RoleInstance instance){
         this.player = player;
         this.instance = instance;
         //**构造期不启动每 tick 更新** —— 第一相（构造）不得创建任何任务，
         //否则构造中途抛错（例如某个组件构造器抛）会泄漏一个永久运行的 ticker。
-        //启动点改为 `RoleInstance#activate()`（第二相），由它调用 {@link #startUpdater()}。
+        //启动点改为 buff 组件的 `start()`（第二相）⇒ {@link #startUpdater()}。
+    }
+
+    /** 接上**账本的持有者**（由 buff 组件在构造期调用一次）。 */
+    public void bindOwner(RoleComponent owner){
+        this.owner = owner;
     }
 
     public void addBuff(BuffType type, int durationTicks){
@@ -107,25 +124,33 @@ public class BuffManager {
             player.getAttribute(Attribute.MOVEMENT_SPEED).removeModifier(BUFF_MOVEMENT_SPEED_MODIFIER_KEY);
         }
 
-        if(instance != null){
+        if(owner != null){
             //buff 移除 ⇒ 请求重绘（添加时**不**请求 —— "添加后无刷新"的既有语义不变）
-            //按 id 取渲染组件、经框架级取用面请求重绘 ⇒ 本类不点名任何具体组件类
-            ServiceComponents.renderRequestRepaint(
-                    instance.componentRegistry().getById(ServiceComponents.ID_HOTBAR_RENDER));
+            //★ 走**基类通用面** `RoleComponent#requestRepaint`（默认空实现、由渲染组件覆写）
+            // ⇒ 本类只持有"账本持有者"这个通用引用，**不认识**渲染组件 ✓（也不再按 id 去取）
+            owner.requestRepaint();
         }
     }
 
-    //加原版药水效果（经 RoleInstance 记账，clear() 时只回收本系统施加的效果）
+    //加原版药水效果（经**账本持有者**记账；clear() 时只回收本系统施加的效果）
     private void applyPotionEffect(BuffType type, int durationTicks){
+        if(owner == null) return;
         switch (type){
             case STUN:
-                instance.applyPotionEffect(new PotionEffect(
+                applyToOwner(new PotionEffect(
                         PotionEffectType.BLINDNESS, durationTicks, 1, false, true
                 ));
-                instance.applyPotionEffect(new PotionEffect(
+                applyToOwner(new PotionEffect(
                         PotionEffectType.DARKNESS, durationTicks, 1, false, true
                 ));
                 break;
+        }
+    }
+
+    /** 把药水交给**账本持有者**记账（它在自己的 `stop()` 里只回收自己记过的类型）。 */
+    private void applyToOwner(PotionEffect effect){
+        if(owner instanceof BuffComponent buffs){
+            buffs.applyPotionEffect(effect);
         }
     }
 

@@ -42,7 +42,7 @@ public class PlayerListener implements Listener {
         roleManager.clearRole(player.getUniqueId());
  //★ 掉线路径的物品清理**不在此处重复** —— `RoleManager.clearRole(UUID)` 已就地用
  //  {@code Bukkit.getPlayer(uuid)} 取到**仍在线**的 Player 并调 {@code HotbarItems.clearFrom} ✓
- //  （t56 曾在此补回一次以修掉"随存档持久化"的残留；清理中心化到两个重载后本行成为冗余）。
+ //  （清理已中心化到两个 clearRole 重载 ⇒ 本处不再重复调用）。
     }
 
 }

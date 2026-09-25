@@ -45,7 +45,7 @@ public class RoleInstance {
     private boolean valid = true;
 
  /**
- * **第二相是否已执行**（P6 两阶段构造）：构造器只做不可见的事，
+ * **第二相是否已执行**：构造器只做不可见的事，
  * 全部玩家可见的副作用在 {@link #activate()} 里，且**至多发生一次**。
  */
     private boolean activated = false;
@@ -61,7 +61,7 @@ public class RoleInstance {
     private final RolesContext platform;
 
  // ─────────：运行期组件异常的**故障隔离**状态（用户新设计） ─────────
- //**同实例只隔离一次**（A7）：一旦置 true，后续异常只记日志、不递归隔离；派发循环也就地退出。
+ //**同实例只隔离一次**：一旦置 true，后续异常只记日志、不递归隔离；派发循环也就地退出。
     private volatile boolean quarantined = false;
  //拆卸中（clear() 起）：此时组件抛异常**只记日志**，不触发隔离 —— 实例本来就在被销毁，
  //把一次正常清角色里的 stop() 异常播成"某角色已停用"是假警报。
@@ -126,7 +126,7 @@ public class RoleInstance {
  //装配完成 → 冻结注册表（此后按 id / 按类型查取才合法）
         componentRegistry.freeze();
 
- // ── 第一相到此结束（P6 两阶段构造）───────────────────────────────
+ // ── 第一相到此结束 ───────────────────────────────
  //构造器**只做不可见的事**：装配（组件 / 服务集 / 窄类型视图 / 服务组件登记）+ 注册表冻结
  //（依赖检查在 `Role#createInstance` 里、本构造器之前， 已有）。
  //**玩家可见**的副作用全部在第二相 {@link #activate()}：写生命修饰符 / 设置生命 / 生命周期广播 /
@@ -232,7 +232,7 @@ public class RoleInstance {
  //与装配期组件走**同一条**构造路径（同一服务集口径）；日志用于删除守卫的
  //"拒绝删除被依赖组件"的日志（点名被删组件 / 阻止者 / 缺的类型）
                 new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger()),
- //（A2）：角色信息服务（聚合根只读面）；
+ //角色信息服务（聚合根只读面）；
  //：构造点仍是**这一处** —— 本类持有同一实例并给出框架侧读口 {@link #roleInfo()}
  //（组件侧 `svc().roleInfo()` 与框架侧 `instance.roleInfo()` = **同一个实例**）。
                 roleInfo
@@ -298,7 +298,7 @@ public class RoleInstance {
  /**
  * 组件初始化（统一装配）：**只遍历 {@code role.getComponents()} 一次** ——
  * 遍历顺序 = `Builder.add*` 的调用顺序 = **纯注册序**（早先的三段遍历
- * 「技能 → 被动 → 主武器」已删除，见交付说明的派发序申报）。
+ * 「技能 → 被动 → 主武器」已删除）。
  * <p>**没有任何"种类"值**需要传递或读取（kind 枚举已删）；
  * **服务集构造也不再需要 kind**（冷却表已合并为单一命名空间）。
  */
@@ -695,7 +695,7 @@ public class RoleInstance {
  * <li><b>记录 log</b> —— 点名 角色 / 玩家 / 组件 / 异常（含栈）；</li>
  * <li><b>给所有人发消息提醒</b> —— 全服简报 + OP 详情 + 限流去重（交给 {@link QuarantineHandler}）。</li>
  * </ol>
- * 第 4 步之后由管理器**清空该玩家角色**（A6，复用既有 {@code clearRole} 清理链）。
+ * 第 4 步之后由管理器**清空该玩家角色**（复用既有 {@code clearRole} 清理链）。
  */
     private void quarantine(QuarantineRequest request) {
         if (quarantined) {

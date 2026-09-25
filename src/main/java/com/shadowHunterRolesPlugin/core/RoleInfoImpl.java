@@ -10,7 +10,7 @@ import org.bukkit.entity.Player;
 import java.util.List;
 
 /**
- * {@link RoleInfo} 的独立适配器（A1）：**持 {@code RoleInstance}**，与
+ * {@link RoleInfo} 的独立适配器：**持 {@code RoleInstance}**，与
  * {@code *PortImpl} 家族同形。
  * <p><b>取值一律经聚合根</b>：{@link #faction()} 读 {@code Role#getFaction()}
  * （**不是**读某个组件实例的字段 ⇒ 阵营"一个角色一份、全局静态"）。

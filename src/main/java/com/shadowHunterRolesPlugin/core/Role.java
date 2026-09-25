@@ -110,7 +110,7 @@ public class Role {
     }
 
     public RoleInstance createInstance(Player player, RolesContext context){
- //（A2 · 检查时机）：依赖检查必须发生在 **任何实例化/awake 之前** ——
+ //检查时机：依赖检查必须发生在 **任何实例化/awake 之前** ——
  // 这里是"造实例"的唯一入口（{@code manager/RoleManager#selectRole} 与测试探针都走它）⇒
  // 在这里再查一次，任何路径都不可能绕过检查进到 {@code awake()}。
  // 幂等：{@code registry/RoleLoader#loadInto} 在注册前已经查过一次（不注册的模板根本到不了这里）。
@@ -187,7 +187,7 @@ public class Role {
  // 这是匹配规则的一部分，**不是**环检测的残留 —— 删环检测**没有**放松它。
  // * 互环（A↔B）与更长的环：装配**通过**（这正是预期）。
  // * 运行期 awake() 顺序 = 容器按插入序，与依赖图无关 ⇒ 环内"谁先醒"**未定义**（见
- // {@link #verifyDependencies()} 的 A3 段）。
+ // {@link #verifyDependencies()} 的顺序说明）。
 
  /**
  * **唯一组件创建点**：全仓**创建路径**只有这里调用

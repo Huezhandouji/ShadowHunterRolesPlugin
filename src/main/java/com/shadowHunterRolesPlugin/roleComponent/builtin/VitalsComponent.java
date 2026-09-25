@@ -114,7 +114,7 @@ public class VitalsComponent extends RoleComponent {
      * <p><b>时序安全性（已核）</b>：`start()` 由 `RoleInstance.activate()` 广播，而
      * `RoleManager.selectRole` 的次序是
      * 「构造（不可见）→ 清旧角色 → `activate()`」⇒ 本方法写入时**旧实例已被清完**
-     * ⇒ 不会重新踩上 A3 那三条「旧实例按共享键误伤新实例」的坑 ✓
+     * ⇒ 不会重新踩上「旧实例按共享键误伤新实例」那三条坑 ✓
      * （逐条：① 上限修饰符 ② 热键栏 ③ 同类型药水）。
      */
     @Override
@@ -212,7 +212,7 @@ public class VitalsComponent extends RoleComponent {
     /**
      * **两参签名的兼容入口**（**保留不破公开面** ✓）：
      * 逐字等价于 {@code damage(target, amount, DamageKind.TRUE)}。
-     * <p>保留理由（P4 同族）：Part A 已把它作为公开面发布 ⇒ 删它属 API 收缩 ✗；
+     * <p>保留理由：它已作为公开面发布 ⇒ 删它属 API 收缩 ✗；
      * 而它的语义（真伤）与 {@code TRUE} 完全一致 ⇒ 委托即可，**没有第二套实现** ✓。
      *
      * @deprecated 改用 {@link #damage(Player, double, DamageKind)}（显式写出伤害类型）。

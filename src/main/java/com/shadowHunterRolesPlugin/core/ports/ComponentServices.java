@@ -14,7 +14,7 @@ package com.shadowHunterRolesPlugin.core.ports;
 public record ComponentServices(
         Self self,
         ComponentLookup components,
- //（A2）：角色信息服务 —— 聚合根（Role）的只读服务面（阵营读取 + 两个行为）。
+ //角色信息服务 —— 聚合根（Role）的只读服务面（阵营读取 + 两个行为）。
         RoleInfo roleInfo
 ) {
 }

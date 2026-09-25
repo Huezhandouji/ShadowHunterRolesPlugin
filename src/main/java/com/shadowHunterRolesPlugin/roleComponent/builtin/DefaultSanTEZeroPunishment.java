@@ -40,13 +40,13 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
  *       （消除"起任务与标记之间"的重入窗口）；</li>
  *   <li>**惩罚期间持续钉 SanTE = 0（逐 tick）**：{@link #update()} 里以 {@code inSanTEPunishment} 守卫，
  *       **每一 tick** 执行 {@code sante.set(0)}
- *       （**Q1 = A**：此前是"任务体每 40 刻钉一次"，整个惩罚只钉 3 次、
+ *       （此前是"任务体每 40 刻钉一次"，整个惩罚只钉 3 次、
  *       两钉点之间可被其它组件抬高（如流血 `+4`）⇒ 现改为逐 tick，**惩罚期间每一 tick 都是 0**）；</li>
  *   <li>**忽略重入**：{@code onSanTEChange} 顶部守卫 {@code if (inSanTEPunishment) return;}
  *       ⇒ 惩罚进行中**不取消、不重启、不刷新 {@code count}、不重放标题/粒子、不重复上 STUN**；</li>
  *   <li>**结束回满（推迟到 STUN 结束）**：在**施加 STUN 的那一跳**（{@code count == 1}）预约
  *       {@code timer.addScheduleLater(this, 100L, …)} ⇒ **STUN 100 刻到期那一刻**清标记并把 SanTE 恢复至 {@code max}
- *       （**Q2 = A**：此前在第 3 跳 ≈4.05 s 就回满、而 STUN 到 5 s 才结束
+ *       （此前在第 3 跳 ≈4.05 s 就回满、而 STUN 到 5 s 才结束
  *       ⇒ 存在约 1 秒「已回满但仍在眩晕」的窗口 ⇒ 现已消除；回满在**同一处一次性**完成）。</li>
  * </ol>
  * <p><b>⚠️ 一条曾被实测证伪的旧注释（已更正）</b>：容器侧 `RoleInstance.dispatchSanTEChange` 的
@@ -108,7 +108,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
     //任务句柄（平台 Task；null = 没有任务在跑）
     private ScheduledHandle punishmentTask;
-    //回满任务句柄（Q2 = A：STUN 100 刻结束时一次性回满；与上面同属本组件资源表）
+    //回满任务句柄（STUN 100 刻结束时一次性回满；与上面同属本组件资源表）
     private ScheduledHandle punishmentRestoreTask;
 
     /**
@@ -139,7 +139,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
     private boolean inSanTEPunishment = false;
 
     /**
-     * 逐 tick 钩子（容器按注册表顺序每 tick 广播一次）—— **(2) 惩罚期间逐 tick 钉 SanTE = 0**（Q1 = A）。
+     * 逐 tick 钩子（容器按注册表顺序每 tick 广播一次）—— **(2) 惩罚期间逐 tick 钉 SanTE = 0**。
      * <p>与容器侧「真变化才派发」的关系（**无重入循环、无任务泄漏**）：
      * <ul>
      *   <li>已是 0 时 {@code set(0)} ⇒ 容器侧 `if(pre == now) return;` ⇒ **不派发**；</li>
@@ -209,7 +209,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                         }
                         count += 1;
 
-                        //(2) 钉 0 已移出任务体：改为 {@link #update()} 里**逐 tick** 执行（Q1 = A）
+                        //(2) 钉 0 已移出任务体：改为 {@link #update()} 里**逐 tick** 执行
                         //    ⇒ 惩罚期间"每一 tick 都是 0"，不再有两钉点之间被抬高的窗口。
 
                         Location loc = player.getLocation();
@@ -217,7 +217,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                         if (count == 1) {
                             buff.add(BuffType.STUN, 100);
 
-                            //(4) 回满推迟到 STUN 结束（Q2 = A）：STUN 在本跳施加、持续 100 刻
+                            //(4) 回满推迟到 STUN 结束：STUN 在本跳施加、持续 100 刻
                             //    ⇒ 自本跳起 100 刻后（= STUN 到期那一刻）清标记并一次性回满。
                             //    ⇒ 惩罚期间 SanTE 全程真正为 0（逐 tick 钉 + 结束后才回满），消除"已回满但仍眩晕"的窗口。
                             punishmentRestoreTask = timer.addScheduleLater(DefaultSanTEZeroPunishment.this, 100L, () -> {
@@ -269,7 +269,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                             particleLoc.getWorld().spawnParticle(Particle.SCULK_SOUL, particleLoc, 30, 0.5d, 0.5d, 0.5d);
                         }
                         vitals.trueDamage(player, null, totalDamageAmount * 0.33333d);
-                        //(4) 回满**不再**发生在第 3 跳：已推迟到 STUN 结束（见 count == 1 处的回满任务，Q2 = A）
+                        //(4) 回满**不再**发生在第 3 跳：已推迟到 STUN 结束（见 count == 1 处的回满任务）
                     }
                 });
     }

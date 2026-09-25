@@ -63,7 +63,7 @@ public class RoleManager {
      * 此时旧角色**已经**被释放（第 3 步不可回退）⇒ 该分支下玩家会处于"无角色"状态：本方法记一条
      * {@code SEVERE}、**释放半激活的实例**（{@code instance.clear()} ⇒ 不泄漏 ticker / 药水 / 热键栏 /
      * 属性修饰符）并返回 {@code false}，**异常不逃逸**。该分支在现有产品里不可达（无组件在
-     * {@code awake()/start()} 抛），已在交付说明的未覆盖项里申报。
+     * {@code awake()/start()} 抛）⇒ 该分支属**防御性设施**（当前不可达）。
      */
     public boolean selectRole(Player player, String roleId){
         if(!roleRegistry.contains(roleId)) return false;
@@ -72,7 +72,7 @@ public class RoleManager {
         Role role = roleRegistry.get(roleId);
         if(role == null) return false;
 
-        //A5 ①：预检（装配期依赖检查）必须在**清理旧角色之前** —— 它不产生任何副作用
+        //① 预检（装配期依赖检查）必须在**清理旧角色之前** —— 它不产生任何副作用
         try {
             role.verifyDependencies();
         } catch (Throwable failure) {
@@ -82,7 +82,7 @@ public class RoleManager {
             return false;
         }
 
- //A5 ②（第一相）：**先把新实例构造成功**（构造器只做不可见的事）
+ //② 第一相（构造）：**先把新实例构造成功**（构造器只做不可见的事）
  //⇒ 失败时旧角色原样保留（残留的收口点：非依赖类构造异常不再让玩家丢角色）
         RoleInstance instance;
         try {
@@ -97,11 +97,11 @@ public class RoleManager {
         //**绑定隔离处置**（必须在 activate() 之前 ⇒ awake()/start() 里的异常也能被隔离）
         instance.bindQuarantineHandler(this::onInstanceQuarantined);
 
-        //A5 ③：构造**成功之后**才清旧角色 —— 新实例此时尚未写入任何玩家可见状态（生命修饰符 /
- //热键栏 / 药水），旧实例的 clear() 无从误伤它（实测的三条约束逐条见交付说明 A3）
+        //③ 构造**成功之后**才清旧角色 —— 新实例此时尚未写入任何玩家可见状态（生命修饰符 /
+ //热键栏 / 药水）⇒ 旧实例的 clear() 无从误伤它 ✓
         if(hasRole(player)) clearRole(player);
 
- //A5 ④（第二相）：激活 —— 可见副作用全部在这里，异常不逃逸
+ //④ 第二相（激活）：可见副作用全部在这里，异常不逃逸
         try {
             instance.activate();
         } catch (Throwable failure) {
@@ -132,7 +132,7 @@ public class RoleManager {
         Role role = roleRegistry.get(roleId);
         if(role == null) return false;
 
-        //同 Player 重载：预检先行（A5 ①）
+        //同 Player 重载：预检先行
         try {
             role.verifyDependencies();
         } catch (Throwable failure) {
@@ -142,7 +142,7 @@ public class RoleManager {
             return false;
         }
 
-        //同 Player 重载：第一相（构造，不可见）—— 失败 ⇒ 旧角色原样保留（A5 ②）
+        //同 Player 重载：第一相（构造，不可见）—— 失败 ⇒ 旧角色原样保留
         RoleInstance instance;
         try {
             instance = role.createInstance(player, context);
@@ -156,10 +156,10 @@ public class RoleManager {
  //同 Player 重载：绑定隔离处置（，必须在 activate() 之前）
         instance.bindQuarantineHandler(this::onInstanceQuarantined);
 
-        //同 Player 重载：构造成功之后才清旧角色（A5 ③）
+        //同 Player 重载：构造成功之后才清旧角色
         if(hasRole(uuid)) clearRole(uuid);
 
-        //同 Player 重载：第二相（激活，可见）—— 异常不逃逸（A5 ④）
+        //同 Player 重载：第二相（激活，可见）—— 异常不逃逸
         try {
             instance.activate();
         } catch (Throwable failure) {
@@ -203,7 +203,7 @@ public class RoleManager {
         //④ 提醒：全服简报（所有人）+ OP 详情（含组件名 / 阶段 / 异常 / 栈摘要）+ **限流去重**
         quarantineNotifier.announce(roleId, playerName, componentId, phase, failure);
 
-        //A6：隔离后角色归属 = 清空（复用既有清理链；玩家变为无角色、可重选）
+        //隔离后角色归属 = 清空（复用既有清理链；玩家变为无角色、可重选）
         if (uuid != null && playerRoleMap.containsKey(uuid)) {
             clearRole(uuid);
         } else {
@@ -295,7 +295,7 @@ public class RoleManager {
  //★ 与 {@link #clearRole(Player)} 的**唯一**差别只是取 Player 的方式：本重载用
  //  {@code Bukkit.getPlayer(uuid)}（离线 ⇒ null ⇒ 无实体可清，跳过）。**清物品这一点两个重载必须一致** ——
  //  否则三条走 UUID 的路径（换角色 / 隔离 / API 的 UUID 重载）会静默失去清理（掉线那处曾因此出现
- //  「随存档持久化的残留」，见 t56 的行为空洞判定）。
+ //  「随存档持久化的残留」）。
             Player online = Bukkit.getPlayer(uuid);
             if(online != null){
                 HotbarItems.clearFrom(online);

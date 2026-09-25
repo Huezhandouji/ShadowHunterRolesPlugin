@@ -9,7 +9,7 @@ import org.bukkit.event.Listener;
  *       平台侧监听器 → 容器注入的 {@code dispatchSanTEChange}（真变化闸门 / 逐监听器故障隔离 / 重入合并
  *       三条都在那条边界上）。{@code RoleInstance.setCurrentSanTE} 转发视图
  *       **已删除** ⇒ 真实路径只剩上面这一条。</li>
- *   <li><b>能量变更</b>：组件侧钩子**无实现者**（F6 死路径）⇒ 转发与容器空壳入口一并删除。</li>
+ *   <li><b>能量变更</b>：组件侧钩子**无实现者** ⇒ 转发与容器空壳入口一并删除。</li>
  * </ul>
  * <p>变更通知一律**只经组件自己的监听器列表**（{@code addListener} + JDK {@code Consumer}）✓
  * ⇒ 不再发布任何平台事件，本类也无事可做。

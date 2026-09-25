@@ -121,7 +121,7 @@ public final class ConfigurationManager {
                 loadFailure = null;
             }
         } catch (Throwable failure) {
-            //A15：读不动 ⇒ 一律默认值，绝不抛异常、绝不让指令因此不可用
+            //读不动 ⇒ 一律默认值，绝不抛异常、绝不让指令因此不可用
             source = null;
             sourceLabel = "unreadable";
             String reason = failure.getClass().getSimpleName() + ": " + failure.getMessage();
@@ -151,7 +151,7 @@ public final class ConfigurationManager {
             log("config " + path + " = " + current + " (source=" + sourceLabel + ")");
         } else if (!previous.equals(current)) {
             loggedValue.put(path, current);
-            //A10：因文件变更而重读时，**一行里同时给出新旧值** ⇒ 运行级证据可直接取原始行
+            //因文件变更而重读时，**一行里同时给出新旧值** ⇒ 运行级证据可直接取原始行
             log("config " + path + ": " + previous + " -> " + current + " (source=" + sourceLabel + ")");
         }
     }

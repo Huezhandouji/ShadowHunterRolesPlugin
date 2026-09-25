@@ -164,21 +164,17 @@ public class RoleInstance {
     }
 
  /**
- * **第二相：激活**（P6 两阶段构造）—— 把原先写在构造器里、**有玩家可见副作用**的
- * 那一段原样搬到这里：语句、顺序、可见时机与既有实现**逐字一致**，唯一差别是**调用时机**
- * （由调用方在"新实例已构造成功、旧角色已清理"之后调用）。
- * <p><b>为什么必须拆两相</b>：早先写法是"先 {@code clear()} 旧角色、再裸构造新实例"⇒ 构造一旦失败，
- * 玩家**先丢角色**。而字面意义的"先构造后清理"又会踩 实测的三条约束 ——
- * 旧实例的 {@code clear()} 会 ① 按**共享 key** 移除新实例刚加的 {@code role_health_modifier}
- * （最大生命掉回 20）② 清空新实例刚渲染的热键栏 ③ 移除同类型药水。那三条之所以成立，
- * 正是因为**构造期就已经把这些可见状态写下去了**；拆出本相后，"清旧"发生在
- * **新实例写任何可见状态之前** ⇒ 三条约束全部落空（逐条对照见交付说明的 A3 一节）。
- * <p><b>幂等</b>：重复调用只生效一次（{@code activated} 护栏）—— 否则会重复启动 ticker、
- * 重复广播生命周期（{@code awake()} 约定幂等，但 {@code start()} 不约定）。
- * 已 {@link #clear()} 的实例（{@code valid == false}）**不得**再激活，直接返回。
- * <p><b>异常</b>：本相**可能**抛（组件在 {@code awake()} / {@code start()} 里抛，
- * 或玩家属性 / 热键栏写入失败）⇒ 调用方**必须**自行 try/catch，见
- * {@code manager/RoleManager#selectRole} 的"激活失败"分支（该分支的残留已在交付说明里如实申报）。
+ * **第二相：激活** —— 构造器只做不可见的事；**有玩家可见副作用**的语句全在这里
+ * （语句、顺序、可见时机与既有实现逐字一致，差别只在**调用时机**）。
+ *
+ * <p><b>为什么必须拆两相</b>：早先"先 `clear()` 旧角色、再裸构造新实例"⇒ 构造一旦失败玩家**先丢角色**。
+ * 而"先构造后清理"又会踩三条约束 —— 旧实例的 `clear()` 会 ① 按**共享 key** 移除新实例刚加的生命上限
+ * 修饰符 ② 清空新实例刚渲染的热键栏 ③ 移除同类型药水。拆出本相后，"清旧"发生在
+ * **新实例写任何可见状态之前** ⇒ 三条约束全部落空。
+ *
+ * <p><b>幂等</b>：重复调用只生效一次（`activated` 护栏）；已 `clear()` 的实例不得再激活。
+ *
+ * <p><b>异常</b>：本相**可能**抛 ⇒ 调用方**必须**自行 try/catch（见 `manager/RoleManager#selectRole`）。
  */
     public void activate(){
         if(activated) return;
@@ -581,22 +577,18 @@ public class RoleInstance {
     private int sanTEPendingValue = Integer.MIN_VALUE;
 
  /**
- * SanTE 变更的**唯一派发点**（容器直派 + 重入护栏）。
+ * SanTE 变更的**唯一派发点**（容器直派 + 重入护栏）：
  * <ul>
- * <li><b>真变化才派发</b>（{@code pre == now} 直接返回）—— B⑨ 口径不变：SanTE 已为 0 时再扣不再通知组件；</li>
- * <li><b>禁止嵌套派发</b>：派发期间组件再次改写 SanTE ⇒ 只把最新值记为待发并立即返回；</li>
- * <li><b>合并成末次一次</b>：本次派发返回后，若期间有重入写入，则对"末次待发值"补发**一次**（中间态被合并掉）；</li>
- * <li><b>`notified` 机制（**为什么不能拿 `currentSanTE` 比**）</b>：{@code setCurrentSanTE} 是**先写字段、后派发**，
- * 所以派发期间字段值已经等于重入写入的目标值 —— 若把补偿条件写成 {@code currentSanTE != target}，该条件**恒假**，
- * 补偿分支会退化成**不可达死代码**（且给人"已实现合并"的假象）。故这里改用局部 {@code notified}
- * （初值 = 本次 {@code newSanTE}；每补发一次更新为 {@code target}）与 {@code target} 比较：
- * **无重入 ⇒ 不补发（与旧行为逐字一致）**；**有重入 ⇒ 恰好补发末次一次**；
- * 循环退出条件 = {@code sanTEPendingValue == Integer.MIN_VALUE}（哨兵 = 无待发值）；</li>
- * <li>异常隔离走 {@link #guardedCall}：**唯一受保护调用** ⇒ 抛异常 = 故障隔离。</li>
+ * <li><b>真变化才派发</b>（`pre == now` 直接返回）；</li>
+ * <li><b>禁止嵌套派发</b>：派发期间组件再次改写 ⇒ 只记最新待发值并立即返回；返回后对末次值**补发一次**
+ * （中间态被合并掉）；</li>
+ * <li>★ **`notified` 为什么不能用 `currentSanTE` 代替**：`setCurrentSanTE` 是**先写字段、后派发**
+ * ⇒ 派发期间字段已等于重入目标值 ⇒ 条件 `currentSanTE != target` **恒假**，补偿分支退化成死代码。
+ * 故用局部 `notified`（初值 = 本次 `newSanTE`，每补发一次更新）比较：无重入 ⇒ 不补发；
+ * 有重入 ⇒ 恰好补发末次一次。退出条件 = `sanTEPendingValue == Integer.MIN_VALUE`（哨兵）；</li>
+ * <li>异常隔离走 {@link #guardedCall}。</li>
  * </ul>
- * 现存两个实现者（{@code DefaultSanTEZeroPunishment} / {@code RedDeeplySorrowSkill} 的
- * {@code onSanTEChange}）都**不在钩子内同步写 SanTE**（前者只调度任务、后者只起冷却）
- * ⇒ 护栏在当前组件集下**不可达**，属防御性设施。
+ * ★ **护栏在当前组件集下不可达**（现存两个 `onSanTEChange` 实现都不在钩子内同步写 SanTE）⇒ 防御性设施。
  */
     private void dispatchSanTEChange(int preSanTE, int newSanTE){
         if(player == null ) return;
@@ -763,22 +755,22 @@ public class RoleInstance {
     }
 
  /**
- * **承受方钩子的交付口**（B-静态半）：平台事件面（{@code EntityDamageEvent} /
- * {@code EntityRegainHealthEvent}）经它把"受伤 / 受治疗"通知到**本实例**的组件。
- * <p><b>★ 为什么必须经这里、而不能从施动方实例直接调目标组件</b>：钩子抛异常时要按
- * {@link #guardedCall} 的**故障隔离**语义处置（真四步）—— 那套语义只存在于本类 ⇒ 绕过它就等于
- * 开第二条调用路径（违反"唯一受保护入口"）⇒ 调用方按**目标实例上实现了承受方标记的组件**扇出后逐个交给本方法。
- * <p><b>为什么外面还要包一层 {@link #withinIterationWindow}</b>：{@code guardedCall} 只把异常**记成**
- * {@link #pendingQuarantine}，真四步是在窗口的 {@code finally} 里跑的（{@code runPendingQuarantine}）⇒
- * 若从事件面裸调 {@code guardedCall}，隔离请求会被记下却**永远不执行** ⇒ 必须自建窗口边界。
- * 窗口内禁止增删组件⇒ 四步照旧落在窗口**之外**执行。
- * <p><b>主线程前提（B-静态半的申报项）</b>：本方法**必须在主线程**调用 —— 钩子会改动玩家状态
- * （生命 / 回调副作用），而 Bukkit 只允许主线程改动世界状态。非主线程 ⇒ **响亮记 SEVERE 并放弃投递**
- * （把静默损坏变成可见错误；**不**静默忽略）。本工程基线是 **Paper**（非 Folia）⇒
- * {@code isPrimaryThread} 成立；**若将来要支持 Folia，这套断言与调度都要重审**。
- * @param component 用于隔离归因的组件（点名"哪个组件抛的"）
- * @param phase 阶段名（进日志与隔离消息，如 {@code onDamaged} / {@code onHealed}）
- * @param action 扇出体（调用方负责遍历 {@code Participant}）
+ * **承受方钩子的交付口**：平台事件面把"受伤 / 受治疗"通知到**本实例**的组件。
+ *
+ * <p><b>为什么必须经这里</b>：钩子抛异常时要按 {@link #guardedCall} 的**故障隔离**语义处置，
+ * 而那套语义只存在于本类 ⇒ 绕过它 = 开第二条调用路径。调用方按目标实例上实现了承受方标记的
+ * 组件扇出后，逐个交给本方法。
+ *
+ * <p><b>为什么外面包 {@link #withinIterationWindow}</b>：`guardedCall` 只把异常**记成**
+ * {@link #pendingQuarantine}，真四步在窗口的 `finally` 里跑 ⇒ 裸调 `guardedCall` 会让隔离请求
+ * 被记下却**永不执行**。
+ *
+ * <p><b>★ 主线程前提</b>：必须主线程调用（钩子改动玩家状态）。非主线程 ⇒ **记 SEVERE 并放弃投递**
+ * （响亮失败，不静默忽略）。基线是 Paper（非 Folia）；若要支持 Folia，这套断言与调度都要重审。
+ *
+ * @param component 用于隔离归因的组件
+ * @param phase 阶段名（进日志与隔离消息）
+ * @param action 扇出体（调用方负责遍历承受方标记）
  */
     public void deliverHook(RoleComponent component, String phase, Runnable action) {
         if (component == null || action == null) {

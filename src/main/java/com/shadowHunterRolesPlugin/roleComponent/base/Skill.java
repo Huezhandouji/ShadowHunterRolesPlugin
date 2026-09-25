@@ -39,12 +39,13 @@ public abstract class Skill extends ActiveComponent {
     //  「闸门 / 当前能量」这两项**下放**，而判定的**顺序与语义**仍唯一落在状态枚举的静态工厂里 ✓。
 
     /**
-     * **闸门是否放行？**（**下放给子类**）—— 基类不查任何组件 ✗。
+     * **现在允许使用吗？**（**下放给子类**）—— 基类不查任何组件 ✗。
      * <p>子类用**自己的 buff 字段**回答（技能侧 = `canCastSkill()`：非 STUN 且非 SILENCE）。
+     * <p>★ 语义 = 三态判定里的「**禁用**」那一维：返回 `false` ⇒ 图标变红屏障（DISABLED）。
      * <p><b>为什么是抽象</b>：三态里的「禁用」完全由本值决定 ⇒ 若给默认值，漏写者会
      * **静默**丢掉"被沉默 / 眩晕时灰显"的可见行为 ✗（本仓口径：漏写要成为**编译错误**，不是运行期惊喜）。
      */
-    protected abstract boolean gateOpen();
+    protected abstract boolean canUse();
 
     /**
      * **当前能量**（**下放给子类**）—— 基类不查任何组件 ✗。
@@ -163,7 +164,7 @@ public abstract class Skill extends ActiveComponent {
         //后两项由**子类**给出（基类不查容器 ✗）；判定顺序与语义仍唯一在状态枚举的静态工厂里 ✓
         IconState state = IconState.of(
                 !isCoolingDown(),
-                gateOpen(),
+                canUse(),
                 currentEnergy(),
                 getEnergyCost());
 

@@ -80,7 +80,7 @@ public class MySkill extends Skill {                       // ✓ core→roleCom
     }
     @Override public void onCast(CastSignal signal) { }    // ✓ 施放回调（CastSignal 由框架投递）
     @Override public void update() { }                     // ✓ 每刻（需要时覆写）
-    @Override protected boolean gateOpen() { return true; }      // ✓ 门控（不满足 ⇒ 不施放、不启冷却）
+    @Override protected boolean canUse() { return true; }      // ✓ 门控（不满足 ⇒ 不施放、不启冷却）
     @Override protected int currentEnergy() { return 0; }        // ✓ 施放前能量读口（与 EnergyComponent 一致）
     @Override public void stop() { }                       // ✓ 清理（幂等）
 

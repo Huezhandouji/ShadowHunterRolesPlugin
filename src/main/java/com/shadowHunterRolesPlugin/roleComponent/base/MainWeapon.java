@@ -43,11 +43,12 @@ public abstract class MainWeapon extends ActiveComponent {
     //  ⇒ 「能量不足」态对它**不可达**（冻结面口径）⇒ 本类**不设**能量钩子，判定直接传声明值 ✓。
 
     /**
-     * **闸门是否放行？**（**下放给子类**）—— 基类不查任何组件 ✗。
+     * **现在允许使用吗？**（**下放给子类**）—— 基类不查任何组件 ✗。
      * <p>子类用**自己的 buff 字段**回答（主武器侧 = `canUseMainWeapon()`：非 STUN）。
+     * <p>★ 语义 = 三态判定里的「**禁用**」那一维：返回 `false` ⇒ 图标变红屏障（DISABLED）。
      * <p><b>为什么是抽象</b>：「禁用」态完全由本值决定 ⇒ 若给默认值，漏写者会**静默**丢掉灰显 ✗。
      */
-    protected abstract boolean gateOpen();
+    protected abstract boolean canUse();
 
     /**
      * 状态行与描述之间的分隔线（冻结字面量，值一字不变）。本类与 {@link Skill} 各持一份
@@ -142,7 +143,7 @@ public abstract class MainWeapon extends ActiveComponent {
         //闸门由**子类**给出（基类不查容器 ✗）；能量维不参与 ⇒ 传声明值（恒 0）
         IconState state = IconState.of(
                 !isCoolingDown(),
-                gateOpen(),
+                canUse(),
                 getEnergyCost(),
                 getEnergyCost());
 

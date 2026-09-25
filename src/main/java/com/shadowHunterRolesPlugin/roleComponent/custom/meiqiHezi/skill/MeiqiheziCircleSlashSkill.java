@@ -145,7 +145,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
      * **闸门放行？**（基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
      */
     @Override
-    protected boolean gateOpen(){
+    protected boolean canUse(){
         return buff.canCastSkill();
     }
 

@@ -3,16 +3,25 @@ package com.shadowHunterRolesPlugin.roleComponent.builtin;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarRenderer;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
+import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * **框架级物品渲染组件**。
@@ -74,6 +83,33 @@ public class HotbarRenderComponent extends RoleComponent {
      * 的唯一归属点，渲染器只是它的写物品手 ✓。
      */
     private final HotbarRenderer hotbarRenderer;
+
+    // ───────── 热键栏身份键（机制面唯一持有者） ─────────
+
+    /**
+     * **热键栏物品的唯一身份键**（值 = 该**物品实例**的随机 UUID 字符串）。
+     * <p><b>定义点唯一</b>：全仓只有本处定义它（形态与 {@code Skill.SKILL_KEY} / {@code MainWeapon.MAIN_WEAPON_KEY}
+     * 逐字同形：都经 {@code KeyFactory.Registry.of(String)} 的**唯一入口**）。
+     * <p><b>身份粒度 = 物品实例</b>（不是「组件 + 槽位」）⇒ 同一组件可提交多个实例、各自独立句柄 ✓。
+     * <p>写侧只在**绑键步**（{@link #bindIdentity}）出现，且与那次 {@code setItemMeta} **同一次**完成
+     * （不得先写 meta 再取回二次写入）✓。
+     */
+    public static final NamespacedKey HOTBAR_ID_KEY = KeyFactory.Registry.of("hotbar_id");
+
+    /** 机制面日志（前缀固定 {@code [hotbar]}；★ 不依赖 Bukkit 静态入口 ⇒ 离线构造组件时也安全）。 */
+    private static final Logger LOG = Logger.getLogger("ShadowHunterRoles.hotbar");
+
+    /**
+     * **活跃提交**：槽位 → 该槽位当前生效的那一个物品实例（同一槽位至多一条 ⇒ 重复提交 = 替换）。
+     * <p>插入序 = 提交序；{@link #renderPlan()} 在拉取式条目之后按此序覆盖同槽位条目。
+     */
+    private final Map<Integer, Submission> liveSubmissions = new LinkedHashMap<>();
+
+    /**
+     * **已失效提交**（按槽位留最近一条）：只为把「**失效了但槽位仍被点击**」这一异常态**报出来**
+     * （契约 §4.3 / §5.2 第 3 行：不得静默丢弃）—— 不参与渲染、不参与派发。
+     */
+    private final Map<Integer, Submission> retiredSubmissions = new LinkedHashMap<>();
 
     /**
      * **置脏标记**。初值 = {@code true} ⇒ 即便无人置脏，首位 flush 也会完成首刷
@@ -177,16 +213,27 @@ public class HotbarRenderComponent extends RoleComponent {
      * <p>不占栏位、或本帧画不出物品的组件**不进计划**（与"跳过该槽位"同义）。
      */
     private List<HotbarRenderer.Entry> renderPlan() {
-        List<HotbarRenderer.Entry> plan = new ArrayList<>();
-        if (svc().components() == null) {
-            return plan;
+        Map<Integer, ItemStack> bySlot = new LinkedHashMap<>();
+        // ① 拉取式（既有）：物品来自组件自己的默认画法读口 —— ★ 画法归属不动（契约 §7.3）
+        if (svc().components() != null) {
+            for (RoleComponent component : svc().components().all()) {
+                ItemStack item = buildItemOf(component);
+                if (item == null) continue;
+                HotbarSpecification<?> specification = specificationOf(component);
+                if (specification == null || !specification.hasSlot()) continue;
+                bySlot.put(specification.slot(), item);
+            }
         }
-        for (RoleComponent component : svc().components().all()) {
-            ItemStack item = buildItemOf(component);
-            if (item == null) continue;
-            HotbarSpecification<?> specification = specificationOf(component);
-            if (specification == null || !specification.hasSlot()) continue;
-            plan.add(new HotbarRenderer.Entry(specification.slot(), item));
+        // ② 提交式（新）：机制面在**绑键步**写身份键（恰好一次 setItemMeta）；同槽位**覆盖**拉取式条目
+        for (Submission submission : liveSubmissions.values()) {
+            ItemStack bound = bindIdentity(submission);
+            if (bound != null) {
+                bySlot.put(submission.slot, bound);
+            }
+        }
+        List<HotbarRenderer.Entry> plan = new ArrayList<>(bySlot.size());
+        for (Map.Entry<Integer, ItemStack> entry : bySlot.entrySet()) {
+            plan.add(new HotbarRenderer.Entry(entry.getKey(), entry.getValue()));
         }
         return plan;
     }
@@ -273,6 +320,256 @@ public class HotbarRenderComponent extends RoleComponent {
          * <p>**只通知**：改不了这一帧的渲染结果（返回 {@code void}）✗。
          */
         void onHotbarRendered();
+    }
+
+    // ───────── 提交面：其他组件提交物品 → 机制面绑身份 → 返回句柄 ─────────
+
+    /**
+     * **句柄的键**（listener 收窄后的「哪种键」；由机制面按槽位派发到句柄回调）。
+     * <p>★ 组件侧词汇不动（{@code CastTrigger} / {@code CastSignal} / {@code AttackSignal} 仍归组件）——
+     * 本枚举只是**机制面内部**的键分类。
+     */
+    public enum HotbarKey { LEFT, RIGHT, DROP, ATTACK }
+
+    /**
+     * **热键栏物品句柄**：提交者拿它设回调、查身份、注销或替换（签名照契约 §3.2 + §12 第 3 条）。
+     * <p><b>失效语义</b>（契约 §4）：{@link #release()} / {@link #replace(ItemStack)} 以及机制面的
+     * 批量注销都会让本句柄**立即失效** ⇒ 之后**绝不允许**回调被调用
+     * （机制面在派发前逐句柄检查 `live`，见 {@link #dispatch(int, HotbarKey)}）。
+     */
+    public interface HotbarItemHandle {
+
+        /** 设**左键**回调（{@code null} = 清除该键回调）。 */
+        HotbarItemHandle onLeftClick(Runnable callback);
+
+        /** 设**右键**回调（{@code null} = 清除该键回调）。 */
+        HotbarItemHandle onRightClick(Runnable callback);
+
+        /** 设 **Q 丢**回调（{@code null} = 清除；Q 已被复用为"用技能"）。 */
+        HotbarItemHandle onDrop(Runnable callback);
+
+        /** 设**攻击命中承受方**回调（{@code null} = 清除）。 */
+        HotbarItemHandle onAttackVictim(Runnable callback);
+
+        /** 本句柄当前对应的槽位；**已失效** ⇒ {@code OptionalInt.empty()}。 */
+        OptionalInt slot();
+
+        /** 本实例的身份值（= PDC 键的值）。★ 失效后**仍返回同一个值**（它是实例身份，不是"是否生效"）。 */
+        String uuid();
+
+        /** 注销：此后本句柄不再收到任何回调。★ 粒度 = 按**实例**（不影响同一组件的兄弟句柄）。 */
+        void release();
+
+        /** 替换本实例的内容（**槽位不变**；旧句柄随之失效，返回**新句柄**）。 */
+        HotbarItemHandle replace(ItemStack item);
+    }
+
+    /**
+     * 一条**提交**：实例身份（{@code uuid}）由机制面在提交时生成并**由本对象持有**
+     * ⇒ 每帧重组物品时把同一个 {@code uuid} 再写回新副本 ⇒ **uuid 不漂移** ✓
+     * （这就是"回调不丢"的前提：身份不随 `ItemStack` 对象重建而变）。
+     */
+    private final class Submission {
+        private final int slot;
+        private final String componentId;
+        private final String uuid;
+        private final ItemStack base;
+        private Runnable leftClick;
+        private Runnable rightClick;
+        private Runnable drop;
+        private Runnable attackVictim;
+        private volatile boolean live = true;
+
+        private Submission(int slot, String componentId, String uuid, ItemStack base) {
+            this.slot = slot;
+            this.componentId = componentId;
+            this.uuid = uuid;
+            this.base = base;
+        }
+
+        private Runnable callbackFor(HotbarKey key) {
+            return switch (key) {
+                case LEFT -> leftClick;
+                case RIGHT -> rightClick;
+                case DROP -> drop;
+                case ATTACK -> attackVictim;
+            };
+        }
+
+        private HotbarItemHandle handle() {
+            return new Handle(this);
+        }
+
+        private void retire() {
+            HotbarRenderComponent.this.retireSubmission(this);
+        }
+
+        private HotbarItemHandle replaceWith(ItemStack item) {
+            return HotbarRenderComponent.this.replaceSubmission(this, item);
+        }
+    }
+
+    /** 句柄实现：只做「转发到 Submission」+「失效翻转」；**不持有任何 Bukkit 库存对象** ✓。 */
+    private static final class Handle implements HotbarItemHandle {
+        private final Submission submission;
+
+        private Handle(Submission submission) {
+            this.submission = submission;
+        }
+
+        @Override public HotbarItemHandle onLeftClick(Runnable callback) { submission.leftClick = callback; return this; }
+        @Override public HotbarItemHandle onRightClick(Runnable callback) { submission.rightClick = callback; return this; }
+        @Override public HotbarItemHandle onDrop(Runnable callback) { submission.drop = callback; return this; }
+        @Override public HotbarItemHandle onAttackVictim(Runnable callback) { submission.attackVictim = callback; return this; }
+
+        @Override public OptionalInt slot() {
+            return submission.live ? OptionalInt.of(submission.slot) : OptionalInt.empty();
+        }
+
+        @Override public String uuid() {
+            return submission.uuid;
+        }
+
+        @Override public void release() {
+            submission.retire();
+        }
+
+        @Override public HotbarItemHandle replace(ItemStack item) {
+            return submission.replaceWith(item);
+        }
+    }
+
+    /**
+     * **提交入口**（契约 §3.1 的 `ItemStack` 等价变体）：吃「槽位 + 提交者 id + 物品」，
+     * 机制面**自己**在绑键步写入 {@link #HOTBAR_ID_KEY}（值 = 本次提交新生成的随机 UUID）。
+     * <p><b>componentId 以字符串传</b>（不传组件引用、不传具体组件类型）⇒ 机制面不需要提交者的类型 ✓。
+     * <p><b>重复提交同一槽位 = 替换</b>：旧实例句柄**立即失效**（契约 §2.3 第 6 条）。
+     * <p>成功 ⇒ **置一次脏**（下一次帧末 flush 落位）✓。
+     */
+    public HotbarItemHandle submit(int slot, String componentId, ItemStack item) {
+        if (slot < 0) {
+            throw new IllegalArgumentException("[hotbar] slot must be >= 0: " + slot);
+        }
+        if (componentId == null || componentId.isEmpty()) {
+            throw new IllegalArgumentException("[hotbar] componentId must not be null/empty");
+        }
+        if (item == null) {
+            throw new IllegalArgumentException("[hotbar] item must not be null");
+        }
+        Submission previous = liveSubmissions.get(slot);
+        if (previous != null) {
+            retireSubmission(previous);
+        }
+        Submission submission = new Submission(slot, componentId, UUID.randomUUID().toString(), item.clone());
+        liveSubmissions.put(slot, submission);
+        markDirty();
+        return submission.handle();
+    }
+
+    /** 该槽位**当前是否有活跃句柄**（= listener 收窄后的取消判据，契约 §5.1）。 */
+    public boolean hasLiveHandle(int slot) {
+        Submission submission = liveSubmissions.get(slot);
+        return submission != null && submission.live;
+    }
+
+    /** 该槽位活跃句柄的身份值（无活跃句柄 ⇒ {@code null}）。 */
+    public String identityOf(int slot) {
+        Submission submission = liveSubmissions.get(slot);
+        return (submission != null && submission.live) ? submission.uuid : null;
+    }
+
+    /** 活跃句柄数（诊断读口）。 */
+    public int liveHandleCount() {
+        return liveSubmissions.size();
+    }
+
+    /**
+     * **按槽位派发**（listener 收窄为「事件 → (槽位, 键)」之后的落点；契约 §5）。
+     * <p><b>逐句柄故障隔离**由本机制面自带**</b>（契约 §5.3）：捕获 + 记日志 + 继续 ——
+     * ★ **不**引用容器的受保护调用设施（那会把「SanTE 逐监听器隔离」的口径从 1 变 2 ✗），
+     * 也**不**由机制面决定"是否隔离该组件"（归属留容器）。
+     * <p><b>不得静默吞事件</b>（契约 §5.2）：每次"本可以派发却没派发"都留一行可 grep 的日志
+     * （前缀固定 {@code [hotbar]}）：无活跃句柄 ⇒ DEBUG 级；回调为 {@code null} / 句柄已失效 ⇒ WARNING 级。
+     * @return {@code true} = 该槽位**有活跃句柄**（⇒ 调用方照常取消事件、物品受保护）；{@code false} = 无
+     */
+    public boolean dispatch(int slot, HotbarKey key) {
+        Submission submission = liveSubmissions.get(slot);
+        if (submission == null || !submission.live) {
+            Submission retired = retiredSubmissions.get(slot);
+            if (retired != null) {
+                LOG.log(Level.WARNING, "[hotbar] handle expired but slot clicked slot=" + slot
+                        + " key=" + key + " by=" + retired.componentId);
+            } else {
+                LOG.log(Level.FINE, "[hotbar] no live handle slot=" + slot + " key=" + key);
+            }
+            return false;
+        }
+        Runnable callback = submission.callbackFor(key);
+        if (callback == null) {
+            LOG.log(Level.WARNING, "[hotbar] no-callback slot=" + slot + " key=" + key + " by=" + submission.componentId);
+            return true;
+        }
+        try {
+            callback.run();
+        } catch (RuntimeException ex) {
+            LOG.log(Level.WARNING, "[hotbar] callback threw slot=" + slot + " key=" + key
+                    + " by=" + submission.componentId, ex);
+        }
+        return true;
+    }
+
+    /**
+     * 注销**某个组件**提交的全部句柄（供生命周期接线：组件 {@code stop()}` / 被隔离 / 角色清除；
+     * 契约 §4.1 第 1–3 行）—— 接线点属聚合根侧（另卡），本卡只提供机制面入口。
+     */
+    public void releaseHandlesOf(String componentId) {
+        for (Submission submission : List.copyOf(liveSubmissions.values())) {
+            if (submission.componentId.equals(componentId)) {
+                retireSubmission(submission);
+            }
+        }
+    }
+
+    /** 注销**全部**句柄（角色清除 / 实例销毁路径）。 */
+    public void releaseAllHandles() {
+        for (Submission submission : List.copyOf(liveSubmissions.values())) {
+            retireSubmission(submission);
+        }
+    }
+
+    /** **失效 = 状态翻转**（契约 §4.2 第 1 条）+ 移出活跃表 + **留痕**（§4.3：不得静默丢弃）。 */
+    private void retireSubmission(Submission submission) {
+        if (!submission.live) {
+            return;
+        }
+        submission.live = false;
+        liveSubmissions.remove(submission.slot, submission);
+        retiredSubmissions.put(submission.slot, submission);
+        markDirty();
+    }
+
+    /** 替换实现：旧实例失效 + 按**同一槽位 / 同一提交者**重新提交（新 uuid ⇒ 新身份）。 */
+    private HotbarItemHandle replaceSubmission(Submission old, ItemStack item) {
+        int slot = old.slot;
+        String componentId = old.componentId;
+        retireSubmission(old);
+        return submit(slot, componentId, item);
+    }
+
+    /**
+     * **绑键步**（机制面唯一写身份键处）：克隆提交内容 → 写 {@link #HOTBAR_ID_KEY} → **恰好一次**
+     * {@code setItemMeta}（契约 §2.3 第 3 条：不得先写 meta 再取回二次写入）。
+     * <p>写入值 = 该提交**自己的** uuid ⇒ 每帧重组都写同一个值 ⇒ **uuid 不漂移** ✓。
+     */
+    private ItemStack bindIdentity(Submission submission) {
+        ItemStack bound = submission.base.clone();
+        ItemMeta meta = bound.getItemMeta();
+        if (meta == null) {
+            return null;
+        }
+        meta.getPersistentDataContainer().set(HOTBAR_ID_KEY, PersistentDataType.STRING, submission.uuid);
+        bound.setItemMeta(meta);
+        return bound;
     }
 
     // ───────── 热键栏能力的**读侧契约**：渲染组件按组件读数据（组件不再实现能力接口） ─────────

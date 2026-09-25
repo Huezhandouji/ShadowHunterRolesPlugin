@@ -79,6 +79,10 @@ public class RedDeeplySorrowSkill extends Skill {
             super(Component.text("黯然销魂"),
                     Component.text("持续扣减[红]的TE值，每秒10点，在TE值归零前获得持续的生命恢复5与力量2，在TE值归零后结束这个技能"),
                     600, 0, Material.REDSTONE_BLOCK);
+            requires(BuffComponent.class);
+            //sante 实取于 start()（:66）但代码自带 null 兜底（:67 订阅 / :141 退订）⇒ 按「实取但可为空」声明为**可选**；
+            //它在 FRAMEWORK_PROVIDED_TYPES 白名单内、ServiceComponents.build 无条件构造 ⇒ 生产环境永不缺失（optional 与实际效果等价）
+            requiresOptional(SanTEComponent.class);
         }
 
         @Override

@@ -51,6 +51,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
                     8,
                     Material.IRON_INGOT
             );
+            requires(EnergyComponent.class, BuffComponent.class, TimerComponent.class, VitalsComponent.class);
         }
 
         @Override

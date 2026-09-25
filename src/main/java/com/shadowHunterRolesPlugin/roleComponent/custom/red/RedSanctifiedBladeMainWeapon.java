@@ -39,6 +39,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
                     Material.IRON_SWORD,
                     100
             );
+            requires(VitalsComponent.class, BuffComponent.class);
         }
 
         @Override

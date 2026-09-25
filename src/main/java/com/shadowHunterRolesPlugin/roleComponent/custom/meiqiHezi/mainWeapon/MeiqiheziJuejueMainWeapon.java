@@ -44,6 +44,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
                     Material.DIAMOND_HOE,
                     20
             );
+            requires(VitalsComponent.class, EnergyComponent.class, BuffComponent.class);
         }
 
         @Override

@@ -50,6 +50,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
                     15,
                     Material.GOLD_INGOT
             );
+            requires(BuffComponent.class, EnergyComponent.class, VitalsComponent.class, TimerComponent.class);
         }
 
         @Override

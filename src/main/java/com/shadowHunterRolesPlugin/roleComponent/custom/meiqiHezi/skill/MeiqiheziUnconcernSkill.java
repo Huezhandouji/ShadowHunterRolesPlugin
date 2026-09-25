@@ -34,6 +34,7 @@ public class MeiqiheziUnconcernSkill extends Skill {
                     0,
                     Material.BLAZE_POWDER
             );
+            requires(BuffComponent.class);
         }
 
         @Override

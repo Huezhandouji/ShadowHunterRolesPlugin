@@ -13,6 +13,9 @@ import org.bukkit.inventory.meta.LeatherArmorMeta;
 
 public class RedEquipmentsPassive extends PassiveSkill {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "red_equippments_passive";
+
     public RedEquipmentsPassive(String id, ComponentServices services) {
         super(id, services, Component.text("穿戴装备"), Component.text("ccb"));
     }

@@ -52,28 +52,6 @@ public class RoleLoader {
     /** 一条角色定义：id 仅用于日志定位，构建逻辑由 {@code builder} 提供（便于注入失败用例做校验）。 */
     public record Definition(String id, Supplier<Role.Builder> builder) { }
 
-    /**
-     * 组件 id 常量（收尾批⑤）：**每个 id 字面量在整个仓里只声明一次** —— 组件构造器不再硬编码 id，
-     * 装配条目统一写作 {@code (id, 组件::new, slot)}；id 由本处声明，容器在构造期把它与服务集一起交给组件。
-     * （字符串多重集净变化 = 0：旧构造器里的 14 处字面量原值移到这里。）
-     */
-    private static final String ID_AUTO_RECOVER_ENERGY = "autoRecoverEnergy_passive";
-    private static final String ID_AUTO_RECOVER_SANTE_HEALTH = "autoRecoverSanTEPassive";
-    private static final String ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT = "default_san_te_zero_punishment";
-    private static final String ID_MEIQIHEZI_JUEJUE_MAIN_WEAPON = "meiqihezi_mainWeapon_juejue";
-    private static final String ID_MEIQIHEZI_EQUIPMENTS = "meiqihezi_equippments_passive";
-    private static final String ID_MEIQIHEZI_BLOODY_SLASH = "meiqihezi_skill_bloody_slash";
-    private static final String ID_MEIQIHEZI_CIRCLE_SLASH = "meiqihezi_skill_circle_slash";
-    private static final String ID_MEIQIHEZI_UNCONCERN = "meiqihezi_skill_unconcern";
-    private static final String ID_RED_BLEED = "red_bleed_passive";
-    private static final String ID_RED_DEEPLY_SORROW = "red_deeplySorrow_skill";
-    private static final String ID_RED_EQUIPMENTS = "red_equippments_passive";
-    private static final String ID_RED_EVIL_SHOCK = "red_evilShock_skill";
-    private static final String ID_RED_SANCTIFIED_BLADE = "red_mainWeapon_sanctifiedBlade";
-    private static final String ID_RED_SOLITARY_ARROGANCE = "red_solitaryArrogance_skill";
-
-    /** 示例角色里的组件 id。 */
-    private static final String ID_EXAMPLE_SELF_REFRESHING = "example_self_refreshing_skill";
 
 
     private final Logger logger;
@@ -158,7 +136,7 @@ public class RoleLoader {
 
     private static Role.Builder meiqiheziBuilder() {
 
-        return withBuiltIns(new Role.Builder("meiqihezi"))
+        return withBuiltIns(new Role.Builder("meiqihezi")
  //★ 「已被提供的类型」由**装配方**注入（`core/Role` 本身不认识任何组件类 ✓）——
  //  否则组件声明 `requires(框架级组件)` 会被模板侧的依赖校验误报成"缺必需依赖"。
                 .providedTypes(RoleInstance.providedComponentTypes())
@@ -173,16 +151,16 @@ public class RoleLoader {
                 ))
                 //表现值（名字/描述/冷却/耗能/图标）随组件自己的 Specification 走，
  //装配点**只写 setSlot**；注册顺序与既有实现逐字一致（= 派发序 = 渲染序）。
-                .addComponent(ID_MEIQIHEZI_UNCONCERN, new MeiqiheziUnconcernSkill.Specification().setSlot(1))
-                .addComponent(ID_MEIQIHEZI_BLOODY_SLASH, new MeiqiheziBloodySlashSkill.Specification().setSlot(2))
-                .addComponent(ID_MEIQIHEZI_CIRCLE_SLASH, new MeiqiheziCircleSlashSkill.Specification().setSlot(3))
-                .addComponent(ID_MEIQIHEZI_JUEJUE_MAIN_WEAPON, new MeiqiheziJuejueMainWeapon.Specification().setSlot(0))
+                .addComponent(MeiqiheziUnconcernSkill.ID, new MeiqiheziUnconcernSkill.Specification().setSlot(1))
+                .addComponent(MeiqiheziBloodySlashSkill.ID, new MeiqiheziBloodySlashSkill.Specification().setSlot(2))
+                .addComponent(MeiqiheziCircleSlashSkill.ID, new MeiqiheziCircleSlashSkill.Specification().setSlot(3))
+                .addComponent(MeiqiheziJuejueMainWeapon.ID, new MeiqiheziJuejueMainWeapon.Specification().setSlot(0))
                 .faction(Faction.HUNTER)
-                .addComponent(ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT, new DefaultSanTEZeroPunishment.Specification())
-                .addComponent(ID_AUTO_RECOVER_SANTE_HEALTH, new AutoRecoverSanTEHealthPassive.Specification())
-                .addComponent(ID_AUTO_RECOVER_ENERGY, new AutoRecoverEnergyPassive.Specification())
-                .addComponent(ID_MEIQIHEZI_EQUIPMENTS, new MeiqiheziEquipmentsPassive.Specification())
-                .icon(Material.DIAMOND_HOE);
+                .addComponent(DefaultSanTEZeroPunishment.ID, new DefaultSanTEZeroPunishment.Specification())
+                .addComponent(AutoRecoverSanTEHealthPassive.ID, new AutoRecoverSanTEHealthPassive.Specification())
+                .addComponent(AutoRecoverEnergyPassive.ID, new AutoRecoverEnergyPassive.Specification())
+                .addComponent(MeiqiheziEquipmentsPassive.ID, new MeiqiheziEquipmentsPassive.Specification())
+                .icon(Material.DIAMOND_HOE));
     }
 
     private static Role.Builder redBuilder() {
@@ -197,14 +175,14 @@ public class RoleLoader {
                         Component.text("一技能捅人恢复生命")
                 ))
                 .faction(Faction.SHADOW)
-                .addComponent(ID_RED_BLEED, new RedBleedPassive.Specification())
-                .addComponent(ID_RED_SANCTIFIED_BLADE, new RedSanctifiedBladeMainWeapon.Specification().setSlot(0))
-                .addComponent(ID_RED_SOLITARY_ARROGANCE, new RedSolitaryArroganceSkill.Specification().setSlot(1))
-                .addComponent(ID_RED_EVIL_SHOCK, new RedEvilShockSkill.Specification().setSlot(2))
-                .addComponent(ID_RED_DEEPLY_SORROW, new RedDeeplySorrowSkill.Specification().setSlot(3))
-                .addComponent(ID_AUTO_RECOVER_SANTE_HEALTH, new AutoRecoverSanTEHealthPassive.Specification())
-                .addComponent(ID_RED_EQUIPMENTS, new RedEquipmentsPassive.Specification())
-                .addComponent(ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT, new DefaultSanTEZeroPunishment.Specification())
+                .addComponent(RedBleedPassive.ID, new RedBleedPassive.Specification())
+                .addComponent(RedSanctifiedBladeMainWeapon.ID, new RedSanctifiedBladeMainWeapon.Specification().setSlot(0))
+                .addComponent(RedSolitaryArroganceSkill.ID, new RedSolitaryArroganceSkill.Specification().setSlot(1))
+                .addComponent(RedEvilShockSkill.ID, new RedEvilShockSkill.Specification().setSlot(2))
+                .addComponent(RedDeeplySorrowSkill.ID, new RedDeeplySorrowSkill.Specification().setSlot(3))
+                .addComponent(AutoRecoverSanTEHealthPassive.ID, new AutoRecoverSanTEHealthPassive.Specification())
+                .addComponent(RedEquipmentsPassive.ID, new RedEquipmentsPassive.Specification())
+                .addComponent(DefaultSanTEZeroPunishment.ID, new DefaultSanTEZeroPunishment.Specification())
                 .icon(Material.POPPY);
     }
 
@@ -226,7 +204,7 @@ public class RoleLoader {
                         Component.text("组件只请求、不写：写入仍由框架在帧末 flush 完成")
                 ))
                 .faction(Faction.SHADOW)
-                .addComponent(ID_EXAMPLE_SELF_REFRESHING, new ExampleSelfRefreshingSkill.Specification().setSlot(0))
+                .addComponent(ExampleSelfRefreshingSkill.ID, new ExampleSelfRefreshingSkill.Specification().setSlot(0))
                 .icon(Material.CLOCK);
     }
 

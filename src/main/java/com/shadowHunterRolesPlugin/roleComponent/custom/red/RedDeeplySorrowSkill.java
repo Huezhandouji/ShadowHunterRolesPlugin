@@ -28,6 +28,9 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
  */
 public class RedDeeplySorrowSkill extends Skill {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "red_deeplySorrow_skill";
+
     private BuffComponent buff;
     private SanTEComponent sante;
 

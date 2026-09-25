@@ -42,6 +42,9 @@ import java.util.List;
  */
 public class ExampleSelfRefreshingSkill extends Skill {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "example_self_refreshing_skill";
+
     //渲染组件引用采用**字段 + 在 start() 内赋值**（与全仓统一形态一致 ✓）——
     //  取组件只能在本钩子（或新写/既有 start()）里做 ✗，不得放 awake()；
     //  注册表装配期后冻结 ⇒ 缓存引用与按需查找**恒等** ✓（未装配时仍为 null ⇒ 下面的静默检查逐字保留 ✓）。

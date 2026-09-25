@@ -7,6 +7,9 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 
 public class AutoRecoverEnergyPassive extends PassiveSkill {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "autoRecoverEnergy_passive";
+
     private EnergyComponent energy;
 
     private int noEnemySurroundTime = 0;

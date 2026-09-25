@@ -19,6 +19,9 @@ import java.util.*;
 
 public class MeiqiheziBloodySlashSkill extends Skill {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "meiqihezi_skill_bloody_slash";
+
     //技能任务句柄化：stop 时取消，避免角色被清除后仍结算伤害（平台 Task）
     private ScheduledHandle attackTask;
 

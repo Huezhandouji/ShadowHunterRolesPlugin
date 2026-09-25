@@ -62,6 +62,9 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
  */
 public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "default_san_te_zero_punishment";
+
     private TaskComponent timer;
     private VitalsComponent vitals;
     private BuffComponent buff;

@@ -20,6 +20,9 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 
 public class MeiqiheziJuejueMainWeapon extends MainWeapon {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "meiqihezi_mainWeapon_juejue";
+
     private VitalsComponent vitals;
     private EnergyComponent energy;
  //**可用性判定下放给子类**（基类不持 buff / energy、不查容器）⇒

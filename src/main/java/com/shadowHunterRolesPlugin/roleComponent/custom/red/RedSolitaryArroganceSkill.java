@@ -21,6 +21,9 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 public class RedSolitaryArroganceSkill extends Skill {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "red_solitaryArrogance_skill";
+
     private TaskComponent timer;
     private BuffComponent buff;
 

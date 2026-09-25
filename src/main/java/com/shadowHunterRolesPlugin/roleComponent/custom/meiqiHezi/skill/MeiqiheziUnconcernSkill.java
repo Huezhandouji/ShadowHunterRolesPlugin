@@ -14,6 +14,9 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 public class MeiqiheziUnconcernSkill extends Skill {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "meiqihezi_skill_unconcern";
+
     private BuffComponent buff;
 
     public MeiqiheziUnconcernSkill(String id, ComponentServices services, Specification specification){

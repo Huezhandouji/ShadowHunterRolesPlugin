@@ -14,6 +14,9 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 
 public class RedSanctifiedBladeMainWeapon extends MainWeapon {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "red_mainWeapon_sanctifiedBlade";
+
     private VitalsComponent vitals;
  //**可用性判定下放给子类**（基类不持 buff / energy、不查容器）⇒
     //  本组件自己持 buff 字段（在既有 start() 内一次查好 ✓）。

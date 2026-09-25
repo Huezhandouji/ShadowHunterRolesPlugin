@@ -8,6 +8,9 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 
 public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
 
+    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    public static final String ID = "autoRecoverSanTEPassive";
+
     private SanTEComponent sante;
 
     private int noEnemySurroundTime = 0;

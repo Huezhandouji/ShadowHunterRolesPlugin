@@ -36,12 +36,11 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
     }
 
     /**
-     * 批次⑤（B⑤）迁移：旧 `update(Player, RoleInstance)` 的**逐条等价**新写法。
+     * 容器在 tick 里对该组件广播 `update()` 钩子。
      * 数值/间隔**逐字不变**：半径 `10`、累计上限 `200` tick、每秒判定 `20` tick、`+3` SanTE、`+1` 生命；
      * SanTE 为 0 时提前 return 的短路**保持**。阵营判定走 `svc().roleInfo().hasEnemyInRange(10)`
      * （语义 = 原 `SkillUtil.hasEnemyInRange`）；SanTE 改走 `sante.increase(3)`、
      * 生命改走**生命组件**的回血入口（不再经服务集端口，改为组件本身用）✓。
-     * 容器在 tick 里对该组件广播 `update()`（B⑤ 第 1 步，`:802`）。
      */
     @Override
     public void update() {

@@ -162,7 +162,7 @@ public class Role {
  * <p><b>不检查什么（如实申报）</b>：可选依赖缺失不报错；提供类型是**族级**的组件（三个家族描述符的
  * 泛型实参是家族基类）无法满足"按具体类"的依赖声明，除非该描述符覆写
  * {@code providedType()}（见 {@code RoleComponent.Specification#providedType()}）。
- * <p><b> 取代指向（不静默改写）</b>：本方法**曾**同时检查"依赖图不得有环"
+ * <p><b>取代指向（不静默改写）</b>：本方法**曾**同时检查"依赖图不得有环"
  *。**明确改为"允许组件环形
  * 依赖"** ⇒ 环检测的**硬失败已删除**（{@code dependencyCycles()} 与其 DFS 一并移除）。
  * **只放开环，不动另一半**：「缺必需依赖 ⇒ 抛异常 + 阻止该角色加载注册」**原样保留**。
@@ -459,7 +459,7 @@ public class Role {
  * 不占热键栏 ⇒ 不进 `slotMap` ⇒ 渲染器遍历时天然看不到它，也不会被要求画物品。
  * <p>"是被动"由**工厂形参的类型**表达（{@code ComponentFactory<PassiveSkill>}）⇒
  * 三个 id 视图按 `PassiveSkill.Specification` 归类；其余语义与描述符入口一致（同一条内部路径）。
- * <p><b> 的依赖面（如实申报）</b>：本入口**没有描述符** ⇒
+ * <p><b>的依赖面（如实申报）</b>：本入口**没有描述符** ⇒
  * ① 提供类型只能是**族级** {@code PassiveSkill.class}（依赖检查按它匹配）；
  * ② **无法**声明依赖（{@code requires} 只在描述符上）。要按具体类被依赖或要声明依赖的被动，
  * 应改走描述符入口（给该被动加一个嵌套 {@code PassiveSkill.Specification}）—— 属逐组件迁移卡的范围。

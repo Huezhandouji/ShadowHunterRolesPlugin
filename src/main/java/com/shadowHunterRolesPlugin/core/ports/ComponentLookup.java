@@ -40,7 +40,7 @@ public interface ComponentLookup {
  /**
  * 取本角色实例内的另一个组件（**按类型**）：**添加顺序第一个**满足可赋值性者
  * （父类/接口查询命中子类/实现类实例）。未注册 → {@code null}；**注册表冻结前调用 → 抛 {@code IllegalStateException}**。
- * <p><b> 语义修正</b>：旧 javadoc 写"具体类优先"，而实现一直是纯线性扫描 ⇒ 那是对行为
+ * <p><b>语义修正</b>：旧 javadoc 写"具体类优先"，而实现一直是纯线性扫描 ⇒ 那是对行为
  * 撒谎的值 ⇒ 已按真实语义（**添加顺序第一个**）改写。{@link #getAll(Class)} 的首元素恒等于本方法的结果。
  * <p><b>类型形参无上界</b>：旧签名 {@code <T extends RoleComponent>} 让**纯接口**无法作为实参，
  * 与"父类**或接口**查询"冲突 ⇒ 改为无上界 + 匹配时 {@code type.cast(...)}（安全）。

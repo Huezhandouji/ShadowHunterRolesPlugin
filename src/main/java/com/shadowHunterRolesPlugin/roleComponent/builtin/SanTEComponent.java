@@ -162,8 +162,8 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
      * **把本轮变更的通知条目逐个交回框架**（{@link RoleInstance.ChangeListenerSource} 的实现）。
      * <p><b>分工</b>：派发边界（真变化闸门 · 逐监听器故障隔离 · 重入合并）全部在容器侧 ✓，
      * 本方法只回答"这轮该通知哪些条目、每条该做什么" ⇒ 容器**不必知道**本组件的登记类型 ✓。
-     * <p><b>平台侧那一条不在此列</b>：它的 {@code owner} 就是本组件自身，写入路径已经直调过它
-     * ⇒ 这里必须排除（否则平台侧会多收一次）。
+     * <p>★ 只排除 `owner == 本组件` 的条目（那条由 {@link #notifyListeners(Change)} 在写入路径直调）——
+     * 生产上该条目**并不存在**，所以实际效果 = 全部订阅者都交回容器 ✓。
      * <p><b>遍历安全性</b>沿用 {@link #forEachListener(Consumer)} 的快照语义 ✓（遍历中增删不影响本趟）。
      */
     @Override
@@ -174,7 +174,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         Change change = new Change(previous, current);
         forEachListener(entry -> {
             if (entry.owner() == this) {
-                return;                             //平台侧那一条：写入路径直调 ⇒ 不属于订阅者
+                return;     // owner == 本组件的那条由写入路径直调 ⇒ 不交回容器（避免同一条被通知两次）
             }
             delivery.accept(new RoleInstance.ChangeDelivery(entry.owner(), () -> entry.listener().accept(change)));
         });
@@ -199,13 +199,13 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         if (change == null) {
             return;
         }
- //★ **逐监听器故障隔离由本组件自持**（原在容器侧 `guardedCall` 里）——
- // 异常 ⇒ **只记日志并继续**，其余监听器照常收到 ✓。
- // ★ 刻意**不**在循环外层套 try：那会让首个异常吞掉排在其后的全部监听器。
+ //★ **无条件通知全部条目** —— 与 {@code EnergyComponent#notifyListeners} 逐字同形。
+ // 曾经这里有一条 `owner == 本组件 ⇒ 跳过`：那引用了一个**不存在**的机制（"平台侧由写入路径直调"），
+ // 而**产线上没有任何组件以本组件为 owner 登记** ⇒ 那条分支的净效果 = 名单**照常**被完整通知，
+ // 但 {@code notifyPlatform} 反而**只**通知那条不存在的条目 ⇒ 订阅者永远收不到变更（技能不结束的真因）。
         forEachListener(entry -> {
-            if (entry.owner() == this) {
-                return;                             //平台侧那一条：写入路径直调 ⇒ 不属于订阅者
-            }
+ //★ **逐监听器故障隔离**：异常 ⇒ **只记日志并继续**，其余监听器照常收到 ✓
+ //（刻意**不**在循环外层套 try —— 那会让首个异常吞掉排在其后的全部监听器）
             try {
                 entry.listener().accept(change);
             } catch (RuntimeException listenerFailure) {
@@ -253,30 +253,19 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         return max;
     }
 
-    /** 直接写入（组件内 clamp；写后通知平台侧通道）。 */
+    /** 直接写入（组件内 clamp；写后通知订阅者）。 */
     public void set(int value) {
         int previous = current;
         current = Math.clamp(value, 0, max);
-        notifyPlatform(new Change(previous, current));
+ //★ 走 {@link #notifyListeners(Change)} 通知**真正的订阅者**（owner == 本组件的那条是"平台侧"约定，
+ // 而**产线上没有任何组件会以本组件为 owner 登记** ⇒ 旧写法通知的是空集 ⇒ 订阅者永远收不到变更 ✗）。
+ // 订阅者只拿变更通知；"真变化闸门 / 重入合并"由容器在派发边界另做（同一份名单）。
+        notifyListeners(new Change(previous, current));
     }
 
-    /**
-     * **只通知平台侧通道**（**平台侧通知的唯一入口** ✓）。
-     * <p><b>为什么不走 {@link #notifyListeners(Change)}</b>：订阅者必须在容器的**派发边界**被通知
-     * —— 真变化闸门（无变化写入不派发）、逐监听器故障隔离、重入合并三条都在那里 ✓；
-     * 写入路径直接通知订阅者会绕过这三条 ✗。
-     * <p>本方法**不做**任何隔离：平台侧回调抛异常 ⇒ **照常上抛**（与写入路径的既有语义一致 ✓）。
-     * <p><b>调用时机</b>：只在写入路径（{@link #set(int)}）里，**且不筛真变化** ——
-     * "有没有真变化"由容器在派发边界过闸门（`pre == now` 直接返回）✓ ⇒
-     * 「变更何时到达平台侧」的语义逐字不变。
-     */
-    private void notifyPlatform(Change change) {
-        forEachListener(entry -> {
-            if (entry.owner() == this) {
-                entry.listener().accept(change);
-            }
-        });
-    }
+ //★ `notifyPlatform(Change)` 已删除 —— 它只通知 `owner == this` 的条目，那是"平台侧约定"，
+ // 而**产线上没有任何组件会以本组件为 owner 登记** ⇒ 它通知的是**空集** ⇒ 订阅者永远收不到变更 ✗。
+ // 写入路径现在直接调 {@link #notifyListeners(Change)}（同一份名单、同一套逐条隔离）。
 
     /** 增加 SanTE（内部按上限 clamp）。 */
     public void increase(int amount) {

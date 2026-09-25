@@ -149,11 +149,9 @@ public class SanTEComponentOperationTest {
      * 载荷与顺序（**行为等价的核心**）：监听器收到的 {@code previous}/{@code current} 与
      * `set` 的 clamp 结果逐条一致 ✓，且顺序 = **添加先后** ✓。
      * <p>对照旧形态：`onSanTEChange(int pre, int now)` 的两个入参**原样**搬进 {@code Change} 记录 ✓。
-     * <p><b>为什么这里显式调 {@code notifyListeners}</b>：本组件**不自己通知** ✗ —— 生产路径里派发由
-     * 容器驱动（`RoleInstance.broadcastSanTEChange` ⇒ 逐个经 {@code guardedCall} 调监听器 ✓，
-     * 且已先过 `pre == now` 的真变化闸门 ✓）；离线单测没有容器 ⇒ 用组件提供的
-     * {@link SanTEComponent#notifyListeners(SanTEComponent.Change)}（与生产**同源**的薄派发 ✓）显式驱动，
-     * 而不是让测试自己写一遍循环 ✗。
+     * <p>★ **写入路径自己就通知订阅者**（`set` → {@link SanTEComponent#notifyListeners}）——
+     * 与 {@code EnergyComponent} 逐字同形 ⇒ 离线单测**不需要**再手工补一次派发。
+     * <p>（生产路径里容器另有一层派发，带 `pre == now` 真变化闸门与逐条 `guardedCall` ✓。）
      */
     @Test
     public void listenersReceiveChangeWithPreviousAndCurrentInRegistrationOrder() {
@@ -164,10 +162,8 @@ public class SanTEComponentOperationTest {
         sante.addListener(SUBSCRIBER, second);
 
         assertEquals("添加两条监听", 2, sante.listenerCount());
-        sante.set(40);                 // 100 → 40
-        sante.notifyListeners(new SanTEComponent.Change(100, 40));
+        sante.set(40);                 // 100 → 40（写入路径自行通知 ⇒ 每条收到 1 次）
         sante.set(500);                // 40 → 100（clamp 到上限）
-        sante.notifyListeners(new SanTEComponent.Change(40, 100));
 
         assertEquals("第一条收到两次", 2, first.seen.size());
         assertEquals("第一条载荷 = 100→40", 100, first.seen.get(0).previous());
@@ -178,12 +174,34 @@ public class SanTEComponentOperationTest {
     }
 
     /**
-     * **两条通道互不串线**（行为等价的核心 ✓）：{@code set(...)} 只走**平台侧通道**
-     * —— **无变化**的写入也走 ✓（事件发布时机不变）；订阅者名单**不被写入路径触碰** ✓
-     * （生产里它们只由容器的派发边界通知 —— 真变化闸门与逐监听器故障隔离都在那里 ✓）。
+     * ★ **回归**（真 bug 的判据）：SanTE **归零**时订阅者**必须**收到那条变更。
+     *
+     * <p>曾经的形态：写入路径只通知 `owner == 本组件` 的那条（"平台侧"），而**产线上不存在**这样的登记
+     * ⇒ `decrease` 到 0 时**没有任何订阅者被通知** ⇒ 依赖"归零即结束"的技能（例：红的黯然销魂）
+     * 永远不结束 ✗。本测试锁住"归零必达"。
      */
     @Test
-    public void writePathNotifiesPlatformChannelOnly() {
+    public void decreaseToZeroNotifiesSubscribers() {
+        SanTEComponent sante = newComponent();
+        RecordingListener subscriber = new RecordingListener();
+        sante.addListener(SUBSCRIBER, subscriber);
+
+        sante.set(10);                 // 100 → 10
+        sante.decrease(10);            // 10 → 0（归零）
+
+        assertEquals("写入两次 ⇒ 两条通知", 2, subscriber.seen.size());
+        SanTEComponent.Change zeroing = subscriber.seen.get(subscriber.seen.size() - 1);
+        assertEquals("归零那条的旧值 = 10", 10, zeroing.previous());
+        assertEquals("归零那条的当前值 = 0", 0, zeroing.current());
+    }
+
+    /**
+     * **写入路径同时到达「平台侧登记」与「订阅者」**：
+     * {@code set(...)} 无条件通知名单里的**每一条**（**无变化**的写入也通知 —— 事件发布时机不变），
+     * 与 {@code EnergyComponent} 同形。
+     */
+    @Test
+    public void writePathNotifiesEveryListenerEntry() {
         RecordingListener platform = new RecordingListener();
         SanTEComponent sante = newComponent(platform);
         RecordingListener subscriber = new RecordingListener();
@@ -194,7 +212,8 @@ public class SanTEComponentOperationTest {
 
         assertEquals("平台侧收到两次（含无变化写入 ✓）", 2, platform.seen.size());
         assertEquals("平台侧载荷 = clamp 结果", 40, platform.seen.get(1).current());
-        assertEquals("订阅者不被写入路径通知（归容器的派发边界 ✓）", 0, subscriber.seen.size());
+        assertEquals("订阅者同样收到两次 ✓", 2, subscriber.seen.size());
+        assertEquals("两边载荷一致", platform.seen.get(1).current(), subscriber.seen.get(1).current());
     }
 
     /**

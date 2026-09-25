@@ -29,7 +29,7 @@ public class TimerComponent extends RoleComponent {
     /**
      * 资源表接入口（容器在构造期注入）：**就是** {@code ComponentRegistry} 的每组件资源表
      * （{@code registry::track} / {@code registry::cancelAll}）。
-     * <p>刻意做成接口而不是直接用 {@code ComponentRegistry}：{@code core/dispatch/**} 不是本组件的依赖面，
+     * <p>刻意做成接口而不是直接用 {@code ComponentRegistry}：{@code core/component/**} 不是本组件的依赖面，
      * 且"组件不该反向依赖容器的具体实现类"是组件化的本意 ✓。
      */
     public interface TaskSink {

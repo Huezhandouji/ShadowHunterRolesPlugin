@@ -56,7 +56,7 @@ public abstract class RoleComponent {
      * <p><b>语义 = 添加顺序第一个满足可赋值性者</b>（用父类/接口查询会命中子类/实现类实例）；
      * 未注册 → {@code null}；冻结前调用 → 抛 {@code IllegalStateException}。要拿**全部**符合者请用
      * {@code svc().components().getAll(type)}。
-     * 同类措辞已在 `core/ports/ComponentLookup` 与 `core/dispatch/ComponentRegistry` 改正，
+     * 同类措辞已在 `core/ports/ComponentLookup` 与 `core/component/ComponentRegistry`（**两者均为现役位置**）改正，
      * 本处（组件侧**唯一取用入口**）是最后一块（`HotbarSpec` 家族的作废措辞亦已同法处理）。
      */
     protected final <T extends RoleComponent> T getComponent(Class<T> type) {
@@ -106,7 +106,7 @@ public abstract class RoleComponent {
      *       （`setSlot` 之类一律抛异常）⇒ 同一个描述符实例被两个角色共享时不可能被串改；</li>
      *   <li>{@link #create(String, ComponentServices)} —— 抽象创建：由**具体描述符**决定造哪个类。</li>
      * </ul>
-     * <b>规则进类型</b>：带栏位的分支是 {@code core/hotbar/HotbarSpecification}
+     * <b>规则进类型</b>：带栏位的分支是 {@code roleComponent/frameworkLevel/hotbar/HotbarSpecification}
      * （它有 {@code setSlot}）；被动描述符 {@code PassiveSkill.Specification} **继承本根类型**、
      * 因此**没有** {@code setSlot} —— "被动不占栏位"于是成为**编译期事实**，不再靠装配点自觉。
      * <p><b>kind 已删</b>：kind 枚举（SKILL / MAIN_WEAPON / PASSIVE）与构造参数一起删除；

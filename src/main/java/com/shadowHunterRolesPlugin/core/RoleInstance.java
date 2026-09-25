@@ -466,7 +466,7 @@ public class RoleInstance {
 
 
 
- //热键栏渲染：唯一写点在渲染组件持有的渲染器里（`core/hotbar` 内）；
+ //热键栏渲染：唯一写点在渲染组件持有的渲染器里（`roleComponent/frameworkLevel/hotbar` 内）；
  //本容器只提供查表与状态输入，**不持有**渲染器、也不对外提供任何渲染器 / 物品访问器。
 
     public Player getPlayer() { return player; }

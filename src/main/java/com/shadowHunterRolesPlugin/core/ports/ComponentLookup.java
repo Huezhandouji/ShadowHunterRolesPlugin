@@ -21,7 +21,7 @@ import java.util.List;
  * <li>{@link #getAll(Class)} = 全部符合条件的（添加顺序；无人符合 ⇒ **空列表**）；</li>
  * <li>{@link #getById(String)} = 第一个 id 相等的，**id 可重复**。</li>
  * </ul>
- * <p><b>实现点唯一</b>：{@code core/ComponentLookupImpl}（把 {@code core.dispatch.ComponentRegistry} 与
+ * <p><b>实现点唯一</b>：{@code core/ComponentLookupImpl}（把 {@code core.component.ComponentRegistry} 与
  * 容器的服务集工厂、日志接起来）。{@link RoleComponent#getComponent(Class)} 走本端口的 {@link #get(Class)}。
  * <p><b>动态添加的生命周期</b>（与装配期同一顺序）：构造（构造期注入服务集）→ {@code awake()} → {@code start()}；
  * 失败一律**回滚**（不残留半初始化组件）。<b>动态删除</b>：{@code stop()} → 回收该组件资源 → 移出容器。

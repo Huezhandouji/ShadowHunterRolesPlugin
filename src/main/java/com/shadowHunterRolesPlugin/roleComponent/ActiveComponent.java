@@ -1,6 +1,8 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.ServiceComponents;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import net.kyori.adventure.text.Component;
@@ -196,6 +198,32 @@ public abstract class ActiveComponent extends RoleComponent
     /** **剩余冷却刻数**：不在冷却中 ⇒ `0`（**不返回负数** ✓）。 */
     public int remainingCooldownTicks() {
         return Math.max(0, cooldownUntilTick - org.bukkit.Bukkit.getCurrentTick());
+    }
+
+    // ───────── 热键栏提交面（本类给出的**唯一**取用入口）─────────
+
+    /**
+     * **把本组件的热键栏物品提交给机制面，并取回句柄**（回调注册的落点）。
+     * <p><b>为什么由基类提供这一处</b>：机制面的 **id 与类型是框架级知识** —— 让每个具体组件各自
+     * 去认 `{@code ServiceComponents.ID_HOTBAR_RENDER}` 与 `{@link HotbarRenderComponent}`，
+     * 等于把同一份框架级知识抄 8 遍 ✗。本类一次性持有它，具体组件只写一行 `submitToHotbar(...)` ✓。
+     * <p><b>槽位口径</b>：提交槽位 = 本组件**自己的表现规格**里声明的槽位（{@link #specification()} 的
+     * `slot()`）—— 与拉取式路径（{@code renderPlan()} 用 {@code specification.slot()}）**同源** ✓
+     * ⇒ 提交式条目**覆盖同一槽位**，不会出现"一个组件占两格"。
+     * <p><b>调用时机</b>：组件在自己的 `start()` 里调用（那时强类型依赖已解析、物品画法可读）✓。
+     *
+     * @param item 要提交的物品（通常 {@code buildItem()} 的产物；{@code null} ⇒ 不提交、返回 {@code null}）
+     * @return 该槽位的句柄（回调注册面）；**渲染组件缺失 / 本组件不占栏位 / item 为 null** ⇒ `null`
+     */
+    protected final HotbarRenderComponent.HotbarItemHandle submitToHotbar(ItemStack item) {
+        if (item == null || !specification().hasSlot()) {
+            return null;
+        }
+        RoleComponent found = svc().components().getById(ServiceComponents.ID_HOTBAR_RENDER);
+        if (!(found instanceof HotbarRenderComponent render)) {
+            return null;
+        }
+        return render.submit(specification().slot(), getId(), item);
     }
 
     /**

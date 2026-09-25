@@ -43,16 +43,11 @@ public class RoleInstance {
     private final Player player;
     private final Role role;
 
- // ───────── 服务组件**每角色实例一个**，但本类**不持有**它们 ─────────
- //它们**不进 `Role` 模板**（`Role.getComponents()` 与装配表逐格不变），但登记进**实例容器**
- //（`componentRegistry`）⇒ 本类与组件侧都经**容器查取入口**取它们
-// （框架侧 = 按 id 现取 {@link #resolve(String)}，组件侧 = `svc().components().get(...)`）。
-//★ 状态归属（「状态唯一」）：能量 / SanTE 的真值、buff 记账表、药水账本、计时资源
-// **都在组件里** ⇒ 本类既不持有这些状态，也**不持有组件本身**：
-// 构造期用局部变量装配（局部 ≠ 持有），此后一律按 id 现取。
-// ★ **各组件自己声明 id**（`XxxComponent.ID`）⇒ 本类只写「id + 工厂」的纯数据，不再有聚合清单类。
-// 本类只引用那份清单里的 `ID_*` 常量，动作也经那份清单的服务入口完成；
-// ⇒ 本类内既没有具体组件类的**类字面量**，也没有第二份同值 id 常量 ✓。
+ // ───────── 内建组件：本类**不持有**它们，一律按 id 现取 ─────────
+ // 它们与其他组件走**同一条装配路**（`Role` 模板里的描述符）⇒ 登记进实例容器后，
+ // 本类与组件侧都经容器查取入口取它们（本类 = {@link #resolve(String)}，组件侧 = `svc().components()`）。
+ //★ 状态归属（「状态唯一」）：能量 / SanTE 的真值、buff 记账表、药水账本、任务表**都在组件里**
+ // ⇒ 本类既不持有这些状态，也**不持有组件本身**（构造期用局部变量装配，此后一律按 id 现取）。
 
 
  //实例是否仍然有效：clear() 之后置为 false，组件里的延时任务用它做"实例已失效"守卫
@@ -104,12 +99,9 @@ public class RoleInstance {
  //组件注册表（组件集合 + 每组件资源表 + getComponent 查找）
     private final ComponentRegistry componentRegistry = new ComponentRegistry();
  /**
- * **聚合根只读服务面**（建立；**成为阵营读取的唯一入口**）：
- * {@link Role} 的只读视图（id / 描述 / **阵营** / 两个行为）。
- * <p><b>本组件</b>：原 `RoleInstance#factionComponent()` 读口与它的
- * **读侧视图**（{@code getFaction} + 三个 {@code isHostileTo}）**已删除** ⇒ 阵营读取一律走本端口
- * （组件侧 = {@code svc().roleInfo()}，框架侧 = {@link #roleInfo()}）。
- * <p><b>只读，不带写面</b>：写入仍在**聚合根** {@link Role#setFaction} / {@link Role#resetFaction}。
+ * **聚合根只读服务面**：{@link Role} 的只读视图（id / 描述 / 阵营 / 两个行为）。
+ * <p>阵营读取一律走本端口（组件侧 = `svc().roleInfo()`，框架侧 = {@link #roleInfo()}）。
+ * <p>**只读，不带写面**：写入仍在聚合根 {@link Role#setFaction} / {@link Role#resetFaction}。
  */
     private final RoleInfo roleInfo = new RoleInfoImpl(this);
  /**
@@ -222,15 +214,10 @@ public class RoleInstance {
 
  /**
  * **按类型取本实例内的组件**（"按类型查找"读口）。
- * <p>与 {@code componentRegistry().getByType(...)} 同源（同一实现点），语义：
- * 返回**添加顺序第一个**可赋值给 {@code type} 的组件（父类/接口查询命中子类实例）；未注册 ⇒ {@code null}；
- * **装配完成之前**调用 ⇒ 抛 {@code IllegalStateException}（既有装配期护栏）。
- * <p><b>调用点申报</b>：生产侧 0 调用点 —— 它是容器的公开读口（**容器职责**：组件查取入口），
- * 消费者是**后续卡的依赖注入路径**与仓外探针（组件侧取组件一律走
- * {@code RoleComponent#getComponent(Class)} ⇒ {@code svc().components().get(...)}）。
- * <p>本口**只增不改**（语义按真实行为写明 = "添加顺序第一个"）；
- * 新增的 {@link #getAllByType(Class)} 是它的"全部"版本（后者已是**活码**：
- * {@code listener/hook/DamageHookListener} 的承受方扇出在用）。
+ * <p>语义：返回**添加顺序第一个**可赋值给 `type` 的组件（父类/接口查询命中子类实例）；
+ * 未注册 ⇒ `null`；**装配完成之前**调用 ⇒ 抛 `IllegalStateException`。
+ * <p>生产侧 0 调用点（组件侧取组件一律走 `RoleComponent#getComponent(Class)`）—— 本口保留给
+ * 仓外探针与后续依赖注入路径。
  */
     public <T> T getByType(Class<T> type) {
         return componentRegistry.getByType(type);
@@ -579,16 +566,14 @@ public class RoleInstance {
  /**
  * SanTE 变更的**唯一派发点**（容器直派 + 重入护栏）：
  * <ul>
- * <li><b>真变化才派发</b>（`pre == now` 直接返回）；</li>
- * <li><b>禁止嵌套派发</b>：派发期间组件再次改写 ⇒ 只记最新待发值并立即返回；返回后对末次值**补发一次**
- * （中间态被合并掉）；</li>
- * <li>★ **`notified` 为什么不能用 `currentSanTE` 代替**：`setCurrentSanTE` 是**先写字段、后派发**
- * ⇒ 派发期间字段已等于重入目标值 ⇒ 条件 `currentSanTE != target` **恒假**，补偿分支退化成死代码。
- * 故用局部 `notified`（初值 = 本次 `newSanTE`，每补发一次更新）比较：无重入 ⇒ 不补发；
- * 有重入 ⇒ 恰好补发末次一次。退出条件 = `sanTEPendingValue == Integer.MIN_VALUE`（哨兵）；</li>
+ * <li>**真变化才派发**（`pre == now` 直接返回）；</li>
+ * <li>**禁止嵌套派发**：派发期间组件再次改写 ⇒ 只记最新待发值并立即返回；返回后对末次值**补发一次**；</li>
+ * <li>★ `notified` 不能用 `currentSanTE` 代替：`setCurrentSanTE` **先写字段、后派发** ⇒ 派发期间字段已等于
+ * 重入目标值 ⇒ 条件 `currentSanTE != target` **恒假**，补偿分支退化成死代码。故用局部 `notified` 比较。
+ * 退出条件 = `sanTEPendingValue == Integer.MIN_VALUE`（哨兵）；</li>
  * <li>异常隔离走 {@link #guardedCall}。</li>
  * </ul>
- * ★ **护栏在当前组件集下不可达**（现存两个 `onSanTEChange` 实现都不在钩子内同步写 SanTE）⇒ 防御性设施。
+ * ★ **护栏在当前组件集下不可达**（两个 `onSanTEChange` 实现都不在钩子内同步写 SanTE）⇒ 防御性设施。
  */
     private void dispatchSanTEChange(int preSanTE, int newSanTE){
         if(player == null ) return;
@@ -728,15 +713,13 @@ public class RoleInstance {
     }
 
  /**
- * **框架调用组件的唯一受保护入口**。
- * <p>框架在**每一处**调用组件（{@code awake/start/stop/update/onSanTEChange} 广播 ·
- * {@code onCast}/{@code onAttack}）都必须经这里 ——
- * **不在组件内部各自 try** （否则第三个组件又要重写一遍）。
+ * **框架调用组件的唯一受保护入口**：框架在**每一处**调用组件（`awake/start/stop/update` 广播 ·
+ * `onSanTEChange` · `onCast` / `onAttack`）都必须经这里 —— **不在组件内部各自 try**。
  * <p>异常处置分三种：
  * <ol>
- * <li><b>拆卸中 / 已隔离</b> ⇒ **只记日志**（不递归隔离 A7）；</li>
- * <li><b>本次派发里已有隔离请求</b> ⇒ 只记日志（首个异常胜出）；</li>
- * <li><b>否则</b> ⇒ 记下隔离请求（真正的四步在遍历窗口之外执行，见 {@link #withinIterationWindow}）。</li>
+ * <li>**拆卸中 / 已隔离** ⇒ **只记日志**（不递归隔离）；</li>
+ * <li>**本次派发里已有隔离请求** ⇒ 只记日志（首个异常胜出）；</li>
+ * <li>**否则** ⇒ 记下隔离请求（真正的四步在遍历窗口之外执行，见 {@link #withinIterationWindow}）。</li>
  * </ol>
  */
     private void guardedCall(RoleComponent component, String phase, Runnable action) {

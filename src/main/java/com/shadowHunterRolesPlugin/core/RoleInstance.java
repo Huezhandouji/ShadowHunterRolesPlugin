@@ -29,6 +29,8 @@ import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.EnergyComponent;
 //（读侧 = `roleInfo` 服务面，见下方 `roleInfo()` 读口；写侧 = `Role#setFaction/resetFaction`）。
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.SanTEComponent;
+//框架级服务组件的**清单**（类 + id + 构造顺序 + 接线都在那一件里）—— 本类只按 id 装配与登记。
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.ServiceComponents;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.VitalsComponent;
 import net.kyori.adventure.text.Component;
@@ -60,8 +62,8 @@ public class RoleInstance {
  //★ 状态归属（「状态唯一」）：能量 / SanTE 的真值、buff 记账表、药水账本、计时资源
  // **都在组件里** ⇒ 本类既不持有这些状态，也**不持有组件本身**：
  // 构造期用局部变量装配（局部 ≠ 持有），此后一律按 id 现取。
- // **保留的是查取机制本身的字段**：{@code componentRegistry} / {@code componentLookup} /{@code componentServices}
- // —— 它们是**容器基础设施**，不是组件。
+ // ★ **构造也不在本类**：六件框架级服务组件的"类 + id + 构造顺序 + 接线"集中在
+ // `ServiceComponents`（框架级清单）⇒ 本类**不点名任何具体组件类**，只按 id 装配与登记 ✓。
 
  /** 服务组件在**实例容器**里的 id（与 {@code ComponentServices} 的成员名同形 ⇒ 便于逐项对照）。 */
     private static final String SERVICE_ID_ENERGY = "energy";
@@ -157,56 +159,27 @@ public class RoleInstance {
 
  // ──：**服务的持有者先于角色组件存在** ────────────────────────────────
  //① buff 管理器（原在 freeze() 之后构造）：它对实例的引用只在方法体里使用 ⇒ 提前构造零行为差异；
- // 它的**持有者**现在是 buff 组件（ 起：聚合根上的 `getBuffManager()` 转发读口
+ // 它的**持有者**现在是 buff 组件（聚合根上的 `getBuffManager()` 转发读口
  // **已删除** ⇒ 需要它的人走组件本身）。
         BuffManager buffManager = new BuffManager(player, this);
 
- //② 物品渲染：**意图面**与渲染器（唯一写点）都归渲染组件 ⇒ 本类不经手渲染器本身
- // 「组件只能请求、不能写」逐字保留（帧末 flush 归渲染组件的 flush()）。
- // ★ 装配顺序：渲染组件必须**先于**任何要置脏的组件（能量构造期的回调就会置脏）。
-        HotbarRenderComponent hotbarRender = new HotbarRenderComponent(SERVICE_ID_HOTBAR_RENDER,
-                createServices(SERVICE_ID_HOTBAR_RENDER));
-        hotbarRender.bindRepaintSink(hotbarRender::markDirty);
+ //② 框架级服务组件的**构造与接线全部外移** —— 本类不点名任何具体组件类；
+ // ★ 构造顺序（渲染组件必须先于任何会置脏者）由 `ServiceComponents#build` 的语句顺序保证 ✓。
+        List<RoleComponent> serviceComponents = ServiceComponents.build(new ServiceComponents.Input(
+                role,
+                this::createServices,
+                platform.scheduler(),
+                buffManager,
+                componentRegistry::track,
+                componentRegistry::cancelAll,
+                change -> dispatchSanTEChange(change.previous(), change.current())));
 
- //③ 能量 / SanTE：真值（current）与上限（max，= 角色模板的声明值）都在组件里；
- // "置脏"这件平台事由容器**注册成监听器**承担 ⇒ 组件本身不需要任何旧端口。
-        EnergyComponent energy = new EnergyComponent(SERVICE_ID_ENERGY, createServices(SERVICE_ID_ENERGY),
-                role.getMaxEnergy(),
-                change -> pickApply(SERVICE_ID_HOTBAR_RENDER, HotbarRenderComponent.class, HotbarRenderComponent::markDirty));
-        SanTEComponent sante = new SanTEComponent(SERVICE_ID_SANTE, createServices(SERVICE_ID_SANTE),
-                role.getMaxSanTE());
- //平台侧通道：以**本组件自身**为 owner 登记 ⇒ 写入路径直调这一条（订阅者仍归下面的派发边界）
-        sante.addListener(sante, change ->
- //容器**直派**：组件只管真值怎么变；"变了之后通知谁"这条边界在容器里
-                dispatchSanTEChange(change.previous(), change.current()));
-
- //④ 生命：clamp 策略的唯一实现在组件里（状态 = Bukkit 玩家属性，属外部平台状态）
-        VitalsComponent vitals = new VitalsComponent(SERVICE_ID_VITALS, createServices(SERVICE_ID_VITALS));
-
- //⑤ buff：记账表（BuffManager）与药水账本都归它持有
-        BuffComponent buffs = new BuffComponent(SERVICE_ID_BUFFS, createServices(SERVICE_ID_BUFFS), buffManager);
-
- //⑥ 计时：任务的**创建**在组件里、**登记归属**按请求者；资源**存储**仍是容器的每组件资源表
- // （TaskSink 就是 ComponentRegistry#track / #cancelAll ⇒ 既有回收机制一条都不改）
-        TimerComponent timers = new TimerComponent(SERVICE_ID_TIMERS, createServices(SERVICE_ID_TIMERS),
-                platform.scheduler(), new TimerComponent.TaskSink() {
-            @Override
-            public void track(RoleComponent requester, Task task) {
-                componentRegistry.track(requester, task);
-            }
-
-            @Override
-            public int cancelAll(RoleComponent requester) {
-                return componentRegistry.cancelAll(requester);
-            }
-        });
-
- //⑦ 阵营：**原 FactionComponent 已整体删除** ——
+ //③ 阵营：**原 FactionComponent 已整体删除** ——
  // 阵营的真值就是聚合根 `Role` 的 `faction` 字段（构造期由描述符写入）；
  // 关系表仍留平台（静态数据 ⇒ 外部单例许可，不进依赖图）：`RoleInfoImpl` / 平台自带 lookup 直接读它。
  // ⇒ 本相**不再构造任何阵营组件**，也不再登记任何阵营服务组件（阵营不是容器里的状态拥有者）。
 
- //⑧ 伤害：四个原语（由 VitalsComponent 承载 ⇒ 伤害与生命只有一个持有者）
+ //④ 伤害：四个原语（由 `VitalsComponent` 承载 ⇒ 伤害与生命只有一个持有者）
  // —— 原独立 DamageComponent 已删除，不再单独构造。
 
  //**动态删除路径**入口（隔离时"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + 删除守卫）
@@ -219,8 +192,7 @@ public class RoleInstance {
 
  //服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
  //登记在冻结点**之后**：登记按 id 调用查取入口（本类不保留任何组件字段）
-        registerServiceComponents(SERVICE_ID_ENERGY, SERVICE_ID_SANTE, SERVICE_ID_VITALS,
-                SERVICE_ID_BUFFS, SERVICE_ID_TIMERS, SERVICE_ID_HOTBAR_RENDER);
+        registerServiceComponents(serviceComponents);
 
  // ── 第一相到此结束（ · P6 两阶段构造）───────────────────────────────
  //构造器**只做不可见的事**：装配（组件 / 服务集 / 窄类型视图 / 服务组件登记）+ 注册表冻结
@@ -310,18 +282,18 @@ public class RoleInstance {
     public RoleInfo roleInfo() { return roleInfo; }
 
  /**
- * 把**框架级服务组件**登记进**实例容器**（按 **id** —— 调用方只需给出 id，不必持有实例）。
+ * 把**框架级服务组件**登记进**实例容器**（按 **id** —— 本类只认 {@code component.getId()}）。
  * <p><b>不进 {@code Role} 模板</b> ⇒ {@code role.getComponents()} = 装配表 = 冻结 CELLS **逐格不变**；
  * 登记后它们可被 {@code svc().components().get(EnergyComponent.class)} / 按 id 取到
  * （= "角色实例 = 组件的容器"的落点）。
- * <p>清单为 **6 个**（能量 / SanTE / 生命 / buff / 计时 / 物品渲染）；原"阵营"一项**已删除**
- * （阵营 = 聚合根上的声明值，不是容器里的服务组件）。
- * <p><b>顺序</b>：登记在 {@link #initComponents()} **之后**、{@link ComponentRegistry#freeze()} **之前**
+ * <p>装配清单为 **6 件**（能量 / SanTE / 生命 / buff / 计时 / 物品渲染），由
+ * {@link ServiceComponents#build} 构造并接线完成 ⇒ 本类**不点名任何具体组件类** ✓
+ * （"哪些组件、什么顺序、怎么接线"全在那个框架级清单里 ✓）。
+ * <p><b>顺序</b>：登记在 {@link #initComponents()} **之后**、{@link ComponentRegistry#freeze()} **之后**
  * ⇒ 容器序 = 模板组件在前、服务组件在后（逐格不变）。
  */
-    private void registerServiceComponents(String... serviceIds) {
-        for (String serviceId : serviceIds) {
-            RoleComponent component = resolve(serviceId);
+    private void registerServiceComponents(List<RoleComponent> serviceComponents) {
+        for (RoleComponent component : serviceComponents) {
             if (component != null) {
                 componentRegistry.register(component);
             }

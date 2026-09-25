@@ -159,6 +159,24 @@ public class HotbarRenderComponent extends RoleComponent {
     }
 
     /**
+     * **本组件的装配描述符**（与技能/被动同规；不带栏位、无额外依赖）。
+     *
+     * <p>★ **本组件不占热键栏**（它**渲染**热键栏，自己不是栏位里的物品）⇒ 用极简描述符，
+     * **不能**用 `HotbarSpecification`（那个的 `requiresSlot()` 恒为 `true` ⇒ 会要求给它一个槽位）。
+     */
+    public static final class Specification extends RoleComponent.Specification<HotbarRenderComponent> {
+
+        public Specification() {
+            super("HotbarRender");
+        }
+
+        @Override
+        public HotbarRenderComponent create(String id, ComponentServices services) {
+            return new HotbarRenderComponent(id, services);
+        }
+    }
+
+    /**
      * **帧末活动**（每 tick 调一次，落点 = 组件更新与到期扫描之后）：**判脏 → 写物品 → 清脏 → 取变更**
      * —— ★ 这条顺序**不可交换** ✓。
      * <p><b>入口条件</b>：① 本组件已置脏，或 ② **外观依赖活状态**的**占栏位**组件**正在冷却**

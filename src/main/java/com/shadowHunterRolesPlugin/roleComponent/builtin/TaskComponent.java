@@ -59,6 +59,24 @@ public class TaskComponent extends RoleComponent {
         super(id, services);
     }
 
+    /**
+     * **本组件的装配描述符**（★ 与技能/被动同规 ⇒ 它就是一个普通组件）。
+     *
+     * <p>不带栏位（{@code requiresSlot()} 默认 {@code false}）⇒ 天然不占热键栏；
+     * 构造只需 `id + services` ⇒ 描述符极简、无额外依赖 ✓。
+     */
+    public static final class Specification extends RoleComponent.Specification<TaskComponent> {
+
+        public Specification() {
+            super("Task");
+        }
+
+        @Override
+        public TaskComponent create(String id, ComponentServices services) {
+            return new TaskComponent(id, services);
+        }
+    }
+
     // ───────── 排定面 ─────────
 
     /** 下一 tick 执行一次。 */

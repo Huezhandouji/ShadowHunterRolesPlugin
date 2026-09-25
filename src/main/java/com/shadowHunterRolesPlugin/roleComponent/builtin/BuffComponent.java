@@ -56,6 +56,19 @@ public class BuffComponent extends RoleComponent implements OperationProvider {
                 Bukkit.getPluginManager().getPlugin("ShadowHunterRolesPlugin")));
     }
 
+    /** **本组件的装配描述符**（与技能/被动同规；不带栏位、无额外依赖 —— 记账表由组件自建）。 */
+    public static final class Specification extends RoleComponent.Specification<BuffComponent> {
+
+        public Specification() {
+            super("Buff");
+        }
+
+        @Override
+        public BuffComponent create(String id, ComponentServices services) {
+            return new BuffComponent(id, services);
+        }
+    }
+
     /**
      * **测试接缝**（包私有）：注入一个替身记账表，供离线单测构造（不需要活 Player）。
      * <p>★ 生产路径**只用上面的公开构造** ⇒ 记账表由本组件自建 ✓。

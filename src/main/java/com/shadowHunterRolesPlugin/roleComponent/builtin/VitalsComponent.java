@@ -92,6 +92,19 @@ public class VitalsComponent extends RoleComponent {
         super(id, services);
     }
 
+    /** **本组件的装配描述符**（与技能/被动同规；不带栏位、无额外依赖）。 */
+    public static final class Specification extends RoleComponent.Specification<VitalsComponent> {
+
+        public Specification() {
+            super("Vitals");
+        }
+
+        @Override
+        public VitalsComponent create(String id, ComponentServices services) {
+            return new VitalsComponent(id, services);
+        }
+    }
+
     /**
      * **开始生效：把生命上限装到玩家身上**（★ 本组件自己实现，不再由容器代劳）。
      *

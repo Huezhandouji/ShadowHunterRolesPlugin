@@ -20,6 +20,12 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 
@@ -128,9 +134,31 @@ public class RoleLoader {
         return registered;
     }
 
+    /**
+     * **把 6 件内建组件加进装配表**（★ 与技能/被动**同一条路** ⇒ 它们就是普通组件）。
+     *
+     * <p><b>★ 必须排在最前</b>：`EnergyComponent` 的描述符要按 id 取到**渲染组件**并挂
+     * 「变更即置脏」的监听 ⇒ 渲染组件必须**先**注册（本方法内部也把它放在第一位）。
+     *
+     * <p>顺序 = 渲染 / 能量 / SanTE / 生命 / buff / 任务（与既有 `buildBuiltIns` 的语句顺序逐字相同
+     * ⇒ 装配序与行为都不变）。
+     *
+     * <p>★ 调用点 = 每个角色的 builder **开头**（三个角色都调）⇒ 内建块在模板组件之前，
+     * 与「服务组件登记在模板之后」的旧序不同，但**渲染/能量之间的相对序不变** ✓。
+     */
+    private static Role.Builder withBuiltIns(Role.Builder builder) {
+        return builder
+                .addComponent(HotbarRenderComponent.ID, new HotbarRenderComponent.Specification())
+                .addComponent(EnergyComponent.ID, new EnergyComponent.Specification())
+                .addComponent(SanTEComponent.ID, new SanTEComponent.Specification())
+                .addComponent(VitalsComponent.ID, new VitalsComponent.Specification())
+                .addComponent(BuffComponent.ID, new BuffComponent.Specification())
+                .addComponent(TaskComponent.ID, new TaskComponent.Specification());
+    }
+
     private static Role.Builder meiqiheziBuilder() {
 
-        return new Role.Builder("meiqihezi")
+        return withBuiltIns(new Role.Builder("meiqihezi"))
  //★ 「已被提供的类型」由**装配方**注入（`core/Role` 本身不认识任何组件类 ✓）——
  //  否则组件声明 `requires(框架级组件)` 会被模板侧的依赖校验误报成"缺必需依赖"。
                 .providedTypes(RoleInstance.providedComponentTypes())
@@ -159,7 +187,7 @@ public class RoleLoader {
 
     private static Role.Builder redBuilder() {
 
-        return new Role.Builder("red")
+        return withBuiltIns(new Role.Builder("red"))
                 .providedTypes(RoleInstance.providedComponentTypes())
                 .displayName(Component.text("Red"))
                 //Component.text("待到血腥降临，一切化为土尘\n普攻造成15流血\n一技能捅人恢复生命\n二技能致盲敌人并结算5层流血恢复te\n三技能烧自己te开启狂暴")
@@ -190,7 +218,7 @@ public class RoleLoader {
      */
     private static Role.Builder selfUpdateExampleBuilder() {
 
-        return new Role.Builder("selfUpdateExample")
+        return withBuiltIns(new Role.Builder("selfUpdateExample"))
                 .providedTypes(RoleInstance.providedComponentTypes())
                 .displayName(Component.text("Self-Update Example"))
                 .description(List.of(

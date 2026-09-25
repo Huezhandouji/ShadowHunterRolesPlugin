@@ -110,6 +110,32 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
     }
 
     /**
+     * **本组件的装配描述符**（与技能/被动同规；不带栏位）。
+     *
+     * <p>★ **「一次变更 ⇒ 请求重绘一次」的接线在 `create` 里完成**：描述符从 `services` 按 id
+     * 取到**渲染组件**并挂上「变更即置脏」的监听（与既有 `buildBuiltIns` 逐字同义）。
+     *
+     * <p><b>注册顺序前提</b>：渲染组件必须**先**注册（它排在装配清单第一位）⇒ 此处按 id 一定取得到 ✓；
+     * 取不到时**不挂监听**（等价于既有的"无置脏通道"分支，不抛）。
+     */
+    public static final class Specification extends RoleComponent.Specification<EnergyComponent> {
+
+        public Specification() {
+            super("Energy");
+        }
+
+        @Override
+        public EnergyComponent create(String id, ComponentServices services) {
+            return new EnergyComponent(id, services, ENERGY_MAX, change -> {
+                RoleComponent render = services.components().getById(HotbarRenderComponent.ID);
+                if (render != null) {
+                    render.requestRepaint();
+                }
+            });
+        }
+    }
+
+    /**
      * **添加监听器**（**唯一**的订阅入口 ✓）—— 订阅方调用，并在需要撤销时用
      * {@link #removeListener(Listener)} 成对移除 ✓。
      * <p><b>幂等</b>：同一 {@code owner} + 同一 {@code listener} 重复添加**不重复登记** ✓。

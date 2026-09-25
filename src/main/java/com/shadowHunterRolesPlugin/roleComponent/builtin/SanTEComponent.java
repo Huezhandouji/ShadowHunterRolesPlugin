@@ -227,6 +227,22 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         this.current = this.max;
     }
 
+    /**
+     * **本组件的装配描述符**（与技能/被动同规；不带栏位）。
+     * <p>上限取组件自己的常量 ⇒ 描述符无额外依赖 ✓。
+     */
+    public static final class Specification extends RoleComponent.Specification<SanTEComponent> {
+
+        public Specification() {
+            super("SanTE");
+        }
+
+        @Override
+        public SanTEComponent create(String id, ComponentServices services) {
+            return new SanTEComponent(id, services, SANTE_MAX);
+        }
+    }
+
     /** 当前 SanTE（读口）。 */
     public int current() {
         return current;

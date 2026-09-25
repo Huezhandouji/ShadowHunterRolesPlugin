@@ -133,9 +133,8 @@ public class RoleInstance {
  //① buff 记账表：★ **已由 buff 组件自己创建**（账本与持有者成对建立）——
  // 容器不再 `new BuffManager`，也不再持有它 ✓（原 `getBuffManager()` 转发读口早已删除）。
 
- //② 内建组件的装配：**由本类的 `buildBuiltIns()` 直接构造**（各组件自己声明 id ⇒
- // 本处只写「id + 工厂」的**纯数据**，不再经过任何「聚合清单」类 ✓）。
-        List<RoleComponent> builtIns = buildBuiltIns();
+ //② ★ **内建组件也走模板装配** —— 6 件由 `registry/RoleLoader#withBuiltIns(...)` 注册进装配表
+ // ⇒ 与技能/被动**同一条路**；本类**不再构造任何组件**（原 `buildBuiltIns()` 已整体删除）✓。
 
  //③ 阵营：**原 FactionComponent 已整体删除** ——
  // 阵营的真值就是聚合根 `Role` 的 `faction` 字段（构造期由描述符写入）；
@@ -148,14 +147,11 @@ public class RoleInstance {
  //**动态删除路径**入口（隔离时"移除全部组件"走它 ⇒ 与运行期增删同一条路径 + 删除守卫）
         this.componentLookup = new ComponentLookupImpl(componentRegistry, this::createServices, platform.logger());
 
+ //★ 装配 = 遍历模板工厂（**内建与角色内容一视同仁**，本类不认识任何组件类）
         initComponents();
 
  //装配完成 → 冻结注册表（此后按 id / 按类型查取才合法）
         componentRegistry.freeze();
-
- //服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
- //登记在冻结点**之后**：登记按 id 调用查取入口（本类不保留任何组件字段）
-        registerBuiltIns(builtIns);
 
  // ── 第一相到此结束（P6 两阶段构造）───────────────────────────────
  //构造器**只做不可见的事**：装配（组件 / 服务集 / 窄类型视图 / 服务组件登记）+ 注册表冻结
@@ -246,8 +242,8 @@ public class RoleInstance {
      * 误报成「缺必需依赖」。装配方把本清单**作为数据**交给 `Role.Builder#providedTypes(...)` ⇒ 校验放行 ✓
      * （{@code Role} 只吃数据、不认类型名 ⇒ 那条边界仍然守住）。
      *
-     * <p>★ **本方法与 {@link #buildBuiltIns()} 是同源的两面**：那里构造了哪几件，
-     * 这里就报哪几类 ⇒ 增删组件时**只改一处**（不再是「构造一处、清单另写一处」）。
+     * <p>★ **与装配表同源**：那 6 件由 `registry/RoleLoader#withBuiltIns(...)` 注册进模板
+     * ⇒ 本清单报的就是那 6 类；增删组件时**两处都在装配侧**（不再有「构造一处、清单另写一处」）。
      */
     public static Set<Class<? extends RoleComponent>> providedComponentTypes() {
         Set<Class<? extends RoleComponent>> types = new LinkedHashSet<>();
@@ -260,62 +256,6 @@ public class RoleInstance {
         return Set.copyOf(types);
     }
 
-    private List<RoleComponent> buildBuiltIns() {        // ① 物品渲染：**最先**构造（置脏通道要先存在）
-        HotbarRenderComponent hotbarRender =
-                new HotbarRenderComponent(HotbarRenderComponent.ID, createServices(HotbarRenderComponent.ID));
-        hotbarRender.bindRepaintSink(hotbarRender::markDirty);
-
-        // ② 能量：上限取组件侧配置；一次变更 ⇒ 请求重绘一次（无条件）
-        EnergyComponent energy = new EnergyComponent(EnergyComponent.ID, createServices(EnergyComponent.ID),
-                EnergyComponent.ENERGY_MAX,
-                change -> hotbarRender.markDirty());
-
-        // ③ SanTE：以本组件自身为 owner 登记平台侧监听 ⇒ 写入路径直调这一条
-        SanTEComponent sante = new SanTEComponent(SanTEComponent.ID, createServices(SanTEComponent.ID),
-                SanTEComponent.SANTE_MAX);
-        sante.addListener(sante, change -> dispatchSanTEChange(change.previous(), change.current()));
-
-        // ④ 生命：钳位策略的唯一实现在组件里（状态 = 玩家属性，属外部平台状态）
-        VitalsComponent vitals =
-                new VitalsComponent(VitalsComponent.ID, createServices(VitalsComponent.ID));
-
-        // ⑤ buff：记账表（与容器共享同一实例）与药水账本都归它持有
-        BuffComponent buffs =
-                new BuffComponent(BuffComponent.ID, createServices(BuffComponent.ID));
-
-        // ⑥ 任务：★ 零注入 —— 构造签名与普通组件一字不差；任务表与回收全归它自己
-        //（组件编写者忘了取消也不会泄漏：实例销毁必经它的 `stop()`）
-        TaskComponent tasks = new TaskComponent(TaskComponent.ID, createServices(TaskComponent.ID));
-
-        List<RoleComponent> ordered = new ArrayList<>(6);
-        ordered.add(hotbarRender);
-        ordered.add(energy);
-        ordered.add(sante);
-        ordered.add(vitals);
-        ordered.add(buffs);
-        ordered.add(tasks);
-        return List.copyOf(ordered);
-    }
-
- /**
- * 把**内建组件**登记进**实例容器**（按 **id** —— 本类只认 {@code component.getId()}）。
- * <p><b>不进 {@code Role} 模板</b> ⇒ {@code role.getComponents()} = 装配表 = 冻结 CELLS **逐格不变**；
- * 登记后它们可被**按 id** 取到（组件侧 = {@code svc().components().get(...)}）
- * （= "角色实例 = 组件的容器"的落点）。
- * <p>装配清单为 **6 件**（物品渲染 / 能量 / SanTE / 生命 / buff / 计时），由
- * {@link #buildBuiltIns()} 构造并接线完成。
- * <p>★ **每个组件自己声明 id**（`XxxComponent.ID`）⇒ 本类只写「id + 工厂」的**纯数据**，
- * 不再经过任何「框架级服务清单」聚合类 ✓。
- * <p><b>顺序</b>：登记在 {@link #initComponents()} **之后**、{@link ComponentRegistry#freeze()} **之后**
- * ⇒ 容器序 = 模板组件在前、内建组件在后（逐格不变）。
- */
-    private void registerBuiltIns(List<RoleComponent> builtIns) {
-        for (RoleComponent component : builtIns) {
-            if (component != null) {
-                componentRegistry.register(component);
-            }
-        }
-    }
 
  /**
  * **按类型取本实例内的组件**（"按类型查找"读口）。

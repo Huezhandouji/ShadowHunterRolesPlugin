@@ -41,7 +41,7 @@ import org.bukkit.event.entity.EntityRegainHealthEvent;
  *
  * <h2>非玩家伤害源（如实申报）</h2>
  * {@code EntityDamageEvent} 的 {@code getEntity()} 不是 {@code Player} 时**直接早退** ⇒
- * **不触发**任何钩子（不覆盖非玩家承受方）✗。将来要覆盖 ⇒ 加新重载/新事件面 = **只增** ✓。
+ * **不触发**任何钩子（不覆盖非玩家承受方）✗。将来要覆盖 ⇒ 加新重载/新事件面 ✓。
  */
 public class DamageHookListener implements Listener {
 

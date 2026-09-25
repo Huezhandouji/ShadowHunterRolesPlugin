@@ -83,7 +83,7 @@ public class RoleInstance {
     private boolean valid = true;
 
  /**
- * **第二相是否已执行**（ · P6 两阶段构造）：构造器只做不可见的事，
+ * **第二相是否已执行**（P6 两阶段构造）：构造器只做不可见的事，
  * 全部玩家可见的副作用在 {@link #activate()} 里，且**至多发生一次**。
  */
     private boolean activated = false;
@@ -122,7 +122,7 @@ public class RoleInstance {
  //组件注册表（组件集合 + 每组件资源表 + getComponent 查找）
     private final ComponentRegistry componentRegistry = new ComponentRegistry();
  /**
- * **聚合根只读服务面**（ 建立；**成为阵营读取的唯一入口**）：
+ * **聚合根只读服务面**（建立；**成为阵营读取的唯一入口**）：
  * {@link Role} 的只读视图（id / 描述 / **阵营** / 两个行为）。
  * <p><b>本组件</b>：原 `RoleInstance#factionComponent()` 读口与它的
  * **读侧视图**（{@code getFaction} + 三个 {@code isHostileTo}）**已删除** ⇒ 阵营读取一律走本端口
@@ -194,7 +194,7 @@ public class RoleInstance {
  //登记在冻结点**之后**：登记按 id 调用查取入口（本类不保留任何组件字段）
         registerServiceComponents(serviceComponents);
 
- // ── 第一相到此结束（ · P6 两阶段构造）───────────────────────────────
+ // ── 第一相到此结束（P6 两阶段构造）───────────────────────────────
  //构造器**只做不可见的事**：装配（组件 / 服务集 / 窄类型视图 / 服务组件登记）+ 注册表冻结
  //（依赖检查在 `Role#createInstance` 里、本构造器之前， 已有）。
  //**玩家可见**的副作用全部在第二相 {@link #activate()}：写生命修饰符 / 设置生命 / 生命周期广播 /
@@ -205,7 +205,7 @@ public class RoleInstance {
     }
 
  /**
- * **框架自身的置脏入口**（）：经**物品渲染组件**转调 ⇒ 与组件侧请求
+ * **框架自身的置脏入口**：经**物品渲染组件**转调 ⇒ 与组件侧请求
  * **收敛到同一条通道** （原先的"直连渲染器置脏"这条独立路径已废止）。
  * <p>用方法引用（{@code this::requestHotbarRepaint}）而不是 lambda：字段初始化式里**不能**读
  * 尚未在构造器里赋值的 final 字段（Java 的 definite-assignment 规则）⇒ 方法引用把读取推迟到调用时。
@@ -215,7 +215,7 @@ public class RoleInstance {
     }
 
  /**
- * **第二相：激活**（ · P6 两阶段构造）—— 把原先写在构造器里、**有玩家可见副作用**的
+ * **第二相：激活**（P6 两阶段构造）—— 把原先写在构造器里、**有玩家可见副作用**的
  * 那一段原样搬到这里：语句、顺序、可见时机与既有实现**逐字一致**，唯一差别是**调用时机**
  * （由调用方在"新实例已构造成功、旧角色已清理"之后调用）。
  * <p><b>为什么必须拆两相</b>：早先写法是"先 {@code clear()} 旧角色、再裸构造新实例"⇒ 构造一旦失败，
@@ -274,7 +274,7 @@ public class RoleInstance {
     public ComponentRegistry componentRegistry() { return componentRegistry; }
 
  /**
- * **角色信息服务面的框架侧读口**（ 新增；取代原 `factionComponent()` 读口）：
+ * **角色信息服务面的框架侧读口**（新增；取代原 `factionComponent()` 读口）：
  * 阵营读取与两个行为（{@code isHostile} / {@code hasEnemyInRange}）都经它 —
  * 与组件侧拿到的 {@code svc().roleInfo()} **同一个实例**（{@code createServices} 交出去的就是它）。
  * <p><b>只读</b>：本端口不带写面；写侧在聚合根上（{@link Role#setFaction} / {@link Role#resetFaction}）。
@@ -308,7 +308,7 @@ public class RoleInstance {
  * <p><b>调用点申报</b>：生产侧 0 调用点 —— 它是容器的公开读口（**容器职责**：组件查取入口），
  * 消费者是**后续卡的依赖注入路径**与仓外探针（组件侧取组件一律走
  * {@code RoleComponent#getComponent(Class)} ⇒ {@code svc().components().get(...)}）。
- * <p>本口**只增不改**（语义按真实行为写明 = "添加顺序第一个"）；
+ * <p>本口**接口面不变**（语义按真实行为写明 = "添加顺序第一个"）；
  * 新增的 {@link #getAllByType(Class)} 是它的"全部"版本（后者已是**活码**：
  * {@code listener/hook/DamageHookListener} 的承受方扇出在用）。
  */
@@ -341,7 +341,7 @@ public class RoleInstance {
     }
 
  /**
- * 组件与其**一对一**的服务集（ 后为三个成员：玩家实例面 / 组件查找 / 聚合根只读面）。
+ * 组件与其**一对一**的服务集（P5 后为三个成员：玩家实例面 / 组件查找 / 聚合根只读面）。
  * <p><b>前置</b>：冷却表已合并为**单一命名空间** ⇒ 本方法**不再需要 kind**
  * （合并前"按 kind 选表"的构造期绑定，是"删 kind 枚举"的硬阻塞）。
  * kind 枚举已整个删掉 ⇒ 注册处也不再承载任何"权威种类"。
@@ -665,7 +665,7 @@ public class RoleInstance {
         pickApply(SERVICE_ID_BUFFS, BuffComponent.class, component -> component.applyPotionEffect(effect));
     }
 
- // ───────── 阵营（ · 欠账 A 后半）：**读侧视图已删除** / 写侧视图保留 ─────────
+ // ───────── 阵营（欠账 A 后半）：**读侧视图已删除** / 写侧视图保留 ─────────
  //★ 真值所在：聚合根 `Role` 的 `faction` 字段（原 `FactionComponent.faction` 组件字段已随组件删除）。
  //★ **读取唯一入口 = `roleInfo` 服务面**：组件侧 `svc().roleInfo()`、框架侧 {@link #roleInfo()}
  // ⇒ 本类**不再**提供 `getFaction()` / `isHostileTo(...)` 三个读视图 （调用点已改走 RoleInfo：
@@ -684,7 +684,7 @@ public class RoleInstance {
  //为**注册表内组件**广播新基类钩子 awake()。
  //广播给"全部注册组件"：所有组件的新钩子由各组件自行实现（基类提供默认空实现）；
  //按迁移状态分支会引入第二套判据。
- //遍历窗口（）：广播期间**禁止**增/删/插位（注册表在窗口内拒绝写口）
+ //遍历窗口：广播期间**禁止**增/删/插位（注册表在窗口内拒绝写口）
  //：窗口包装 + **唯一受保护调用**（异常 ⇒ 记下隔离请求，窗口关闭后执行四步）
         withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
@@ -698,7 +698,7 @@ public class RoleInstance {
         if(player == null ) return;
 
  //为注册表内组件广播新基类钩子 start()（顺序 = 注册表顺序；理由同 awake 处注释）
- //遍历窗口（）：同 awake 处；：同 awake 处（唯一受保护调用）
+ //遍历窗口：同 awake 处；：同 awake 处（唯一受保护调用）
         withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
                 guardedCall(component, "start", component::start);
@@ -716,7 +716,7 @@ public class RoleInstance {
  //未迁移组件则对基类 stop() 是**默认空实现** ⇒ 任一组件在任一时刻只被"真实逻辑"处理一次。
  //**幂等说明**：若组件在 stop() 里自行取消任务，随后 clear() 的 cancelAllAndClear() 仍会取消其
  //资源表内的同一句柄 ⇒ 重复 cancel 幂等（Task.cancel() 对已取消句柄是 no-op）。
- //遍历窗口（）：同 awake 处
+ //遍历窗口：同 awake 处
  //：唯一受保护调用 —— 但本方法**只**由 clear() 调用（tearingDown=true）⇒ 其中的异常
  //只记日志、**不**触发隔离（否则一次正常清角色里的 stop() 异常会播成"某角色已停用"= 假警报）
         withinIterationWindow(() -> {
@@ -748,7 +748,7 @@ public class RoleInstance {
  * （初值 = 本次 {@code newSanTE}；每补发一次更新为 {@code target}）与 {@code target} 比较：
  * **无重入 ⇒ 不补发（与旧行为逐字一致）**；**有重入 ⇒ 恰好补发末次一次**；
  * 循环退出条件 = {@code sanTEPendingValue == Integer.MIN_VALUE}（哨兵 = 无待发值）；</li>
- * <li>异常隔离走 {@link #guardedCall}（ 起：**唯一受保护调用** ⇒ 抛异常 = 故障隔离）。</li>
+ * <li>异常隔离走 {@link #guardedCall}（起：**唯一受保护调用** ⇒ 抛异常 = 故障隔离）。</li>
  * </ul>
  * 现存两个实现者（{@code DefaultSanTEZeroPunishment} / {@code RedDeeplySorrowSkill} 的
  * {@code onSanTEChange}）都**不在钩子内同步写 SanTE**（前者只调度任务、后者只起冷却）
@@ -805,7 +805,7 @@ public class RoleInstance {
         if (sante == null) {
             return;
         }
- //遍历窗口（）：可嵌套（update() 广播期间改 SanTE ⇒ 本方法再次进入窗口）
+ //遍历窗口：可嵌套（update() 广播期间改 SanTE ⇒ 本方法再次进入窗口）
  //：唯一受保护调用（异常 ⇒ 窗口关闭后执行隔离四步）
         withinIterationWindow(() -> {
             sante.forEachListener(entry -> {
@@ -831,7 +831,7 @@ public class RoleInstance {
  //**顺序说明**：按**注册表顺序**遍历（无先后关系）；
  //所有组件都对基类 update() 自行实现（基类默认空实现）；组件均已迁移（无迁移标记）
  //**不再实现 legacy 更新接口** ⇒ 只被这一条路径调用，不会双触发。
- //遍历窗口（）：**update() 广播期间禁止增/删/插位**（"禁止遍历中修改"的落点）
+ //遍历窗口：**update() 广播期间禁止增/删/插位**（"禁止遍历中修改"的落点）
  //：唯一受保护调用 —— 组件在 update() 里抛 ⇒ 整实例隔离（窗口关闭后执行四步）
         withinIterationWindow(() -> {
             for(RoleComponent component : componentRegistry.all()){
@@ -859,7 +859,7 @@ public class RoleInstance {
     }
 
  /**
- * **热键栏"本帧真的变了"的通知**（ · B3）：按
+ * **热键栏"本帧真的变了"的通知**：按
  * {@link HotbarRenderComponent.RenderCallback} **扇出**，逐个经 {@link #deliverHook} 调用。
  * <p><b>只通知、不可否决</b>：回调返回 {@code void} ⇒ 改不了这一帧的渲染结果。
  * <p><b>为何逐个 deliverHook 而不是把整个循环塞进一次调用</b>：那样首个异常会让"本次派发"里
@@ -898,7 +898,7 @@ public class RoleInstance {
     }
 
  /**
- * **框架调用组件的唯一受保护入口**（ · A1）。
+ * **框架调用组件的唯一受保护入口**（A1）。
  * <p>框架在**每一处**调用组件（{@code awake/start/stop/update/onSanTEChange} 广播 ·
  * {@code onCast}/{@code onAttack}）都必须经这里 ——
  * **不在组件内部各自 try** （否则第三个组件又要重写一遍）。
@@ -925,7 +925,7 @@ public class RoleInstance {
     }
 
  /**
- * **承受方钩子的交付口**（ · B-静态半）：平台事件面（{@code EntityDamageEvent} /
+ * **承受方钩子的交付口**（B-静态半）：平台事件面（{@code EntityDamageEvent} /
  * {@code EntityRegainHealthEvent}）经它把"受伤 / 受治疗"通知到**本实例**的组件。
  * <p><b>★ 为什么必须经这里、而不能从施动方实例直接调目标组件</b>：钩子抛异常时要按
  * {@link #guardedCall} 的**故障隔离**语义处置（真四步）—— 那套语义只存在于本类 ⇒ 绕过它就等于
@@ -965,7 +965,7 @@ public class RoleInstance {
     }
 
  /**
- * **遍历窗口的唯一包装**（）：窗口关闭后立刻执行待处理的隔离。
+ * **遍历窗口的唯一包装**：窗口关闭后立刻执行待处理的隔离。
  * <p>为什么隔离不能在窗口**内**执行：容器在遍历窗口内**拒绝写口**
  * ⇒ "移除全部组件"必须等窗口关闭；把四步放在窗口之外**仍属同一次派发调用**（不是延迟到下一 tick）。
  */

@@ -17,8 +17,7 @@ import java.util.Map;
  * 运行期**不可能**增删组件。现在改成**写放开、读始终可用**：
  * <ul>
  * <li><b>写</b>（{@link #register} / {@link #insert} / {@link #remove} / {@link #removeById}）：
- * <b>装配期与运行期都可调用</b>（"装配即冻"取消）；id **可重复**（ 放开 ——
- * 用户新路线图第 2 条：添加组件时允许重复组件）；
+ * <b>装配期与运行期都可调用</b>（"装配即冻"取消）；id **可重复**（添加组件时允许重复组件）；
  * <b>遍历窗口内一律拒绝</b>（{@link #beginIteration()} 与 {@link #endIteration()} 之间，
  * 即框架正在广播 {@code awake/start/stop/update/onSanTEChange} 时）⇒ "禁止遍历中修改"；</li>
  * <li><b>读</b>（{@link #get} / {@link #getByType} / {@link #getAll} / {@link #getById} / {@link #all}）：
@@ -27,7 +26,7 @@ import java.util.Map;
  * <b>装配期（{@code frozen=false}）仍禁止跨组件查找</b>：这是既有的约束
  * （组件在构造期只应拿到服务集，不得读到"还在一半"的组件表），本次**不放宽**。</li>
  * </ul>
- * <p><b>查询语义（ 按用户新路线图第 1 条统一）</b>：类型条件 = **可赋值性**
+ * <p><b>查询语义</b>：类型条件 = **可赋值性**
  * （{@code type.isInstance(component)} ⇒ 父类/接口查询命中子类实例），顺序 = **添加顺序**
  * （容器当前序，不是 id 序、不是具体类优先）：
  * <ul>
@@ -45,7 +44,7 @@ public final class ComponentRegistry {
     private final Map<RoleComponent, List<Task>> resources = new IdentityHashMap<>();
 
  /**
- * **每组件一条依赖声明**（ · P2）：`组件 → 声明`。
+ * **每组件一条依赖声明**：`组件 → 声明`。
  * 声明**从装配条目 / 描述符快照算出**（{@code Role.ComponentEntry} 或
  * {@code RoleComponent.Specification.Snapshot}），**不是手工维护的表** ⇒ 不会漂移。
  * 它是"删除前算反向依赖"的唯一数据来源。
@@ -80,7 +79,7 @@ public final class ComponentRegistry {
  * **在指定下标插入**一个组件并登记其依赖声明（运行期"插位"；{@code index == size()} 等价于追加）。
  * <p>检查项（按序检查，失败即拒）：① null ⇒ {@code NullPointerException}；
  * ② **遍历窗口内** ⇒ {@code IllegalStateException}；③ 下标越界 ⇒ {@code IndexOutOfBoundsException}。
- * <p><b>（用户新路线图第 2 条）：id 唯一性已放开</b> —— 同一个 id **可以**在容器内出现多次
+ * <p><b>id 唯一性已放开</b> —— 同一个 id **可以**在容器内出现多次
  * （原先的 ④"id 已存在 ⇒ {@code IllegalArgumentException}" 已删除）。随之而来的两条口径：
  * <ul>
  * <li>{@link #getById(String)} / {@link #removeById(String)} 取/删的都是**添加顺序第一个**同 id 者
@@ -140,7 +139,7 @@ public final class ComponentRegistry {
         return component != null && remove(component);
     }
 
- // ───────────── 依赖声明与反向依赖（ · P2） ─────────────
+ // ───────────── 依赖声明与反向依赖 ─────────────
 
  /**
  * 一条组件的**依赖声明**：`(id, 提供类型, 必需依赖类型)`。
@@ -187,7 +186,7 @@ public final class ComponentRegistry {
  * （与 {@link #getById(String)} / {@link #removeById(String)} 同目标 —— 删除守卫要保护的正是"会被删掉的那一个"）。
  * 若需要**按实例**精确判定（例如隔离路径逐个挑"当前无人依赖"的组件），用
  * {@link #requiredBy(RoleComponent)}。
- * <p>用途（P2）：删除组件前先算这张表 —— 非空 ⇒ **拒绝删除**（否则"必需"会静默失效）。
+ * <p>用途：删除组件前先算这张表 —— 非空 ⇒ **拒绝删除**（否则"必需"会静默失效）。
  */
     public Map<String, Class<? extends RoleComponent>> requiredBy(String id) {
         return requiredBy(findById(id));
@@ -331,7 +330,7 @@ public final class ComponentRegistry {
  * <p><b>类型条件 = 可赋值性</b>（{@code isInstance}）⇒ 用**父类或接口**查询会命中子类/实现类实例
  * （例：抽象 `FatherComponent` 派生 `C1Component` / `C2Component`，先加 C1、后加 C2
  * ⇒ `get(FatherComponent.class)` 返回 **C1**）。
- * <p><b>类型形参不设上界</b>（）：旧签名是 {@code <T extends RoleComponent>}，那样
+ * <p><b>类型形参不设上界</b>：旧签名是 {@code <T extends RoleComponent>}，那样
  * **纯接口**（不继承 {@code RoleComponent} 的接口，例如 `Tag`）**根本无法作为实参** ——
  * 而用户第 1 条明写"父类**或接口**查询命中子类实例" ⇒ 改为无上界 {@code <T>} + {@code type.cast(...)}
  * （匹配时才 cast ⇒ 对任意 {@code type} 都**安全**：不匹配就返回 null / 空列表）。
@@ -356,7 +355,7 @@ public final class ComponentRegistry {
     }
 
  /**
- * **按类型取全部**（ · 用户新路线图第 1 条新增）：返回**全部**满足
+ * **按类型取全部**：返回**全部**满足
  * {@code type.isInstance(...)} 的组件，顺序 = **添加顺序**（容器当前序）。
  * <p>与 {@link #get(Class)} **同一条件、同一顺序**，只是不截断到第一个 ⇒
  * {@code getAll(T).isEmpty()} ⟺ {@code get(T) == null}，且 `getAll` 的首元素恒等于 `get`。

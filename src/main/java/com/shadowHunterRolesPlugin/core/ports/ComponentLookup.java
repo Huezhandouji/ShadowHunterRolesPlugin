@@ -19,7 +19,7 @@ import java.util.List;
  * <ul>
  * <li>{@link #get(Class)} = 第一个符合条件的（**不是"具体类优先"** —— 已按真实语义改正）；</li>
  * <li>{@link #getAll(Class)} = 全部符合条件的（添加顺序；无人符合 ⇒ **空列表**）；</li>
- * <li>{@link #getById(String)} = 第一个 id 相等的（ 起 **id 可重复**）。</li>
+ * <li>{@link #getById(String)} = 第一个 id 相等的（起 **id 可重复**）。</li>
  * </ul>
  * <p><b>实现点唯一</b>：{@code core/ComponentLookupImpl}（把 {@code core.dispatch.ComponentRegistry} 与
  * 容器的服务集工厂、日志接起来）。{@link RoleComponent#getComponent(Class)} 走本端口的 {@link #get(Class)}。
@@ -85,7 +85,7 @@ public interface ComponentLookup {
  /**
  * **运行期动态添加**（追加到容器末尾）：声明 → 依赖预检 → 构造 → 注册 → {@code awake()} → {@code start()}。
  * <p>吃**装配期描述符**（与 {@code Role.Builder.addComponent} 同一个口径）：描述符同时给出
- * "造哪个类"与"依赖声明" ⇒ 容器能把声明登记进反向依赖表（P2 的数据来源）。
+ * "造哪个类"与"依赖声明" ⇒ 容器能把声明登记进反向依赖表。
  * 没有描述符的组件（例如经 {@code Role.Builder.addPassive} 装配的被动）**没有**运行期添加入口 ——
  * 与装配期同一分工（要按需添加就先给它补一个嵌套描述符）。
  * @param id 组件 id（** 起可重复**：同一个 id 可以添加多次 ⇒ 容器内会有多个同 id 组件）

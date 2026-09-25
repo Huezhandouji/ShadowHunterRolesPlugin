@@ -18,6 +18,23 @@ public class MeiqiheziEquipmentsPassive extends PassiveSkill {
     }
 
     /**
+     * 本组件的**被动描述符**（迁移后被动走统一的 {@code addComponent} 入口 ⇒ 无栏位 ⇒ 天然不占热键栏）。
+     * 表现数据**逐字沿用**组件构造器里那一对文案（不新拟）；**无依赖声明** —— 本组件实取 0 个组件
+     * （只用 {@code svc().self().player()}）。
+     */
+    public static final class Specification extends PassiveSkill.Specification {
+
+        public Specification(){
+            super(Component.text("穿戴装备"), Component.text("ccb"));
+        }
+
+        @Override
+        public MeiqiheziEquipmentsPassive create(String id, ComponentServices services){
+            return new MeiqiheziEquipmentsPassive(id, services);
+        }
+    }
+
+    /**
      * 迁移：改**无参新钩子**（容器已广播），装备发放逻辑**逐字未动**
      * （四槽 = IRON_HELMET / LEATHER_CHESTPLATE / IRON_LEGGINGS / LEATHER_BOOTS；
      * 设置顺序 helmet→chestplate→leggings→boots 不变）。

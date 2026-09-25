@@ -37,7 +37,7 @@ public class RegistrationOrderTest {
         for (int i = 0; i < IDS.length; i++) {
             b.addComponent(IDS[i], new MeiqiheziBloodySlashSkill.Specification().setSlot(i));
         }
-        b.addPassive("c_9_no_slot", AutoRecoverEnergyPassive::new);
+        b.addComponent("c_9_no_slot", new AutoRecoverEnergyPassive.Specification());
         Role role = b.build();
 
         List<String> actualOrder = new ArrayList<>(role.getComponents().keySet());

@@ -17,6 +17,24 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
     }
 
     /**
+     * 本组件的**被动描述符**（迁移后被动走统一的 {@code addComponent} 入口 ⇒ 无栏位 ⇒ 天然不占热键栏）。
+     * 表现数据**逐字沿用**组件构造器里那一对文案（不新拟）；依赖 = 实取清单（`start()` 内的
+     * {@code svc().components().get(...)} 调用点）。
+     */
+    public static final class Specification extends PassiveSkill.Specification {
+
+        public Specification(){
+            super(Component.text("自动恢复能量"), Component.text("周围10格没有敌人时，每秒恢复3点能量"));
+            requires(EnergyComponent.class);
+        }
+
+        @Override
+        public AutoRecoverEnergyPassive create(String id, ComponentServices services){
+            return new AutoRecoverEnergyPassive(id, services);
+        }
+    }
+
+    /**
      * 容器在 tick 里对该组件广播 `update()` 钩子。
      * 数值/间隔**逐字不变**：半径 `10`、无敌人累计上限 `200` tick、每秒判定 `20` tick、`+3` 能量。
      * 阵营判定改走 `svc().roleInfo().hasEnemyInRange(10)`（其语义 = 原 `SkillUtil.hasEnemyInRange`，

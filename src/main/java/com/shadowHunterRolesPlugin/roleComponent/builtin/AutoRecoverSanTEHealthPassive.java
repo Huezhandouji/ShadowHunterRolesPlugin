@@ -22,6 +22,23 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
     }
 
     /**
+     * 本组件的**被动描述符**（迁移后被动走统一的 {@code addComponent} 入口 ⇒ 无栏位 ⇒ 天然不占热键栏）。
+     * 表现数据**逐字沿用**组件构造器里那一对文案（不新拟）；依赖 = 实取清单（`start()` 内的两个调用点）。
+     */
+    public static final class Specification extends PassiveSkill.Specification {
+
+        public Specification(){
+            super(Component.text("自动恢复SanTE"), Component.text("当周围10格没有敌人五秒后, 开始自动恢复SanTE, 每秒3"));
+            requires(SanTEComponent.class).requires(VitalsComponent.class);
+        }
+
+        @Override
+        public AutoRecoverSanTEHealthPassive create(String id, ComponentServices services){
+            return new AutoRecoverSanTEHealthPassive(id, services);
+        }
+    }
+
+    /**
      * **开始生效**：把生命组件**一次查好**缓存进字段 ✓。
      * <p>为什么在 {@code start()} 而不是 {@code awake()}：禁止在 {@code awake()} 里
      * 取用其他组件 ✗（awake 只做构造期自检 / 只读自身）；`start()` 相容器已冻结 ⇒ 容器查找合法 ✓。

@@ -52,7 +52,7 @@ public class AssemblyValidationTest {
         assertEquals("Skill already registered: c_a", e.getMessage());
 
         Role.Builder b2 = builder("r2");
-        b2.addPassive("c_a", AutoRecoverEnergyPassive::new);
+        b2.addComponent("c_a", new AutoRecoverEnergyPassive.Specification());
         assertThrows(IllegalArgumentException.class,
                 () -> b2.addComponent("c_a", new MeiqiheziBloodySlashSkill.Specification().setSlot(1)));
     }

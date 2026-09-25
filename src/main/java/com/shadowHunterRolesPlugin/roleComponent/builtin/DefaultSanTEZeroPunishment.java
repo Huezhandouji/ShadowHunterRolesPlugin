@@ -83,6 +83,26 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
         );
     }
 
+    /**
+     * 本组件的**被动描述符**（迁移后被动走统一的 {@code addComponent} 入口 ⇒ 无栏位 ⇒ 天然不占热键栏）。
+     * 表现数据**逐字沿用**组件构造器自己的实参（本组件原本就传 {@code null, null} ⇒ 描述符同样传 null，不新拟）；
+     * 依赖 = 实取清单（`start()` 内的四个调用点）。
+     */
+    public static final class Specification extends PassiveSkill.Specification {
+
+        public Specification(){
+            super(null, null);
+            requires(TimerComponent.class).requires(VitalsComponent.class).requires(BuffComponent.class);
+            //sante 实取但代码自带 null 兜底（`start()` 的 if (sante != null) 订阅 / `stop()` 的退订）⇒ 按「实取但可为空」声明为**可选**
+            requiresOptional(SanTEComponent.class);
+        }
+
+        @Override
+        public DefaultSanTEZeroPunishment create(String id, ComponentServices services){
+            return new DefaultSanTEZeroPunishment(id, services);
+        }
+    }
+
     //任务句柄（平台 Task；null = 没有任务在跑）
     private Task punishmentTask;
     //回满任务句柄（Q2 = A：STUN 100 刻结束时一次性回满；与上面同属本组件资源表）

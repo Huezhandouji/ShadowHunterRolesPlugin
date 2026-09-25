@@ -41,7 +41,7 @@ public class Role {
     private final Map<String, ComponentEntry> components;
  /**
  * 三个按**描述符类型**过滤的**有序** id 视图（组内保持声明序；公共访问器语义不变）：
- * 技能 = {@link Skill.Specification} 一支 · 被动 = {@link PassiveSkill.Specification} · 主武器 =
+ * 技能 = {@link Skill.Specification} 一支 · 被动 = **无栏位的那一支** · 主武器 =
  * {@link MainWeapon.Specification}。
  */
     private final Set<String> skillIds;
@@ -111,8 +111,8 @@ public class Role {
  /**
  * 按**描述符类型**过滤出**保持声明序**的 id 视图（`LinkedHashSet`）。
  * <p>早先口径是"按权威 kind 过滤"（`kind 枚举` 已删）；现口径 = **描述符类型**——
- * 技能/主武器来自带栏位描述符的两个家族支，被动来自 {@code PassiveSkill.Specification}
- * （装配入口 {@code addPassive} 按工厂类型归到它）。仓内读数逐条相同。
+ * 技能/主武器来自带栏位描述符的两个家族支，被动来自**无栏位的被动描述符支**
+ * （装配入口 = 统一的 {@code addComponent}；归类只按描述符类型的**可赋值性**）。仓内读数逐条相同。
  */
     private static Set<String> filterIds(Map<String, ComponentEntry> components, Class<?> descriptorType){
         Set<String> ids = new LinkedHashSet<>();
@@ -232,12 +232,6 @@ public class Role {
     }
 
  /** 旧窄类型入口（保留兼容）：见 {@link #createSkill(String, ComponentServices)}。 */
-    public PassiveSkill createPassive(String passiveId, ComponentServices services){
-        RoleComponent component = createComponent(passiveId, services);
-        return component instanceof PassiveSkill passive ? passive : null;
-    }
-
- /** 旧窄类型入口（保留兼容）：见 {@link #createSkill(String, ComponentServices)}。 */
     public MainWeapon createMainWeapon(String weaponId, ComponentServices services){
         RoleComponent component = createComponent(weaponId, services);
         return component instanceof MainWeapon weapon ? weapon : null;
@@ -266,7 +260,7 @@ public class Role {
  * <p><b>不占栏位 = 栏位的缺失</b>：栏位用**可空的 {@link Integer}** 表达（`null` = 不占热键栏，
  * 不进 `slotMap` ⇒ 渲染器遍历 `slotMap` 时天然看不到它）。
  * 旧版的 `-1` 哨兵已删除 —— {@link #getSlot()} 在无栏位时**抛异常**，而不是返回一个能参与算术的值；
- * 想表达"不占栏位"只剩一条路：装配一个**没有栏位**的描述符（如 `PassiveSkill.Specification`）。
+ * 想表达"不占栏位"只剩一条路：装配一个**没有栏位**的描述符（如**无栏位的被动描述符支**）。
  * <p>本条目是装配期从描述符取到的**不可变快照**：只持有几个值，**不持有描述符对象** ⇒
  * 同一份描述符实例被两个角色共享时，后手改动影响不到先手。
  * <p>`descriptorType` = 描述符的**类型**（原 `kind` 的唯一职责改由它承担：三个 id 视图按
@@ -395,7 +389,7 @@ public class Role {
  * 栏位从描述符读，**不再由调用点传值**；也不再有任何"种类"形参。
  * <p>占不占栏位由**描述符的类型**决定：带栏位的描述符（`HotbarSpecification` 一支）用
  * {@code setSlot} 指定位置，装配期未设栏位 ⇒ 此处抛异常；不带栏位的描述符
- * （`PassiveSkill.Specification`）**没有** {@code setSlot} ⇒ 天然不占栏位。
+ * （**无栏位的被动描述符**）**没有** {@code setSlot} ⇒ 天然不占栏位。
  * <p>本方法对传入描述符取**不可变快照**（{@code Specification#freeze()}）：条目只留
  * `(栏位, 工厂, 描述符类型, 提供类型, 必需依赖, 可选依赖)`，**不持有描述符对象**。
  * <p>：描述符上的依赖声明（{@code requires(...)} / {@code requiresOptional(...)}）与
@@ -411,22 +405,6 @@ public class Role {
                     snapshot.hasSlot() ? Integer.valueOf(snapshot.getSlot()) : null,
                     snapshot.getFactory(), snapshot.getDescriptorLabel(),
                     snapshot.getProvidedType(), snapshot.getRequiredTypes(), snapshot.getOptionalTypes());
-        }
-
- /**
- * **无栏位装配入口**（被动唯一的入口；kind 形参已随 `kind 枚举` 删除）：
- * 不占热键栏 ⇒ 不进 `slotMap` ⇒ 渲染器遍历时天然看不到它，也不会被要求画物品。
- * <p>"是被动"由**工厂形参的类型**表达（{@code ComponentFactory<PassiveSkill>}）⇒
- * 三个 id 视图按 `PassiveSkill.Specification` 归类；其余语义与描述符入口一致（同一条内部路径）。
- * <p><b>依赖面（如实申报）</b>：本入口**没有描述符** ⇒
- * ① 提供类型只能是**族级** {@code PassiveSkill.class}（依赖检查按它匹配）；
- * ② **无法**声明依赖（{@code requires} 只在描述符上）。要按具体类被依赖或要声明依赖的被动，
- * 应改走描述符入口（给该被动加一个嵌套 {@code PassiveSkill.Specification}）—— 属逐组件迁移卡的范围。
- */
-        public Builder addPassive(String passiveId, ComponentFactory<PassiveSkill> factory){
-            Objects.requireNonNull(factory);
-            return addComponentInternal(passiveId, PassiveSkill.Specification.class, null, factory, "Passive",
-                    PassiveSkill.class, List.of(), List.of());
         }
 
  /**

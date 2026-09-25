@@ -150,10 +150,10 @@ public class RoleLoader {
                 .addComponent(ID_MEIQIHEZI_CIRCLE_SLASH, new MeiqiheziCircleSlashSkill.Specification().setSlot(3))
                 .addComponent(ID_MEIQIHEZI_JUEJUE_MAIN_WEAPON, new MeiqiheziJuejueMainWeapon.Specification().setSlot(0))
                 .faction(Faction.HUNTER)
-                .addPassive(ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT, DefaultSanTEZeroPunishment::new)
-                .addPassive(ID_AUTO_RECOVER_SANTE_HEALTH, AutoRecoverSanTEHealthPassive::new)
-                .addPassive(ID_AUTO_RECOVER_ENERGY, AutoRecoverEnergyPassive::new)
-                .addPassive(ID_MEIQIHEZI_EQUIPMENTS, MeiqiheziEquipmentsPassive::new)
+                .addComponent(ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT, new DefaultSanTEZeroPunishment.Specification())
+                .addComponent(ID_AUTO_RECOVER_SANTE_HEALTH, new AutoRecoverSanTEHealthPassive.Specification())
+                .addComponent(ID_AUTO_RECOVER_ENERGY, new AutoRecoverEnergyPassive.Specification())
+                .addComponent(ID_MEIQIHEZI_EQUIPMENTS, new MeiqiheziEquipmentsPassive.Specification())
                 .icon(Material.DIAMOND_HOE);
     }
 
@@ -169,14 +169,14 @@ public class RoleLoader {
                         Component.text("一技能捅人恢复生命")
                 ))
                 .faction(Faction.SHADOW)
-                .addPassive(ID_RED_BLEED, RedBleedPassive::new)
+                .addComponent(ID_RED_BLEED, new RedBleedPassive.Specification())
                 .addComponent(ID_RED_SANCTIFIED_BLADE, new RedSanctifiedBladeMainWeapon.Specification().setSlot(0))
                 .addComponent(ID_RED_SOLITARY_ARROGANCE, new RedSolitaryArroganceSkill.Specification().setSlot(1))
                 .addComponent(ID_RED_EVIL_SHOCK, new RedEvilShockSkill.Specification().setSlot(2))
                 .addComponent(ID_RED_DEEPLY_SORROW, new RedDeeplySorrowSkill.Specification().setSlot(3))
-                .addPassive(ID_AUTO_RECOVER_SANTE_HEALTH, AutoRecoverSanTEHealthPassive::new)
-                .addPassive(ID_RED_EQUIPMENTS, RedEquipmentsPassive::new)
-                .addPassive(ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT, DefaultSanTEZeroPunishment::new)
+                .addComponent(ID_AUTO_RECOVER_SANTE_HEALTH, new AutoRecoverSanTEHealthPassive.Specification())
+                .addComponent(ID_RED_EQUIPMENTS, new RedEquipmentsPassive.Specification())
+                .addComponent(ID_DEFAULT_SAN_TE_ZERO_PUNISHMENT, new DefaultSanTEZeroPunishment.Specification())
                 .icon(Material.POPPY);
     }
 

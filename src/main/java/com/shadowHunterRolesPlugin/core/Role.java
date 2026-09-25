@@ -225,18 +225,6 @@ public class Role {
  // * 运行期 awake() 顺序 = 容器按插入序，与依赖图无关 ⇒ 环内"谁先醒"**未定义**（见
  // {@link #verifyDependencies()} 的 A3 段）。
 
- /** 旧窄类型入口（保留兼容）：kind 不符时返回 {@code null}（与"该类型未装配"同义）。 */
-    public Skill createSkill(String skillId, ComponentServices services){
-        RoleComponent component = createComponent(skillId, services);
-        return component instanceof Skill skill ? skill : null;
-    }
-
- /** 旧窄类型入口（保留兼容）：见 {@link #createSkill(String, ComponentServices)}。 */
-    public MainWeapon createMainWeapon(String weaponId, ComponentServices services){
-        RoleComponent component = createComponent(weaponId, services);
-        return component instanceof MainWeapon weapon ? weapon : null;
-    }
-
  /**
  * **唯一组件创建点**：全仓**创建路径**只有这里调用
  * {@link ComponentFactory#create(String, ComponentServices)}；装配表按 id 查条目的工厂。

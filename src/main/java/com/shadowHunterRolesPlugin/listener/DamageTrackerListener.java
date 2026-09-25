@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.listener;
 
-import com.shadowHunterRolesPlugin.core.DamageUtil;
+import com.shadowHunterRolesPlugin.core.util.DamageUtil;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;

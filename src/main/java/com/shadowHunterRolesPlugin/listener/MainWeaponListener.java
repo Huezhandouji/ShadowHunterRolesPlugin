@@ -1,6 +1,12 @@
 package com.shadowHunterRolesPlugin.listener;
 
-import com.shadowHunterRolesPlugin.core.MainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
+import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
@@ -40,13 +46,36 @@ public class MainWeaponListener implements Listener {
         if(instance == null) return;
 
         String weaponId = MainWeapon.Utils.getWeaponId(item);
-        MainWeapon weapon = instance.getMainWeaponById(weaponId);
-        if(weapon == null) return;
 
         //取消原版事件
         event.setCancelled(true);
-        //新管道（T-1 ④ 后**旧派发入口已删**）：武器由框架统一处理并在 SUCCEED 时启动冷却（无双启动）。
-        instance.handleAttack(victim, attacker);
+        //★ 攻击管道**归本 listener**（容器已删 `handleAttack`）：按 id 取通用面 → 判类型 → 受保护调用 → 请求重绘
+        RoleComponent component = instance.componentRegistry().getById(weaponId);
+        if(!(component instanceof ActiveComponent active)) return;
+        instance.invokeComponentHook(component, "onAttack", () -> active.onAttack(new AttackSignal(victim)));
+        requestRepaint(instance);
+    }
+
+    /**
+     * **施放管道**（★ 原先住在容器 `handleCast`，现归本 listener）。
+     * <p>读物品 id → 按 id 取通用面 → 判「声明了主动入口」→ 判冷却 → 受保护调用 → 请求重绘。
+     *
+     * @return 是否真的施放了（未命中 / 未声明主动入口 / 冷却中 ⇒ {@code false}）
+     */
+    private boolean cast(RoleInstance instance, String weaponId, CastTrigger trigger){
+        RoleComponent component = instance.componentRegistry().getById(weaponId);
+        if(!(component instanceof ActiveComponent active)) return false;
+        if(active.isCoolingDown()) return false;
+        instance.invokeComponentHook(component, "onCast", () -> active.onCast(new CastSignal(trigger)));
+        requestRepaint(instance);
+        return true;
+    }
+
+    /** **请求热键栏重绘**（★ 按 id 取渲染组件后调它的通用面；容器不再代劳）。 */
+    private void requestRepaint(RoleInstance instance){
+        //★ 渲染组件**由本 listener 自己按 id 取**（容器不持有它、也不认识它）
+        RoleComponent render = instance.componentRegistry().getById(HotbarRenderComponent.ID);
+        if(render != null) render.requestRepaint();
     }
 
     @EventHandler
@@ -58,7 +87,6 @@ public class MainWeaponListener implements Listener {
         if(action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) return;
 
 
-
         if(!MainWeapon.Utils.isMainWeapon(item)) return;
 
         RoleInstance instance = roleManager.getRoleInstance(player);
@@ -68,14 +96,10 @@ public class MainWeaponListener implements Listener {
 
 
         String weaponId = MainWeapon.Utils.getWeaponId(item);
-        MainWeapon weapon = instance.getMainWeaponById(weaponId);
-        if(weapon == null) return;
 
         event.setCancelled(true);
 
-        if(!instance.isMainWeaponReady(weaponId)) return;
-
-        instance.castMainWeaponLeftClick(weaponId, player);
+        cast(instance, weaponId, CastTrigger.LEFT_CLICK);
     }
 
     @EventHandler
@@ -92,17 +116,14 @@ public class MainWeaponListener implements Listener {
         if(instance == null) return;
 
         String weaponId = MainWeapon.Utils.getWeaponId(item);
-        MainWeapon weapon = instance.getMainWeaponById(weaponId);
-        if(weapon == null) return;
 
         event.setCancelled(true);
 
-        if(!instance.isMainWeaponReady(weaponId)) return;
-
-        instance.castMainWeaponRightClick(weaponId, player);
+        cast(instance, weaponId, CastTrigger.RIGHT_CLICK);
     }
 
-    @EventHandler
+    //ignoreCancelled：已取消的丢弃不重复取消、也不触发施法 ✓
+    @EventHandler(ignoreCancelled = true)
     public void onQDrop(PlayerDropItemEvent event){
         Player player = event.getPlayer();
         ItemStack item = event.getItemDrop().getItemStack();
@@ -116,8 +137,6 @@ public class MainWeaponListener implements Listener {
         if(instance == null) return;
 
         String weaponId = MainWeapon.Utils.getWeaponId(item);
-        MainWeapon weapon = instance.getMainWeaponById(weaponId);
-        if(weapon == null) return;
 
         //设置标记
         instance.setDroppingState(true);
@@ -127,17 +146,12 @@ public class MainWeaponListener implements Listener {
         }, 1L);
 
 
-
-
-        if(!instance.isMainWeaponReady(weaponId)) return;
-
-
-
-        instance.castMainWeaponQDrop(weaponId, player);
+        cast(instance, weaponId, CastTrigger.DROP);
 
     }
 
-    @EventHandler
+    //ignoreCancelled：已取消的点击不重复取消 ✓
+    @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event){
         if(!(event.getWhoClicked() instanceof Player player)) return;
 

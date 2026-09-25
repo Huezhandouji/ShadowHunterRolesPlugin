@@ -1,11 +1,12 @@
 package com.shadowHunterRolesPlugin.command;
+import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.core.ports.CooldownPort;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -18,7 +19,7 @@ import java.util.List;
  * <p>
  * **op 门控由 {@link DebugCommand} 在调试树入口承担**（原实现是在本段最前面判定，可见行为相同）。
  * 输出文案与既有内联实现**逐字相同**；{@code status|end|restart} 的语义、参数个数不足时的用法提示、
- * 以及"槽位 → 组件 id"的解析规则均未改动（本卡只重组指令结构，不碰冷却语义）。
+ * 以及"槽位 → 组件 id"的解析规则均未改动（本类只做指令面，不碰冷却语义）。
  */
 public class DebugCooldownCommand implements SubCommand {
 
@@ -65,22 +66,21 @@ public class DebugCooldownCommand implements SubCommand {
             return true;
         }
         RoleComponent component = instance.componentRegistry().getById(componentId);
+        //判据 = **组件类型**：本命令只需要"有冷却这回事 + 能读声明时长"的组件 ⇒ 与派发面同一套接受集
+        //（`RoleInstance#handleCast` / `#handleAttack` 也判 `ActiveComponent` / `MainWeapon`）。
+        //仓内满足该接受集的只有活动组件基类那一棵子树（表现规格对象只实现 HotbarItem，不在此列）。
         if(!(component instanceof ActiveComponent active)){
             send(player, "Not an active component (skill/main weapon): " + componentId);
             return true;
         }
-        ComponentServices services = instance.servicesOf(componentId);
-        if(services == null){
-            send(player, "No services bound for component: " + componentId);
-            return true;
-        }
-        CooldownPort cooldowns = services.cooldowns();
+        //冷却读数与动作**直接问组件本身**（不经服务集端口取表 ✗）——
+        //  声明值由描述符给出（`getCooldownTicks()`），状态与动作由组件基类给出 ✓。
         int declared = active.getCooldownTicks();
 
         switch (action){
             case "status":{
-                int remaining = cooldowns.remainingTicks();
-                boolean cooling = remaining > 0;
+                int remaining = active.remainingCooldownTicks();
+                boolean cooling = active.isCoolingDown();
                 send(player, "[cooldown] " + componentId
                         + " | cooling=" + cooling
                         + " | remainingTicks=" + remaining
@@ -89,19 +89,20 @@ public class DebugCooldownCommand implements SubCommand {
                 return true;
             }
             case "end":{
-                boolean wasCooling = cooldowns.remainingTicks() > 0;
-                boolean ended = cooldowns.end();
+                boolean wasCooling = active.isCoolingDown();
+                active.stopCooldown();
+                boolean ended = wasCooling;
                 send(player, "[cooldown] end(" + componentId + ") returned=" + ended
                         + " | wasCooling=" + wasCooling
-                        + (ended ? " | ENDED_BY_COMPONENT dispatched (onCooldownEnd)" : " | no-op (was not cooling)"));
+                        + (ended ? " | state cleared (component-side)" : " | no-op (was not cooling)"));
                 return true;
             }
             case "restart":{
-                boolean wasCooling = cooldowns.remainingTicks() > 0;
-                cooldowns.start(declared);
-                int remaining = cooldowns.remainingTicks();
+                boolean wasCooling = active.isCoolingDown();
+                active.startCooldown(declared);
+                int remaining = active.remainingCooldownTicks();
                 send(player, "[cooldown] restart(" + componentId + ") wasCooling=" + wasCooling
-                        + (wasCooling ? " | RESTARTED dispatched (old segment dropped)" : " | no old segment was cooling")
+                        + (wasCooling ? " | old segment dropped (component-side overwrite)" : " | no old segment was cooling")
                         + " | newRemainingTicks=" + remaining);
                 return true;
             }
@@ -126,11 +127,16 @@ public class DebugCooldownCommand implements SubCommand {
         return List.of();
     }
 
-    /** 目标解析：纯数字 = 热键栏槽位（读 {@code Role.getSlotMap()}，不猜）；否则按组件 id（须在注册表内）。 */
+    /**
+     * 目标解析：纯数字 = 热键栏槽位，否则按组件 id（须在注册表内）。
+     *
+     * <p>★ **槽位反查走渲染组件**（`HotbarRenderComponent.componentIdAtSlot(components, slot)`）——
+     * 「物品栏位置」的持有者就是它（聚合根不再持有任何栏位视图）✓。
+     */
     private String resolveComponentId(RoleInstance instance, String target){
         if(target.matches("\\d+")){
-            Integer slot = Integer.parseInt(target);
-            return instance.getRole().getSlotMap().get(slot);
+            int slot = Integer.parseInt(target);
+            return HotbarRenderComponent.componentIdAtSlot(instance.componentRegistry().all(), slot);
         }
         return instance.componentRegistry().getById(target) != null ? target : null;
     }

@@ -9,9 +9,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 角色模板的**纯容器**（阶段 3.1）：只负责保存与查询，不再自己做注册。
+ * 角色模板的**纯容器**：只负责保存与查询，不再自己做注册。
  *
- * <p>与阶段 2 之前的关键差别：
+ * <p>关键差别：
  * <ul>
  *   <li>**没有 static{} 初始化块** —— 注册改由 {@link RoleLoader} 在 {@code onEnable} 显式执行，
  *       装配失败不再可能变成 {@code ExceptionInInitializerError}（那会把整个类初始化拖垮）。</li>
@@ -54,7 +54,7 @@ public class RoleRegistry {
         return roles.isEmpty();
     }
 
-    // 阶段 4（本卡 ⑤）：**D-2 静态兼容桥已删除** —— 原 `install/active/hasRole/getRole/isValidRoleId`
+    // **静态兼容桥已删除** —— 原 `install/active/hasRole/getRole/isValidRoleId`
     // 的静态形式调用方（`command/RoleCommand`、`manager/RoleManager`）已改为**构造注入**本容器的实例 API。
     // 因此本类现在只有实例成员：没有静态 Map、没有 static{}、也没有任何静态状态。
 

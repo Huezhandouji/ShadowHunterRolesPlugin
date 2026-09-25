@@ -27,10 +27,10 @@ import java.util.TreeMap;
  */
 public class DebugCommand implements SubCommand {
 
-    /** 门控文案（与原实现逐字相同） */
-    private static final String NO_PERMISSION = "You do not have permission to use this command.";
+    //门控文案**只保留一处**：唯一副本 = {@link CommandAccess#NO_PERMISSION}，本类直接引用它。
+    //（原先本类自持一份 private NO_PERMISSION 常量 ⇒ 与根入口各一套口径；现全仓仅剩 CommandAccess 一处。）
 
-    /** 控制台/日志路径的统一前缀（t61 起；卡面自查命令按此 grep：`git grep -n 'command-debug'`）。 */
+    /** 控制台/日志路径的统一前缀（按它即可 grep 出本类全部日志行）。 */
     static final String CONSOLE_PREFIX = "[command-debug]";
 
     /**
@@ -70,9 +70,9 @@ public class DebugCommand implements SubCommand {
     public boolean execute(CommandSender sender, String[] args){
         if(!(sender instanceof Player player)) return true;
 
-        //门控：仅 op（对普通玩家零可见行为；与原实现同款、且先于任何参数判定）
-        if(!player.isOp()){
-            player.sendMessage(Component.text(NO_PERMISSION));
+        //门控：与根入口**同一 helper**（等级 ≥ 3）—— 冗余的一道防线，口径只有一套
+        if(!CommandAccess.check(sender, "/role debug")){
+            player.sendMessage(Component.text(CommandAccess.NO_PERMISSION));
             return true;
         }
 
@@ -89,8 +89,8 @@ public class DebugCommand implements SubCommand {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, String[] args){
-        //补全与执行用同一道门：非 op 不暴露调试话题
-        if(!(sender instanceof Player player) || !player.isOp()) return List.of();
+        //补全与执行用同一道门（同 helper）：非玩家或等级 < 3 不暴露调试话题
+        if(!(sender instanceof Player player) || !CommandAccess.check(sender, "/role debug (tab)")) return List.of();
 
         if(args.length == 1) return SubCommand.filter(topics.keySet(), args[0]);
 

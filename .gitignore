@@ -44,6 +44,7 @@ usercache.json
 world/
 world_nether/
 world_the_end/
+debug-logs
 
 # ---------- IDE ----------
 .idea/
@@ -88,3 +89,25 @@ debug-logs/**
 .agent-teams/
 .scratch/
 .b-flow-scratch/
+
+# ---------- probe/（结构整理④ · t140：用户裁定「probe 不进库」）----------
+# 理由一句：probe = **工装件**（开发期探针插件，自带独立 Gradle 构建、非发布物）⇒ 不入库 ✓。
+# 形态：独立 Gradle 构建（`gradlew -p probe jar`，与主构建各自 settings/build 脚本）⇒ 不随主产物分发 ✓。
+# 脱管：本目录原被跟踪 6 件，已由 `git rm -r --cached probe` 显式停止跟踪（**工作区文件保留**，盘上仍可构建 ✓）；
+#       代价如实标注：源码不再受版本控制，磁盘丢失则无法从 git 恢复；要改主意 ⇒ 一条 `git add probe` 即可恢复跟踪 ✓。
+# ★ 单元测试仍入库 ✗✓：`src/test/**` **不得**加入忽略（用户已裁定，与 probe 是两回事）✓。
+probe/
+
+# ---------- debug-logs（用户裁定 2026-09-21：整体不入库）----------
+# 本目录只存在于工作目录，不随克隆/推送传播。
+# 其中 debug-logs/回滚快照/jars 的 11 代归档制品是本机唯一副本，请自行备份。
+# 因此：不要再对 debug-logs 执行 git add -f；也不要用 git grep 对 debug-logs 下的文件做判据（未跟踪件恒空）。
+# 证据与台账仍在盘上、仍可 read，但不再与 commit 绑定。
+
+# 构建配置必须随库分发：本工程路径含 CJK，gradle.properties 里的 jvmargs/-Dfile.encoding 是 :test 能跑起来的前提（见 debug-logs/测试记录/阶段9/阶段9-测试缝环境前置-说明.txt）
+!gradle.properties
+
+# ── 阶段 10 · t59（裁定 P3）：入库默认值 + 本机专属覆盖的**分界** ──────────────────────────
+# gradle.properties 只放可移植项（随库分发 ✓）；本机专属项（服务端 plugins 目录等）写进下面这个文件，
+# 它**不入库**（每台机器不同），构建脚本在它不存在时按 no-op 处理 ⇒ 任务照常可用 ✓
+gradle.local.properties

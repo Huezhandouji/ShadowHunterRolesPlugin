@@ -1,8 +1,10 @@
 package com.shadowHunterRolesPlugin.command;
 
+import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
+import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -48,23 +50,26 @@ public class EnergyCommand implements SubCommand {
 
         switch (args[0]){
             case "get":
-                if(args.length == 1){
-                    handleGetEnergy(player, null);
-                    return true;
-                }
+                //★ **目标必填**：`/role energy get` 不再默认给自己
                 if(args.length == 2){
                     handleGetEnergy(player, args[1]);
+                    return true;
+                }
+                if(args.length == 1){
+                    player.sendMessage(Component.text(PlayerTargets.targetRequired("/role energy get <player|@s>")));
                     return true;
                 }
                 break;
 
             case "set":
-                if(args.length == 2){
-                    handleSetEnergy(player, args[1], null);
-                    return true;
-                }
+                //★ **目标必填**：`/role energy set <n>` 不再默认给自己 —— 参数序 = set <n> <player|@s>
                 if(args.length == 3){
                     handleSetEnergy(player, args[1], args[2]);
+                    return true;
+                }
+                if(args.length == 2){
+                    player.sendMessage(Component.text(PlayerTargets.targetRequired(
+                            "/role energy set <amount> <player|@s>")));
                     return true;
                 }
                 break;
@@ -80,28 +85,28 @@ public class EnergyCommand implements SubCommand {
     }
 
     private void handleGetEnergy(Player sender, String targetName){
-        Player target;
-
-        if(targetName == null) target = sender;
-        else target = Bukkit.getPlayer(targetName);
+        //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
+        PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
+        Player target = resolved.player();
         if(target == null || !target.isOnline()){
-            sender.sendMessage(Component.text("Cannot find the player you provided: " + targetName));
+            sender.sendMessage(Component.text(PlayerTargets.rejection(targetName, resolved,
+                    "Cannot find the player you provided: " + targetName)));
             return;
         }
         if(!roleManager.hasRole(target)) {
             sender.sendMessage(Component.text(target.getName() + " has no role!"));
             return;
         }
-        sender.sendMessage(Component.text("The current energy level of [" + target.getName() + "] is: " + roleManager.getRoleInstance(target).getCurrentEnergy()));
+        sender.sendMessage(Component.text("The current energy level of [" + target.getName() + "] is: " + energyOf(roleManager, target)));
     }
 
     private void handleSetEnergy(Player sender, String energyLevel, String targetName){
-        Player target;
-
-        if(targetName == null) target = sender;
-        else target = Bukkit.getPlayer(targetName);
+        //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
+        PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
+        Player target = resolved.player();
         if(target == null || !target.isOnline()){
-            sender.sendMessage(Component.text("Cannot find the player you provided: " + targetName));
+            sender.sendMessage(Component.text(PlayerTargets.rejection(targetName, resolved,
+                    "Cannot find the player you provided: " + targetName)));
             return;
         }
         if(!roleManager.hasRole(target)) {
@@ -111,10 +116,32 @@ public class EnergyCommand implements SubCommand {
 
         try{
             int el = Integer.parseInt(energyLevel);
-            roleManager.getRoleInstance(target).setCurrentEnergy(el);
+            writeEnergy(roleManager, target, el);
         }
         catch (NumberFormatException e){
             return;
         }
+    }
+
+
+    /**
+     * **读数 / 设值都自己按 id 取能量组件**（★ 容器已删两个能量视图 —— 它不再指名任何组件）。
+     * <p>取到通用面后调基类通用面：`readCurrentEnergy()` / `writeCurrentEnergy(...)` ✓
+     */
+    private static int energyOf(RoleManager roleManager, Player target){
+        RoleComponent energy = energyComponentOf(roleManager, target);
+        return energy == null ? 0 : energy.readCurrentEnergy();
+    }
+
+    private static void writeEnergy(RoleManager roleManager, Player target, int amount){
+        RoleComponent energy = energyComponentOf(roleManager, target);
+        if (energy != null) {
+            energy.writeCurrentEnergy(amount);
+        }
+    }
+
+    private static RoleComponent energyComponentOf(RoleManager roleManager, Player target){
+        RoleInstance instance = roleManager.getRoleInstance(target);
+        return instance == null ? null : instance.componentRegistry().getById(EnergyComponent.ID);
     }
 }

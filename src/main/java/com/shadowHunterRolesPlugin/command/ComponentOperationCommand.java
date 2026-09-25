@@ -28,24 +28,19 @@ import java.util.Locale;
  * （{@code @a} / {@code @p} / {@code @e[type=player]} …）⇒ 经 {@link PlayerTargets} 解析，且**必须恰好命中 1 名在线玩家**，
  * 否则按真实原因回绝 ✓。
  * <p><b>目标与 id 的消歧</b> ✓：第 2 个参数**当且仅当**它以 {@code @} 开头（选择器 / {@code @s}）**或**是一个**在线**玩家名时才当作目标 ✓；
- * 否则它本身就是 {@code componentId}（目标 = 自己）✓ —— 这样 `query energy current` 不会被误读成"目标 = energy" ✗。
+ * 否则它本身就是 {@code componentId}（目标 = 自己）✓ —— 这样 `energy current` 不会被误读成"目标 = energy" ✗。
  * <p><b>payload 一律原样交给组件**自解析**</b> ✓（首 token 必为操作动词 ✓；本类**不解释**它 ✗）。
  *
  * <p><b>注册</b> ✓：本子指令由主指令 {@link RoleCommand} 在构造期登记（`/role` 根命令仍走 `plugin.yml` + `setExecutor` ✓，
  * **未新增根命令** ⇒ 无需改 `plugin.yml` ✓；"root 用现有根还是新根"在此取**现有根** ✓）。
  *
- * <p><b>Tab 补全</b> ✓：第 1 段补 {@code query|modify} ✓；第 2 段补**在线玩家名 + 自己的组件 id** ✓；
- * 第 3 段补目标的组件 id ✓。★ **op 名与参数不可补** ✗ —— "无自报清单"取舍所致
+ * <p><b>Tab 补全</b> ✓：第 1 段补**在线玩家名 + 自己的组件 id** ✓；
+ * 第 2 段补目标的组件 id ✓。★ **op 名与参数不可补** ✗ —— "无自报清单"取舍所致
  * （组件不自报可用操作 ⇒ 只能补到 {@code componentId} ✓，op 与参数需**手写文档** ✓）；补全同样受根门禁约束 ✓。
  *
  * <p><b>文本</b>：一律 Adventure {@link Component} ✓（**不用 {@code ChatColor}** ✗）。
  */
 public class ComponentOperationCommand implements SubCommand {
-
-    /** 只读动词 ✓。 */
-    private static final String VERB_QUERY = "query";
-    /** 写动词 ✓。 */
-    private static final String VERB_MODIFY = "modify";
 
     private final RoleManager roleManager;
     private final ComponentOperationDispatcher dispatcher;
@@ -78,52 +73,36 @@ public class ComponentOperationCommand implements SubCommand {
             return true;
         }
 
-        String verb = args[0].toLowerCase(Locale.ROOT);
-        if (!verb.equals(VERB_QUERY) && !verb.equals(VERB_MODIFY)) {
-            player.sendMessage(Component.text("Unknown verb '" + args[0] + "'."));
+        //★ **目标必填**：第 1 个参数必须是玩家名（在线）或选择器（含 @s）—— 不再支持"省略 ⇒ 自己"
+        if (!isTargetToken(args[0])) {
+            player.sendMessage(Component.text("The target is required: pass a player name or a selector"
+                    + " (use @s for yourself)."));
             player.sendMessage(Component.text(getUsage()));
             return true;
         }
-
-        //目标与 id 的消歧（见类 javadoc ✓）：以 "@" 开头（选择器 / @s）或是**在线**玩家名时才算目标
-        String targetToken;
-        String componentId;
-        int payloadFrom;
-        if (isTargetToken(args[1])) {
-            if (args.length < 3) {
-                player.sendMessage(Component.text(getUsage()));
-                return true;
-            }
-            PlayerTargets.Result resolved = PlayerTargets.resolve(player, args[1]);
-            if (!resolved.resolved()) {
-                //选择器失败按真实原因分句；非选择器（在线玩家名）失败回既有那句
-                player.sendMessage(Component.text(PlayerTargets.rejection(args[1], resolved,
-                        "No online player named '" + args[1] + "'. (Omit the player to target yourself.)")));
-                return true;
-            }
-            //派发与审计都用解析后的规范名 —— 原始选择器串无法定位到唯一对象
-            targetToken = resolved.player().getName();
-            componentId = args[2];
-            payloadFrom = 3;
-        } else {
-            targetToken = null;                 //省略 ⇒ 执行者自己 ✓
-            componentId = args[1];
-            payloadFrom = 2;
+        PlayerTargets.Result resolved = PlayerTargets.resolve(player, args[0]);
+        if (!resolved.resolved()) {
+            player.sendMessage(Component.text(PlayerTargets.rejection(args[0], resolved,
+                    "No online player named '" + args[0] + "'. (Use @s for yourself.)")));
+            return true;
         }
+        //派发与审计都用解析后的规范名 —— 原始选择器串无法定位到唯一对象
+        String targetToken = resolved.player().getName();
+        String componentId = args[1];
+        int payloadFrom = 2;
 
         String payload = payloadFrom >= args.length
                 ? ""
                 : String.join(" ", Arrays.copyOfRange(args, payloadFrom, args.length));
 
-        //§6.6 在 v2 定案下**可实现的**那一半 ✓：modify 没有 payload ⇒ 没有可写的东西 ⇒ 回绝
-        //（"query 却调写操作"无法在派发器侧判定 ✗ —— payload 里没有 query/modify 信息、组件也无自报清单 ✗）
-        if (verb.equals(VERB_MODIFY) && payload.isBlank()) {
-            player.sendMessage(Component.text("modify needs an operation payload,"
-                    + " e.g. /role operation modify " + componentId + " set 50"));
+        //★ 空 payload ⇒ 没有可交给组件的东西 ⇒ 回绝（原先靠 `modify` 动词判，现在没有动词 ⇒ 一律回绝）
+        if (payload.isBlank()) {
+            player.sendMessage(Component.text("This needs an operation payload,"
+                    + " e.g. /role operation @s " + componentId + " set 50"));
             return true;
         }
 
-        dispatcher.dispatch(player, verb, targetToken, componentId, payload);
+        dispatcher.dispatch(player, targetToken, componentId, payload);
         return true;
     }
 
@@ -133,26 +112,23 @@ public class ComponentOperationCommand implements SubCommand {
             return List.of();
         }
         if (args.length == 1) {
-            return SubCommand.filter(List.of(VERB_QUERY, VERB_MODIFY), args[0]);
-        }
-        if (args.length == 2) {
             List<String> candidates = new ArrayList<>();
             for (Player online : Bukkit.getOnlinePlayers()) {
                 candidates.add(online.getName());
             }
             candidates.add(ComponentOperationDispatcher.SELF_TOKEN);
             candidates.addAll(componentIdsOf(player));
-            return SubCommand.filter(candidates, args[1]);
+            return SubCommand.filter(candidates, args[0]);
         }
-        if (args.length == 3) {
-            Player target = isTargetToken(args[1]) ? Bukkit.getPlayerExact(args[1]) : player;
-            return SubCommand.filter(target == null ? List.of() : componentIdsOf(target), args[2]);
+        if (args.length == 2) {
+            Player target = isTargetToken(args[0]) ? Bukkit.getPlayerExact(args[0]) : player;
+            return SubCommand.filter(target == null ? List.of() : componentIdsOf(target), args[1]);
         }
-        //★ op 名与参数**不可补** ✗（无自报清单 ⇒ 只能补到 componentId ✓；如实说明见类 javadoc）
+        //★ op 名与参数**不可补**（无自报清单 ⇒ 只能补到 componentId；如实说明见类 javadoc）
         return List.of();
     }
 
-    /** 第 2 个参数是否**当目标**：以 `@` 开头（选择器 / `@s`）或是**在线**玩家名 ✓。 */
+    /** 第 1 个参数是否**当目标**：以 `@` 开头（选择器 / `@s`）或是**在线**玩家名。 */
     private boolean isTargetToken(String token) {
         if (token == null || token.isBlank()) {
             return false;

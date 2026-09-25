@@ -102,7 +102,11 @@ final class CommandAccess {
     }
 
     /**
-     * 单一门禁判定：{@code true} = 允许本次指令（同时把判定结果打进服务端日志）。
+     * 单一门禁判定：{@code true} = 允许本次指令。
+     *
+     * <p>★ **只记「被拒绝」**（`FINE` 级）—— **通过不写日志**。理由：补全侧与执行侧共用本方法，
+     * 而补全**每按一个键就会调一次** ⇒ 若"通过"也记日志，输入一个指令会刷满日志 ✗。
+     * 拒绝是异常事件，仍然留痕（`FINE` ⇒ 默认不打印，需要排查时开日志级别即可）。
      *
      * @param sender 指令发送者
      * @param action 用于日志的可读动作名（例如 {@code /role} / {@code /role debug}）
@@ -114,15 +118,16 @@ final class CommandAccess {
             int effective = level != null ? level : 0;
             int required = requiredLevel();
             boolean allowed = effective >= required;
-            log((allowed ? "allowed " : "denied ") + action + " for " + player.getName()
-                    + " (level=" + effective + ", required=" + required + ")");
+            if (!allowed) {
+                fine("denied " + action + " for " + player.getName()
+                        + " (level=" + effective + ", required=" + required + ")");
+            }
             return allowed;
         }
         if (sender instanceof ConsoleCommandSender || sender instanceof RemoteConsoleCommandSender) {
-            log("allowed " + action + " for console (level=4 equivalent)");
             return true;
         }
-        log("denied " + action + " for " + sender.getClass().getSimpleName() + " (unsupported sender)");
+        fine("denied " + action + " for " + sender.getClass().getSimpleName() + " (unsupported sender)");
         return false;
     }
 
@@ -218,6 +223,17 @@ final class CommandAccess {
         ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
         if (plugin == null) return;
         plugin.getLogger().info("[command-access] " + text);
+    }
+
+    /**
+     * **低噪日志**（`FINE` ⇒ 默认不打印）。
+     * <p>给**高频路径**用：门禁检查由补全侧与执行侧共用，而补全**每键一次** ⇒ 用 `INFO` 会刷屏 ✗。
+     * 需要排查时把该 logger 调到 `FINE` 即可看到。
+     */
+    private static void fine(String text) {
+        ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
+        if (plugin == null) return;
+        plugin.getLogger().fine("[command-access] " + text);
     }
 
     private static void severe(String text) {

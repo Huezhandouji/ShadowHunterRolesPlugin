@@ -18,7 +18,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashSet;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
@@ -130,6 +132,16 @@ public class HotbarRenderComponent extends RoleComponent {
     private boolean changed;
 
     /**
+     * **上一帧处于冷却中的组件**（★ 用于「冷却结束」那一次的收尾重绘）。
+     *
+     * <p><b>为什么需要它</b>：帧入口条件是「本组件已置脏 **或** 有占栏位组件正在冷却」。
+     * 冷却**结束的那一刻**两个条件**同时不成立** ⇒ 若就此返回，图标会**停在冷却态**、
+     * 直到下一次置脏才恢复（现象 = 冷却好了但图标延迟一两秒才变回）。
+     * <p>⇒ 本集合记住"上一帧谁在冷却"，凡是**这一帧已不在冷却**的 ⇒ **强制置脏一次**（恰好一次）。
+     */
+    private final Set<String> coolingLastFrame = new LinkedHashSet<>();
+
+    /**
      * **「本帧真的刷新了」的通知名单**（★ 函数式接口 · 使用者自己的函数）。
      *
      * <p><b>登记方式</b>：想收通知的组件在**自己的 {@code start()}** 里调
@@ -185,15 +197,48 @@ public class HotbarRenderComponent extends RoleComponent {
      * <p><b>只置脏、不写物品</b>的是 {@link #requestRepaint()}；本方法才是**写物品**的那一半。
      */
     public void flush() {
+ //★ 「冷却结束」收尾：凡上一帧在冷却、这一帧已不在冷却的组件 ⇒ 强制置脏一次
+ //（否则切换那一刻两个入口条件都不成立，图像会停在冷却态直到下次置脏）
+        markDirtyForFinishedCooldowns();
         if (!dirty && !hasCoolingTickingComponent()) {
             return;
         }
         renderNow();
         dirty = false;
+        rememberCooling();
  //★ "本帧真的刷新了"的通知由**本组件自己**扇出（名单 = 使用者 `addRenderListener` 登记的函数）
  // —— 容器不再逐组件匹配类型去通知 ✓（那要求使用者实现本组件的嵌套接口）。
         if (consumeChanged()) {
             notifyRendered();
+        }
+    }
+
+    /**
+     * **冷却结束 ⇒ 置脏一次**（恰好一次）：与 {@link #coolingLastFrame} 对比得出。
+     */
+    private void markDirtyForFinishedCooldowns() {
+        if (coolingLastFrame.isEmpty()) {
+            return;
+        }
+        for (String id : coolingLastFrame) {
+            RoleComponent component = svc().components() == null ? null : svc().components().getById(id);
+            if (component instanceof ActiveComponent active && !active.isCoolingDown()) {
+                dirty = true;                     //本轮至少有一次收尾重绘
+                return;
+            }
+        }
+    }
+
+    /** 记下**本帧**仍在冷却的组件 id（用于下一帧检测"冷却结束"）。 */
+    private void rememberCooling() {
+        coolingLastFrame.clear();
+        if (svc().components() == null) {
+            return;
+        }
+        for (RoleComponent component : svc().components().all()) {
+            if (component instanceof ActiveComponent active && active.isCoolingDown()) {
+                coolingLastFrame.add(component.getId());
+            }
         }
     }
 
@@ -229,7 +274,7 @@ public class HotbarRenderComponent extends RoleComponent {
 
     /**
      * **置脏**（幂等：同一 tick 多次置脏与一次等价）。**不写物品** ✓
-     * <p>由框架内部调用（施放管道 / 冷却启动 / 冷却到点 / 能量单一入口 / buff 移除）；
+     * <p>调用者 = **需要重绘的一方**（施放 / 攻击成功后由 listener 经本组件的通用面请求；能量变更、buff 移除同理）；
      * 组件侧的重绘请求走 {@link #requestRepaint()}。
      */
     public void markDirty() {
@@ -367,15 +412,23 @@ public class HotbarRenderComponent extends RoleComponent {
     }
 
     /**
-     * **帧入口条件之一**：是否存在**外观依赖活状态**的**占栏位**组件正在冷却
-     * （判据 = 组件自报的 {@link #dependsOnLiveStateOf(RoleComponent)} + 它自己的冷却读口）。
+     * **帧入口条件之一**：是否存在**占栏位**组件正在冷却。
+     *
+     * <p>★ **判据是"占栏位且正在冷却"，不是"外观依赖活状态"**：两者都要能刷 ——
+     * <ul>
+     *   <li>**依赖活状态**的（技能家族，名里有秒数）⇒ 每 tick 都要刷（否则秒数不再递减 = 可见行为变化）；</li>
+     *   <li>**不依赖活状态**的（主武器）⇒ ★ **在冷却期间也必须能刷** —— 它的图标要切到冷却态，
+     *       若只在"置脏那一刻"刷一次，之后冷却结束前没人再刷 ⇒ 图标与真实状态脱节。</li>
+     * </ul>
+     * 不占栏位的组件不参与（它们不进渲染计划 ⇒ 刷了也看不见）。
      */
     private boolean hasCoolingTickingComponent() {
         if (svc().components() == null) {
             return false;
         }
         for (RoleComponent component : svc().components().all()) {
-            if (!dependsOnLiveStateOf(component)) continue;
+            HotbarSpecification<?> specification = specificationOf(component);
+            if (specification == null || !specification.hasSlot()) continue;
             if (component instanceof ActiveComponent active && active.isCoolingDown()) return true;
         }
         return false;

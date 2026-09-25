@@ -60,19 +60,21 @@ public final class ComponentOperationDispatcher {
     /**
      * 派发一条组件操作。
      *
-     * @param sender      指令执行者（本子指令只对玩家开放 ⇒ 实际总是 {@link Player} ✓，仍按通用 sender 处理 ✓）
-     * @param verb        {@code query}（只读）或 {@code modify}（写）✓ —— 只影响**权限与回显措辞** ✓（两者都走同一 API 入口 ✓）
-     * @param targetToken 目标玩家名 / {@code @s} / 空（空 ⇒ 执行者自己 ✓）
-     * @param componentId 组件 id，可带 {@code #index}（**0 基** ✓）
-     * @param payload     **整段**操作文本（**可含空格** ✓；由组件自解析 ✓）
-     * @return 回显结果（{@code handled=false} = 已回绝 ✓）
+     * <p>★ **没有 query / modify 动词** —— 两者都走同一 API 入口（{@code onOperationCommand}），
+     * 行为一致 ⇒ 动作由 **payload 的首 token** 表达（审计记的也是它）。
+     *
+     * @param sender      指令执行者（本子指令只对玩家开放 ⇒ 实际总是 {@link Player}，仍按通用 sender 处理）
+     * @param targetToken 目标玩家名 / {@code @s} / 空（空 ⇒ 执行者自己）
+     * @param componentId 组件 id，可带 {@code #index}（**0 基**）
+     * @param payload     **整段**操作文本（**可含空格**；由组件自解析）
+     * @return 回显结果（{@code handled=false} = 已回绝）
      */
-    public Outcome dispatch(CommandSender sender, String verb, String targetToken, String componentId, String payload) {
+    public Outcome dispatch(CommandSender sender, String targetToken, String componentId, String payload) {
         String auditTarget = (targetToken == null || targetToken.isBlank()) ? SELF_TOKEN : targetToken;
 
         //⓪ 主线程（§4 ★）：不在主线程 ⇒ 回绝（组件状态与渲染都在主线程上）
         if (!Bukkit.isPrimaryThread()) {
-            return refuse(sender, verb, auditTarget, componentId, payload, "not-on-primary-thread",
+            return refuse(sender, auditTarget, componentId, payload, "not-on-primary-thread",
                     "This command can only run on the server thread.");
         }
 
@@ -81,7 +83,7 @@ public final class ComponentOperationDispatcher {
         if (target == null) {
             boolean known = targetToken != null && !targetToken.isBlank()
                     && Bukkit.getOfflinePlayer(targetToken).hasPlayedBefore();
-            return refuse(sender, verb, auditTarget, componentId, payload, known ? "target-offline" : "target-not-found",
+            return refuse(sender, auditTarget, componentId, payload, known ? "target-offline" : "target-not-found",
                     known
                             ? "Player '" + targetToken + "' is not online."
                             : "No online player named '" + targetToken + "'. (Omit the player to target yourself.)");
@@ -90,7 +92,7 @@ public final class ComponentOperationDispatcher {
         //② UUID → RoleInstance（无实例 ⇒ 回绝 ✓）
         RoleInstance instance = roleManager.getRoleInstance(target);
         if (instance == null) {
-            return refuse(sender, verb, auditTarget, componentId, payload, "no-role-instance",
+            return refuse(sender, auditTarget, componentId, payload, "no-role-instance",
                     "Player '" + target.getName() + "' has no role instance.");
         }
 
@@ -99,19 +101,19 @@ public final class ComponentOperationDispatcher {
         Resolution resolution = resolve(components, componentId);
         switch (resolution.kind()) {
             case NO_SUCH_ID -> {
-                return refuse(sender, verb, auditTarget, componentId, payload, "no-such-component-id",
+                return refuse(sender, auditTarget, componentId, payload, "no-such-component-id",
                         "No component with id '" + resolution.id() + "' on " + target.getName()
                                 + ". Available ids: " + String.join(", ", resolution.availableIds())
                                 + " (if you meant a player, make sure they are online).");
             }
             case AMBIGUOUS -> {
-                return refuse(sender, verb, auditTarget, componentId, payload, "ambiguous-component-id",
+                return refuse(sender, auditTarget, componentId, payload, "ambiguous-component-id",
                         "Id '" + resolution.id() + "' matches " + resolution.matches()
                                 + " components on " + target.getName() + "; use '" + resolution.id() + "#<index>'"
                                 + " (indexes are 0-based: 0.." + (resolution.matches() - 1) + ").");
             }
             case BAD_INDEX -> {
-                return refuse(sender, verb, auditTarget, componentId, payload, "bad-index",
+                return refuse(sender, auditTarget, componentId, payload, "bad-index",
                         "'#" + resolution.indexToken() + "' is not a usable index for '" + resolution.id()
                                 + "' (0-based, available: 0.." + (resolution.matches() - 1) + ").");
             }
@@ -124,9 +126,9 @@ public final class ComponentOperationDispatcher {
         //  ② 叠加**按组件粒度**的权限节点 ✓（对 op/控制台默认放行 ⇒ 不改变既有可用性 ✓，
         //     而权限插件可据此**逐组件**收紧 ✓）
         String node = PERMISSION_PREFIX + "." + resolution.id();
-        if (!CommandAccess.check(sender, "/role operation " + verb + " " + resolution.id())) {
+        if (!CommandAccess.check(sender, "/role operation " + resolution.id())) {
             CommandAccess.sendNoPermission(sender);
-            return audit(sender, verb, auditTarget, componentId, payload, "denied-by-gate", null, false,
+            return audit(sender, auditTarget, componentId, payload, "denied-by-gate", null, false,
                     Component.empty());
         }
         if (!sender.hasPermission(node)) {
@@ -135,7 +137,7 @@ public final class ComponentOperationDispatcher {
             if (sender instanceof Player player) {
                 player.sendMessage(echo);
             }
-            return audit(sender, verb, auditTarget, componentId, payload, "denied-by-node:" + node, null, false, echo);
+            return audit(sender, auditTarget, componentId, payload, "denied-by-node:" + node, null, false, echo);
         }
 
         //⑥ 调**公开** API：读写都走它 ✓
@@ -144,21 +146,19 @@ public final class ComponentOperationDispatcher {
             returned = roleAPI.executeComponentOperation(target.getUniqueId(), componentId, payload);
         } catch (RuntimeException unexpected) {
             //⑧ 兜底（API 层已捕获组件异常 ✓，这里防的是 API 自身/上游的意外 ⇒ 绝不逃到指令层 ✗）
-            return refuse(sender, verb, auditTarget, componentId, payload,
+            return refuse(sender, auditTarget, componentId, payload,
                     "unexpected:" + unexpected.getClass().getSimpleName(), "The operation failed and was refused.");
         }
 
         //⑦ 回显 + 审计（三态：null = 未识别/被拒绝 ✓；"" = 已识别但无回值 ✓；非空 = 规范化值 ✓）
         String reason = returned == null ? "refused-by-component" : "ok";
         Component echo = returned == null
-                ? Component.text(verb.equals("query")
-                        ? "Unknown operation or refused by the component."
-                        : "Unknown operation, or the component refused it.")
+                ? Component.text("Unknown operation, or the component refused it.")
                 : Component.text("OK: " + (returned.isEmpty() ? "(no value)" : returned));
         if (sender instanceof Player player) {
             player.sendMessage(echo);
         }
-        return audit(sender, verb, auditTarget, componentId, payload, reason, returned, returned != null, echo);
+        return audit(sender, auditTarget, componentId, payload, reason, returned, returned != null, echo);
     }
 
     // ───────── 纯函数：定位（离线可测 ✓） ─────────
@@ -254,27 +254,40 @@ public final class ComponentOperationDispatcher {
         return Bukkit.getPlayerExact(targetToken);
     }
 
+    /**
+     * **payload 的首 token**（= 操作动词）。
+     * <p>审计用它 —— 原先记的是**命令行动词**（query/modify），那个动词已删除 ⇒ 动作现在由 payload 表达。
+     */
+    private static String firstToken(String payload) {
+        if (payload == null) {
+            return "<null>";
+        }
+        String trimmed = payload.trim();
+        int space = trimmed.indexOf(' ');
+        return space < 0 ? trimmed : trimmed.substring(0, space);
+    }
+
     /** 回绝路径：回显 + 审计（**失败也留记录** ✓ —— 全部显式拒绝，绝不静默 ✓）。 */
-    private Outcome refuse(CommandSender sender, String verb, String target, String componentId, String payload,
+    private Outcome refuse(CommandSender sender, String target, String componentId, String payload,
                            String reason, String message) {
         Component echo = Component.text(message);
         if (sender instanceof Player player) {
             player.sendMessage(echo);
         }
-        return audit(sender, verb, target, componentId, payload, reason, null, false, echo);
+        return audit(sender, target, componentId, payload, reason, null, false, echo);
     }
 
     /**
      * **审计**（§5）：执行者 / 时间 / 目标 / 组件 id + **0 基下标** / **原始 payload** / 返回值 ✓。
      * <p>与玩家侧回显是两回事 ✓：审计走**服务端日志**（前缀 {@value #AUDIT_PREFIX}）⇒ 运行级证据可直接取原始行 ✓。
      */
-    private Outcome audit(CommandSender sender, String verb, String target, String componentId, String payload,
+    private Outcome audit(CommandSender sender, String target, String componentId, String payload,
                           String reason, String returned, boolean handled, Component echo) {
         ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
         if (plugin != null) {
             plugin.getLogger().info(AUDIT_PREFIX + " sender=" + senderName(sender)
                     + " at=" + System.currentTimeMillis()
-                    + " verb=" + verb
+                    + " op=" + firstToken(payload)
                     + " target=" + target
                     + " componentId=" + componentId
                     + " payload=" + (payload == null ? "<null>" : '"' + payload + '"')

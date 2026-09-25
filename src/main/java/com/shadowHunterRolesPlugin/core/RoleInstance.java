@@ -357,11 +357,11 @@ public class RoleInstance {
  //★ **能量视图（`getCurrentEnergy` / `setCurrentEnergy`）已整体删除** —— 它们让容器**指名能量组件**
  // （`"energy"` 字面量）。现在：调用方自己按能量组件的 `ID` 从 `componentRegistry()` 取通用面，
  // 再调基类通用面 `readCurrentEnergy()` / `writeCurrentEnergy(...)` ✓
- //（更早的三个转发访问器 `getMaxEnergy` / `decreaseEnergy` / `increaseEnergy` 早已删除 —— 消费者 0）。
+ //（更早的转发访问器早已删除 —— 消费者 0）。
 
  //SanTE（**视图**：真值与 clamp 都在 SanTE 组件里；派发边界由容器**给出的平台侧监听**触发）
  //`getCurrentSanTE` / `setCurrentSanTE` / `increaseSanTE` / `decreaseSanTE` /
- //`getMaxSanTE` 五个转发访问器**已删除** （消费者 0；真值与行为都在 **SanTE 组件**）。
+ //SanTE 的五个转发访问器**已删除**（消费者 0；真值与行为都在 SanTE 组件里）。
 
  //实例是否有效：clear() 之后为 false，供组件里的延时任务做失效守卫
  //原 `isValid()` 公开读口**已删除**（消费者 0：容器内一律

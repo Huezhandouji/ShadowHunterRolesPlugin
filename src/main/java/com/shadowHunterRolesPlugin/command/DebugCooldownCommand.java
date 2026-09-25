@@ -131,8 +131,7 @@ public class DebugCooldownCommand implements SubCommand {
      * 目标解析：纯数字 = 热键栏槽位，否则按组件 id（须在注册表内）。
      *
      * <p>★ **槽位反查走渲染组件**（`HotbarRenderComponent.componentIdAtSlot(components, slot)`）——
-     * 「物品栏位置」的持有者就是它；聚合根 `Role` 的那张派生视图（`getSlotMap()` /
-     * `componentIdAtSlot(int)`）**已整体删除** ⇒ 本命令不再经聚合根解析槽位 ✓。
+     * 「物品栏位置」的持有者就是它（聚合根不再持有任何栏位视图）✓。
      */
     private String resolveComponentId(RoleInstance instance, String target){
         if(target.matches("\\d+")){

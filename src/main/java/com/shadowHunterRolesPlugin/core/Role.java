@@ -48,7 +48,7 @@ public class Role {
     private final Set<String> passiveIds;
     private final Set<String> mainWeaponIds;
 
- //★ **栏位视图已整体删除**（`slotMap` / `deriveSlotMap` / `getSlotMap()` / `componentIdAtSlot()`）——
+ //★ **栏位视图已整体删除** ——
  // 「物品栏位置」的持有者是**渲染组件**（它自己读描述符的 `slot()` 做落位），聚合根不再持有派生视图。
  // 条目仍携带栏位值（`ComponentEntry.slot`）—— 那是**数据**（描述符快照的一部分），不是本类的视图。
 
@@ -255,7 +255,7 @@ public class Role {
  /** 本组件声明的**可选**依赖类型（不可变副本）。 */
         public List<Class<? extends RoleComponent>> getOptionalTypes() { return optionalTypes; }
 
- //★ `getSlot()` / `hasSlot()` 已删除 —— 栏位值**只**住在描述符快照里
+ //★ 条目不再持有栏位值 —— 它**只**住在描述符快照里
  // （`Specification.Snapshot#getSlot()`），渲染组件读那一份做落位 ⇒ 条目不再重复持有它 ✓
     }
 
@@ -304,7 +304,7 @@ public class Role {
             return this;
         }
 
- //★ `Builder#providedTypes(...)` 已删除 —— 见类内「豁免机制已整体删除」的说明。
+ //★ 「已被提供的类型」豁免机制已整体删除（6 件内建组件已进模板 ⇒ 供给面只看模板组件表）。
 
  /**
  * **统一装配入口（描述符口径）**：吃一个装配期描述符，栏位与依赖都从它读，**调用点不传值**。
@@ -464,7 +464,7 @@ public class Role {
  */
     public void resetFaction(){ this.faction = defaultFaction; }
 
- //★ **栏位视图与按槽位反查已整体删除**（`getSlotMap()` / `componentIdAtSlot(int)`）——
+ //★ **栏位视图与按槽位反查已整体删除** ——
  // 「物品栏位置」的持有者是**渲染组件**：它自己读描述符的 `slot()` 做落位，
  // 数字目标解析也由它提供（`HotbarRenderComponent.identityOf(int)`）。
 }

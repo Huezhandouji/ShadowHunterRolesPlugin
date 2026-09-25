@@ -19,9 +19,8 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * T-4（t50 §4）：锁住**注册序 → 栏位视图**（t50 §1 第 ⑨ 条的纯半边），并且**专门锁 `LinkedHashMap` 的顺序性**。
- * <p>为什么能单测：装配表是一张纯内存表；{@code getComponents()} / {@code getSlotMap()} /
- * {@code componentIdAtSlot(int)} 都只读它，不需要实例、不需要 Bukkit ⇒ 离线可跑。
+ * T-4（t50 §4）：锁住**注册序**（t50 §1 第 ⑨ 条的纯半边），并且**专门锁 `LinkedHashMap` 的顺序性**。
+ * <p>为什么能单测：装配表是一张纯内存表；`getComponents()` 只读它，不需要实例、不需要 Bukkit ⇒ 离线可跑。
  * <p>顺序为什么最贵：本项目"注册序 = 渲染序 = 派发序"是冻结面；把表换成 `HashMap` 就会静默乱序。
  * 本测试因此内置一条**样本判别力守卫**：同一批 id 装进 {@link HashMap} 时的迭代序与登记序**必须不同**
  * （现算样本 `c_1…c_8` 满足）—— 若哪天 JDK 让两者巧合相同，这条守卫会先红，提示"该换样本了"，

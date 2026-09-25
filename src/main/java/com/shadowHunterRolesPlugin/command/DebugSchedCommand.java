@@ -7,7 +7,7 @@ import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.ServiceComponents;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
@@ -337,21 +337,23 @@ public class DebugSchedCommand implements SubCommand {
         else{
             final ComponentServices portSvc = portServices;
             //请求者 = 这一对服务集所属的那个组件实例（与 servicesOf 同一条 id 解析口径）；
-            //计时组件 = 框架级服务组件（装配期已登记进实例容器 ⇒ 经容器的按类型查取入口取 ✓）
+            //计时组件 = 框架级服务组件（装配期已登记进实例容器 ⇒ **按 id** 取通用面，本类不点名具体组件类 ✓）
             RoleComponent portRequester = portSvc.components().getById(str[8]);
-            TimerComponent portTimer = portInstance != null ? portInstance.getByType(TimerComponent.class) : null;
+            RoleComponent portTimer = portInstance != null
+                    ? portInstance.componentRegistry().getById(ServiceComponents.ID_TIMERS)
+                    : null;
             if(portRequester == null || portTimer == null){
                 str[8] = "portLeg=SKIPPED(no requester or no timer component)";
                 sendKey(player, "[sched] ④p port leg | " + str[8]);
             }
             else{
-                portHolder[0] = portTimer.runRepeating(portRequester, 0L, 10L, () -> {
+                portHolder[0] = ServiceComponents.scheduleRepeating(portTimer, portRequester, 0L, 10L, () -> {
                     int now = Bukkit.getCurrentTick();
                     portCount[0]++;
                     int k = portCount[0];
                     if(k <= 2){
                         portTicks[k - 1] = now - baseTick;
-                        player.sendMessage(Component.text("[sched] ④p component(TimerComponent) delay=0 period=10 #" + k
+                        player.sendMessage(Component.text("[sched] ④p component(" + ServiceComponents.ID_TIMERS + ") delay=0 period=10 #" + k
                                 + " | tick=" + now + " | delta=" + (now - baseTick) + " | component=" + str[8]));
                     }
                     if(k == 2){

@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.manager;
 
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.Buff;
 import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.BuffType;
-import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.HotbarRenderComponent;
+import com.shadowHunterRolesPlugin.roleComponent.frameworkLevel.ServiceComponents;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.Task;
@@ -109,10 +109,9 @@ public class BuffManager {
 
         if(instance != null){
             //buff 移除 ⇒ 请求重绘（添加时**不**请求 —— "添加后无刷新"的既有语义不变）
-            HotbarRenderComponent render = instance.getByType(HotbarRenderComponent.class);
-            if(render != null){
-                render.requestRepaint();
-            }
+            //按 id 取渲染组件、经框架级取用面请求重绘 ⇒ 本类不点名任何具体组件类
+            ServiceComponents.renderRequestRepaint(
+                    instance.componentRegistry().getById(ServiceComponents.ID_HOTBAR_RENDER));
         }
     }
 

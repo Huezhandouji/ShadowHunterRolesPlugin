@@ -275,4 +275,31 @@ public final class ServiceComponents {
             timers.cancelAllOf(requester);
         }
     }
+
+    /**
+     * **请求重绘**（组件侧的"我要重绘"入口；**只置脏、不写物品** —— 写物品仍只由帧末 flush 完成）。
+     * <p>与 {@link #renderMarkDirty} 的落点相同（置脏通道的终点是渲染组件自己的脏标记），
+     * 差别只在入口形态：本入口对应"请求重绘"这一语义，供**框架侧**调用。未命中 ⇒ 无操作。
+     */
+    public static void renderRequestRepaint(RoleComponent component) {
+        if (component instanceof HotbarRenderComponent render) {
+            render.requestRepaint();
+        }
+    }
+
+    /**
+     * 以**计时组件**登记一个重复任务（未命中该组件 ⇒ 回 {@code null}）。
+     * @param component         计时组件的通用面（按 {@link #ID_TIMERS} 取到）
+     * @param requester         任务归属的请求者（资源按请求者登记）
+     * @param initialDelayTicks 首次延迟（刻）
+     * @param periodTicks       周期（刻）
+     * @param task              任务体
+     * @return 任务句柄；未命中计时组件 ⇒ {@code null}
+     */
+    public static Task scheduleRepeating(RoleComponent component, RoleComponent requester,
+                                         long initialDelayTicks, long periodTicks, Runnable task) {
+        return component instanceof TimerComponent timers
+                ? timers.runRepeating(requester, initialDelayTicks, periodTicks, task)
+                : null;
+    }
 }

@@ -222,39 +222,6 @@ public class RoleInstance {
  */
     public RoleInfo roleInfo() { return roleInfo; }
 
-    /**
-     * **构造并接线内建组件**（★ 装配点）。
-     *
-     * <p><b>顺序 = 契约的一部分</b>：**物品渲染组件必须最先** —— 它的置脏通道要先于任何会置脏者存在
-     * （能量组件在它之后的构造期即可请求重绘）。改动本方法的语句顺序 = 改动行为 ⇒ 须同时改注释。
-     *
-     * <p><b>id 从哪来</b>：**各组件自己声明**（`XxxComponent.ID`）⇒ 本处只写「id + 工厂」的纯数据，
-     * 不再有第二份同值 id 常量、也不再有「框架级服务清单」聚合类 ✓。
-     *
-     * <p><b>接线</b>：SanTE 的平台侧通知接回 {@link #dispatchSanTEChange(int, int)}
-     * （真变化闸门 / 逐监听器隔离 / 重入合并仍在容器侧）；计时组件接容器的每组件资源表。
-     */
-    /**
-     * **内建组件的「已被提供的类型」清单**（★ **从装配动作派生**，不是另写一份声明）。
-     *
-     * <p><b>用途</b>：装配期依赖校验（{@code Role#verifyDependencies()}）只看**模板的组件表**，
-     * 而内建组件是**按实例**装配的 ⇒ 模板侧看不见它们 ⇒ 任何 {@code requires(这些类型)} 会被
-     * 误报成「缺必需依赖」。装配方把本清单**作为数据**交给 `Role.Builder#providedTypes(...)` ⇒ 校验放行 ✓
-     * （{@code Role} 只吃数据、不认类型名 ⇒ 那条边界仍然守住）。
-     *
-     * <p>★ **与装配表同源**：那 6 件由 `registry/RoleLoader#withBuiltIns(...)` 注册进模板
-     * ⇒ 本清单报的就是那 6 类；增删组件时**两处都在装配侧**（不再有「构造一处、清单另写一处」）。
-     */
-    public static Set<Class<? extends RoleComponent>> providedComponentTypes() {
-        Set<Class<? extends RoleComponent>> types = new LinkedHashSet<>();
-        types.add(HotbarRenderComponent.class);
-        types.add(EnergyComponent.class);
-        types.add(SanTEComponent.class);
-        types.add(VitalsComponent.class);
-        types.add(BuffComponent.class);
-        types.add(TaskComponent.class);
-        return Set.copyOf(types);
-    }
 
 
  /**

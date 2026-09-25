@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
 import org.junit.Test;
 
 import java.util.Map;
@@ -67,19 +68,23 @@ public class AssemblyValidationTest {
         assertEquals("Slot 1 is already occupied by 'c_a'.", e.getMessage());
     }
 
-    /** 正常装配：build() 成功、条目栏位正确、组件数正确。 */
+    /** 正常装配：build() 成功、栏位由描述符持有、组件数正确。 */
     @Test
     public void validAssemblySucceeds() {
         Role.Builder b = builder("r");
-        b.addComponent("c_a", new MeiqiheziBloodySlashSkill.Specification().setSlot(1));
-        b.addComponent("c_b", new MeiqiheziCircleSlashSkill.Specification().setSlot(2));
+        HotbarSpecification<?> specA =
+                new MeiqiheziBloodySlashSkill.Specification().setSlot(1);
+        HotbarSpecification<?> specB =
+                new MeiqiheziCircleSlashSkill.Specification().setSlot(2);
+        b.addComponent("c_a", specA);
+        b.addComponent("c_b", specB);
         Role role = b.build();
         assertNotNull(role);
         assertEquals(2, role.getComponents().size());
- //★ 栏位视图已从聚合根删除（`getSlotMap` / `componentIdAtSlot`）⇒ 改读**条目携带的栏位值**
- //（与渲染组件读描述符的 `slot()` 同一来源）
-        assertEquals(1, role.getComponents().get("c_a").getSlot());
-        assertEquals(2, role.getComponents().get("c_b").getSlot());
+ //★ 栏位值**只**住在描述符里（条目与 Role 实例都不再持有）⇒ 断言读描述符本身
+ //（与渲染组件读 `specification().slot()` 同一来源）
+        assertEquals(1, (int) specA.slotOrNull());
+        assertEquals(2, (int) specB.slotOrNull());
         assertTrue(role.getSkillIds().contains("c_a"));
         assertTrue(role.getSkillIds().contains("c_b"));
     }
@@ -91,7 +96,7 @@ public class AssemblyValidationTest {
         spec.setSlot(5);
         Role r1 = builder("r1").addComponent("c_x", spec).build();
         assertThrows(IllegalStateException.class, () -> spec.setSlot(6));
- //★ 同上：改读条目携带的栏位值
-        assertEquals(5, r1.getComponents().get("c_x").getSlot());
+ //★ 同上：读描述符自身的栏位（冻结后仍可读）
+        assertEquals(5, (int) spec.slotOrNull());
     }
 }

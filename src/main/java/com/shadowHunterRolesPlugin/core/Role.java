@@ -85,9 +85,7 @@ public class Role {
 
         this.icon = builder.icon;
 
- //★ 由**装配方**注入的「已被提供的类型」数据 —— 本类**不知道**这些类型是什么组件，
- //  也不 import 任何具体组件类 ✓（见下方 providedTypes 的说明）。
-        this.providedTypes = Collections.unmodifiableSet(new LinkedHashSet<>(builder.providedTypes));
+ //★ 「已被提供的类型」注入机制已删除（6 件内建组件已进模板 ⇒ 供给面判定只看模板组件表）
 
     }
 
@@ -155,28 +153,13 @@ public class Role {
         }
     }
 
- // ─────────────：装配方注入的「已被提供的类型」（本类不知道它们是什么组件） ─────────────
- /**
- * **已被提供的组件类型**（由**装配方**注入的数据；默认空集）。
- *
- * <p><b>为什么是数据而不是本类写死的一张清单</b>：『框架级组件』只是**提前写好的一些重要组件**，
- * 它们**不代表可以碰到聚合根 / 本类** ✗。本类因此**不 import 任何具体组件类**、也不认识任何
- * `ID_*`；它只回答一个纯数据问题：「组件表之外的这些类型，算不算已被提供」。
- *
- * <p><b>谁注入</b>：装配方（`registry/RoleLoader` = 模板注册链）在构造 `Role` 时把
- * **当前确实被提供的类型**交进来。于是知识留在**组件层 / 装配层**，而依赖校验仍能正确放行
- * 「`requires(某个已被提供的类型)`」—— 不会把合法声明误报成"缺必需依赖"。
- *
- * <p><b>默认空集的后果（如实申报）</b>：不经装配方构造的 `Role`（例如单测里直接
- * `new Role.Builder(id)`）**不享受**任何豁免 ⇒ 声明了该类依赖的组件会被判为缺依赖。
- * 这是**正确**的默认：那种上下文里确实没有任何组件被提供 ✓。
- */
-    private final Set<Class<? extends RoleComponent>> providedTypes;
+ //★ **「已被提供的类型」豁免机制已整体删除** —— 它原本是「内建组件按实例装配、模板里看不见」
+ // 那个缺口的补丁；现在 6 件内建组件**已注册进模板**（`registry/RoleLoader#withBuiltIns`）
+ // ⇒ `requires(...)` 的供给面判定只看**模板组件表**即可，不再需要任何外部清单 ✓。
 
  /**
  * **缺必需依赖的清单**（诊断用；空 = 齐）。每条都点名：组件 id · 该组件**提供**的类型 · **缺**的类型。
  * <p>{@link #verifyDependencies()} 的异常消息直接由它拼出 ⇒ 消息与清单**同源**，不会各说一套。
- * <p>判定供给面时，{@link #providedTypes}（装配方注入）里的类型**不算缺** ⇒ 跳过。
  */
     public List<String> missingRequiredDependencies(){
         List<String> problems = new ArrayList<>();
@@ -184,8 +167,6 @@ public class Role {
             String componentId = entry.getKey();
             ComponentEntry component = entry.getValue();
             for(Class<? extends RoleComponent> required : component.getRequiredTypes()){
- //装配方注入的「已被提供的类型」（组件表之外的供给面）⇒ 声明它不算缺依赖 ✓
-                if(providedTypes.contains(required)) continue;
                 if(!hasProviderOtherThan(componentId, required)){
                     problems.add("component '" + componentId + "' (provides " + component.getProvidedType().getName()
                             + ") requires missing component type '" + required.getName() + "'");
@@ -247,7 +228,6 @@ public class Role {
     public static final class ComponentEntry{
 
         private final ComponentFactory<? extends RoleComponent> factory;
-        private final Integer slot;
         private final Class<?> descriptorType;
  /** 本组件**提供**的类型（依赖检查的供给面；无描述符的装配入口按工厂形参类型给族级值）。 */
         private final Class<? extends RoleComponent> providedType;
@@ -256,12 +236,11 @@ public class Role {
  /** **可选**依赖类型（缺失不报错）。 */
         private final List<Class<? extends RoleComponent>> optionalTypes;
 
-        ComponentEntry(ComponentFactory<? extends RoleComponent> factory, Integer slot, Class<?> descriptorType,
+        ComponentEntry(ComponentFactory<? extends RoleComponent> factory, Class<?> descriptorType,
                        Class<? extends RoleComponent> providedType,
                        List<Class<? extends RoleComponent>> requiredTypes,
                        List<Class<? extends RoleComponent>> optionalTypes){
             this.factory = factory;
-            this.slot = slot;
             this.descriptorType = descriptorType;
             this.providedType = providedType;
             this.requiredTypes = List.copyOf(requiredTypes);
@@ -282,16 +261,8 @@ public class Role {
  /** 本组件声明的**可选**依赖类型（不可变副本）。 */
         public List<Class<? extends RoleComponent>> getOptionalTypes() { return optionalTypes; }
 
- /** 栏位（0..8）；**不占栏位 ⇒ 抛异常**（本版不再有 `-1` 哨兵）。 */
-        public int getSlot() {
-            if (slot == null) {
-                throw new IllegalStateException("Component does not occupy a hotbar slot.");
-            }
-            return slot;
-        }
-
- /** 占不占热键栏（`false` ⇒ 渲染组件取计划时会跳过它）。 */
-        public boolean hasSlot() { return slot != null; }
+ //★ `getSlot()` / `hasSlot()` 已删除 —— 栏位值**只**住在描述符快照里
+ // （`Specification.Snapshot#getSlot()`），渲染组件读那一份做落位 ⇒ 条目不再重复持有它 ✓
     }
 
     public static class Builder{
@@ -305,8 +276,9 @@ public class Role {
  /** 唯一有序组件表（声明序 = 装配调用序）—— 派发序载体，也是**栏位的唯一来源**。 */
         private final Map<String, ComponentEntry> components = new LinkedHashMap<>();
 
- /** 装配方注入的「已被提供的类型」（默认空集 ⇒ 无豁免；见 {@link Role#providedTypes} 的说明）。 */
-        private final Set<Class<? extends RoleComponent>> providedTypes = new LinkedHashSet<>();
+        /** 已占用的栏位（★ 只在**装配期**用于冲突判定；不进条目、不进 Role 实例）。 */
+        private final Set<Integer> occupiedSlots = new LinkedHashSet<>();
+
 
         private Material icon;
 
@@ -338,25 +310,7 @@ public class Role {
             return this;
         }
 
- /**
- * **注入「已被提供的类型」**（装配方在构造角色模板时调用；默认空集）。
- *
- * <p><b>为什么由装配方注入</b>：『框架级组件』只是**提前写好的一些重要组件**，它们**不代表可以碰到
- * 聚合根 / 本类** ⇒ 本类**不认识**任何具体组件类，只把这份清单当**数据**收下，用于依赖校验的供给面判定
- * （见 {@link Role#providedTypes}）。
- *
- * <p><b>典型调用方</b>：`registry/RoleLoader`（模板注册链）—— 它把「当前确实被提供的类型」
- * 交进来，使「`requires(某个已被提供的类型)`」不被误报成缺依赖 ✓。
- *
- * @param types 已被提供的组件类型（可为空/省略 ⇒ 无豁免）
- */
-        public Builder providedTypes(Set<Class<? extends RoleComponent>> types){
-            this.providedTypes.clear();
-            if(types != null){
-                this.providedTypes.addAll(types);
-            }
-            return this;
-        }
+ //★ `Builder#providedTypes(...)` 已删除 —— 见类内「豁免机制已整体删除」的说明。
 
  /**
  * **统一装配入口（描述符口径，不含 kind）**：吃一个**装配期描述符**
@@ -376,8 +330,22 @@ public class Role {
  //"不带 id 的构造"声明，不绑定的话描述符里的 id 字段会恒为 null。
             specification.bindId(id);
             RoleComponent.Specification.Snapshot snapshot = specification.freeze();
+ //★ 栏位值**不进条目** —— 它住在描述符快照里（渲染组件读那一份做落位）；
+ // 但**装配期仍做冲突判定**（fail-fast 语义与文案逐字不变）：扫的是快照值，不是条目的字段。
+            if (snapshot.hasSlot()) {
+                int slot = snapshot.getSlot();
+                if (slot < 0 || slot > 8) {
+                    throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
+                }
+                for (Map.Entry<String, ComponentEntry> registered : components.entrySet()) {
+                    if (occupiedSlots.contains(slot)) {
+                        throw new IllegalArgumentException(
+                                "Slot " + slot + " is already occupied by '" + registered.getKey() + "'.");
+                    }
+                }
+                occupiedSlots.add(slot);
+            }
             return addComponentInternal(id, specification.getClass(),
-                    snapshot.hasSlot() ? Integer.valueOf(snapshot.getSlot()) : null,
                     snapshot.getFactory(), snapshot.getDescriptorLabel(),
                     snapshot.getProvidedType(), snapshot.getRequiredTypes(), snapshot.getOptionalTypes());
         }
@@ -395,7 +363,7 @@ public class Role {
  * @param requiredTypes **必需**依赖类型（缺任一 ⇒ {@link Role#verifyDependencies()} 抛异常）
  * @param optionalTypes **可选**依赖类型（缺失不报错）
  */
-        private Builder addComponentInternal(String id, Class<?> descriptorType, Integer slot,
+        private Builder addComponentInternal(String id, Class<?> descriptorType,
                                              ComponentFactory<? extends RoleComponent> factory,
                                              String descriptorLabel,
                                              Class<? extends RoleComponent> providedType,
@@ -415,11 +383,7 @@ public class Role {
             }
             ensureIdNotRegistered(descriptorLabel, id);
 
-            if(slot != null){
-                validateSlot(slot);
-            }
-
-            components.put(id, new ComponentEntry(factory, slot, descriptorType, providedType,
+            components.put(id, new ComponentEntry(factory, descriptorType, providedType,
                     requiredTypes, optionalTypes));
 
             return this;
@@ -435,24 +399,6 @@ public class Role {
         private void ensureIdNotRegistered(String descriptorLabel, String id){
             if (components.containsKey(id)) {
                 throw new IllegalArgumentException(descriptorLabel + " already registered: " + id);
-            }
-        }
-
- /**
- * 槽位冲突 fail-fast —— 抛异常、该角色不注册，不再"告警 + 覆盖"。
- * <p>★ **栏位合法性校验仍在装配期**（此处），但**本类不再持有栏位视图** ——
- * 它只扫「条目携带的栏位值」做**冲突判定**（条目仍持有那个值：它是描述符快照的一部分，
- * 渲染组件要读它做落位）。异常类型与文案**逐字不变**。
- */
-        private void validateSlot(int slot){
-            if(slot < 0 || slot > 8){
-                throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
-            }
-            for(Map.Entry<String, ComponentEntry> entry : components.entrySet()){
-                ComponentEntry registered = entry.getValue();
-                if(registered.hasSlot() && registered.getSlot() == slot){
-                    throw new IllegalArgumentException("Slot " + slot + " is already occupied by '" + entry.getKey() + "'.");
-                }
             }
         }
 

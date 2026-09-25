@@ -376,6 +376,16 @@ public abstract class RoleComponent {
          * <p><b>依赖声明的自检</b>：同一个类型不得**既必需又可选择** ⇒ 抛
          * {@link IllegalStateException}（自相矛盾的声明必须在装配期就喊出来，而不是"看哪条先被读到"）。
          */
+        /**
+         * **本描述符声明的栏位**（未设 ⇒ {@code null}）。
+         *
+         * <p>★ 这是「栏位值」的**唯一读口**（装配期冲突判定与渲染组件落位都读它）
+         * —— 条目与 `Role` 实例**都不再持有**栏位值 ✓。
+         */
+        public final Integer slotOrNull() {
+            return slot;
+        }
+
         public final Snapshot freeze() {
             if (requiresSlot() && slot == null) {
                 throw new IllegalStateException(

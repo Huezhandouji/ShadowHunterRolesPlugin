@@ -3,6 +3,7 @@ import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -45,24 +46,24 @@ public class RegistrationOrderTest {
         expectedOrder.add("c_9_no_slot");
         assertEquals("遍历序必须等于登记序（LinkedHashMap 的语义）", expectedOrder, actualOrder);
 
- //★ 栏位视图已从聚合根删除 ⇒ 改为断言**条目携带的栏位值**（与渲染组件读描述符同一来源）
-        for (int i = 0; i < IDS.length; i++) {
-            assertEquals("栏位 " + i + " 必须写在登记时给出的那个条目上",
-                    i, role.getComponents().get(IDS[i]).getSlot());
-        }
-        assertFalse("无栏位者不得带栏位值", role.getComponents().get("c_9_no_slot").hasSlot());
+ //★ 栏位值**只**住在描述符里（条目与 Role 实例都不再持有）⇒ 改为断言**登记序**本身
+        assertEquals("登记序必须与 IDS 逐位相同",
+                Arrays.asList(IDS), new ArrayList<>(role.getComponents().keySet()).subList(0, IDS.length));
     }
 
-    /** 栏位 0..8 全覆盖：9 个条目都能各占一格。 */
+    /** 栏位 0..8 全覆盖：9 个条目都能各占一格（栏位由各自描述符持有）。 */
     @Test
     public void everySlotCanBeOccupiedExactlyOnce() {
         Role.Builder b = new Role.Builder("r");
+        HotbarSpecification<?>[] specs = new HotbarSpecification<?>[9];
         for (int i = 0; i <= 8; i++) {
-            b.addComponent("slot_" + i, new MeiqiheziBloodySlashSkill.Specification().setSlot(i));
+            specs[i] = new MeiqiheziBloodySlashSkill.Specification().setSlot(i);
+            b.addComponent("slot_" + i, specs[i]);
         }
-        Role role = b.build();
+        b.build();
+ //★ 读描述符自身的栏位（与渲染组件同一来源）
         for (int i = 0; i <= 8; i++) {
-            assertEquals("栏位 " + i + " 必须写在条目上", i, role.getComponents().get("slot_" + i).getSlot());
+            assertEquals("栏位 " + i + " 必须由描述符持有", i, (int) specs[i].slotOrNull());
         }
     }
 
@@ -70,16 +71,22 @@ public class RegistrationOrderTest {
     @Test
     public void orderIsInsertionNotAlphabetical() {
         Role.Builder b = new Role.Builder("r");
-        b.addComponent("zzz", new MeiqiheziBloodySlashSkill.Specification().setSlot(3));
-        b.addComponent("aaa", new MeiqiheziBloodySlashSkill.Specification().setSlot(1));
-        b.addComponent("mmm", new MeiqiheziBloodySlashSkill.Specification().setSlot(2));
+        HotbarSpecification<?> specZ =
+                new MeiqiheziBloodySlashSkill.Specification().setSlot(3);
+        HotbarSpecification<?> specA =
+                new MeiqiheziBloodySlashSkill.Specification().setSlot(1);
+        HotbarSpecification<?> specM =
+                new MeiqiheziBloodySlashSkill.Specification().setSlot(2);
+        b.addComponent("zzz", specZ);
+        b.addComponent("aaa", specA);
+        b.addComponent("mmm", specM);
         Role role = b.build();
         assertEquals("组件表遍历序 = 登记序（不是字母序）",
                 Arrays.asList("zzz", "aaa", "mmm"), new ArrayList<>(role.getComponents().keySet()));
- //★ 栏位视图已删除 ⇒ 逐条断言**条目携带的栏位值**
-        assertEquals(3, role.getComponents().get("zzz").getSlot());
-        assertEquals(1, role.getComponents().get("aaa").getSlot());
-        assertEquals(2, role.getComponents().get("mmm").getSlot());
+ //★ 栏位由各自描述符持有（条目不再持有）
+        assertEquals(3, (int) specZ.slotOrNull());
+        assertEquals(1, (int) specA.slotOrNull());
+        assertEquals(2, (int) specM.slotOrNull());
     }
 
     /** 样本判别力守卫：同一批 id 的 {@link HashMap} 迭代序与登记序**不同** ⇒ 上面对顺序的断言不可能是恒真。 */

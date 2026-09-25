@@ -259,6 +259,35 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
      * <p><b>三态返回</b>：{@code null} = **未识别 / 拒绝执行**（未知动词 ✓ · 参数缺失/多余 ✓ · 非数字/负数/溢出 ✓ · 空或空白 payload ✓）；
      * 非空串 = **规范化值**（写类回写后值、读类回当前值 ✓）。
      * <p><b>薄适配纪律</b>：本方法**只调**上述既有方法 ⇒ 不新增平行的状态改动路径 ✗、不绕过既有 clamp / 通知 / 置脏 ✓。
+     *
+     * <h2>payload 口径（★ 先读这一段）</h2>
+     * <b>组件收到的是「含动词的整段 payload」</b> —— 外部指令面把**首 token 起、直到行尾**的整段
+     * **原样**交给本方法（{@code OperationProvider} 明写「op 与 args **合并**后交给组件自解析」，
+     * 派发器**不解析**它 ✗）⇒ 本方法自行切分 token ✓。
+     * <p>★ <b>指令里的 {@code #index} 不是 op/args 分隔符</b>：{@code componentId[#index]} 的 {@code #}
+     * 是**同 id 多份实例的下标**（在**派发层**就已被切掉，用于选中第几份实例；多份且未给下标 ⇒ 直接
+     * 拒绝 ⇒ **本方法根本收不到**）⇒ 它**与 payload 无关** ✗ —— **不存在** {@code op#args} 这种形态 ✓。
+     *
+     * <h2>返回值三态（与 {@link OperationProvider} 契约逐字一致）</h2>
+     * <ul>
+     *   <li>{@code null} = **未识别或拒绝**（未知动词 / 语法错 / 参数不合法）✗；</li>
+     *   <li>{@code ""}（空串）= **已识别但没有回值**（纯写操作）✓ —— ★ 本组件**从不**回空串
+     *       （它总有一个可回的值：读类回当前值、写类回写后状态）✓；</li>
+     *   <li>**非空串** = **规范化值** ✓。</li>
+     * </ul>
+     * <p>★ <b>组件内部抛出的 {@code RuntimeException} 由派发层吞掉并回 {@code null}</b>
+     * （派发层在调用本方法处 {@code try}/{@code catch} ⇒ 异常不得逃到调用方）⇒ ★ 调用方
+     * **无法**从 {@code null} 区分「语法错」与「组件崩了」✗（两者在外部看起来一样）。
+     *
+     * <h2>可直接照抄的指令</h2>
+     * <pre>
+     * /role operation query  @s sante current
+     * /role operation query  @s sante max
+     * /role operation modify @s sante gain 20       ⇒ 写后值
+     * /role operation modify @s sante gain -1       ⇒ null（负数 ⇒ 参数不合法）
+     * /role operation query  @s sante max 1         ⇒ null（只读动词不得带参数）
+     * </pre>
+     * ★ 反例说明：第 4 条走**参数不合法**分支（负数 ⇒ 拒绝）；第 5 条走**只读动词带参**分支。
      */
     @Override
     public String onOperationCommand(String payload) {

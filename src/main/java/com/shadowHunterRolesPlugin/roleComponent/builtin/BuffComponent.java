@@ -129,6 +129,34 @@ public class BuffComponent extends RoleComponent implements OperationProvider {
      *
      * <p><b>薄适配纪律</b>：本方法**只调**上述既有强类型方法 ⇒ 不新增平行的状态改动路径 ✗、
      * 不绕过既有的 buff 语义（闸门 / 取最大时长 / 药水记账）✓。
+     *
+     * <h2>payload 口径（★ 先读这一段）</h2>
+     * <b>组件收到的是「含动词的整段 payload」</b> —— 外部指令面把**首 token 起、直到行尾**的整段
+     * **原样**交给本方法（{@code OperationProvider} 明写「op 与 args **合并**后交给组件自解析」，
+     * 派发器**不解析**它 ✗）⇒ 本方法自行切分 token ✓。
+     * <p>★ <b>指令里的 {@code #index} 不是 op/args 分隔符</b>：{@code componentId[#index]} 的 {@code #}
+     * 是**同 id 多份实例的下标**（在**派发层**就已被切掉，用于选中第几份实例；多份且未给下标 ⇒ 直接
+     * 拒绝 ⇒ **本方法根本收不到**）⇒ 它**与 payload 无关** ✗ —— **不存在** {@code op#args} 这种形态 ✓。
+     *
+     * <h2>返回值三态（与 {@link OperationProvider} 契约逐字一致）</h2>
+     * <ul>
+     *   <li>{@code null} = **未识别或拒绝**（未知动词 / 语法错 / 参数不合法）✗；</li>
+     *   <li>{@code ""}（空串）= **已识别但没有回值**（纯写操作）✓ —— ★ 本组件**从不**回空串
+     *       （它总有一个可回的值：读类回当前值、写类回写后状态）✓；</li>
+     *   <li>**非空串** = **规范化值** ✓。</li>
+     * </ul>
+     * <p>★ <b>组件内部抛出的 {@code RuntimeException} 由派发层吞掉并回 {@code null}</b>
+     * （派发层在调用本方法处 {@code try}/{@code catch} ⇒ 异常不得逃到调用方）⇒ ★ 调用方
+     * **无法**从 {@code null} 区分「语法错」与「组件崩了」✗（两者在外部看起来一样）。
+     *
+     * <h2>可直接照抄的指令</h2>
+     * <pre>
+     * /role operation query  @s buffs count
+     * /role operation modify @s buffs add STUN 100  ⇒ 施加后剩余刻数
+     * /role operation modify @s buffs add stun 100  ⇒ null（大小写不符 ⇒ 严格 valueOf 拒绝）
+     * /role operation query  @s buffs remaining NOPE   ⇒ null（未知 buff id ⇒ 严格 valueOf 拒绝）
+     * </pre>
+     * ★ 反例说明：第 3 条走**严格 {@code valueOf}** 分支（{@code SILENCE}/{@code STUN}/{@code IMMUNE} 必须逐字相符）；第 4 条走**未知 buff id** 分支。
      */
     @Override
     public String onOperationCommand(String payload) {

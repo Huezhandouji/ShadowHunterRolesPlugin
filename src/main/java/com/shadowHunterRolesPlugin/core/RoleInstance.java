@@ -258,7 +258,7 @@ public class RoleInstance {
  * <p><b>调用点申报</b>：生产侧 0 调用点 —— 它是容器的公开读口（**容器职责**：组件查取入口），
  * 消费者是**后续卡的依赖注入路径**与仓外探针（组件侧取组件一律走
  * {@code RoleComponent#getComponent(Class)} ⇒ {@code svc().components().get(...)}）。
- * <p>本口**接口面不变**（语义按真实行为写明 = "添加顺序第一个"）；
+ * <p>本口**只增不改**（语义按真实行为写明 = "添加顺序第一个"）；
  * 新增的 {@link #getAllByType(Class)} 是它的"全部"版本（后者已是**活码**：
  * {@code listener/hook/DamageHookListener} 的承受方扇出在用）。
  */
@@ -291,7 +291,7 @@ public class RoleInstance {
     }
 
  /**
- * 组件与其**一对一**的服务集（P5 后为三个成员：玩家实例面 / 组件查找 / 聚合根只读面）。
+ * 组件与其**一对一**的服务集（ 后为三个成员：玩家实例面 / 组件查找 / 聚合根只读面）。
  * <p><b>前置</b>：冷却表已合并为**单一命名空间** ⇒ 本方法**不再需要 kind**
  * （合并前"按 kind 选表"的构造期绑定，是"删 kind 枚举"的硬阻塞）。
  * kind 枚举已整个删掉 ⇒ 注册处也不再承载任何"权威种类"。
@@ -759,7 +759,7 @@ public class RoleInstance {
     }
 
  /**
- * **框架调用组件的唯一受保护入口**（A1）。
+ * **框架调用组件的唯一受保护入口**。
  * <p>框架在**每一处**调用组件（{@code awake/start/stop/update/onSanTEChange} 广播 ·
  * {@code onCast}/{@code onAttack}）都必须经这里 ——
  * **不在组件内部各自 try** （否则第三个组件又要重写一遍）。

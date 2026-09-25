@@ -620,7 +620,7 @@ public class Role {
 
  /**
  * 栏位视图（**派生**）：`栏位 → 组件 id`，由构造期一次性从组件表派生。
- * 签名与语义**完全一致**（公开 API）；栏位归属本身随组件自己的描述符走。
+ * 签名与语义**完全一致**（公开 API，只增不改）；栏位归属本身随组件自己的描述符走。
  */
     public Map<Integer, String> getSlotMap() { return slotMap; }
 

@@ -19,7 +19,7 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEquipmentsPassive
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.ServiceComponents;
+import com.shadowHunterRolesPlugin.core.RoleInstance;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 
@@ -133,7 +133,7 @@ public class RoleLoader {
         return new Role.Builder("meiqihezi")
  //★ 「已被提供的类型」由**装配方**注入（`core/Role` 本身不认识任何组件类 ✓）——
  //  否则组件声明 `requires(框架级组件)` 会被模板侧的依赖校验误报成"缺必需依赖"。
-                .providedTypes(ServiceComponents.FRAMEWORK_PROVIDED_TYPES)
+                .providedTypes(RoleInstance.providedComponentTypes())
                 .displayName(Component.text("MeiqiHezi"))
                 //Component.text("战斗疯子\n普攻20能量以上左键造成范围伤害并消耗能量，20以下只能打一个人\n一技能加速\n二技能三段突进并造成伤害\n三技能圆弧斩，范围真伤")
                 .description(List.of(
@@ -160,7 +160,7 @@ public class RoleLoader {
     private static Role.Builder redBuilder() {
 
         return new Role.Builder("red")
-                .providedTypes(ServiceComponents.FRAMEWORK_PROVIDED_TYPES)
+                .providedTypes(RoleInstance.providedComponentTypes())
                 .displayName(Component.text("Red"))
                 //Component.text("待到血腥降临，一切化为土尘\n普攻造成15流血\n一技能捅人恢复生命\n二技能致盲敌人并结算5层流血恢复te\n三技能烧自己te开启狂暴")
                 .description(List.of(
@@ -191,7 +191,7 @@ public class RoleLoader {
     private static Role.Builder selfUpdateExampleBuilder() {
 
         return new Role.Builder("selfUpdateExample")
-                .providedTypes(ServiceComponents.FRAMEWORK_PROVIDED_TYPES)
+                .providedTypes(RoleInstance.providedComponentTypes())
                 .displayName(Component.text("Self-Update Example"))
                 .description(List.of(
                         Component.text("示例角色：演示「组件可请求重绘」"),

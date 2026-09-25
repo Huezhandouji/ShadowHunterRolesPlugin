@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent;
 
 import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.ServiceComponents;
+
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import net.kyori.adventure.text.Component;
@@ -205,7 +205,7 @@ public abstract class ActiveComponent extends RoleComponent
     /**
      * **把本组件的热键栏物品提交给机制面，并取回句柄**（回调注册的落点）。
      * <p><b>为什么由基类提供这一处</b>：机制面的 **id 与类型是框架级知识** —— 让每个具体组件各自
-     * 去认 `{@code ServiceComponents.ID_HOTBAR_RENDER}` 与 `{@link HotbarRenderComponent}`，
+     * 去认 `{@code HotbarRenderComponent.ID}` 与 `{@link HotbarRenderComponent}`，
      * 等于把同一份框架级知识抄 8 遍 ✗。本类一次性持有它，具体组件只写一行 `submitToHotbar(...)` ✓。
      * <p><b>槽位口径</b>：提交槽位 = 本组件**自己的表现规格**里声明的槽位（{@link #specification()} 的
      * `slot()`）—— 与拉取式路径（{@code renderPlan()} 用 {@code specification.slot()}）**同源** ✓
@@ -219,7 +219,7 @@ public abstract class ActiveComponent extends RoleComponent
         if (item == null || !specification().hasSlot()) {
             return null;
         }
-        RoleComponent found = svc().components().getById(ServiceComponents.ID_HOTBAR_RENDER);
+        RoleComponent found = svc().components().getById(HotbarRenderComponent.ID);
         if (!(found instanceof HotbarRenderComponent render)) {
             return null;
         }

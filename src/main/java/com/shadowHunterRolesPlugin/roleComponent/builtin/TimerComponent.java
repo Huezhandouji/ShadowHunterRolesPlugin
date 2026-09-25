@@ -27,6 +27,12 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 public class TimerComponent extends RoleComponent {
 
     /**
+     * **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。
+     * <p>容器装配时只读这个 **id + 工厂**（{@code data}），不点名组件类 ✓。
+     */
+    public static final String ID = "timers";
+
+    /**
      * 资源表接入口（容器在构造期注入）：**就是** {@code ComponentRegistry} 的每组件资源表
      * （{@code registry::track} / {@code registry::cancelAll}）。
      * <p>刻意做成接口而不是直接用 {@code ComponentRegistry}：{@code core/component/**} 不是本组件的依赖面，

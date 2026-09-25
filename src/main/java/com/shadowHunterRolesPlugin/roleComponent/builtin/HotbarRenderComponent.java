@@ -64,6 +64,12 @@ import java.util.logging.Logger;
 public class HotbarRenderComponent extends RoleComponent {
 
     /**
+     * **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。
+     * <p>容器装配时只读这个 **id + 工厂**（{@code data}），不点名组件类 ✓。
+     */
+    public static final String ID = "hotbarRender";
+
+    /**
      * **渲染意图的置脏入口**（本组件对外暴露的那一条通道的落点）。
      * <p>{@code null} 是**合法**状态：未装配时（例如单元测试直接构造组件）请求重绘是**静默无操作** ✓
      * —— 与"未装配 ⇒ 无事可做"同义，**不是**错误 ✗。

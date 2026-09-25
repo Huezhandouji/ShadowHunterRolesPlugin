@@ -7,7 +7,7 @@ import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
 import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.ServiceComponents;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
@@ -340,20 +340,20 @@ public class DebugSchedCommand implements SubCommand {
             //计时组件 = 框架级服务组件（装配期已登记进实例容器 ⇒ **按 id** 取通用面，本类不点名具体组件类 ✓）
             RoleComponent portRequester = portSvc.components().getById(str[8]);
             RoleComponent portTimer = portInstance != null
-                    ? portInstance.componentRegistry().getById(ServiceComponents.ID_TIMERS)
+                    ? portInstance.componentRegistry().getById(TimerComponent.ID)
                     : null;
             if(portRequester == null || portTimer == null){
                 str[8] = "portLeg=SKIPPED(no requester or no timer component)";
                 sendKey(player, "[sched] ④p port leg | " + str[8]);
             }
             else{
-                portHolder[0] = ServiceComponents.scheduleRepeating(portTimer, portRequester, 0L, 10L, () -> {
+                portHolder[0] = ((TimerComponent) portTimer).runRepeating(portRequester, 0L, 10L, () -> {
                     int now = Bukkit.getCurrentTick();
                     portCount[0]++;
                     int k = portCount[0];
                     if(k <= 2){
                         portTicks[k - 1] = now - baseTick;
-                        player.sendMessage(Component.text("[sched] ④p component(" + ServiceComponents.ID_TIMERS + ") delay=0 period=10 #" + k
+                        player.sendMessage(Component.text("[sched] ④p component(" + TimerComponent.ID + ") delay=0 period=10 #" + k
                                 + " | tick=" + now + " | delta=" + (now - baseTick) + " | component=" + str[8]));
                     }
                     if(k == 2){

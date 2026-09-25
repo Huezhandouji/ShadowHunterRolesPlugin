@@ -17,7 +17,12 @@ import com.shadowHunterRolesPlugin.platform.Task;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 //框架级服务组件的**清单**（类 + id + 构造顺序 + 接线 + 容器侧的服务取用入口都在那一件里）——
 //本类只引用它的 `ID_*` 常量与静态服务入口。
-import com.shadowHunterRolesPlugin.roleComponent.builtin.ServiceComponents;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TimerComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -45,7 +50,7 @@ public class RoleInstance {
 //★ 状态归属（「状态唯一」）：能量 / SanTE 的真值、buff 记账表、药水账本、计时资源
 // **都在组件里** ⇒ 本类既不持有这些状态，也**不持有组件本身**：
 // 构造期用局部变量装配（局部 ≠ 持有），此后一律按 id 现取。
-// ★ **组件的类名、id 与"取用动作"都不在本类**：三者都集中在 `ServiceComponents`（框架级清单）——
+// ★ **各组件自己声明 id**（`XxxComponent.ID`）⇒ 本类只写「id + 工厂」的纯数据，不再有聚合清单类。
 // 本类只引用那份清单里的 `ID_*` 常量，动作也经那份清单的服务入口完成；
 // ⇒ 本类内既没有具体组件类的**类字面量**，也没有第二份同值 id 常量 ✓。
 
@@ -130,16 +135,9 @@ public class RoleInstance {
  // **已删除** ⇒ 需要它的人走组件本身）。
         BuffManager buffManager = new BuffManager(player, this);
 
- //② 框架级服务组件的**构造与接线全部外移** —— 本类不点名任何具体组件类；
- // ★ 构造顺序（渲染组件必须先于任何会置脏者）由 `ServiceComponents#build` 的语句顺序保证 ✓。
-        List<RoleComponent> serviceComponents = ServiceComponents.build(new ServiceComponents.Input(
-                role,
-                this::createServices,
-                platform.scheduler(),
-                buffManager,
-                componentRegistry::track,
-                componentRegistry::cancelAll,
-                change -> dispatchSanTEChange(change.previous(), change.current())));
+ //② 内建组件的装配：**由本类的 `buildBuiltIns(...)` 直接构造**（各组件自己声明 id ⇒
+ // 本处只写「id + 工厂」的**纯数据**，不再经过任何「框架级服务清单」聚合类 ✓）。
+        List<RoleComponent> builtIns = buildBuiltIns(buffManager);
 
  //③ 阵营：**原 FactionComponent 已整体删除** ——
  // 阵营的真值就是聚合根 `Role` 的 `faction` 字段（构造期由描述符写入）；
@@ -159,7 +157,7 @@ public class RoleInstance {
 
  //服务组件登记进**实例容器**（**不进 Role 模板** ⇒ 装配表/冻结 CELLS 逐格不变）
  //登记在冻结点**之后**：登记按 id 调用查取入口（本类不保留任何组件字段）
-        registerServiceComponents(serviceComponents);
+        registerServiceComponents(builtIns);
 
  // ── 第一相到此结束（P6 两阶段构造）───────────────────────────────
  //构造器**只做不可见的事**：装配（组件 / 服务集 / 窄类型视图 / 服务组件登记）+ 注册表冻结
@@ -230,16 +228,98 @@ public class RoleInstance {
  */
     public RoleInfo roleInfo() { return roleInfo; }
 
+    /**
+     * **构造并接线内建组件**（★ 装配点）。
+     *
+     * <p><b>顺序 = 契约的一部分</b>：**物品渲染组件必须最先** —— 它的置脏通道要先于任何会置脏者存在
+     * （能量组件在它之后的构造期即可请求重绘）。改动本方法的语句顺序 = 改动行为 ⇒ 须同时改注释。
+     *
+     * <p><b>id 从哪来</b>：**各组件自己声明**（`XxxComponent.ID`）⇒ 本处只写「id + 工厂」的纯数据，
+     * 不再有第二份同值 id 常量、也不再有「框架级服务清单」聚合类 ✓。
+     *
+     * <p><b>接线</b>：SanTE 的平台侧通知接回 {@link #dispatchSanTEChange(int, int)}
+     * （真变化闸门 / 逐监听器隔离 / 重入合并仍在容器侧）；计时组件接容器的每组件资源表。
+     */
+    /**
+     * **内建组件的「已被提供的类型」清单**（★ **从装配动作派生**，不是另写一份声明）。
+     *
+     * <p><b>用途</b>：装配期依赖校验（{@code Role#verifyDependencies()}）只看**模板的组件表**，
+     * 而内建组件是**按实例**装配的 ⇒ 模板侧看不见它们 ⇒ 任何 {@code requires(这些类型)} 会被
+     * 误报成「缺必需依赖」。装配方把本清单**作为数据**交给 `Role.Builder#providedTypes(...)` ⇒ 校验放行 ✓
+     * （{@code Role} 只吃数据、不认类型名 ⇒ 那条边界仍然守住）。
+     *
+     * <p>★ **本方法与 {@link #buildBuiltIns(BuffManager)} 是同源的两面**：那里构造了哪几件，
+     * 这里就报哪几类 ⇒ 增删组件时**只改一处**（不再是「构造一处、清单另写一处」）。
+     */
+    public static Set<Class<? extends RoleComponent>> providedComponentTypes() {
+        Set<Class<? extends RoleComponent>> types = new LinkedHashSet<>();
+        types.add(HotbarRenderComponent.class);
+        types.add(EnergyComponent.class);
+        types.add(SanTEComponent.class);
+        types.add(VitalsComponent.class);
+        types.add(BuffComponent.class);
+        types.add(TimerComponent.class);
+        return Set.copyOf(types);
+    }
+
+    private List<RoleComponent> buildBuiltIns(BuffManager buffManager) {        // ① 物品渲染：**最先**构造（置脏通道要先存在）
+        HotbarRenderComponent hotbarRender =
+                new HotbarRenderComponent(HotbarRenderComponent.ID, createServices(HotbarRenderComponent.ID));
+        hotbarRender.bindRepaintSink(hotbarRender::markDirty);
+
+        // ② 能量：上限取组件侧配置；一次变更 ⇒ 请求重绘一次（无条件）
+        EnergyComponent energy = new EnergyComponent(EnergyComponent.ID, createServices(EnergyComponent.ID),
+                EnergyComponent.ENERGY_MAX,
+                change -> hotbarRender.markDirty());
+
+        // ③ SanTE：以本组件自身为 owner 登记平台侧监听 ⇒ 写入路径直调这一条
+        SanTEComponent sante = new SanTEComponent(SanTEComponent.ID, createServices(SanTEComponent.ID),
+                SanTEComponent.SANTE_MAX);
+        sante.addListener(sante, change -> dispatchSanTEChange(change.previous(), change.current()));
+
+        // ④ 生命：钳位策略的唯一实现在组件里（状态 = 玩家属性，属外部平台状态）
+        VitalsComponent vitals =
+                new VitalsComponent(VitalsComponent.ID, createServices(VitalsComponent.ID));
+
+        // ⑤ buff：记账表（与容器共享同一实例）与药水账本都归它持有
+        BuffComponent buffs =
+                new BuffComponent(BuffComponent.ID, createServices(BuffComponent.ID), buffManager);
+
+        // ⑥ 计时：任务的创建在组件里、登记归属按请求者
+        TimerComponent timers = new TimerComponent(TimerComponent.ID, createServices(TimerComponent.ID),
+                platform.scheduler(), new TimerComponent.TaskSink() {
+            @Override
+            public void track(RoleComponent requester, Task task) {
+                componentRegistry.track(requester, task);
+            }
+
+            @Override
+            public int cancelAll(RoleComponent requester) {
+                return componentRegistry.cancelAll(requester);
+            }
+        });
+
+        List<RoleComponent> ordered = new ArrayList<>(6);
+        ordered.add(hotbarRender);
+        ordered.add(energy);
+        ordered.add(sante);
+        ordered.add(vitals);
+        ordered.add(buffs);
+        ordered.add(timers);
+        return List.copyOf(ordered);
+    }
+
  /**
- * 把**框架级服务组件**登记进**实例容器**（按 **id** —— 本类只认 {@code component.getId()}）。
+ * 把**内建组件**登记进**实例容器**（按 **id** —— 本类只认 {@code component.getId()}）。
  * <p><b>不进 {@code Role} 模板</b> ⇒ {@code role.getComponents()} = 装配表 = 冻结 CELLS **逐格不变**；
  * 登记后它们可被**按 id** 取到（组件侧 = {@code svc().components().get(...)}）
  * （= "角色实例 = 组件的容器"的落点）。
- * <p>装配清单为 **6 件**（能量 / SanTE / 生命 / buff / 计时 / 物品渲染），由
- * {@link ServiceComponents#build} 构造并接线完成 ⇒ 本类**不点名任何具体组件类** ✓
- * （"哪些组件、什么顺序、怎么接线"全在那个框架级清单里 ✓）。
+ * <p>装配清单为 **6 件**（物品渲染 / 能量 / SanTE / 生命 / buff / 计时），由
+ * {@link #buildBuiltIns(BuffManager)} 构造并接线完成。
+ * <p>★ **每个组件自己声明 id**（`XxxComponent.ID`）⇒ 本类只写「id + 工厂」的**纯数据**，
+ * 不再经过任何「框架级服务清单」聚合类 ✓。
  * <p><b>顺序</b>：登记在 {@link #initComponents()} **之后**、{@link ComponentRegistry#freeze()} **之后**
- * ⇒ 容器序 = 模板组件在前、服务组件在后（逐格不变）。
+ * ⇒ 容器序 = 模板组件在前、内建组件在后（逐格不变）。
  */
     private void registerServiceComponents(List<RoleComponent> serviceComponents) {
         for (RoleComponent component : serviceComponents) {
@@ -349,11 +429,11 @@ public class RoleInstance {
         }
     }
 
- // ───────── 组件取用：动作一律经 `ServiceComponents` 的服务入口（本类不点名具体组件类） ─────────
+ // ───────── 组件取用：一律「按 id 取到通用面 + 调基类方法」（本类不 cast、不写 `.class`）─────────
  // `resolve(id)` 只负责"按 id 从容器里取到**通用面**"；"取到之后做什么"（置脏 / 帧末刷新 / 首刷 /
  // 取变化读数 / 读写能量 / 治疗 / 药水记账 / 取消计时 / 渲染通知扫描）全在框架级清单里完成
  // ⇒ 本类不需要 `Class<T>` 参数，也就不需要任何具体组件类的**类字面量** ✓。
- // 静默语义不变：id 取不到 / 类型不符 ⇒ 不做任何事；读口回既定回退值（见 `ServiceComponents` 各入口）。
+ // 静默语义不变：id 取不到 ⇒ 不做任何事；读口回基类既定回退值（见 `RoleComponent` 各视图方法）。
 
  // ───────── 施放 / 攻击管道（单一入口 = handleCast/handleAttack） ─────────
 
@@ -431,7 +511,7 @@ public class RoleInstance {
 
  //：组件侧不再被绑定一条**独立**的重绘通道 —— 需要请求重绘的组件改为
  //经**渲染组件**这一条通道：`svc().components().get(...)`
- //（按 id 取 —— id 常量见框架级清单 `ServiceComponents.ID_*`）拿到它，再调 requestRepaint()。
+ //（按 id 取 —— id 常量归组件自己：`HotbarRenderComponent.ID`）拿到它，再调 requestRepaint()。
  //⇒ 组件侧与框架侧**收敛到同一条通道**（禁两套并存）；
  // 旧 `RepaintRequestable` / `RepaintRequester` 两条通道**已删除**。
  //绑定时机的纪律不变：渲染组件本身在构造器里就已 bindRepaintSink（早于任何 awake/start）。
@@ -692,7 +772,7 @@ public class RoleInstance {
  * 派发边界**不再**回调平台侧通道（那会造成同一监听被通知两次，而第二次的派发会被重入闸门吞掉 ⇒ 只是空转）。
  */
     private void broadcastSanTEChange(int preSanTE, int newSanTE){
-        RoleComponent provider = resolve(ServiceComponents.ID_SANTE);
+        RoleComponent provider = resolve(SanTEComponent.ID);
         if (!(provider instanceof ChangeListenerSource source)) {
             return;
         }

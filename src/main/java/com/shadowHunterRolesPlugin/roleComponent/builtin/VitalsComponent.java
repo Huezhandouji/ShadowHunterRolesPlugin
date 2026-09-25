@@ -52,6 +52,12 @@ import org.bukkit.entity.Player;
 public class VitalsComponent extends RoleComponent {
 
     /**
+     * **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。
+     * <p>容器装配时只读这个 **id + 工厂**（{@code data}），不点名组件类 ✓。
+     */
+    public static final String ID = "vitals";
+
+    /**
      * **玩家未装角色时的原版生命上限**（= 既有实现里那个字面量 {@code 20} 的命名化）。
      * <p>它不是"角色配置"，而是**平台基线**：上限修饰符的值 = {@code cap - BASE_MAX_HEALTH} ⇒
      * 本常量变则所有人的上限一起变 ⇒ **只在这里出现一次**，不得散落。

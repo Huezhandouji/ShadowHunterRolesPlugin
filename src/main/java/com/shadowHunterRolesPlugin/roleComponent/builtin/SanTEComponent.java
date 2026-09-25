@@ -48,6 +48,14 @@ import java.util.function.Consumer;
  */
 public class SanTEComponent extends RoleComponent implements OperationProvider, RoleInstance.ChangeListenerSource {
 
+    /**
+     * **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。
+     * <p>容器装配时只读这个 **id + 工厂**（{@code data}），不点名组件类 ✓。
+     */
+    public static final String ID = "sante";
+    /** **本组件的 SanTE 上限**（★ 组件侧配置 · 占位值；原住在框架级清单里，现归组件自己）。 */
+    public static final int SANTE_MAX = 100;
+
     /** 本组件的日志（逐监听器隔离时报出**是谁**抛了）。 */
     private static final java.util.logging.Logger LOG =
             java.util.logging.Logger.getLogger("ShadowHunterRoles.sante");

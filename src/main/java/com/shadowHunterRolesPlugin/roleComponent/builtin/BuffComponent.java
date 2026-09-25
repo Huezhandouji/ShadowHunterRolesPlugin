@@ -28,6 +28,12 @@ import java.util.Set;
  */
 public class BuffComponent extends RoleComponent implements OperationProvider {
 
+    /**
+     * **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。
+     * <p>容器装配时只读这个 **id + 工厂**（{@code data}），不点名组件类 ✓。
+     */
+    public static final String ID = "buffs";
+
     private final BuffManager buffManager;
 
     /** ★ 药水记账账本（原 {@code RoleInstance#appliedPotionTypes} 的持有者搬到这里）。 */

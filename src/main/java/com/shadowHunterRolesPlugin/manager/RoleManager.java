@@ -170,7 +170,7 @@ public class RoleManager {
             return false;
         }
 
- //同 Player 重载：激活期被隔离 ⇒ 不再写入 map（）
+ //同 Player 重载：激活期被隔离 ⇒ 不再写入 map
         if(instance.isQuarantined()) {
             return false;
         }

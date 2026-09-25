@@ -2,7 +2,6 @@ package com.shadowHunterRolesPlugin.command;
 
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -46,15 +45,17 @@ public class ClearRoleCommand implements SubCommand {
     }
 
     private void handleClear(Player sender, String targetName){
-        // 确定目标玩家
+        // 确定目标玩家：省略目标 ⇒ 自己；否则经统一解析（裸名 / @s / 选择器，且必须恰好命中 1 名在线玩家）
         Player target;
         if(targetName == null){
             target = sender; // 默认自己
         }
         else{
-            target = Bukkit.getPlayer(targetName);
+            PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
+            target = resolved.player();
             if(target == null || !target.isOnline()){
-                sender.sendMessage(Component.text("Cannot find the player you provided: " + targetName));
+                sender.sendMessage(Component.text(PlayerTargets.rejection(targetName, resolved,
+                        "Cannot find the player you provided: " + targetName)));
                 return;
             }
         }

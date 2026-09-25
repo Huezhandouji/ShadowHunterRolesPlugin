@@ -24,8 +24,10 @@ import java.util.Locale;
  * /role operation modify [player|@s] &lt;componentId[#index]&gt; &lt;payload…&gt;
  * </pre>
  * <b>动词</b> = {@code query}（只读）/ {@code modify}（写）✓ —— 两者都走**同一个** API 入口 ✓，
- * 动词只影响**权限与回显措辞** ✓（§5）。<b>目标</b>省略（或写 {@code @s}）⇒ 默认**执行者自己** ✓。
- * <p><b>目标与 id 的消歧</b> ✓：第 2 个参数**当且仅当**它是 {@code @s} 或一个**在线**玩家名时才当作目标 ✓；
+ * 动词只影响**权限与回显措辞** ✓（§5）。<b>目标</b>省略（或写 {@code @s}）⇒ 默认**执行者自己** ✓；写选择器
+ * （{@code @a} / {@code @p} / {@code @e[type=player]} …）⇒ 经 {@link PlayerTargets} 解析，且**必须恰好命中 1 名在线玩家**，
+ * 否则按真实原因回绝 ✓。
+ * <p><b>目标与 id 的消歧</b> ✓：第 2 个参数**当且仅当**它以 {@code @} 开头（选择器 / {@code @s}）**或**是一个**在线**玩家名时才当作目标 ✓；
  * 否则它本身就是 {@code componentId}（目标 = 自己）✓ —— 这样 `query energy current` 不会被误读成"目标 = energy" ✗。
  * <p><b>payload 一律原样交给组件**自解析**</b> ✓（首 token 必为操作动词 ✓；本类**不解释**它 ✗）。
  *
@@ -83,7 +85,7 @@ public class ComponentOperationCommand implements SubCommand {
             return true;
         }
 
-        //目标与 id 的消歧（见类 javadoc ✓）：只有"@s / 在线玩家名"才算目标
+        //目标与 id 的消歧（见类 javadoc ✓）：以 "@" 开头（选择器 / @s）或是**在线**玩家名时才算目标
         String targetToken;
         String componentId;
         int payloadFrom;
@@ -92,7 +94,15 @@ public class ComponentOperationCommand implements SubCommand {
                 player.sendMessage(Component.text(getUsage()));
                 return true;
             }
-            targetToken = args[1];
+            PlayerTargets.Result resolved = PlayerTargets.resolve(player, args[1]);
+            if (!resolved.resolved()) {
+                //选择器失败按真实原因分句；非选择器（在线玩家名）失败回既有那句
+                player.sendMessage(Component.text(PlayerTargets.rejection(args[1], resolved,
+                        "No online player named '" + args[1] + "'. (Omit the player to target yourself.)")));
+                return true;
+            }
+            //派发与审计都用解析后的规范名 —— 原始选择器串无法定位到唯一对象
+            targetToken = resolved.player().getName();
             componentId = args[2];
             payloadFrom = 3;
         } else {
@@ -142,12 +152,12 @@ public class ComponentOperationCommand implements SubCommand {
         return List.of();
     }
 
-    /** 第 2 个参数是否**当目标**（`@s` 或在线玩家名 ✓）。 */
+    /** 第 2 个参数是否**当目标**：以 `@` 开头（选择器 / `@s`）或是**在线**玩家名 ✓。 */
     private boolean isTargetToken(String token) {
         if (token == null || token.isBlank()) {
             return false;
         }
-        return ComponentOperationDispatcher.SELF_TOKEN.equalsIgnoreCase(token)
+        return token.startsWith("@")
                 || Bukkit.getPlayerExact(token) != null;
     }
 

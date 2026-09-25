@@ -2,7 +2,6 @@ package com.shadowHunterRolesPlugin.command;
 
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -83,10 +82,15 @@ public class EnergyCommand implements SubCommand {
         Player target;
 
         if(targetName == null) target = sender;
-        else target = Bukkit.getPlayer(targetName);
-        if(target == null || !target.isOnline()){
-            sender.sendMessage(Component.text("Cannot find the player you provided: " + targetName));
-            return;
+        else{
+            // 统一解析：裸名 / @s / 选择器，且必须恰好命中 1 名在线玩家
+            PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
+            target = resolved.player();
+            if(target == null || !target.isOnline()){
+                sender.sendMessage(Component.text(PlayerTargets.rejection(targetName, resolved,
+                        "Cannot find the player you provided: " + targetName)));
+                return;
+            }
         }
         if(!roleManager.hasRole(target)) {
             sender.sendMessage(Component.text(target.getName() + " has no role!"));
@@ -99,10 +103,15 @@ public class EnergyCommand implements SubCommand {
         Player target;
 
         if(targetName == null) target = sender;
-        else target = Bukkit.getPlayer(targetName);
-        if(target == null || !target.isOnline()){
-            sender.sendMessage(Component.text("Cannot find the player you provided: " + targetName));
-            return;
+        else{
+            // 统一解析：裸名 / @s / 选择器，且必须恰好命中 1 名在线玩家
+            PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
+            target = resolved.player();
+            if(target == null || !target.isOnline()){
+                sender.sendMessage(Component.text(PlayerTargets.rejection(targetName, resolved,
+                        "Cannot find the player you provided: " + targetName)));
+                return;
+            }
         }
         if(!roleManager.hasRole(target)) {
             sender.sendMessage(Component.text(target.getName() + " has no role!"));

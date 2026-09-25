@@ -271,6 +271,36 @@ public class HotbarRenderComponent extends RoleComponent {
         return dirty;
     }
 
+    // ───────── 生命周期：本组件自己的两个节拍（容器不再代劳）─────────
+
+    /**
+     * **开始生效：同步首刷一次**（选角色瞬间热键栏即就绪、零延迟）。
+     *
+     * <p><b>为什么在 {@code start()}</b>：首刷会**写玩家的热键栏** ⇒ 属**玩家可见**副作用
+     * ⇒ 只能在 `start()`（`awake()` 的契约禁止可见改动）。
+     *
+     * <p><b>时序（已核）</b>：本组件在注册表**末位**（服务组件在角色组件之后注册）⇒
+     * `triggerLifecycleStart()` 遍历到本组件时，其余组件都已初始化完 ⇒ 首刷取到的画法齐全 ✓。
+     */
+    @Override
+    public void start() {
+        firstFlush();
+    }
+
+    /**
+     * **每 tick：帧末刷新**（判脏 → 写物品 → 清脏 → 扇出"真的刷新了"）。
+     *
+     * <p><b>为什么在 {@code update()}</b>：契约里本组件的刷新点 = **tick 末尾、其余组件更新之后**
+     * ⇒ 而注册序恰好把它排在最末（服务组件后注册）⇒ 本组件的 `update()` **天然最后跑** ✓
+     * ⇒ 时序与既有"容器在 update 广播之后调 flush"**逐字等价** ✓。
+     *
+     * <p>★ 入口条件在 {@link #flush()} 内部（未置脏且无占栏位者冷却 ⇒ **本帧零 `setItem`**）✓
+     */
+    @Override
+    public void update() {
+        flush();
+    }
+
     /**
      * **帧末 flush 完成后清脏**。**唯一消费者 = {@link #flush()} 的尾部**；
      * 组件 / 渲染器内部都不得调用（会吞掉本 tick 的可见更新）。

@@ -85,6 +85,10 @@ public class RoleInstance {
 
     private Task updateTask;
 
+ //★ 热键栏渲染组件的 **id 字面量**（纯数据 ⇒ 本类不算"认识组件"，只是按 id 取通用面）。
+ // 取用后一律调**基类通用面**（`RoleComponent#requestRepaint` 等），不 cast、不写 `.class` ✓。
+    private static final String HOTBAR_RENDER_ID = "hotbarRender";
+
  //★ 生命上限修饰符的密钥**已随该状态迁入生命组件**（`VitalsComponent.HEALTH_MODIFIER_KEY`）——
  // 本类不再持有它（持有它 = 容器必须认识生命组件）⇒ 字段与本类内的取用一并删除 ✓。
 
@@ -203,9 +207,9 @@ public class RoleInstance {
                 1L
         );
 
- //④ 构造期**同步首刷一次**（可见时机与既有实现逐字一致 = 选角色瞬间热键栏即就绪、零延迟）；
- //首个 tick 因置脏初值为 true 还会再写一次同内容（不可见、且此后空闲 tick 不再写）。
-        ServiceComponents.renderFirstFlush(resolve(ServiceComponents.ID_HOTBAR_RENDER));
+ //④ 同步首刷：**已由渲染组件在自己的 `start()` 里做** ✓ ——
+ // ★ 本类不再代劳（那会让容器必须认识渲染组件）。
+ // 可见时机逐字不变：`start()` 由上面的 `triggerLifecycleStart()` 广播，就在本处之前几行。
     }
 
  //平台上下文：组件取用入口（逐批收窄后服务集只剩三个成员）
@@ -327,6 +331,20 @@ public class RoleInstance {
         return componentRegistry.getById(id);
     }
 
+    /**
+     * **请求热键栏重绘**（派发边界之后的"无条件置脏一次"）。
+     *
+     * <p>★ 走**基类通用面** {@link RoleComponent#requestRepaint()}（默认空实现、由渲染组件覆写）
+     * ⇒ 本类只用一个 **id 字面量**取到通用面，**不认识**是哪个组件提供的 ✓。
+     * 未命中（id 不存在）⇒ 不做任何事（与既有静默语义逐字一致 ✓）。
+     */
+    private void requestRepaintOfHotbar() {
+        RoleComponent repaintTarget = resolve(HOTBAR_RENDER_ID);
+        if (repaintTarget != null) {
+            repaintTarget.requestRepaint();
+        }
+    }
+
  // ───────── 组件取用：动作一律经 `ServiceComponents` 的服务入口（本类不点名具体组件类） ─────────
  // `resolve(id)` 只负责"按 id 从容器里取到**通用面**"；"取到之后做什么"（置脏 / 帧末刷新 / 首刷 /
  // 取变化读数 / 读写能量 / 治疗 / 药水记账 / 取消计时 / 渲染通知扫描）全在框架级清单里完成
@@ -362,7 +380,9 @@ public class RoleInstance {
  //调用方会回落到旧路径 ⇒ **二次派发**（组件已被隔离，二次派发是新的错误面）
  //施放后**无条件**置脏一次（与既有实现逐字一致：这次置脏**不在**帧末入口条件里
  // ⇒ 即使本次施放没有可见变化，也照旧请求一次重绘）
-        ServiceComponents.renderMarkDirty(resolve(ServiceComponents.ID_HOTBAR_RENDER));
+ //★ 走**基类通用面**（`RoleComponent#requestRepaint`，默认空实现、由渲染组件覆写）
+ // ⇒ 本类按 id 取到通用面即可请求，**不必认识**是哪个组件提供的 ✓
+        requestRepaintOfHotbar();
         return true;
     }
 
@@ -385,7 +405,8 @@ public class RoleInstance {
         guardedCall(component, "onAttack", () -> hook.onAttack(new AttackSignal(victim)));
         runPendingQuarantine();
  //同 handleCast：攻击后**无条件**置脏一次（这次置脏不在帧末入口条件里）
-        ServiceComponents.renderMarkDirty(resolve(ServiceComponents.ID_HOTBAR_RENDER));
+ //★ 同走基类通用面 ✓
+        requestRepaintOfHotbar();
         return true;
     }
 
@@ -695,13 +716,10 @@ public class RoleInstance {
         if(quarantined) return;
 
 
- //帧末 flush（落点 = tick 末尾，紧接组件更新与到期扫描之后）：
- //渲染组件自己判定"要不要刷"（判脏 → 写物品 → 清脏，**顺序不可交换**）——
- //入口条件与写物品段都在它内部。
- //★ **"本帧真的刷新了"的通知也已归它自己扇出**：想收通知的组件在自己的 `start()` 里
- //  `addRenderListener(...)` 登记**自己的函数**（函数式接口）⇒ 本类**不再**逐组件匹配类型去通知 ✓
- //  —— 那要求使用者实现渲染组件的嵌套接口（本类也不再需要 `dispatchRenderedNotice`）。
-        ServiceComponents.renderFlush(resolve(ServiceComponents.ID_HOTBAR_RENDER));
+ //帧末 flush：**已由渲染组件在自己的 `update()` 里做** ✓ ——
+ // ★ 本类不再代劳。时序逐字不变：服务组件在角色组件**之后**注册 ⇒ 渲染组件排在注册表**末位**
+ //   ⇒ 它的 `update()` 天然最后跑，位置与既有"在 update 广播之后调 flush"等价 ✓
+ // "本帧真的刷新了"的通知也归它自己扇出（名单 = 使用者 `addRenderListener` 登记的函数）。
 
     }
 

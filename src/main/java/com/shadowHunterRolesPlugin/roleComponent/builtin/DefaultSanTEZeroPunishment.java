@@ -77,13 +77,8 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
      */
     private SanTEComponent.Listener santeListener;
 
-    public DefaultSanTEZeroPunishment(String id, ComponentServices services) {
-        super(
-                id,
-                services,
-                null,
-                null
-        );
+    public DefaultSanTEZeroPunishment(String id, ComponentServices services, Specification specification) {
+        super(id, services, specification);
     }
 
     /**
@@ -102,7 +97,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
         @Override
         public DefaultSanTEZeroPunishment create(String id, ComponentServices services){
-            return new DefaultSanTEZeroPunishment(id, services);
+            return new DefaultSanTEZeroPunishment(id, services, this);
         }
     }
 

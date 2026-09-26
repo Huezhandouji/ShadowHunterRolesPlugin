@@ -59,27 +59,23 @@ public class ComponentOperationCommand implements SubCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(Component.text("Only players can execute this command!"));
-            return true;
-        }
-
+        //★ 服务端也能执行（不必是玩家）—— 目标必填，故控制台只需给出目标名或选择器
         if (args.length < 2) {
-            player.sendMessage(Component.text(getUsage()));
+            sender.sendMessage(Component.text(getUsage()));
             return true;
         }
 
         //★ **目标必填**：第 1 个参数必须是玩家名（在线）或选择器（含 @s）—— 不再支持"省略 ⇒ 自己"
         if (!isTargetToken(args[0])) {
-            player.sendMessage(Component.text("The target is required: pass a player name or a selector"
-                    + " (use @s for yourself)."));
-            player.sendMessage(Component.text(getUsage()));
+            sender.sendMessage(Component.text("The target is required: pass a player name or a selector"
+                    + " (players may use @s for themselves)."));
+            sender.sendMessage(Component.text(getUsage()));
             return true;
         }
-        PlayerTargets.Result resolved = PlayerTargets.resolve(player, args[0]);
+        PlayerTargets.Result resolved = PlayerTargets.resolve(sender, args[0]);
         if (!resolved.resolved()) {
-            player.sendMessage(Component.text(PlayerTargets.rejection(args[0], resolved,
-                    "No online player named '" + args[0] + "'. (Use @s for yourself.)")));
+            sender.sendMessage(Component.text(PlayerTargets.rejection(args[0], resolved,
+                    "No online player named '" + args[0] + "'. (Players may use @s for themselves.)")));
             return true;
         }
         //派发与审计都用解析后的规范名 —— 原始选择器串无法定位到唯一对象
@@ -93,31 +89,34 @@ public class ComponentOperationCommand implements SubCommand {
 
         //★ 空 payload ⇒ 没有可交给组件的东西 ⇒ 回绝（原先靠 `modify` 动词判，现在没有动词 ⇒ 一律回绝）
         if (payload.isBlank()) {
-            player.sendMessage(Component.text("This needs an operation payload,"
+            sender.sendMessage(Component.text("This needs an operation payload,"
                     + " e.g. /role operation @s " + componentId + " set 50"));
             return true;
         }
 
-        dispatcher.dispatch(player, targetToken, componentId, payload);
+        dispatcher.dispatch(sender, targetToken, componentId, payload);
         return true;
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player player)) {
-            return List.of();
-        }
+        //★ 服务端也能补全：控制台没有"自己"，但**在线玩家名**与**目标的组件 id**照常可补
+        //（`@s` 仅对玩家有意义 ⇒ 控制台仍列出来，但执行时会被按真实原因回绝）
         if (args.length == 1) {
             List<String> candidates = new ArrayList<>();
             for (Player online : Bukkit.getOnlinePlayers()) {
                 candidates.add(online.getName());
             }
             candidates.add(ComponentOperationDispatcher.SELF_TOKEN);
-            candidates.addAll(componentIdsOf(player));
+            if (sender instanceof Player player) {
+                candidates.addAll(componentIdsOf(player));
+            }
             return SubCommand.filter(candidates, args[0]);
         }
         if (args.length == 2) {
-            Player target = isTargetToken(args[0]) ? Bukkit.getPlayerExact(args[0]) : player;
+            Player target = isTargetToken(args[0])
+                    ? Bukkit.getPlayerExact(args[0])
+                    : (sender instanceof Player player ? player : null);
             return SubCommand.filter(target == null ? List.of() : componentIdsOf(target), args[1]);
         }
         //★ op 名与参数**不可补**（无自报清单 ⇒ 只能补到 componentId；如实说明见类 javadoc）

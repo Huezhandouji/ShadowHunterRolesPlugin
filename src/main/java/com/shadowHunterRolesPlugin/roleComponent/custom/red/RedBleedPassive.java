@@ -60,8 +60,8 @@ public class RedBleedPassive extends PassiveSkill {
 
     private int secondCountdown = 0;
 
-    public RedBleedPassive(String id, ComponentServices services) {
-        super(id, services, Component.text("流血"), Component.text("红的流血被动"));
+    public RedBleedPassive(String id, ComponentServices services, Specification specification) {
+        super(id, services, specification);
     }
 
     /**
@@ -77,7 +77,7 @@ public class RedBleedPassive extends PassiveSkill {
 
         @Override
         public RedBleedPassive create(String id, ComponentServices services){
-            return new RedBleedPassive(id, services);
+            return new RedBleedPassive(id, services, this);
         }
     }
 

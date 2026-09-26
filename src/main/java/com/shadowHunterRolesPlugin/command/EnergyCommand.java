@@ -41,10 +41,9 @@ public class EnergyCommand implements SubCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args){
-        if(!(sender instanceof Player player)) return true;
-
+        //★ 服务端也能执行（不必是玩家）—— 目标由选择器指定
         if(args.length < 1){
-            player.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
+            sender.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
             return true;
         }
 
@@ -52,11 +51,11 @@ public class EnergyCommand implements SubCommand {
             case "get":
                 //★ **目标必填**：`/role energy get` 不再默认给自己
                 if(args.length == 2){
-                    handleGetEnergy(player, args[1]);
+                    handleGetEnergy(sender, args[1]);
                     return true;
                 }
                 if(args.length == 1){
-                    player.sendMessage(Component.text(PlayerTargets.targetRequired("/role energy get <player|@s>")));
+                    sender.sendMessage(Component.text(PlayerTargets.targetRequired("/role energy get <player|@s>")));
                     return true;
                 }
                 break;
@@ -64,17 +63,17 @@ public class EnergyCommand implements SubCommand {
             case "set":
                 //★ **目标必填**：`/role energy set <n>` 不再默认给自己 —— 参数序 = set <n> <player|@s>
                 if(args.length == 3){
-                    handleSetEnergy(player, args[1], args[2]);
+                    handleSetEnergy(sender, args[1], args[2]);
                     return true;
                 }
                 if(args.length == 2){
-                    player.sendMessage(Component.text(PlayerTargets.targetRequired(
+                    sender.sendMessage(Component.text(PlayerTargets.targetRequired(
                             "/role energy set <amount> <player|@s>")));
                     return true;
                 }
                 break;
         }
-        HelpCommand.sendHelp(player);
+        HelpCommand.sendHelp(sender);
         return true;
     }
 
@@ -84,7 +83,7 @@ public class EnergyCommand implements SubCommand {
         return List.of();
     }
 
-    private void handleGetEnergy(Player sender, String targetName){
+    private void handleGetEnergy(CommandSender sender, String targetName){
         //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
         PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
         Player target = resolved.player();
@@ -100,7 +99,7 @@ public class EnergyCommand implements SubCommand {
         sender.sendMessage(Component.text("The current energy level of [" + target.getName() + "] is: " + energyOf(roleManager, target)));
     }
 
-    private void handleSetEnergy(Player sender, String energyLevel, String targetName){
+    private void handleSetEnergy(CommandSender sender, String energyLevel, String targetName){
         //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
         PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
         Player target = resolved.player();

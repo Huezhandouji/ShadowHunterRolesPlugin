@@ -63,12 +63,12 @@ public class CapabilityDispatchTest {
         out.put("ExampleSelfRefreshingSkill", new ExampleSelfRefreshingSkill("t_7", svc, new ExampleSelfRefreshingSkill.Specification()));
         out.put("MeiqiheziJuejueMainWeapon", new MeiqiheziJuejueMainWeapon("t_8", svc, new MeiqiheziJuejueMainWeapon.Specification()));
         out.put("RedSanctifiedBladeMainWeapon", new RedSanctifiedBladeMainWeapon("t_9", svc, new RedSanctifiedBladeMainWeapon.Specification()));
-        out.put("AutoRecoverEnergyPassive", new AutoRecoverEnergyPassive("t_10", svc));
-        out.put("AutoRecoverSanTEHealthPassive", new AutoRecoverSanTEHealthPassive("t_11", svc));
-        out.put("DefaultSanTEZeroPunishment", new DefaultSanTEZeroPunishment("t_12", svc));
-        out.put("MeiqiheziEquipmentsPassive", new MeiqiheziEquipmentsPassive("t_13", svc));
-        out.put("RedBleedPassive", new RedBleedPassive("t_14", svc));
-        out.put("RedEquipmentsPassive", new RedEquipmentsPassive("t_15", svc));
+        out.put("AutoRecoverEnergyPassive", new AutoRecoverEnergyPassive("t_10", svc, new AutoRecoverEnergyPassive.Specification()));
+        out.put("AutoRecoverSanTEHealthPassive", new AutoRecoverSanTEHealthPassive("t_11", svc, new AutoRecoverSanTEHealthPassive.Specification()));
+        out.put("DefaultSanTEZeroPunishment", new DefaultSanTEZeroPunishment("t_12", svc, new DefaultSanTEZeroPunishment.Specification()));
+        out.put("MeiqiheziEquipmentsPassive", new MeiqiheziEquipmentsPassive("t_13", svc, new MeiqiheziEquipmentsPassive.Specification()));
+        out.put("RedBleedPassive", new RedBleedPassive("t_14", svc, new RedBleedPassive.Specification()));
+        out.put("RedEquipmentsPassive", new RedEquipmentsPassive("t_15", svc, new RedEquipmentsPassive.Specification()));
         return out;
     }
 

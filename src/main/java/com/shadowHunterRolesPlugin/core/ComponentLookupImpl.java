@@ -154,6 +154,109 @@ final class ComponentLookupImpl implements ComponentLookup {
     }
 
     @Override
+    public <T> boolean remove(Class<T> type, String id) {
+        if (type == null) {
+            throw new NullPointerException("type");
+        }
+        if (registry.isIterating()) {
+            throw new IllegalStateException("Cannot remove components while the container is iterating "
+                    + "(the framework is broadcasting component hooks); defer it until after the broadcast.");
+        }
+        RoleComponent first = firstMatch(type, id);
+        return first != null && removeChecked(first);
+    }
+
+    /**
+     * **按类型删除添加顺序第一个匹配的组件**（不看 id）。
+     * <p>守卫、顺序与 {@link #remove(Class, String)} **逐条一致** —— 本方法就是它把 id 条件放宽为
+     * "任意 id"（`firstMatch(type, null)` ⇒ 只判可赋值性）。
+     */
+    @Override
+    public <T> boolean remove(Class<T> type) {
+        if (type == null) {
+            throw new NullPointerException("type");
+        }
+        if (registry.isIterating()) {
+            throw new IllegalStateException("Cannot remove components while the container is iterating "
+                    + "(the framework is broadcasting component hooks); defer it until after the broadcast.");
+        }
+        RoleComponent first = firstMatch(type, null);
+        return first != null && removeChecked(first);
+    }
+
+    /**
+     * **按（类型 + id）删全部**：逐个守卫 ⇒ **有阻止者的跳过**、其余照删，返回被跳过者。
+     *
+     * <p>★ 检查（遍历窗口 + type 非空）**先于任何删除** ⇒ 抛异常时**一个都不删**（不留半态）。
+     */
+    @Override
+    public <T> List<RoleComponent> removeAll(Class<T> type, String id) {
+        if (type == null) {
+            throw new NullPointerException("type");
+        }
+        if (registry.isIterating()) {
+            throw new IllegalStateException("Cannot remove components while the container is iterating "
+                    + "(the framework is broadcasting component hooks); defer it until after the broadcast.");
+        }
+        List<RoleComponent> skipped = new ArrayList<>();
+        for (RoleComponent candidate : registry.all()) {
+            if (id == null || !id.equals(candidate.getId()) || !type.isInstance(candidate)) {
+                continue;
+            }
+            if (!removeChecked(candidate)) {
+                skipped.add(candidate);
+            }
+        }
+        return List.copyOf(skipped);
+    }
+
+    /**
+     * **添加顺序第一个**匹配的组件；无 ⇒ {@code null}。
+     *
+     * <p>判据：{@code type.isInstance(candidate)}（**可赋值性** ⇒ 父类/接口查询命中子类实例）**且**
+     * {@code id == null || id.equals(candidate.getId())} —— ★ `id == null`（或空表）⇒ **只判类型**，
+     * 这正是 {@link #remove(Class)} 与 {@link #remove(Class, String)} 共用的原因。
+     */
+    private <T> RoleComponent firstMatch(Class<T> type, String id) {
+        for (RoleComponent candidate : registry.all()) {
+            if (id != null && !id.equals(candidate.getId())) {
+                continue;
+            }
+            if (type.isInstance(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * **带反向依赖守卫地删一个实例**（单数版与复数版共用的唯一实现）：
+     * 有阻止者 ⇒ 记日志并回 {@code false}（**不删、无副作用**）；否则 {@code stop()} → 回收资源 → 移出容器。
+     */
+    private boolean removeChecked(RoleComponent target) {
+        if (target == null) {
+            return false;
+        }
+        Map<String, Class<? extends RoleComponent>> blockers = registry.requiredBy(target);
+        if (!blockers.isEmpty()) {
+            StringBuilder detail = new StringBuilder();
+            for (Map.Entry<String, Class<? extends RoleComponent>> blocker : blockers.entrySet()) {
+                if (detail.length() > 0) {
+                    detail.append("; ");
+                }
+                detail.append("component '").append(blocker.getKey())
+                        .append("' (requires '").append(blocker.getValue().getName()).append("')");
+            }
+            logger.warning("Refused to remove component '" + target.getId()
+                    + "' from role instance: still required by " + detail + ".");
+            return false;
+        }
+        target.stop();
+        registry.cancelAll(target);
+        return registry.remove(target);
+    }
+
+    @Override
     public boolean remove(String id) {
  //：id 可重复 ⇒ 目标是**添加顺序第一个**同 id 者（与 getById 同目标；
  //反向依赖表也按那一个实例计算 ⇒ 守卫保护的正是"会被删掉的那一个"），其余同 id 者留在容器里

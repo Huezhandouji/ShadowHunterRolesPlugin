@@ -39,15 +39,14 @@ public class SetRoleCommand implements SubCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args){
-        if(!(sender instanceof Player player)) return true;
-
+        //★ 服务端也能执行（不必是玩家）—— 目标由第 2 参的选择器指定
         //★ **目标必填**：`/role set <roleId>` 不再默认给自己
         if(args.length == 1){
-            player.sendMessage(Component.text(PlayerTargets.targetRequired("/role set <roleId> <player|@s>")));
+            sender.sendMessage(Component.text(PlayerTargets.targetRequired("/role set <roleId> <player|@s>")));
             return true;
         }
         if(args.length == 2){
-            handleSet(player, args[0], args[1]);
+            handleSet(sender, args[0], args[1]);
             return true;
         }
         //既有行为逐字保留：参数个数不匹配时静默返回（原实现是中央 switch 的 break → return true）
@@ -60,7 +59,7 @@ public class SetRoleCommand implements SubCommand {
         return List.of();
     }
 
-    private void handleSet(Player sender, String roleId, String targetName){
+    private void handleSet(CommandSender sender, String roleId, String targetName){
         if(!roleRegistry.contains(roleId)){
             sender.sendMessage(Component.text("Role '" + roleId + "' not exist!"));
             return;

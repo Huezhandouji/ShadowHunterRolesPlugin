@@ -107,6 +107,28 @@ public abstract class RoleComponent {
     }
 
     /**
+     * **当前 SanTE 读数**（框架视图；默认 {@code 0} = "未命中时的既有回退值"）。
+     *
+     * <p>声明在基类 ⇒ 调用方按 id 取到通用面即可读，**不必认识** SanTE 组件 ✓
+     * —— 与 {@link #readCurrentEnergy()} **完全对称**（SanTE 组件的读数落点见
+     * {@code SanTEComponent#readCurrentSanTE()}）。
+     *
+     * <p>★ **名字不与 {@code SanTEComponent#current()} 冲突**：本方法名带 `Current` 前缀，
+     * 且实现类的 `current()` 是它自己的读口 ⇒ 两者并存、各司其职。
+     */
+    public int readCurrentSanTE() {
+        return 0;
+    }
+
+    /**
+     * **写当前 SanTE**（框架视图；clamp 在组件内部；默认空实现）。
+     * <p>声明在基类 ⇒ 调用方按 id 取到通用面即可写，**不必认识** SanTE 组件 ✓
+     * —— 与 {@link #writeCurrentEnergy(int)} **完全对称**。
+     */
+    public void writeCurrentSanTE(int value) {
+    }
+
+    /**
      * **治疗**（框架视图；clamp 策略的唯一实现在生命组件里；默认空实现）。
      * <p>声明在基类 ⇒ 框架按 id 取到通用面即可治疗，**不必认识**生命组件 ✓。
      */

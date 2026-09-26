@@ -6,27 +6,47 @@ import net.kyori.adventure.text.Component;
 
 /**
  * 被动组件基类（继承 {@link RoleComponent}）。
- * <p>与今天的差别：`id` 与 `getId()` 上移到基类（`RoleComponent.getId()` 是 `final`），
- * 本类只保留 `displayName`/`description`。
- * 首位两参 `(id, ComponentServices)` 为**构造期注入**；其后两参**顺序与含义逐字稳定**。
- * 被动**不实现** `HotbarRenderComponent.HotbarItem`/`HotbarRenderComponent.HotbarPresentable`（也不在物品支持组件那一棵子树里）⇒ "能不能被施放"
- * 与"能不能上热键栏"仍是编译期事实。
- * <p>本类**不**在热键栏能力簇内 ⇒ 不会被强制实现 `buildItem()`（被动从不被渲染）；
- * 旧构造里那个历史瑕疵（被动曾误传技能 kind）已随 kind 枚举一并消失。
+ *
+ * <p><b>声明数据的来源 = 描述符</b>（与 {@link com.shadowHunterRolesPlugin.roleComponent.ActiveComponent}
+ * 同一口径）：{@code displayName} / {@code description} **只写在嵌套 {@code Specification} 里一次**，
+ * 本类不再各存一份字段，{@link #getDisplayName()} / {@link #getDescription()} 直接**委托**给描述符 ✓。
+ *
+ * <p>★ <b>为什么要改</b>：旧形态里同一对文案被写**两遍** —— 组件构造函数的两个实参、
+ * 以及描述符构造函数的两个实参。两处是**互相独立的副本** ⇒ 改一处忘另一处会**静默不一致**
+ * （角色列表读描述符、热键栏读组件字段）。收敛成一支后**不可能写重**。
+ *
+ * <p>首位两参 {@code (id, ComponentServices)} 为**构造期注入**；第 3 参为**本组件自己的描述符**
+ * （由 {@code Specification#create(...)} 把它交回来 ⇒ 组件与描述符同源）。
+ *
+ * <p>被动**不实现** `HotbarRenderComponent.HotbarItem`/`HotbarRenderComponent.HotbarPresentable`
+ * （也不在物品支持组件那一棵子树里）⇒ "能不能被施放"与"能不能上热键栏"仍是编译期事实。
+ * <p>本类**不**在热键栏能力簇内 ⇒ 不会被强制实现 `buildItem()`（被动从不被渲染）。
  */
 public abstract class PassiveSkill extends RoleComponent {
 
-    protected final Component displayName;
-    protected final Component description;
+    /** **本组件的描述符**（声明数据的唯一来源；由子类在构造时交回）。 */
+    private final Specification specification;
 
-    public PassiveSkill(String id, ComponentServices services, Component displayName, Component description){
+    /**
+     * @param id            注册 id（装配期由 {@code Role.Builder.addComponent} 绑定）
+     * @param services      该 id 的服务集
+     * @param specification 本组件自己的描述符（**声明数据的唯一来源**）
+     */
+    public PassiveSkill(String id, ComponentServices services, Specification specification){
         super(id, services);
-        this.displayName = displayName;
-        this.description = description;
+        this.specification = specification;
     }
 
-    public Component getDisplayName() { return displayName; }
-    public Component getDescription() { return description; }
+    /** **唯一实现点**：被动描述符的读面（显示名 / 描述都从这里取）。 */
+    public final Specification specification() {
+        return specification;
+    }
+
+    /** 显示名（数据源 = 描述符）。 */
+    public Component getDisplayName() { return specification().getDisplayName(); }
+
+    /** 描述（数据源 = 描述符）。 */
+    public Component getDescription() { return specification().getDescription(); }
 
     /**
      * **被动描述符**（收敛为纯声明）：自带显示名与描述，

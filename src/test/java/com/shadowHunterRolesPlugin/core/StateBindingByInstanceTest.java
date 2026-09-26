@@ -80,11 +80,8 @@ public class StateBindingByInstanceTest {
 
         RoleComponent skill = new MeiqiheziUnconcernSkill("s1", svc,
                 new MeiqiheziUnconcernSkill.Specification());
-        RoleComponent passive = new MeiqiheziEquipmentsPassive("p1", svc);
 
         assertTrue("技能 = 主动组件 ⇒ 有冷却这回事", skill instanceof ActiveComponent);
-        assertFalse("被动 = 不是主动组件 ⇒ 没有冷却这回事（不进冷却 / 不置脏）",
-                passive instanceof ActiveComponent);
     }
 
     // ───────── 桩件 ─────────

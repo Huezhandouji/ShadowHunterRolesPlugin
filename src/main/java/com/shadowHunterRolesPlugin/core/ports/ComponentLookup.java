@@ -12,7 +12,9 @@ import java.util.List;
  * {@link #getById(String)}（按 id，**第一个**）· {@link #all()}（当前序快照）；</li>
  * <li><b>动态添加</b>（"运行期可增 / 可删 / 插位"）：
  * {@link #add(String, RoleComponent.Specification)} ·
- * {@link #insertAt(int, String, RoleComponent.Specification)} · {@link #remove(String)}。</li>
+ * {@link #insertAt(int, String, RoleComponent.Specification)} · {@link #remove(String)} ·
+ * {@link #remove(Class)}（按类型删第一个）· {@link #remove(Class, String)}（按类型+id 删第一个）·
+ * {@link #removeAll(Class, String)}（删光同条件者）。</li>
  * </ul>
  * <p><b>查询语义</b>：类型条件 = **可赋值性**
  * （父类/接口查询命中子类实例），顺序 = **添加顺序**：
@@ -114,4 +116,59 @@ public interface ComponentLookup {
  * @throws IllegalStateException 框架正在遍历组件表；或存在把本组件声明为必需的阻止者
  */
     boolean remove(String id);
+
+    /**
+     * **按（类型 + id）删除第一个匹配的组件**：两个条件**同时满足**才算匹配
+     * （类型条件 = **可赋值性**，与 {@link #get(Class)} 同一把尺 ⇒ 父类/接口查询命中子类实例）。
+     *
+     * <p>顺序 = **添加顺序** ⇒ 删的是**第一个**匹配者；同条件的其余实例**留在容器里**。
+     * 想一次删光同条件的所有实例请用 {@link #removeAll(Class, String)}。
+     *
+     * <p><b>语义与既有 {@link #remove(String)} 逐条一致</b>：
+     * ① **反向依赖守卫** —— 若仍有组件把它声明为必需 ⇒ **拒绝删除** + **记日志** + 抛异常；
+     * ② 通过则 {@code stop()} → 回收该组件资源 → 移出容器；
+     * ③ **遍历窗口内**（框架正在广播组件钩子）⇒ 抛 {@code IllegalStateException}。
+     *
+     * @param type 组件类型（可为**接口**；{@code null} ⇒ 抛 {@code NullPointerException}）
+     * @param id   组件 id（{@code null} ⇒ 无匹配，回 {@code false}）
+     * @return 是否确实删除了一个组件（无匹配 ⇒ {@code false}，无副作用）
+     * @throws IllegalStateException 框架正在遍历组件表；或存在把该组件声明为必需的阻止者
+     */
+    <T> boolean remove(Class<T> type, String id);
+
+    /**
+     * **按类型删除添加顺序第一个匹配的组件**（**不看 id**）：
+     * 类型条件 = **可赋值性**（与 {@link #get(Class)} 同一把尺 ⇒ 父类/接口查询命中子类实例）。
+     *
+     * <p>与 {@link #remove(Class, String)} 的关系：**同一条实现**，只是把 id 条件放宽为"任意 id"
+     * ⇒ 守卫、顺序、失败形态**逐条一致**。想删光同类型的所有实例请用 {@link #removeAll(Class, String)}
+     * 并传 {@code id = null}（或按具体 id 收窄）。
+     *
+     * <p>★ **重载消歧**：本口与 {@link #remove(String)} 同名不同参 —— 传 {@code null} 字面量会**歧义**
+     * （编译期报错）⇒ 请显式转型，或直接用 {@code remove((String) null)} / {@code remove((Class<?>) null)} 之外的方法。
+     *
+     * @param type 组件类型（可为**接口**；{@code null} ⇒ 抛 {@code NullPointerException}）
+     * @return 是否确实删除了一个组件（无匹配 ⇒ {@code false}，无副作用）
+     * @throws IllegalStateException 框架正在遍历组件表；或存在把该组件声明为必需的阻止者
+     */
+    <T> boolean remove(Class<T> type);
+
+    /**
+     * **按（类型 + id）删除全部匹配的组件**：条件与 {@link #remove(Class, String)} 相同，
+     * 但**遍历整张表**、把所有匹配者逐个删除（顺序 = **添加顺序**）⇒ 同条件的实例**一个不留**。
+     *
+     * <p><b>与单数版的关键差异（★ 必有失败面，故不抛异常）</b>：
+     * <ul>
+     *   <li>逐个**先查反向依赖**：**有阻止者的那一个被跳过**（记日志点名"被删者 / 阻止者 / 缺的类型"），
+     *       其余照常删除 ⇒ 不因一个删不掉而整体失败；</li>
+     *   <li>返回被跳过者的**不可变列表**（空列表 = 全部删成功）；调用方由此知道哪些没删掉；</li>
+     *   <li><b>遍历窗口内</b>仍抛 {@code IllegalStateException}（那次**一个都不删** —— 检查先于任何删除）。</li>
+     * </ul>
+     *
+     * @param type 组件类型（可为**接口**；{@code null} ⇒ 抛 {@code NullPointerException}）
+     * @param id   组件 id（{@code null} ⇒ 无匹配，回空列表）
+     * @return **被跳过（因反向依赖）的组件**，顺序 = 添加顺序；全部删成功 ⇒ 空列表
+     * @throws IllegalStateException 框架正在遍历组件表
+     */
+    <T> List<RoleComponent> removeAll(Class<T> type, String id);
 }

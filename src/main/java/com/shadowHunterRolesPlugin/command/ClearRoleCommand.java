@@ -30,22 +30,21 @@ public class ClearRoleCommand implements SubCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args){
-        if(!(sender instanceof Player player)) return true;
-
+        //★ 服务端也能执行（不必是玩家）—— 目标由第 1 参的选择器指定
         //★ **目标必填**：`/role clear` 不再默认给自己
         if(args.length == 0){
-            player.sendMessage(Component.text(PlayerTargets.targetRequired("/role clear <player|@s>")));
+            sender.sendMessage(Component.text(PlayerTargets.targetRequired("/role clear <player|@s>")));
             return true;
         }
         if(args.length == 1){
-            handleClear(player, args[0]);
+            handleClear(sender, args[0]);
             return true;
         }
         //既有行为逐字保留：参数个数不匹配时静默返回（原实现是中央 switch 的 break → return true）
         return true;
     }
 
-    private void handleClear(Player sender, String targetName){
+    private void handleClear(CommandSender sender, String targetName){
         //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
         PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
         Player target = resolved.player();

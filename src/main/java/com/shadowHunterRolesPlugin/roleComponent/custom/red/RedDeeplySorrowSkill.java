@@ -15,8 +15,6 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
  * 黯然销魂（红）：持续扣减红的 SanTE，归零前给自己回血与力量。
  * <p><b>迁移口径</b>（四类 `*Aware` 实现者归零）：
  * <ul>
- *   <li>去 legacy `UpdateAware` 与 `SanTEChangeAware` ⇒ 改走基类新钩子 {@link #update()} 与
- *       {@link #onSanTEChange(int, int)}（容器对**注册表内组件**广播；SanTE 侧为"真变化才派发"，
  * 由既有实现完成、不新增可见变化）；</li>
  *   <li>聚合根调用端口化：`instance.decreaseSanTE(10)` → **SanTE 组件**的 `decrease(10)`（直接用组件）；
  *       `instance.applyPotionEffect(…createEffect(45, 5/2))` → **Buff 组件**的 `applyPotionEffect(type, 45, 5/2)`（同上）

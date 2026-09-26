@@ -22,67 +22,31 @@ import java.util.List;
  */
 public class RoleApiSurfaceTest {
 
-    /** 冻结快照（现算 58 个 —— 阶段 13 · t125 起：57 + 新增 {@code executeComponentOperation} ✓；排序后逐字比较 ⇒ 与声明顺序无关）。 */
+    /**
+     * 冻结快照（现算 **16** 条）。
+     *
+     * <p>★ **本轮收缩 58 → 16**：废弃方法已被删除（"直接操作组件"时代的空壳 —— 恒回中性哨兵值 / 空操作）：
+     * 阵营三条（读走 {@code RoleInfo#faction()}、写只在聚合根上）、生命 / 能量 / SanTE / 冷却读数与增减、
+     * 以及所有 {@code Player} 重载。
+     * <p>★ **保留** {@code areHostile}（它**不是**空壳 —— 转调 {@code RoleManager} 的可用实现，且判定链
+     * 只从聚合根读阵营）。
+     * <p>排序后逐字比较 ⇒ 与声明顺序无关。
+     */
     private static final String[] FROZEN_SIGNATURES = {
             "boolean areHostile(java.util.UUID,java.util.UUID)",
-            "boolean areHostile(org.bukkit.entity.Player,org.bukkit.entity.Player)",
             "boolean clearPlayerRole(java.util.UUID)",
-            "boolean clearPlayerRole(org.bukkit.entity.Player)",
             "boolean hasRole(java.util.UUID)",
-            "boolean hasRole(org.bukkit.entity.Player)",
-            "boolean isSkillReady(java.util.UUID,java.lang.String)",
-            "boolean isSkillReady(org.bukkit.entity.Player,java.lang.String)",
             "boolean isValidRoleId(java.lang.String)",
             "boolean setPlayerRole(java.util.UUID,java.lang.String)",
-            "boolean setPlayerRole(org.bukkit.entity.Player,java.lang.String)",
-            "com.shadowHunterRolesPlugin.core.Faction getFaction(java.util.UUID)",
-            "com.shadowHunterRolesPlugin.core.Faction getFaction(org.bukkit.entity.Player)",
-            "double getPlayerHealth(java.util.UUID)",
-            "double getPlayerHealth(org.bukkit.entity.Player)",
-            "double getPlayerMaxHealth(java.util.UUID)",
-            "double getPlayerMaxHealth(org.bukkit.entity.Player)",
-            "int getPlayerEnergy(java.util.UUID)",
-            "int getPlayerEnergy(org.bukkit.entity.Player)",
-            "int getPlayerMaxEnergy(java.util.UUID)",
-            "int getPlayerMaxEnergy(org.bukkit.entity.Player)",
-            "int getPlayerMaxSanTE(java.util.UUID)",
-            "int getPlayerMaxSanTE(org.bukkit.entity.Player)",
-            "int getPlayerSanTE(java.util.UUID)",
-            "int getPlayerSanTE(org.bukkit.entity.Player)",
-            "int getSkillCooldownTick(java.util.UUID,java.lang.String)",
-            "int getSkillCooldownTick(org.bukkit.entity.Player,java.lang.String)",
-            //阶段 13 · t125：新增项**仅此一条**（组件操作面的唯一入口 ✓）—— 旧 57 条一字未动 ✓
             "java.lang.String executeComponentOperation(java.util.UUID,java.lang.String,java.lang.String)",
             "java.lang.String getPlayerRoleId(java.util.UUID)",
-            "java.lang.String getPlayerRoleId(org.bukkit.entity.Player)",
             "java.util.List getRoleDescription(java.lang.String)",
             "java.util.List getRoles()",
-            "java.util.OptionalInt getPlayerSanTEOptional(java.util.UUID)",
-            "java.util.OptionalInt getPlayerSanTEOptional(org.bukkit.entity.Player)",
             "java.util.Set getAllRoleIds()",
             "java.util.UUID getLastDamagerUuid(org.bukkit.entity.LivingEntity)",
             "net.kyori.adventure.text.Component getPlayerRoleDisplayName(java.util.UUID)",
-            "net.kyori.adventure.text.Component getPlayerRoleDisplayName(org.bukkit.entity.Player)",
             "net.kyori.adventure.text.Component getRoleDisplayName(java.lang.String)",
-            "org.bukkit.Material getRoleIcon(java.lang.String)",
-            "void decreaseEnergy(java.util.UUID,int)",
-            "void decreaseEnergy(org.bukkit.entity.Player,int)",
-            "void decreaseSanTE(java.util.UUID,int)",
-            "void decreaseSanTE(org.bukkit.entity.Player,int)",
-            "void healPlayer(java.util.UUID,double)",
-            "void healPlayer(org.bukkit.entity.Player,double)",
-            "void increaseEnergy(java.util.UUID,int)",
-            "void increaseEnergy(org.bukkit.entity.Player,int)",
-            "void increaseSanTE(java.util.UUID,int)",
-            "void increaseSanTE(org.bukkit.entity.Player,int)",
-            "void resetFaction(java.util.UUID)",
-            "void resetFaction(org.bukkit.entity.Player)",
-            "void setFaction(java.util.UUID,com.shadowHunterRolesPlugin.core.Faction)",
-            "void setFaction(org.bukkit.entity.Player,com.shadowHunterRolesPlugin.core.Faction)",
-            "void setPlayerEnergy(java.util.UUID,int)",
-            "void setPlayerEnergy(org.bukkit.entity.Player,int)",
-            "void setPlayerSanTE(java.util.UUID,int)",
-            "void setPlayerSanTE(org.bukkit.entity.Player,int)"
+            "org.bukkit.Material getRoleIcon(java.lang.String)"
     };
 
     /** 现算（与快照同一条口径：declared methods ⇒ 只数本接口自己的声明）。 */

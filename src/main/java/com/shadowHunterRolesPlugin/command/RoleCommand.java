@@ -9,7 +9,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -73,11 +72,9 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if(!(sender instanceof Player player)){
-            sender.sendMessage(Component.text("Only players can execute this command!"));
-            return true;
-        }
-
+        //★ **服务端（控制台 / 远程控制台）也能执行** —— 不再要求 sender 是玩家。
+        //  面向玩家的子指令（set / clear / energy / operation）经**目标选择器**指定玩家
+        //  ⇒ 控制台只需给出目标名或选择器即可（`@s` 对控制台无意义 ⇒ 会被按真实原因回绝）。
         if(args.length == 0){
             //既有可见行为逐字保留：/role 空参数不输出任何内容（历史实现的 sendHelp 调用被注释掉）
             return true;
@@ -85,14 +82,14 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
 
         SubCommand subCommand = subCommands.get(args[0].toLowerCase(Locale.ROOT));
         if(subCommand == null){
-            player.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
+            sender.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
             return true;
         }
 
         //剥离第一个参数，剩余参数交给子指令
         String[] subArgs = new String[args.length - 1];
         System.arraycopy(args, 1, subArgs, 0, subArgs.length);
-        return subCommand.execute(player, subArgs);
+        return subCommand.execute(sender, subArgs);
     }
 
     @Override

@@ -15,8 +15,8 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
     private int noEnemySurroundTime = 0;
     private int tickSecondRecord = 0;
 
-    public AutoRecoverEnergyPassive(String id, ComponentServices services) {
-        super(id, services, Component.text("自动恢复能量"), Component.text("周围10格没有敌人时，每秒恢复3点能量"));
+    public AutoRecoverEnergyPassive(String id, ComponentServices services, Specification specification) {
+        super(id, services, specification);
     }
 
     /**
@@ -33,7 +33,7 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
 
         @Override
         public AutoRecoverEnergyPassive create(String id, ComponentServices services){
-            return new AutoRecoverEnergyPassive(id, services);
+            return new AutoRecoverEnergyPassive(id, services, this);
         }
     }
 

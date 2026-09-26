@@ -16,8 +16,8 @@ public class RedEquipmentsPassive extends PassiveSkill {
     /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
     public static final String ID = "red_equippments_passive";
 
-    public RedEquipmentsPassive(String id, ComponentServices services) {
-        super(id, services, Component.text("穿戴装备"), Component.text("ccb"));
+    public RedEquipmentsPassive(String id, ComponentServices services, Specification specification) {
+        super(id, services, specification);
     }
 
     /**
@@ -33,7 +33,7 @@ public class RedEquipmentsPassive extends PassiveSkill {
 
         @Override
         public RedEquipmentsPassive create(String id, ComponentServices services){
-            return new RedEquipmentsPassive(id, services);
+            return new RedEquipmentsPassive(id, services, this);
         }
     }
 

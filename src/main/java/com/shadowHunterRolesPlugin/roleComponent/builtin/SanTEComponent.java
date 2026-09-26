@@ -276,6 +276,38 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
     public void decrease(int amount) {
         set(current - amount);
     }
+
+    /**
+     * **检查 + 扣减合一**：SanTE 不足 ⇒ {@code false} 且**不扣、不产生变更**。
+     *
+     * <p>★ 与 {@code EnergyComponent#tryConsume(int)} 的阈值语义**逐字同形**：
+     * {@code amount <= 0} ⇒ {@code true}（不扣）；{@code current < amount} ⇒ {@code false}；
+     * 否则 {@link #set(int)} 扣减并通知订阅者。
+     */
+    public boolean tryConsume(int amount) {
+        if (amount <= 0) {
+            return true;
+        }
+        if (current < amount) {
+            return false;
+        }
+        set(current - amount);
+        return true;
+    }
+
+    // ───────── 基类通用面（框架 / 他人**按 id 取到通用面即可读写**，不必认识本组件）─────────
+
+    /** {@inheritDoc} —— 框架视图的读数落点（与 {@link #current()} 同值）。 */
+    @Override
+    public int readCurrentSanTE() {
+        return current;
+    }
+
+    /** {@inheritDoc} —— 框架视图的写入落点（clamp 与通知仍在 {@link #set(int)} 里）。 */
+    @Override
+    public void writeCurrentSanTE(int value) {
+        set(value);
+    }
     /**
      * **组件操作面**：把外部字符串指令**薄适配**到本组件既有强类型方法（零新增状态通道 ✓）。
      * <p><b>grammar（首 token 必为动词，大小写敏感；参数以单个空格分隔）</b>：

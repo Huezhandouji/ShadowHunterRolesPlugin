@@ -7,6 +7,9 @@ import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.Style;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -153,8 +156,8 @@ public final class ComponentOperationDispatcher {
         //⑦ 回显 + 审计（三态：null = 未识别/被拒绝 ✓；"" = 已识别但无回值 ✓；非空 = 规范化值 ✓）
         String reason = returned == null ? "refused-by-component" : "ok";
         Component echo = returned == null
-                ? Component.text("Unknown operation, or the component refused it.")
-                : Component.text("OK: " + (returned.isEmpty() ? "(no value)" : returned));
+                ? Component.text("§c§l[OPERATION FAILED]§r ").append(Component.text("Unknown operation, or the component refused it.", NamedTextColor.WHITE))
+                : Component.text("§a§l[OPERATION SUCCEED]§r ").append(Component.text(returned.isEmpty() ? "(no value)" : returned));
         if (sender instanceof Player player) {
             player.sendMessage(echo);
         }

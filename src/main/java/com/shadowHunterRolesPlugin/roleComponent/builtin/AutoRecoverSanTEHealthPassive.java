@@ -20,8 +20,8 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
     //服务集的白名单端口是**纯转发**（同一组件的同一方法）⇒ 两种取用逐字等价。
     private VitalsComponent vitals;
 
-    public AutoRecoverSanTEHealthPassive(String id, ComponentServices services) {
-        super(id, services, Component.text("自动恢复SanTE"), Component.text("当周围10格没有敌人五秒后, 开始自动恢复SanTE, 每秒3"));
+    public AutoRecoverSanTEHealthPassive(String id, ComponentServices services, Specification specification) {
+        super(id, services, specification);
     }
 
     /**
@@ -37,7 +37,7 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
 
         @Override
         public AutoRecoverSanTEHealthPassive create(String id, ComponentServices services){
-            return new AutoRecoverSanTEHealthPassive(id, services);
+            return new AutoRecoverSanTEHealthPassive(id, services, this);
         }
     }
 

@@ -8,6 +8,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
@@ -24,6 +25,7 @@ import org.bukkit.util.Vector;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * **澜冰左轮**（苍鹭）：一把八发左轮。
@@ -90,6 +92,24 @@ public class CangluBlueIceRevolverSkill extends Skill {
     /** 自动换弹检查的节拍计数。 */
     private int autoReloadTick;
 
+    /**
+     * **待办：换弹完成（冷却走完）那一刻要执行的瞬移 + 真伤**。
+     *
+     * <p>★ 为什么要有它：瞬移必须发生在**换弹完成之后**（换弹期间不动位置），
+     * 而"完成"由**冷却到期**表达 ⇒ 到期检测在 {@link #update()} 里，执行体存在这里。
+     * <p>{@code null} = 没有待办（常态）⇒ 每 tick 的检测是**一次空引用比较**，零开销 ✓
+     */
+    private PendingReload pendingReload;
+
+    /** 换弹完成后的待办动作（{@code target} = 登记时锁定的目标 UUID）。 */
+    private static final class PendingReload {
+        private final UUID target;
+
+        private PendingReload(UUID target) {
+            this.target = target;
+        }
+    }
+
     private VitalsComponent vitals;
     private EnergyComponent energy;
 
@@ -140,6 +160,8 @@ public class CangluBlueIceRevolverSkill extends Skill {
      */
     @Override
     public void stop(){
+        //★ 丢弃换弹待办：实例已销毁 ⇒ 不该再瞬移/造成伤害（否则是"死后打人"）
+        pendingReload = null;
         for(BulletData bullet : bullets){
             bullet.getMarker().remove();
         }
@@ -178,14 +200,18 @@ public class CangluBlueIceRevolverSkill extends Skill {
         createBullet();
 
         Player self = svc().self().player();
-        self.getWorld().playSound(self.getLocation(), Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1, 1);
+        self.getWorld().playSound(self.getLocation(), Sound.ENTITY_ENDER_DRAGON_HURT, 1, 1.5f);
     }
 
     /**
      * **换弹**：能量足够才成立（不足 ⇒ 什么都不做，玩家可见反馈是"没反应"）。
      * <p>成立时按顺序：扣 8 能量 → **启动换弹冷却**（图标进入普通技能的冷却形态）→ 弹夹回满
-     * → 瞬移到最近敌人身后 → 对它造成 4 点真实伤害。
-     * <p>★ **找不到敌人也照样换弹**（只跳过瞬移与真实伤害）—— 否则"附近没人时无法换弹"会很难用。
+     * → **登记待办**（换弹完成那一刻再瞬移到目标身后并造成 4 点真实伤害）。
+     *
+     * <p>★ **瞬移发生在换弹【完成之后】**：目标在**登记时**锁定（此刻最近的敌人），
+     * 到期执行时才取它的**当时位置** —— 中途找不到/走远/目标消失 ⇒ 只跳过瞬移与真伤，**不影响换弹**。
+     * <p>★ **找不到敌人也照样换弹**（`pendingReload` 带 `null` 目标）——
+     * 否则"附近没人时无法换弹"会很难用。
      */
     private void reload(){
         if(energy == null || !energy.tryConsume(RELOAD_ENERGY_CONSUMPTION)){
@@ -196,13 +222,44 @@ public class CangluBlueIceRevolverSkill extends Skill {
         currentBulletCount = MAX_MAGAZINE_CAPACITY;
 
         Player self = svc().self().player();
-        Player nearest = findNearestEnemy(self, RELOAD_SEARCH_RADIUS);
-        if(nearest == null){
+        Player nearest = self == null ? null : findNearestEnemy(self, RELOAD_SEARCH_RADIUS);
+        //★ 登记待办：目标在【此刻】锁定（可为 null = 附近没人，只换弹不瞬移）
+        pendingReload = new PendingReload(nearest == null ? null : nearest.getUniqueId());
+    }
+
+    /**
+     * **冷却走完那一刻的收尾**（每 tick 检测）：执行 {@link #reload()} 登记的待办。
+     *
+     * <p>判定 = "有待办 **且** 已不在冷却中"；执行后立刻清空待办 ⇒ **恰好执行一次** ✓
+     * （若被打断 —— 例如组件 {@code stop()} —— 待办随之丢弃，见 {@link #stop()}）。
+     */
+    private void finishPendingReload(){
+        if(pendingReload == null || isCoolingDown()){
             return;
         }
+        PendingReload pending = pendingReload;
+        pendingReload = null;
 
-        teleportBehind(self, nearest);
-        vitals.trueDamage(nearest, self, RELOAD_TRUE_DAMAGE);
+        Player self = svc().self().player();
+        if(self == null || pending.target == null){
+            return;
+        }
+        Player target = Bukkit.getPlayer(pending.target);
+        if(target == null || !target.isOnline() || target.isDead()){
+            return;
+        }
+        //★ 取【执行时】的位置：目标在这 2 秒里可能已经移动 —— 落点必须贴合它现在的朝向 ✓
+        if(!target.getWorld().equals(self.getWorld())){
+            return;
+        }
+        if(self.getLocation().distanceSquared(target.getLocation()) > RELOAD_SEARCH_RADIUS * RELOAD_SEARCH_RADIUS){
+            return;      //走远了 ⇒ 只换弹，不瞬移
+        }
+
+        teleportBehind(self, target);
+        if(vitals != null){
+            vitals.trueDamage(target, self, RELOAD_TRUE_DAMAGE);
+        }
     }
 
     /**
@@ -236,6 +293,9 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     @Override
     public void update() {
+        //★ 换弹完成检测：冷却走完那一刻执行待办的瞬移 + 真伤（见 finishPendingReload）
+        finishPendingReload();
+
         if(autoReloadTick++ >= RELOAD_AUTO_CHECK_INTERVAL){
             autoReloadTick = 0;
             tryAutoReload();

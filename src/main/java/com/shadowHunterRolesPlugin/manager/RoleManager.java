@@ -228,10 +228,11 @@ public class RoleManager {
     }
 
     //这两个查询原本是 core/RoleInstance 的静态方法（内部走 RoleManager.getInstance()）。
-    //移到数据所有者这里：语义逐字保留（任一方没有角色 → true），且 core 不再依赖单例。
-    //★ 判定路径：先各自解析实例（**任一方无角色 ⇒ 真值 true 直返**，这是既有口径）；
-    //  两方都有实例时，交由 **`roleInfo` 服务面的「两 UUID 判敌对」口径**回答
-    //  （同一条 `FactionLookup#isHostile(UUID,UUID)` 关系表 ⇒ 与旧的 `A→B || B→A` 对称化等价）✓。
+    //移到数据所有者这里：core 不再依赖单例。
+    //★ 判定路径：先各自解析实例，再交由 **`roleInfo` 服务面的「两 UUID 判敌对」口径**回答
+    //  （落点 = `FactionLookup#isHostile(UUID,UUID)` 关系表）。
+    //★ **「无角色」口径已变更**：**任一方没有角色 ⇒ `false`（不敌对）** ——
+    //  此前是 `true`（"既有的任一方无角色 ⇒ 敌对"），现按「有角色者与无角色者互不敌对」执行 ✓
     public boolean areHostile(Player p1, Player p2){
         if(p1 == null || p2 == null) return false;
         return areHostile(p1.getUniqueId(), p2.getUniqueId());
@@ -241,9 +242,10 @@ public class RoleManager {
         RoleInstance ins1 = getRoleInstance(p1);
         RoleInstance ins2 = getRoleInstance(p2);
 
-        if(ins1 == null || ins2 == null) return true;
+        //★ 任一方没有角色 ⇒ 不敌对（与 FactionLookup 的「无角色」口径一致）
+        if(ins1 == null || ins2 == null) return false;
         RoleInfo info1 = ins1.roleInfo();
-        if(info1 == null) return true;
+        if(info1 == null) return false;
         return info1.isHostile(p1, p2);
     }
 

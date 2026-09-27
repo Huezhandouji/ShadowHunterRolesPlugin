@@ -84,6 +84,8 @@ public class CangluBlueIceRevolverSkill extends Skill {
     /** "弹夹空 + 有能量 ⇒ 自动换弹"的检查间隔（tick）。 */
     private static final int RELOAD_AUTO_CHECK_INTERVAL = 20;
 
+
+
     // ───────── 状态 ─────────
 
     /** 当前弹夹剩余子弹数。 */
@@ -113,6 +115,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     private VitalsComponent vitals;
     private EnergyComponent energy;
+    private CangluHysteriaPassive hysteriaPassive;
 
     public CangluBlueIceRevolverSkill(String id, ComponentServices services, Specification specification) {
         super(id, services, specification);
@@ -153,6 +156,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
         //契约：依赖字段在 start() 里一次查好（基类不代查）
         vitals = svc().components().get(VitalsComponent.class);
         energy = svc().components().get(EnergyComponent.class);
+        hysteriaPassive = svc().components().get(CangluHysteriaPassive.class);
     }
 
     /**
@@ -347,6 +351,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
             Player victim = firstHostileIn(next);
             if(victim != null){
                 vitals.physicalDamage(victim, self, BULLET_DAMAGE, BULLET_KNOCKBACK);
+                hysteriaPassive.requestAddStackCount(1);
                 return false;
             }
 

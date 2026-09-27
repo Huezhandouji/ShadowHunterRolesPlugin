@@ -5,7 +5,10 @@ import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
 
@@ -22,11 +25,14 @@ public class CangluHysteriaPassive extends PassiveSkill {
 
     private static final int SAN_RECOVER_AMOUNT = 4;
     private static final int ABSORPTION_TIME = 160;
-    private static final int ABSORPTION_LEVEL = 2;
+    private static final int ABSORPTION_LEVEL = 1;
 
-    private VitalsComponent vitals;
     private SanTEComponent sante;
     private BuffComponent buff;
+
+    BossBar bossbar;
+
+
 
 
     /**
@@ -59,17 +65,40 @@ public class CangluHysteriaPassive extends PassiveSkill {
     @Override
     public void start(){
         super.start();
-        vitals = svc().components().get(VitalsComponent.class);
         sante = svc().components().get(SanTEComponent.class);
         buff = svc().components().get(BuffComponent.class);
+
+
+
+        bossbar = BossBar.bossBar(
+                Component.empty(),
+                0f,
+                BossBar.Color.BLUE,
+                BossBar.Overlay.PROGRESS
+        );
+        svc().self().player().showBossBar(bossbar);
+    }
+
+    @Override
+    public void update(){
+        float progress;
+        if(stackCount <= 0){
+            progress = 0f;
+        }
+        else{
+            progress = (float) stackCount / MAX_STACK_COUNT;
+        }
+        bossbar.progress(progress);
+        bossbar.name(Component.text("创伤 " + stackCount + "/" + MAX_STACK_COUNT, NamedTextColor.BLUE, TextDecoration.BOLD));
     }
 
     @Override
     public void stop()  {
         super.stop();
-        vitals = null;
         sante = null;
         buff = null;
+        svc().self().player().hideBossBar(bossbar);
+        bossbar = null;
     }
 
     public void requestAddStackCount(@Nonnegative int amount){

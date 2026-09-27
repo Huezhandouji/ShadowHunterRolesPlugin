@@ -9,6 +9,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.UUID;
@@ -86,6 +87,9 @@ public class CangluTraumaMainWeapon extends MainWeapon {
 
     @Override
     public void onAttack(AttackSignal signal){
+
+        if(!canUse()) return;
+
         UUID victimPid = signal.victim().getUniqueId();
         sante.decreaseSanTE(victimPid, SANTE_DAMAGE_AMOUNT);
 
@@ -96,9 +100,16 @@ public class CangluTraumaMainWeapon extends MainWeapon {
 
         hysteriaPassive.requestAddStackCount(1);
         boolean passiveCasted = hysteriaPassive.requestResolve();
+
         if(passiveCasted){
             vitals.trueDamage(signal.victim(), svc().self().player(), EXTRA_TURE_DAMAGE_AMOUNT);
+            svc().self().player().getWorld().playSound(svc().self().player().getLocation(), Sound.ENTITY_ELDER_GUARDIAN_CURSE, 0.7f, 1.5f);
         }
+        else {
+            svc().self().player().getWorld().playSound(svc().self().player().getLocation(), Sound.BLOCK_AMETHYST_BLOCK_HIT, 1f, 1f);
+        }
+
+
 
         startCooldown();
     }

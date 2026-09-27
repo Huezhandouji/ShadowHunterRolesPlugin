@@ -44,9 +44,11 @@ public interface FactionLookup {
      *
      * <p><b>谁读它</b>：{@code core/RoleInfoImpl} 用它把"无角色"挡在敌对判定之外
      * （见类注释的「无角色」口径）。
+     *
+     * <p>★ 真值转发到 {@link FactionRelation#hasRole(Faction)}（**纯静态、可离线测试**）。
      */
     default boolean hasRole(UUID player) {
-        return factionOf(player) != Faction.UNKNOWN;
+        return FactionRelation.hasRole(factionOf(player));
     }
 
     /**

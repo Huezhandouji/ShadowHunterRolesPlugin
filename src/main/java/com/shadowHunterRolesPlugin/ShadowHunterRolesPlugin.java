@@ -14,6 +14,7 @@ import com.shadowHunterRolesPlugin.listener.*;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
 import com.shadowHunterRolesPlugin.platform.FactionLookup;
+import com.shadowHunterRolesPlugin.platform.FactionRelation;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.registry.RoleLoader;
@@ -70,28 +71,24 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
              * **两个玩家之间是否敌对**（★ 对称）：两侧都按 UUID 取阵营
              * ⇒ {@code isHostile(a,b)} 与 {@code isHostile(b,a)} 同值 ✓。
              *
-             * <p>★ **「无角色」口径**：任一方没有角色 ⇒ **不敌对**（不再是"恒敌对"）。
-             * 即"已选角色的玩家"与"没选角色的玩家"**互不敌对** —— 未选角色者不会被技能当敌人选中。
+             * <p>★ 真值转发到 {@link FactionRelation#isHostile(Faction, Faction)}
+             * （**纯静态、离线可测**）⇒ 本处的"接线"不再自己持有语义，
+             * 测试与生产**共用同一份判据** ✓
              */
             @Override
             public boolean isHostile(UUID self, UUID other) {
-                if(!hasRole(self) || !hasRole(other)){
-                    return false;      //★ 任一方没有角色 ⇒ 不敌对
-                }
-                return factionOf(self) != factionOf(other);
+                return FactionRelation.isHostile(factionOf(self), factionOf(other));
             }
 
             /**
              * **「某个阵营」与「某个玩家」是否敌对**：对方**有角色** 且 阵营不同 ⇒ 敌对。
              * <p>★ 对方**没有角色** ⇒ **不**敌对（旧口径为"恒敌对"，本条是有意变更）。
              * <p>消费者 = {@code core/RoleInfoImpl#isHostileTo(UUID)}（"我这个角色是否与它敌对"）。
+             * <p>★ 真值转发到 {@link FactionRelation#isHostileTo(Faction, Faction)}（同上）。
              */
             @Override
             public boolean isHostile(Faction self, UUID other) {
-                if(!hasRole(other)){
-                    return false;      //★ 对方没有角色 ⇒ 不敌对
-                }
-                return self != factionOf(other);
+                return FactionRelation.isHostileTo(self, factionOf(other));
             }
         };
 

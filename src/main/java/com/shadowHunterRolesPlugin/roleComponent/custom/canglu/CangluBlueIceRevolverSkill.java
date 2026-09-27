@@ -263,7 +263,6 @@ public class CangluBlueIceRevolverSkill extends Skill {
     }
 
     /**
-    /**
      * **自动换弹检查**（每 {@link #RELOAD_AUTO_CHECK_INTERVAL} tick 一次）：
      * 只有当"弹夹空 **且** 不在冷却中"时才尝试。
      *

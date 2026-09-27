@@ -106,7 +106,9 @@ final class RoleInfoImpl implements RoleInfo {
             if (p == null) {
                 continue;
             }
- //没有选角色的玩家也要算进来（FactionLookup 对未选角色返回敌对）
+ //★ **未选角色的玩家不算敌人**：关系表（FactionLookup）对"任一方无角色"一律判**不敌对**
+ //  ⇒ 本方法无需额外过滤（那道判定已在那层挡掉）。旧注释写的是"也要算进来"，
+ //  那是**变更前**的口径，已作废 ✗
             if (isHostileTo(p.getUniqueId())) {
                 return true;
             }

@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.canglu;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.SoundUtil;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
@@ -8,6 +9,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
@@ -24,6 +26,7 @@ import org.bukkit.util.Vector;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * **澜冰左轮**（苍鹭）：一把八发左轮。
@@ -81,6 +84,8 @@ public class CangluBlueIceRevolverSkill extends Skill {
     /** "弹夹空 + 有能量 ⇒ 自动换弹"的检查间隔（tick）。 */
     private static final int RELOAD_AUTO_CHECK_INTERVAL = 20;
 
+
+
     // ───────── 状态 ─────────
 
     /** 当前弹夹剩余子弹数。 */
@@ -90,8 +95,27 @@ public class CangluBlueIceRevolverSkill extends Skill {
     /** 自动换弹检查的节拍计数。 */
     private int autoReloadTick;
 
+    /**
+     * **待办：换弹完成（冷却走完）那一刻要执行的瞬移 + 真伤**。
+     *
+     * <p>★ 为什么要有它：瞬移必须发生在**换弹完成之后**（换弹期间不动位置），
+     * 而"完成"由**冷却到期**表达 ⇒ 到期检测在 {@link #update()} 里，执行体存在这里。
+     * <p>{@code null} = 没有待办（常态）⇒ 每 tick 的检测是**一次空引用比较**，零开销 ✓
+     */
+    private PendingReload pendingReload;
+
+    /** 换弹完成后的待办动作（{@code target} = 登记时锁定的目标 UUID）。 */
+    private static final class PendingReload {
+        private final UUID target;
+
+        private PendingReload(UUID target) {
+            this.target = target;
+        }
+    }
+
     private VitalsComponent vitals;
     private EnergyComponent energy;
+    private CangluHysteriaPassive hysteriaPassive;
 
     public CangluBlueIceRevolverSkill(String id, ComponentServices services, Specification specification) {
         super(id, services, specification);
@@ -132,6 +156,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
         //契约：依赖字段在 start() 里一次查好（基类不代查）
         vitals = svc().components().get(VitalsComponent.class);
         energy = svc().components().get(EnergyComponent.class);
+        hysteriaPassive = svc().components().get(CangluHysteriaPassive.class);
     }
 
     /**
@@ -140,6 +165,8 @@ public class CangluBlueIceRevolverSkill extends Skill {
      */
     @Override
     public void stop(){
+        //★ 丢弃换弹待办：实例已销毁 ⇒ 不该再瞬移/造成伤害（否则是"死后打人"）
+        pendingReload = null;
         for(BulletData bullet : bullets){
             bullet.getMarker().remove();
         }
@@ -178,14 +205,18 @@ public class CangluBlueIceRevolverSkill extends Skill {
         createBullet();
 
         Player self = svc().self().player();
-        self.getWorld().playSound(self.getLocation(), Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1, 1);
+        self.getWorld().playSound(self.getLocation(), Sound.ENTITY_ENDER_DRAGON_HURT, 1, 1.5f);
     }
 
     /**
      * **换弹**：能量足够才成立（不足 ⇒ 什么都不做，玩家可见反馈是"没反应"）。
      * <p>成立时按顺序：扣 8 能量 → **启动换弹冷却**（图标进入普通技能的冷却形态）→ 弹夹回满
-     * → 瞬移到最近敌人身后 → 对它造成 4 点真实伤害。
-     * <p>★ **找不到敌人也照样换弹**（只跳过瞬移与真实伤害）—— 否则"附近没人时无法换弹"会很难用。
+     * → **登记待办**（换弹完成那一刻再瞬移到目标身后并造成 4 点真实伤害）。
+     *
+     * <p>★ **瞬移发生在换弹【完成之后】**：目标在**登记时**锁定（此刻最近的敌人），
+     * 到期执行时才取它的**当时位置** —— 中途找不到/走远/目标消失 ⇒ 只跳过瞬移与真伤，**不影响换弹**。
+     * <p>★ **找不到敌人也照样换弹**（`pendingReload` 带 `null` 目标）——
+     * 否则"附近没人时无法换弹"会很难用。
      */
     private void reload(){
         if(energy == null || !energy.tryConsume(RELOAD_ENERGY_CONSUMPTION)){
@@ -196,46 +227,81 @@ public class CangluBlueIceRevolverSkill extends Skill {
         currentBulletCount = MAX_MAGAZINE_CAPACITY;
 
         Player self = svc().self().player();
-        Player nearest = findNearestEnemy(self, RELOAD_SEARCH_RADIUS);
-        if(nearest == null){
+        Player nearest = self == null ? null : findNearestEnemy(self, RELOAD_SEARCH_RADIUS);
+        //★ 登记待办：目标在【此刻】锁定（可为 null = 附近没人，只换弹不瞬移）
+        pendingReload = new PendingReload(nearest == null ? null : nearest.getUniqueId());
+
+        if (self != null) {
+            self.getWorld().playSound(self.getLocation(), Sound.BLOCK_PISTON_CONTRACT, 1, 0.8f);
+        }
+    }
+
+    /**
+     * **冷却走完那一刻的收尾**（每 tick 检测）：执行 {@link #reload()} 登记的待办。
+     *
+     * <p>判定 = "有待办 **且** 已不在冷却中"；执行后立刻清空待办 ⇒ **恰好执行一次** ✓
+     * （若被打断 —— 例如组件 {@code stop()} —— 待办随之丢弃，见 {@link #stop()}）。
+     */
+    private void finishPendingReload(){
+        if(pendingReload == null || isCoolingDown()){
+            return;
+        }
+        PendingReload pending = pendingReload;
+        pendingReload = null;
+
+        Player self = svc().self().player();
+        if(self == null){
+            return;
+        }
+        //★ 声音属于**换弹完成本身**（与"有没有目标"无关）⇒ 必须在所有 early-return 之前播；
+        //  否则附近没人时换弹会【没声音】（那是另一码事，跟瞬移无关）
+        SoundUtil.playGunReloadSound(self);
+
+        if(pending.target == null){
+            return;      //附近没人 ⇒ 只换弹：不瞬移、不真伤
+        }
+        Player target = Bukkit.getPlayer(pending.target);
+        if(target == null || !target.isOnline() || target.isDead()){
             return;
         }
 
-        teleportBehind(self, nearest);
-        vitals.trueDamage(nearest, self, RELOAD_TRUE_DAMAGE);
+        //★ 取【执行时】的位置：目标在这 2 秒里可能已经移动 —— 落点必须贴合它现在的朝向 ✓
+        if(!target.getWorld().equals(self.getWorld())){
+            return;
+        }
+        if(self.getLocation().distanceSquared(target.getLocation()) > RELOAD_SEARCH_RADIUS * RELOAD_SEARCH_RADIUS){
+            return;      //走远了 ⇒ 只换弹，不瞬移
+        }
+
+        teleportBehind(self, target);
+        if(vitals != null){
+            vitals.trueDamage(target, self, RELOAD_TRUE_DAMAGE);
+        }
+
+
     }
 
     /**
      * **自动换弹检查**（每 {@link #RELOAD_AUTO_CHECK_INTERVAL} tick 一次）：
-     * 只有当"**手持本左轮** 且 弹夹空 **且 不在冷却中**"时才尝试。
+     * 只有当"弹夹空 **且** 不在冷却中"时才尝试。
      *
-     * <p>★ **"手持"这一条必须有**：本检查是**每 tick 广播**驱动的（与手持物无关）⇒ 若不加，
-     * 玩家把枪收起来干别的事，能量也会被悄悄扣掉。
+     * <p>★ **不判断"是否手持本左轮"**：弹夹空就自动换弹（枪收在背包里、或正拿着别的东西时也一样）。
+     * 代价 = 能量可能在玩家没留意时被扣掉 —— 这是**有意的**口径。
      * <p>★ 能量是否够由 {@link #reload()} 自己判（唯一判定点）⇒ 这里不重复查。
      */
     private void tryAutoReload(){
         if(currentBulletCount > 0 || energy == null || isCoolingDown()){
             return;
         }
-        if(!holdingThisSkill()){
-            return;
-        }
         reload();
     }
-
-    /** 主手是否正拿着**本组件**那把左轮（按物品 PDC 里的 skill id 判）。 */
-    private boolean holdingThisSkill(){
-        Player self = svc().self().player();
-        if(self == null){
-            return false;
-        }
-        return getId().equals(Skill.Utils.getSkillId(self.getInventory().getItemInMainHand()));
-    }
-
     // ───────── 每 tick ─────────
 
     @Override
     public void update() {
+        //★ 换弹完成检测：冷却走完那一刻执行待办的瞬移 + 真伤（见 finishPendingReload）
+        finishPendingReload();
+
         if(autoReloadTick++ >= RELOAD_AUTO_CHECK_INTERVAL){
             autoReloadTick = 0;
             tryAutoReload();
@@ -285,6 +351,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
             Player victim = firstHostileIn(next);
             if(victim != null){
                 vitals.physicalDamage(victim, self, BULLET_DAMAGE, BULLET_KNOCKBACK);
+                hysteriaPassive.requestAddStackCount(1);
                 return false;
             }
 

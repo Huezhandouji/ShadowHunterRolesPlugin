@@ -22,6 +22,13 @@ import java.util.UUID;
  *   <li>{@link #hasEnemyInRange(double)} —— 自身半径内是否有敌人。</li>
  * </ul>
  *
+ * <h2>★★「无角色」口径</h2>
+ * <b>一个已选角色的玩家，与一个没选角色的玩家，视为【不敌对】</b>
+ * ⇒ 三个判定全都遵守（{@code isHostileTo} / {@code isHostile(UUID,UUID)} / {@code hasEnemyInRange}）。
+ * <p>落点 = {@code FactionLookup#hasRole(UUID)}：任一参与方没角色 ⇒ 一律 {@code false}。
+ * 效果：**未选角色的玩家不会被技能当作敌人选中/伤害**（例如自动索敌、"附近是否有敌人"）。
+ * <p>★ 这是**有意变更**的口径；此前是"未选角色 ⇒ 恒敌对"。
+ *
  * <p><b>阵营判定与平台侧「同步形态」</b>：本端口与 {@code platform/FactionLookup} 的判定**同构**
  * —— UUID 版是**主口径**，`Player` 版（{@link #isHostile(Player)}）是**弃用 + 纯委托**
  * （{@code victim.getUniqueId()} → UUID 版）⇒ 语义在**编译期**就等价，不可能漂移 ✓。

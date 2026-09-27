@@ -315,7 +315,8 @@ public class RoleInstance {
  //（按 id 取 —— id 常量归组件自己）拿到它，再调 requestRepaint()。
  //⇒ 组件侧与框架侧**收敛到同一条通道**（禁两套并存）；
  // 旧 `RepaintRequestable` / `RepaintRequester` 两条通道**已删除**。
- //绑定时机的纪律不变：渲染组件本身在构造器里就已 bindRepaintSink（早于任何 awake/start）。
+ //★ 渲染组件**自持脏标记**（`requestRepaint()` 直接置自己的字段）⇒ **不需要任何注入/绑定动作**，
+ // 容器也不再参与"置脏通道"的装配（旧的 `bindRepaintSink` 注入点已删除）。
  //：原"创建后绑定"的**装配期落点已整体删除** （它唯一的绑定目标是计时端口，
  // 端口面 已清理 ⇒ 该调用早已是 no-op）—— 状态一律归**组件实例本身**，不需要任何绑定动作。
 

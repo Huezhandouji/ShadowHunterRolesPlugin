@@ -125,22 +125,25 @@ public class EnergyCommand implements SubCommand {
 
     /**
      * **读数 / 设值都自己按 id 取能量组件**（★ 容器已删两个能量视图 —— 它不再指名任何组件）。
-     * <p>取到通用面后调基类通用面：`readCurrentEnergy()` / `writeCurrentEnergy(...)` ✓
+     * <p>★ 基类通用面（`readCurrentEnergy` / `writeCurrentEnergy`）**已删除**（那是能量组件的语言）
+     * ⇒ 本处取到**强类型的 `EnergyComponent`** 后直调它自己的 `current()` / `set(int)` ✓
      */
     private static int energyOf(RoleManager roleManager, Player target){
-        RoleComponent energy = energyComponentOf(roleManager, target);
-        return energy == null ? 0 : energy.readCurrentEnergy();
+        EnergyComponent energy = energyComponentOf(roleManager, target);
+        return energy == null ? 0 : energy.current();
     }
 
     private static void writeEnergy(RoleManager roleManager, Player target, int amount){
-        RoleComponent energy = energyComponentOf(roleManager, target);
+        EnergyComponent energy = energyComponentOf(roleManager, target);
         if (energy != null) {
-            energy.writeCurrentEnergy(amount);
+            energy.set(amount);
         }
     }
 
-    private static RoleComponent energyComponentOf(RoleManager roleManager, Player target){
+    private static EnergyComponent energyComponentOf(RoleManager roleManager, Player target){
         RoleInstance instance = roleManager.getRoleInstance(target);
-        return instance == null ? null : instance.componentRegistry().getById(EnergyComponent.ID);
+        RoleComponent component = instance == null ? null
+                : instance.componentRegistry().getById(EnergyComponent.ID);
+        return component instanceof EnergyComponent energy ? energy : null;
     }
 }

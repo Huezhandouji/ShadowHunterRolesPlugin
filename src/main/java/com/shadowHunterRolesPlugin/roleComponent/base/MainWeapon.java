@@ -65,16 +65,6 @@ public abstract class MainWeapon extends ActiveComponent {
     }
 
     /**
-     * 表现参数内联的构造口径：**保留为兼容别名** —— 与既有口径逐字同序同义（`energyCost` 仍恒传 0）。
-     *
-     * @deprecated 改用 `(id, services, Specification)`：表现值写进组件自己的嵌套 `Specification`。
-     */
-    @Deprecated
-    public MainWeapon(String id, ComponentServices services, Component displayName, Component description, Material icon, int cooldown){
-        super(id, services, HotbarSpecification.of("MainWeapon", id, displayName, description, icon, cooldown, 0));
-    }
-
-    /**
      * **主武器描述符**（收敛为纯声明）：带栏位
      * （继承 {@link HotbarSpecification} ⇒ 有 {@code setSlot}），kind 已删（不再自述种类）。
      * <p>参数顺序 = 本类构造器去掉前两位（`id` / `services`）后的**原样顺序**。

@@ -71,19 +71,8 @@ public class HotbarRenderComponent extends RoleComponent {
      */
     public static final String ID = "hotbarRender";
 
-    /**
-     * **渲染意图的置脏入口**（本组件对外暴露的那一条通道的落点）。
-     * <p>{@code null} 是**合法**状态：未装配时（例如单元测试直接构造组件）请求重绘是**静默无操作** ✓
-     * —— 与"未装配 ⇒ 无事可做"同义，**不是**错误 ✗。
-     */
-    @FunctionalInterface
-    public interface RepaintSink {
-        /** 置脏（幂等：同一 tick 多次请求与一次等价）。**不写物品** ✗。 */
-        void markDirty();
-    }
-
-    /** 置脏通道；装配期注入，未注入时为 {@code null}（见 {@link RepaintSink} 的 null 语义）。 */
-    private RepaintSink repaintSink;
+    //★ `RepaintSink`（注入式置脏回调）**已删除** —— 它的注入点在容器里失去调用者后，
+    //   回调恒为 null ⇒ `requestRepaint()` 静默变成空操作。现由本组件**自持脏标记**：见 `requestRepaint()`。
 
     /**
      * **渲染器**（唯一写点所在）—— 由本组件**持有并驱动** ✓。
@@ -360,6 +349,12 @@ public class HotbarRenderComponent extends RoleComponent {
     @Override
     public void start() {
         // 首刷不在这里 —— 见方法 javadoc
+        //★ **订阅 buff 移除**：buff 消失会改变图标外观（"被沉默 / 眩晕"的禁用态等）⇒ 需要置脏重绘。
+        //  依赖方向 = **渲染组件主动去认识 buff 组件**（而不是记账器 / 别的组件反向认识渲染）✓
+        BuffComponent buffs = findComponent(BuffComponent.class);
+        if(buffs != null){
+            buffs.manager().onBuffRemoved(this::markDirty);
+        }
     }
 
     /**
@@ -399,6 +394,59 @@ public class HotbarRenderComponent extends RoleComponent {
      * **物品**取自组件自己的默认画法读口（{@link #buildItemOf(RoleComponent)}）。
      * <p>不占栏位、或本帧画不出物品的组件**不进计划**（与"跳过该槽位"同义）。
      */
+    /**
+     * **「组件 id → 栏位」登记表**（★ 本组件自持；由组件在装配期向本组件**登记**自己的栏位）。
+     *
+     * <p>为什么不让渲染侧去描述符里读：那是"框架要认识带栏位描述符"，而栏位是**热键栏的契约**
+     * ⇒ 归本组件持有最自然 ✓（组件自己知道自己要占哪一格）。
+     * <p>顺序 = **登记顺序**（= 组件装配序）⇒ 落位结果可复现 ✓。
+     */
+    private final Map<String, Integer> slotByComponent = new LinkedHashMap<>();
+
+    /**
+     * **组件登记自己的栏位**（★ 唯一入口；`slot == null` ⇒ 撤销登记 = 不占栏位）。
+     *
+     * <p><b>仲裁</b>：同一栏位被两个组件占用 ⇒ **抛 {@link IllegalArgumentException}**（fail-fast）。
+     * <p>★ **两处判据的"同一种说法"**：本方法与装配期 {@code core/Role.Builder#addComponent}
+     * 扫描述符快照那一段，**共用同一套异常类型与文案** ⇒ 同一判据只有一种说法 ✓
+     * （两者拦的是不同阶段的坏法：装配期拦"模板写错"，本处拦"运行期登记错"，
+     * 且本处还覆盖**不经装配器的动态添加**那条路径）。
+     * <p>同一组件重复登记同一栏位 ⇒ 幂等 ✓（换栏位 ⇒ 先撤旧再记新）。
+     */
+    public void registerSlot(RoleComponent component, Integer slot) {
+        if (component == null) {
+            return;
+        }
+        if (slot == null) {
+            slotByComponent.remove(component.getId());
+            return;
+        }
+        //★ 校验与文案**与装配期逐字对齐**（`core/Role.Builder#addComponent` 扫快照的那一段）：
+        //   ① 越界 ⇒ 同一句 IllegalArgumentException
+        //   ② 冲突 ⇒ **同一句冻结文案**（`Slot N is already occupied by 'X'.`），
+        //      ★ 只**追加**一个分句点名"谁想占"——冻结的主句一字未动 ⇒ 既有断言不受影响 ✓
+        if (slot < 0 || slot > 8) {
+            throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
+        }
+        for (Map.Entry<String, Integer> occupied : slotByComponent.entrySet()) {
+            if (!occupied.getKey().equals(component.getId()) && occupied.getValue().equals(slot)) {
+                throw new IllegalArgumentException("Slot " + slot + " is already occupied by '"
+                        + occupied.getKey() + "'. (registration refused for '" + component.getId() + "')");
+            }
+        }
+        slotByComponent.put(component.getId(), slot);
+    }
+
+    /** 某组件登记的栏位（未登记 ⇒ {@code null} = 不占热键栏）。 */
+    public Integer slotOf(String componentId) {
+        return componentId == null ? null : slotByComponent.get(componentId);
+    }
+
+    /** 已登记的栏位数（诊断读口）。 */
+    public int registeredSlotCount() {
+        return slotByComponent.size();
+    }
+
     private List<HotbarRenderer.Entry> renderPlan() {
         Map<Integer, ItemStack> bySlot = new LinkedHashMap<>();
         // ① 拉取式（既有）：物品来自组件自己的默认画法读口 —— ★ 画法归属不动（契约 §7.3）
@@ -406,9 +454,10 @@ public class HotbarRenderComponent extends RoleComponent {
             for (RoleComponent component : svc().components().all()) {
                 ItemStack item = buildItemOf(component);
                 if (item == null) continue;
-                HotbarSpecification<?> specification = specificationOf(component);
-                if (specification == null || !specification.hasSlot()) continue;
-                bySlot.put(specification.slot(), item);
+                //★ 落位读**登记表**（组件自己登记的栏位）；未登记 ⇒ 不占热键栏 ✓
+                Integer slot = slotByComponent.get(component.getId());
+                if (slot == null) continue;
+                bySlot.put(slot, item);
             }
         }
         // ② 提交式（新）：机制面在**绑键步**写身份键（恰好一次 setItemMeta）；同槽位**覆盖**拉取式条目
@@ -441,38 +490,25 @@ public class HotbarRenderComponent extends RoleComponent {
             return false;
         }
         for (RoleComponent component : svc().components().all()) {
-            HotbarSpecification<?> specification = specificationOf(component);
-            if (specification == null || !specification.hasSlot()) continue;
+            //★ "占栏位"读**登记表**（与渲染落位同源 ✓）
+            if (slotByComponent.get(component.getId()) == null) continue;
             if (component instanceof ActiveComponent active && active.isCoolingDown()) return true;
         }
         return false;
     }
 
     /**
-     * **装配期绑定**（构造之后、{@code awake()} 之前）—— 与既有【装配期解析】同一条纪律
-     * （绑定一律在构造期完成）。
-     * <p>由 {@code RoleInstance} 在装配期调用（见该处注释）。
-     */
-    public void bindRepaintSink(RepaintSink sink) {
-        this.repaintSink = sink;
-    }
-
-    /**
-     * **请求重绘**：把"要重绘"这件事登记到本组件，并置脏 ⇒ **下一次帧末 flush** 才会写物品 ✓。
-     * <p>这是**唯一**的组件侧渲染意图入口 ✓ —— 取代此前并存的
-     * {@code RepaintRequestable} / {@code RepaintRequester} 两条老通道（**禁两套并存** ✗）。
+     * **请求重绘**：把"要重绘"这件事置到本组件的脏标记上 ⇒ **下一次帧末 flush** 才会写物品 ✓。
+     * <p>这是**唯一**的组件侧渲染意图入口 ✓。
+     * <p>★ **本组件自持脏标记**（{@link #markDirty()}）：早期形态是"注入一个 {@code RepaintSink} 回调"
+     * —— 那个注入点后来**失去调用者**（容器不再绑定）⇒ 该回调恒为 {@code null}
+     * ⇒ `requestRepaint()` 静默变成**空操作**（射击 / 能量变化 / 冷却置脏全部失效）✗。
+     * 现直接置本组件的字段：**自指的空转件已删除**，不可能再出现"没接线就静默失效" ✓。
      * <p><b>幂等</b>：脏标记是布尔量 ⇒ 同一 tick 内多次调用与一次等价 ✓。
      * <p><b>不写物品</b> ✗：返回后物品**尚未**被改写 ✓（「空闲 tick 零 {@code setItem}」逐字不变 ✓）。
      */
     public void requestRepaint() {
-        if (repaintSink != null) {
-            repaintSink.markDirty();
-        }
-    }
-
-    /** 是否已装配置脏通道（诊断读口；供探针与运行级取证使用）。 */
-    public boolean hasRepaintSink() {
-        return repaintSink != null;
+        markDirty();
     }
 
     /**
@@ -672,15 +708,15 @@ public class HotbarRenderComponent extends RoleComponent {
     /**
      * **按槽位反查组件 id**（★ 栏位知识的归属：本组件）。
      *
-     * <p>遍历给定的组件集，返回**第一个**描述符声明了该槽位的组件的 id；未占用 ⇒ {@code null}。
-     * 与 {@link #renderPlan()} 读槽位**同一来源**（描述符的 {@code slot()}）⇒ 不会与渲染结果脱节 ✓。
+     * <p>读的是本组件的**登记表**（`slotByComponent`）⇒ 与 {@link #renderPlan()} 落位**同源**
+     * ⇒ 反查结果与渲染结果不可能脱节 ✓。未占用 ⇒ {@code null}。
      *
-     * <p>★ **组件集由调用方传入**（本组件不自持"全部组件"）⇒ 它不依赖容器，只吃一份数据 ✓。
+     * <p>★ **实例方法**（不再是静态）：登记表是**实例状态** ⇒ 反查必须问"这一个实例" ✓。
      *
      * @param components 要扫的组件集（顺序 = 调用方给的顺序；命中即返回）
      * @param slot       槽位（0..8）
      */
-    public static String componentIdAtSlot(List<RoleComponent> components, int slot) {
+    public String componentIdAtSlot(List<RoleComponent> components, int slot) {
         if (components == null) {
             return null;
         }
@@ -688,8 +724,9 @@ public class HotbarRenderComponent extends RoleComponent {
             if (component == null) {
                 continue;
             }
-            HotbarSpecification<?> specification = specificationOf(component);
-            if (specification != null && specification.hasSlot() && specification.slot() == slot) {
+            //★ 读**登记表**（与 renderPlan 同源 ⇒ 不会与渲染结果脱节 ✓）；未登记 ⇒ 不占栏位
+            Integer registered = slotByComponent.get(component.getId());
+            if (registered != null && registered == slot) {
                 return component.getId();
             }
         }

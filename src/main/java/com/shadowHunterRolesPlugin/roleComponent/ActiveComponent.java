@@ -4,7 +4,6 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecificat
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -31,8 +30,7 @@ import org.bukkit.inventory.ItemStack;
  * {@link #onCast(CastSignal)} / {@link #onAttack(AttackSignal)} 与 {@link CastTrigger} /
  * {@link CastSignal} / {@link AttackSignal} 都归组件 —— 施放与攻击由**物品支持类组件**处理。
  */
-public abstract class ActiveComponent extends RoleComponent
-        implements EnergyComponent.EnergyCosting {
+public abstract class ActiveComponent extends RoleComponent {
 
     /** **热键栏触发的三种来源**（listener 只做"事件 → trigger"翻译；`onCast` 入口的输入词汇）。 */
     public enum CastTrigger {
@@ -57,6 +55,39 @@ public abstract class ActiveComponent extends RoleComponent
      * （组件自己持有冷却与判断，框架不知道冷却）。
      */
     private int cooldownUntilTick = 0;
+
+    /**
+     * **装配期把自己要占的栏位登记给渲染组件**（★ 栏位的运行期归属 = 渲染组件）。
+     *
+     * <p><b>为什么在 {@code awake()}</b>：框架**保证每个组件都被调用一次**，而多数子类不覆写它。
+     * <p><b>登记内容 = 描述符声明的栏位</b>（{@link HotbarSpecification#slotOrNull()}）；
+     * 无栏位（被动 / 内建）⇒ 传 {@code null} ⇒ 渲染组件撤销登记 ✓。
+     * <p>渲染组件按注册序排在最前（内建块首位）⇒ 本方法执行时它**已在容器里** ✓。
+     *
+     * <h2>★★ 为什么本方法是 {@code final}</h2>
+     * 子类**不能**覆写它 —— 它只做"栏位登记"这一件事，而登记**绝不允许被漏掉**。
+     * 需要自己的装配期初始化 ⇒ 覆写钩子 {@link #onAwake()}（本方法会替你调用）✓
+     * <p>实测事故（本方法改为 final 之前）：`CangluBlueIceRevolverSkill` 覆写 `awake()` 未调 super
+     * ⇒ 登记没执行 ⇒ **热键栏里没有左轮，且无任何报错** ⇒ 靠 final 从**编译期**堵死这条路。
+     */
+    @Override
+    public final void awake() {
+        HotbarRenderComponent render = findComponent(HotbarRenderComponent.class);
+        if (render != null) {
+            render.registerSlot(this, specification().slotOrNull());
+        }
+        onAwake();
+    }
+
+    /**
+     * **子类自己的装配期初始化钩子**（默认空）。
+     *
+     * <p>契约同 {@code awake()}：**幂等**、**不得改动任何玩家可见状态**、**不得取用其它组件**
+     * （依赖解析放 {@code start()}）。
+     * <p>★ 由 {@link #awake()} 在**栏位登记之后**调用 ⇒ 顺序有保证（登记先于子类初始化）。
+     */
+    protected void onAwake() {
+    }
 
     protected ActiveComponent(String id, ComponentServices services, HotbarSpecification<?> specification) {
         super(id, services);
@@ -116,8 +147,7 @@ public abstract class ActiveComponent extends RoleComponent
         return specification().getCooldownTicks();
     }
 
-    /** 耗能**声明值**（数据源 = 描述符）；同时满足 {@link EnergyComponent.EnergyCosting} 的声明。 */
-    @Override
+    /** 耗能**声明值**（数据源 = 描述符）；{@code 0} = 不耗能（{@code ENERGY_LACK} 态不可达）。 */
     public int getEnergyCost() {
         return specification().getEnergyCost();
     }

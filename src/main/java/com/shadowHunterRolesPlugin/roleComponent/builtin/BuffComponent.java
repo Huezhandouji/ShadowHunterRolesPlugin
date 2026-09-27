@@ -97,6 +97,7 @@ public class BuffComponent extends RoleComponent implements OperationProvider {
     @Override
     public void start() {
         buffManager.startUpdater();
+        //★ buff 移除后的重绘由**渲染组件自己订阅**（它认识本组件）⇒ 本组件不做任何渲染相关动作 ✓
     }
 
     /**

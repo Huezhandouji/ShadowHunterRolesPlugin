@@ -29,6 +29,24 @@ public class BuffManager {
 
     private final RoleComponent owner;
 
+    /**
+     * **buff 真被移除后的通知**（**函数式回调**；默认什么都不做）。
+     *
+     * <p>★ <b>为什么是回调而不是持有渲染组件</b>：本类是**记账器**，不该认识热键栏/渲染
+     * —— "移除后要不要重绘、找谁重绘"是**调用方**（`BuffComponent`）的事 ✓。
+     * 本类只负责在语义正确的时机（buff 真的从账本里删掉那一刻）**喊一声**。
+     */
+    private Runnable onBuffRemoved = () -> { };
+
+    /**
+     * **登记"buff 真被移除"的通知**（★ 由**认识本类的组件**调用 —— 例如渲染组件在它的 `start()` 里订阅）。
+     * <p>本类**不认识**渲染/热键栏：只负责在语义正确的时机（buff 从账本里删掉那一刻）喊一声 ✓。
+     * <p>传 {@code null} ⇒ 复位为空操作（幂等；重复登记 ⇒ 后手覆盖前手）。
+     */
+    public void onBuffRemoved(Runnable listener) {
+        this.onBuffRemoved = listener != null ? listener : () -> { };
+    }
+
     /** 调度端口（★ 平台面，不是容器）—— 本类**不再依赖 `RoleInstance`**。 */
     private final Scheduler scheduler;
 
@@ -117,7 +135,8 @@ public class BuffManager {
             //buff 移除 ⇒ 请求重绘（添加时**不**请求 —— "添加后无刷新"的既有语义不变）
             //★ 走**基类通用面** `RoleComponent#requestRepaint`（默认空实现、由渲染组件覆写）
             // ⇒ 本类只持有"账本持有者"这个通用引用，**不认识**渲染组件 ✓（也不再按 id 去取）
-            owner.requestRepaint();
+            //★ 本类不认识渲染组件 ⇒ 只**喊一声**"buff 被移除了"，找谁重绘由调用方决定 ✓
+            onBuffRemoved.run();
         }
     }
 

@@ -78,18 +78,10 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
     public record Listener(RoleComponent owner, Consumer<Change> listener) {
     }
 
-    /**
-     * **「这个组件耗能量」的能力接口**：耗能是**能量面**的声明 ⇒ 本接口归能量组件所有
-     * （能力各归其家：耗能声明与能量真值同属能量面）。
-     * 非零能量成本只有两个技能（`MeiqiheziBloodySlashSkill` = 8 / `MeiqiheziCircleSlashSkill` = 15）。
-     * <p>实现方式：由 `HotbarRenderComponent.HotbarPresentable` 的 `default` 满足，并由 `ActiveComponent`
-     * 显式转发（本组件不实现它，只承载声明面 ✓）。
-     */
-    public interface EnergyCosting {
-
-        /** 扔放所需能量（点）；{@code 0} = 不耗能（{@code ENERGY_LACK} 态不可达）。 */
-        int getEnergyCost();
-    }
+    //★ `EnergyCosting` 接口**已删除**（多此一举：它只有 `getEnergyCost()` 一个方法，
+    //   实现者只有 `ActiveComponent`，且**没有任何以它为类型的消费者** ⇒ 纯空转类型）。
+    //   耗能声明值仍由 {@code ActiveComponent#getEnergyCost()} 提供（数据源 = 描述符），
+    //   消费者照旧（技能 / 主武器的默认画法、两个按耗能扣减的技能）。
 
     /** **监听器名单** —— 顺序 = 添加先后 ✓（迭代序稳定 ⇒ "按注册序通知"可复现 ✓）。 */
     private final List<Listener> listeners = new ArrayList<>();
@@ -128,8 +120,8 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
         public EnergyComponent create(String id, ComponentServices services) {
             return new EnergyComponent(id, services, ENERGY_MAX, change -> {
                 RoleComponent render = services.components().getById(HotbarRenderComponent.ID);
-                if (render != null) {
-                    render.requestRepaint();
+                if (render instanceof HotbarRenderComponent hotbar) {
+                    hotbar.markDirty();
                 }
             });
         }
@@ -212,19 +204,8 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
         return max;
     }
 
-    // ───────── 基类通用面（框架按 id 取到通用面即可读/写，不必认识本组件）─────────
-
-    /** {@inheritDoc} —— 框架视图的读数落点。 */
-    @Override
-    public int readCurrentEnergy() {
-        return current;
-    }
-
-    /** {@inheritDoc} —— 框架视图的写入落点（clamp 与通知仍在 {@link #set(int)} 里）。 */
-    @Override
-    public void writeCurrentEnergy(int value) {
-        set(value);
-    }
+    //★ 基类通用面 `readCurrentEnergy` / `writeCurrentEnergy` **已删除**（那是本组件的语言）
+    //   ⇒ 消费者直接持有强类型 `EnergyComponent`，调下面的 `current()` / `set(int)` ✓
 
     /** 直接写入（组件内 clamp；写后通知监听器）。 */
     public void set(int value) {

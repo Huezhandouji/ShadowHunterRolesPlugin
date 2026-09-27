@@ -52,6 +52,23 @@ public abstract class RoleComponent {
     }
 
     /**
+     * **按类型取同实例内的另一个组件**（基类便利口，转发到容器的查取入口）。
+     *
+     * <p>为什么放在基类：这是**"我有服务集 ⇒ 我能取组件"**的同义表达，**不含任何具体组件的语言**
+     * （类型由调用方给）⇒ 与"基类不认识子类"的纪律不冲突 ✓。
+     * 早先各组件各自写 `svc().components().get(X.class)`，被动组件连 `svc()` 都够不到（它是 protected）
+     * ⇒ 现在统一走本口。
+     *
+     * <p>未命中 / 服务集不可用 ⇒ {@code null}（**不抛**：调用方普遍按"可缺失"处理）。
+     */
+    protected final <T> T findComponent(Class<T> type) {
+        if (this.svc == null || this.svc.components() == null) {
+            return null;
+        }
+        return this.svc.components().get(type);
+    }
+
+    /**
      * 取本角色实例内的另一个组件（**按类型**）。
      * <p><b>语义 = 添加顺序第一个满足可赋值性者</b>（用父类/接口查询会命中子类/实现类实例）；
      * 未注册 → {@code null}；冻结前调用 → 抛 {@code IllegalStateException}。要拿**全部**符合者请用
@@ -73,68 +90,14 @@ public abstract class RoleComponent {
     public void start() {
     }
 
-    /**
-     * **请求一次重绘**（幂等；**不写物品**，真正的写在帧末）。
-     *
-     * <p><b>为什么这个方法在基类上</b>：派发边界（施放 / 攻击）之后要**无条件请求一次重绘**
-     * —— 那是**框架的派发边界行为**，而不是某个组件的业务。把它声明在基类上 ⇒
-     * 框架按 **id** 取到通用面即可请求，**不必认识**是哪个组件提供的 ✓
-     * （不认识具体组件的组件实现它、其余组件沿用空实现 ✓）。
-     *
-     * <p><b>默认空实现</b>：不关心外观的组件（技能 / 被动 / 主武器 / 能量 / 生命 …）无需覆写 ✓。
-     */
-    public void requestRepaint() {
-    }
-
-    /**
-     * **当前能量读数**（框架视图；默认 {@code 0} = "未命中时的既有回退值"）。
-     *
-     * <p>声明在基类 ⇒ 框架按 id 取到通用面即可读，**不必认识**能量组件 ✓。
-     *
-     * <p>★ **方法名不带 `currentEnergy`**：那个名字已被 {@code base/Skill} 家族的
-     * `protected abstract int currentEnergy()` 占用（"下放给子类回答"的抽象义务）⇒
-     * 两者不得同名（否则 protected 无法覆盖 public）。
-     */
-    public int readCurrentEnergy() {
-        return 0;
-    }
-
-    /**
-     * **写当前能量**（框架视图；clamp 在组件内部；默认空实现）。
-     * <p>声明在基类 ⇒ 框架按 id 取到通用面即可写，**不必认识**能量组件 ✓。
-     */
-    public void writeCurrentEnergy(int value) {
-    }
-
-    /**
-     * **当前 SanTE 读数**（框架视图；默认 {@code 0} = "未命中时的既有回退值"）。
-     *
-     * <p>声明在基类 ⇒ 调用方按 id 取到通用面即可读，**不必认识** SanTE 组件 ✓
-     * —— 与 {@link #readCurrentEnergy()} **完全对称**（SanTE 组件的读数落点见
-     * {@code SanTEComponent#readCurrentSanTE()}）。
-     *
-     * <p>★ **名字不与 {@code SanTEComponent#current()} 冲突**：本方法名带 `Current` 前缀，
-     * 且实现类的 `current()` 是它自己的读口 ⇒ 两者并存、各司其职。
-     */
-    public int readCurrentSanTE() {
-        return 0;
-    }
-
-    /**
-     * **写当前 SanTE**（框架视图；clamp 在组件内部；默认空实现）。
-     * <p>声明在基类 ⇒ 调用方按 id 取到通用面即可写，**不必认识** SanTE 组件 ✓
-     * —— 与 {@link #writeCurrentEnergy(int)} **完全对称**。
-     */
-    public void writeCurrentSanTE(int value) {
-    }
-
-    /**
-     * **治疗**（框架视图；clamp 策略的唯一实现在生命组件里；默认空实现）。
-     * <p>声明在基类 ⇒ 框架按 id 取到通用面即可治疗，**不必认识**生命组件 ✓。
-     */
-    public void heal(double amount) {
-    }
-
+ //★ **六个"框架通用视图"已整体删除**（它们让基类认识热键栏 / 能量 / SanTE / 生命——那些是具体组件的语言）：
+ //   requestRepaint()      → 渲染组件自己的 `markDirty()`（消费者直接持有渲染组件）
+ //   readCurrentEnergy()   → 能量组件的 `current()`
+ //   writeCurrentEnergy()  → 能量组件的 `set(int)`
+ //   readCurrentSanTE()    → SanTE 组件的 `current()`（原基类那份**生产者 0**，已直删）
+ //   writeCurrentSanTE()   → SanTE 组件的 `set(int)`（同上）
+ //   heal(double)          → 生命组件的 `heal(double)`（原基类那份**消费者 0**）
+ //  ⇒ 本基类现在**不含任何子类/具体组件的语言** ✓
     /** 停止生效：与 start 严格对称。返回后框架自动回收本组件登记的资源。 */
     public void stop() {
     }
@@ -185,8 +148,8 @@ public abstract class RoleComponent {
          */
         private final String descriptorLabel;
 
-        /** 栏位；{@code null} = 不占栏位（**类型的缺失，不是 -1 哨兵**）。 */
-        private Integer slot;
+ //★ **本基类不持有栏位字段** —— 栏位归「带栏位的那一支描述符」（`HotbarSpecification`）。
+ //   基类只声明一个可选读口 `slotOrNull()`（默认 null = 不占栏位）✓
 
         /** 冻结位：装配期 {@link #freeze()} 之后禁止再改（防止被共享后被串改）。 */
         private boolean frozen;
@@ -327,51 +290,36 @@ public abstract class RoleComponent {
             }
         }
 
-        /** 占不占热键栏；{@code false} = 不占（不进槽位表）。 */
-        public final boolean hasSlot() {
-            return slot != null;
-        }
+ //★ **栏位的持有者是「带栏位的那一支描述符」**（`builtin/hotbar/HotbarSpecification`），
+ //   **不是**本基类 —— 被动等组件根本没有栏位，基类不该出现栏位语言。
+ //   本基类只留**一个可选读口**：`slotOrNull()`（`null` = 不占栏位）。
 
-        /** 栏位（0..8）；**未设栏位 ⇒ 抛异常**（绝不回落 `-1` 哨兵）。 */
-        public final int slot() {
-            if (slot == null) {
-                throw new IllegalStateException(
-                        "Component specification of kind " + descriptorLabel + " has no slot assigned.");
-            }
-            return slot;
+        /**
+         * **本描述符**声明的栏位；**{@code null} = 不占栏位**。
+         *
+         * <p>默认 {@code null}（当前基类**不再持有**栏位字段 ⇒ 本方法只是"带栏位那一支"的读口契约）：
+         * {@code HotbarSpecification} 覆写它返回真正的栏位值；被动等无栏位描述符用默认值 ✓。
+         *
+         * <p><b>谁读它</b>：装配期冲突判定（{@code core/Role.Builder}）与渲染侧的登记入口。
+         */
+        public Integer slotOrNull() {
+            return null;
         }
 
         /**
-         * 装配器设置栏位（**唯一一处**会在装配期写入的参数；其余表现字段由组件自己的描述符声明默认值）。
-         * 非法值、重复设置、冻结后设置一律抛异常。
+         * **冻结校验**（供**子类**在自己的可写口里复用）：已冻结 ⇒ 抛异常。
+         * <p>冻结位是本类的私有状态 ⇒ 子类需要这个受保护读口，而不是各自重写一遍文案。
          */
-        protected final void assignSlot(int slot) {
+        protected final void ensureMutable() {
             if (frozen) {
                 throw new IllegalStateException(
                         "Component specification of kind " + descriptorLabel + " is frozen and cannot be changed.");
             }
-            if (slot < 0 || slot > 8) {
-                throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
-            }
-            if (this.slot != null && this.slot != slot) {
-                throw new IllegalStateException(
-                        "Slot already assigned to " + this.slot + " for kind " + descriptorLabel + "; refusing to move it to " + slot + ".");
-            }
-            this.slot = slot;
         }
 
-        /**
-         * **装配器绑定注册 id**（与 {@link #assignSlot(int)} 同族：都是"必须由装配器设置"的参数）。
-         * <p>为什么必须有它：组件自带的描述符用"不带 id 的构造"声明（id 属于注册处）⇒ 若不绑定，
-         * 描述符里任何读 id 的路径都会拿到 {@code null}。绑定后
-         * **描述符的 id 与注册处同源同值**，字段不再撒谎。
-         * <p>id 为空 / 已冻结 / 已绑定到**另一个** id ⇒ 抛异常（同 id 重复绑定是幂等的）。
-         */
+        /** 装配器绑定注册 id（与"栏位"同族：都是"必须由装配器设置"的参数）。 */
         public final void bindId(String id) {
-            if (frozen) {
-                throw new IllegalStateException(
-                        "Component specification of kind " + descriptorLabel + " is frozen and cannot be changed.");
-            }
+            ensureMutable();
             if (id == null || id.trim().isEmpty()) {
                 throw new IllegalArgumentException("Component ID cannot be null or empty.");
             }
@@ -393,26 +341,21 @@ public abstract class RoleComponent {
          * 并把本实例置为只读。
          * <p>装配入口 {@code Role.Builder.addComponent(String, Specification)} 只使用这份快照
          * ⇒ 角色模板**不持有描述符对象**，两个角色共用一个描述符实例也互不影响。
-         * <p><b>带栏位必填</b>：子类若声明"本类型必须有栏位"（{@link #requiresSlot()}），则未设栏位时
-         * **在此抛异常** —— 不占栏位必须由**类型**表达（用无栏位的描述符），不得静默降级。
+         * <p><b>栏位</b>：本方法只把 {@link #slotOrNull()}（多态）的值抄进快照 ——
+         * "带栏位必填"的 fail-fast 由**带栏位那一支描述符**自己做（{@code HotbarSpecification}）✓。
          * <p><b>依赖声明的自检</b>：同一个类型不得**既必需又可选择** ⇒ 抛
          * {@link IllegalStateException}（自相矛盾的声明必须在装配期就喊出来，而不是"看哪条先被读到"）。
          */
         /**
-         * **本描述符声明的栏位**（未设 ⇒ {@code null}）。
-         *
-         * <p>★ 这是「栏位值」的**唯一读口**（装配期冲突判定与渲染组件落位都读它）
-         * —— 条目与 `Role` 实例**都不再持有**栏位值 ✓。
+         * **冻结前的子类自检**（默认空）：带栏位那一支描述符在此做"必须有栏位"的 fail-fast。
+         * <p>为什么是钩子而不是覆写 {@link #freeze()}：freeze 是 `final` 的**单一实现点**
+         * （快照形状必须唯一）⇒ 子类只能插校验，不能改形状 ✓。
          */
-        public final Integer slotOrNull() {
-            return slot;
+        protected void validateForFreeze() {
         }
 
         public final Snapshot freeze() {
-            if (requiresSlot() && slot == null) {
-                throw new IllegalStateException(
-                        "A hotbar specification of kind " + descriptorLabel + " must be given a slot (setSlot) before assembly.");
-            }
+            validateForFreeze();
             for (Class<? extends RoleComponent> type : optionalTypes) {
                 if (requiredTypes.contains(type)) {
                     throw new IllegalStateException(
@@ -421,12 +364,7 @@ public abstract class RoleComponent {
                 }
             }
             this.frozen = true;
-            return new Snapshot(descriptorLabel, slot, this::create, providedType(), requiredTypes, optionalTypes);
-        }
-
-        /** 本类型的描述符是否**必须**有栏位（默认 `false`；带栏位分支覆写为 `true`）。 */
-        protected boolean requiresSlot() {
-            return false;
+            return new Snapshot(descriptorLabel, slotOrNull(), this::create, providedType(), requiredTypes, optionalTypes);
         }
 
         /** 抽象创建：由具体描述符决定造哪个组件类。 */

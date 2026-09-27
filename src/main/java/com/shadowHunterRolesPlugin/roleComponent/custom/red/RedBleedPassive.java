@@ -6,7 +6,10 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
+import org.bukkit.Material;
 import org.bukkit.Particle;
+import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
 
@@ -192,7 +195,8 @@ public class RedBleedPassive extends PassiveSkill {
             playerBleedRecord.put(pid, newBleed);
 
             //粒子
-            player.spawnParticle(Particle.DUST, victim.getLocation().clone().add(0, 0.5, 0), 1, 1, 1, 1, new Particle.DustOptions(Color.RED, 1f));
+            BlockData bd = Bukkit.createBlockData(Material.RED_CONCRETE);
+            player.spawnParticle(Particle.BLOCK, victim.getLocation().clone().add(0, 0.5, 0), 30, 0.3, 0.3, 0.3,0.1, bd);
             vitals.trueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
             //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 **Buff 组件**的入口（与框架**同一条已记账路径**））
             buff.applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);

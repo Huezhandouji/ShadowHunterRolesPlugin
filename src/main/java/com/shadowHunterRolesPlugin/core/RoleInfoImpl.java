@@ -8,10 +8,14 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * {@link RoleInfo} 的独立适配器：**持 {@code RoleInstance}**，与
  * {@code *PortImpl} 家族同形。
+ * <p><b>阵营判定与平台侧「同步形态」</b>：本类与 {@code platform/FactionLookup} 的两支**同构** ——
+ * UUID 版是**主口径**（直连关系表），`Player` 版是**弃用 + 纯委托**
+ * （{@code victim.getUniqueId()} → UUID 版）⇒ 两侧语义在编译期就等价，不可能漂移 ✓。
  * <p><b>取值一律经聚合根</b>：{@link #faction()} 读 {@code Role#getFaction()}
  * （**不是**读某个组件实例的字段 ⇒ 阵营"一个角色一份、全局静态"）。
  * <p><b>两个行为照搬原阵营组件</b>（该组件已整体删除；它的
@@ -61,9 +65,34 @@ final class RoleInfoImpl implements RoleInfo {
         return role == null ? Faction.UNKNOWN : role.getFaction();
     }
 
+    /**
+     * **自己是否与 {@code target} 敌对**（★ 自身相对）：直连平台关系表
+     * （{@code platform.FactionLookup#isHostile(Faction, UUID)}）——
+     * **不经过**"把 UUID 解析成在线玩家"这一步 ⇒ 判定与对象是否在线**无关** ✓。
+     */
+    @Override
+    public boolean isHostileTo(UUID target) {
+        return target != null && lookup().isHostile(faction(), target);
+    }
+
+    /**
+     * **两个给定玩家之间是否敌对**（★ 对称）：直连平台关系表的**两 UUID 口径**
+     * （{@code platform.FactionLookup#isHostile(UUID, UUID)}）——
+     * 与本角色无关，任意两个玩家都可判（含离线者）✓。
+     */
+    @Override
+    public boolean isHostile(UUID first, UUID second) {
+        return first != null && second != null && lookup().isHostile(first, second);
+    }
+
+    /**
+     * @deprecated 改用 {@link #isHostileTo(UUID)}
+     * —— 本方法只是 {@code isHostileTo(victim.getUniqueId())}（与平台侧的弃用支同形）。
+     */
+    @Deprecated
     @Override
     public boolean isHostile(Player victim) {
-        return lookup().isHostile(faction(), victim);
+        return victim != null && isHostileTo(victim.getUniqueId());
     }
 
     @Override
@@ -73,14 +102,12 @@ final class RoleInfoImpl implements RoleInfo {
             return false;
         }
 
-        Faction selfFaction = faction();
-
         for (Player p : loc.getNearbyPlayers(radius)) {
             if (p == null) {
                 continue;
             }
  //没有选角色的玩家也要算进来（FactionLookup 对未选角色返回敌对）
-            if (lookup().isHostile(selfFaction, p)) {
+            if (isHostileTo(p.getUniqueId())) {
                 return true;
             }
         }

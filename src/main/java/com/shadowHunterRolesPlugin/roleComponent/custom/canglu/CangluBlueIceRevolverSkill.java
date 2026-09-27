@@ -263,32 +263,20 @@ public class CangluBlueIceRevolverSkill extends Skill {
     }
 
     /**
+    /**
      * **自动换弹检查**（每 {@link #RELOAD_AUTO_CHECK_INTERVAL} tick 一次）：
-     * 只有当"**手持本左轮** 且 弹夹空 **且 不在冷却中**"时才尝试。
+     * 只有当"弹夹空 **且** 不在冷却中"时才尝试。
      *
-     * <p>★ **"手持"这一条必须有**：本检查是**每 tick 广播**驱动的（与手持物无关）⇒ 若不加，
-     * 玩家把枪收起来干别的事，能量也会被悄悄扣掉。
+     * <p>★ **不判断"是否手持本左轮"**：弹夹空就自动换弹（枪收在背包里、或正拿着别的东西时也一样）。
+     * 代价 = 能量可能在玩家没留意时被扣掉 —— 这是**有意的**口径。
      * <p>★ 能量是否够由 {@link #reload()} 自己判（唯一判定点）⇒ 这里不重复查。
      */
     private void tryAutoReload(){
         if(currentBulletCount > 0 || energy == null || isCoolingDown()){
             return;
         }
-        if(!holdingThisSkill()){
-            return;
-        }
         reload();
     }
-
-    /** 主手是否正拿着**本组件**那把左轮（按物品 PDC 里的 skill id 判）。 */
-    private boolean holdingThisSkill(){
-        Player self = svc().self().player();
-        if(self == null){
-            return false;
-        }
-        return getId().equals(Skill.Utils.getSkillId(self.getInventory().getItemInMainHand()));
-    }
-
     // ───────── 每 tick ─────────
 
     @Override

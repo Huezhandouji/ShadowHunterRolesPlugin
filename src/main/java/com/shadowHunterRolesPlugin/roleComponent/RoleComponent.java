@@ -52,6 +52,23 @@ public abstract class RoleComponent {
     }
 
     /**
+     * **按类型取同实例内的另一个组件**（基类便利口，转发到容器的查取入口）。
+     *
+     * <p>为什么放在基类：这是**"我有服务集 ⇒ 我能取组件"**的同义表达，**不含任何具体组件的语言**
+     * （类型由调用方给）⇒ 与"基类不认识子类"的纪律不冲突 ✓。
+     * 早先各组件各自写 `svc().components().get(X.class)`，被动组件连 `svc()` 都够不到（它是 protected）
+     * ⇒ 现在统一走本口。
+     *
+     * <p>未命中 / 服务集不可用 ⇒ {@code null}（**不抛**：调用方普遍按"可缺失"处理）。
+     */
+    protected final <T> T findComponent(Class<T> type) {
+        if (this.svc == null || this.svc.components() == null) {
+            return null;
+        }
+        return this.svc.components().get(type);
+    }
+
+    /**
      * 取本角色实例内的另一个组件（**按类型**）。
      * <p><b>语义 = 添加顺序第一个满足可赋值性者</b>（用父类/接口查询会命中子类/实现类实例）；
      * 未注册 → {@code null}；冻结前调用 → 抛 {@code IllegalStateException}。要拿**全部**符合者请用
@@ -73,68 +90,14 @@ public abstract class RoleComponent {
     public void start() {
     }
 
-    /**
-     * **请求一次重绘**（幂等；**不写物品**，真正的写在帧末）。
-     *
-     * <p><b>为什么这个方法在基类上</b>：派发边界（施放 / 攻击）之后要**无条件请求一次重绘**
-     * —— 那是**框架的派发边界行为**，而不是某个组件的业务。把它声明在基类上 ⇒
-     * 框架按 **id** 取到通用面即可请求，**不必认识**是哪个组件提供的 ✓
-     * （不认识具体组件的组件实现它、其余组件沿用空实现 ✓）。
-     *
-     * <p><b>默认空实现</b>：不关心外观的组件（技能 / 被动 / 主武器 / 能量 / 生命 …）无需覆写 ✓。
-     */
-    public void requestRepaint() {
-    }
-
-    /**
-     * **当前能量读数**（框架视图；默认 {@code 0} = "未命中时的既有回退值"）。
-     *
-     * <p>声明在基类 ⇒ 框架按 id 取到通用面即可读，**不必认识**能量组件 ✓。
-     *
-     * <p>★ **方法名不带 `currentEnergy`**：那个名字已被 {@code base/Skill} 家族的
-     * `protected abstract int currentEnergy()` 占用（"下放给子类回答"的抽象义务）⇒
-     * 两者不得同名（否则 protected 无法覆盖 public）。
-     */
-    public int readCurrentEnergy() {
-        return 0;
-    }
-
-    /**
-     * **写当前能量**（框架视图；clamp 在组件内部；默认空实现）。
-     * <p>声明在基类 ⇒ 框架按 id 取到通用面即可写，**不必认识**能量组件 ✓。
-     */
-    public void writeCurrentEnergy(int value) {
-    }
-
-    /**
-     * **当前 SanTE 读数**（框架视图；默认 {@code 0} = "未命中时的既有回退值"）。
-     *
-     * <p>声明在基类 ⇒ 调用方按 id 取到通用面即可读，**不必认识** SanTE 组件 ✓
-     * —— 与 {@link #readCurrentEnergy()} **完全对称**（SanTE 组件的读数落点见
-     * {@code SanTEComponent#readCurrentSanTE()}）。
-     *
-     * <p>★ **名字不与 {@code SanTEComponent#current()} 冲突**：本方法名带 `Current` 前缀，
-     * 且实现类的 `current()` 是它自己的读口 ⇒ 两者并存、各司其职。
-     */
-    public int readCurrentSanTE() {
-        return 0;
-    }
-
-    /**
-     * **写当前 SanTE**（框架视图；clamp 在组件内部；默认空实现）。
-     * <p>声明在基类 ⇒ 调用方按 id 取到通用面即可写，**不必认识** SanTE 组件 ✓
-     * —— 与 {@link #writeCurrentEnergy(int)} **完全对称**。
-     */
-    public void writeCurrentSanTE(int value) {
-    }
-
-    /**
-     * **治疗**（框架视图；clamp 策略的唯一实现在生命组件里；默认空实现）。
-     * <p>声明在基类 ⇒ 框架按 id 取到通用面即可治疗，**不必认识**生命组件 ✓。
-     */
-    public void heal(double amount) {
-    }
-
+ //★ **六个"框架通用视图"已整体删除**（它们让基类认识热键栏 / 能量 / SanTE / 生命——那些是具体组件的语言）：
+ //   requestRepaint()      → 渲染组件自己的 `markDirty()`（消费者直接持有渲染组件）
+ //   readCurrentEnergy()   → 能量组件的 `current()`
+ //   writeCurrentEnergy()  → 能量组件的 `set(int)`
+ //   readCurrentSanTE()    → SanTE 组件的 `current()`（原基类那份**生产者 0**，已直删）
+ //   writeCurrentSanTE()   → SanTE 组件的 `set(int)`（同上）
+ //   heal(double)          → 生命组件的 `heal(double)`（原基类那份**消费者 0**）
+ //  ⇒ 本基类现在**不含任何子类/具体组件的语言** ✓
     /** 停止生效：与 start 严格对称。返回后框架自动回收本组件登记的资源。 */
     public void stop() {
     }

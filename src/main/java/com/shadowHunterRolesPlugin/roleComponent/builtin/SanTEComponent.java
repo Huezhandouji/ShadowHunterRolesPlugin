@@ -295,19 +295,8 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         return true;
     }
 
-    // ───────── 基类通用面（框架 / 他人**按 id 取到通用面即可读写**，不必认识本组件）─────────
-
-    /** {@inheritDoc} —— 框架视图的读数落点（与 {@link #current()} 同值）。 */
-    @Override
-    public int readCurrentSanTE() {
-        return current;
-    }
-
-    /** {@inheritDoc} —— 框架视图的写入落点（clamp 与通知仍在 {@link #set(int)} 里）。 */
-    @Override
-    public void writeCurrentSanTE(int value) {
-        set(value);
-    }
+ //★ 基类通用面 `readCurrentSanTE` / `writeCurrentSanTE` **已删除**（那是本组件的语言；且它们当时的**生产者 = 0**）
+ //   ⇒ 消费者直接持有强类型 `SanTEComponent`，调 `current()` / `set(int)` ✓
     /**
      * **组件操作面**：把外部字符串指令**薄适配**到本组件既有强类型方法（零新增状态通道 ✓）。
      * <p><b>grammar（首 token 必为动词，大小写敏感；参数以单个空格分隔）</b>：

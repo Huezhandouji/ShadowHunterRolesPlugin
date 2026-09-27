@@ -349,6 +349,12 @@ public class HotbarRenderComponent extends RoleComponent {
     @Override
     public void start() {
         // 首刷不在这里 —— 见方法 javadoc
+        //★ **订阅 buff 移除**：buff 消失会改变图标外观（"被沉默 / 眩晕"的禁用态等）⇒ 需要置脏重绘。
+        //  依赖方向 = **渲染组件主动去认识 buff 组件**（而不是记账器 / 别的组件反向认识渲染）✓
+        BuffComponent buffs = findComponent(BuffComponent.class);
+        if(buffs != null){
+            buffs.manager().onBuffRemoved(this::markDirty);
+        }
     }
 
     /**

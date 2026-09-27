@@ -79,7 +79,7 @@ public class ExampleSelfRefreshingSkill extends Skill {
         if(ticks < REQUEST_WINDOW_START_TICKS || ticks > REQUEST_WINDOW_END_TICKS) return;
         if(ticks % REQUEST_PERIOD_TICKS != 0) return;
         if(renderComponent != null){
-            renderComponent.requestRepaint();
+            renderComponent.markDirty();
         }
     }
 

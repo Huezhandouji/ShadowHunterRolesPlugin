@@ -194,7 +194,7 @@ public class SkillListener implements Listener {
         instance.invokeComponentHook(component, "onCast", () -> active.onCast(new CastSignal(trigger)));
         //★ 渲染组件**由本 listener 自己按 id 取**（容器不持有它、也不认识它）
         RoleComponent render = instance.componentRegistry().getById(HotbarRenderComponent.ID);
-        if(render != null) render.requestRepaint();
+        if(render instanceof HotbarRenderComponent hotbar) hotbar.markDirty();
         return true;
     }
 }

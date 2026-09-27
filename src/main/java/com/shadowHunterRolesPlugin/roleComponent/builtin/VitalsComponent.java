@@ -231,13 +231,12 @@ public class VitalsComponent extends RoleComponent {
 
     // ───────────── 单参入口（= target 为自己；★ 同时是基类通用面的实现）─────────────
 
+ //★ 基类通用面 `heal(double)` **已删除**（那是本组件的语言）⇒ 本方法保留为**本组件自己的公开口**：
+ //   消费者持有强类型 `VitalsComponent` 后直接调它（与 `heal(Player, double)` 同源）✓
+
     /**
-     * 治疗**自己**（内部按最大生命 clamp）—— 与原 {@code RoleInstance#heal} 逐字等价。
-     *
-     * <p>★ **本方法覆写 {@link RoleComponent#heal(double)}** ⇒ 框架按 id 取到通用面即可治疗，
-     * **不必认识本组件** ✓（签名与语义与既有实现逐字相同）。
+     * **治疗自己**（内部按最大生命 clamp）—— 与原 {@code RoleInstance#heal} 逐字等价。
      */
-    @Override
     public void heal(double amount) {
         heal(self(), amount);
     }

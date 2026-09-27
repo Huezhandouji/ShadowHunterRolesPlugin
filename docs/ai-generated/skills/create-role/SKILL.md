@@ -84,10 +84,12 @@ public class MySkill extends Skill {                       // ✓ core→roleCom
     @Override protected int currentEnergy() { return 0; }        // ✓ 施放前能量读口（与 EnergyComponent 一致）
     @Override public void stop() { }                       // ✓ 清理（幂等）
 
-    public static final class Specification extends Skill.Specification {   // ★ 声明值写在这里 ✓
+    // ★ 泛型实参必须写【你自己的类】（否则 requires(具体组件.class) 永不满足，见 组件模型.md §6.6）
+    public static final class Specification extends Skill.Specification<MySkill> {   // ★ 声明值写在这里 ✓
         public Specification() {
+            // ★ 现行构造器签名 = (显示名, 说明, 冷却tick, 耗能, 图标) —— 说明是单个 Component，不是 List
             super(net.kyori.adventure.text.Component.text("我的技能"),   // 显示名（★ Adventure ✗ 不用 ChatColor）
-                  java.util.List.of(net.kyori.adventure.text.Component.text("说明")),
+                  net.kyori.adventure.text.Component.text("说明"),        // 说明（单个 Component）
                   org.bukkit.Material.REDSTONE,                        // 图标
                   100,                                                 // 冷却 tick（0 = 无冷却）
                   0);                                                  // 耗能（0 = 不耗能）
@@ -101,7 +103,7 @@ public class MySkill extends Skill {                       // ✓ core→roleCom
 public class MyPassive extends PassiveSkill {
     public MyPassive(String id, ComponentServices services, Specification specification) { super(id, services, specification); }
     @Override public void update() { }                     // 每刻；或覆写 start()/stop()
-    public static final class Specification extends PassiveSkill.Specification { /* 同型：显示名 + 说明 + 图标 */ }
+    public static final class Specification extends PassiveSkill.Specification<MyPassive> { /* 同型：显示名 + 说明 */ }
 }
 ```
 **★ 冷却与耗能** ✓（R-7）：冷却由**组件自持** —— 在施放成功处调 `startCooldown()` ✓、需要停时 `stopCooldown()` ✓（**不要**去框架里找冷却表 ✗）。耗能写进描述符（第 5 参 ✓），施放前用 `currentEnergy()` 声明读口 ✓。

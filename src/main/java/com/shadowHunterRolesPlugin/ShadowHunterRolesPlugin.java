@@ -18,6 +18,8 @@ import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.registry.RoleLoader;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
+import java.util.UUID;
+
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.PluginCommand;
@@ -50,19 +52,40 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         KeyFactory.Registry.install(keys);
 
         FactionLookup factions = new FactionLookup() {
+            /**
+             * **按 UUID 读阵营**（★ 主口径）：实现体与旧的 `factionOf(Player)` **逐字同源** ——
+             * 只是取实例那一步改用 `getRoleInstance(uuid)`（`RoleManager` 的 UUID 重载）。
+             *
+             * <p>取值经**聚合根**（角色模板上的阵营声明值）：未选角色 / 取不到角色模板 ⇒ UNKNOWN。
+             */
             @Override
-            public Faction factionOf(Player player) {
-                if(player == null) return Faction.UNKNOWN;
-                RoleInstance target = roleManager != null ? roleManager.getRoleInstance(player) : null;
-                //取值改经**聚合根**（角色模板上的阵营声明值）✓ ——
-                //原 `RoleInstance#getFaction()` 视图已随 FactionComponent 整体删除 ✗；
-                //本 lambda 的语义不变：未选角色 / 取不到角色模板 ⇒ UNKNOWN。
+            public Faction factionOf(UUID uuid) {
+                if(uuid == null) return Faction.UNKNOWN;
+                RoleInstance target = roleManager != null ? roleManager.getRoleInstance(uuid) : null;
                 Role role = target != null ? target.getRole() : null;
                 return role != null ? role.getFaction() : Faction.UNKNOWN;
             }
 
+            /**
+             * **两个玩家之间是否敌对**（★ 对称）：两侧都按 UUID 取阵营，再套同一条判据
+             * ⇒ {@code isHostile(a,b)} 与 {@code isHostile(b,a)} 同值 ✓。
+             */
             @Override
-            public boolean isHostile(Faction self, Player other) {
+            public boolean isHostile(UUID self, UUID other) {
+                Faction selfFaction = factionOf(self);
+                Faction otherFaction = factionOf(other);
+                return selfFaction != otherFaction
+                        || selfFaction == Faction.UNKNOWN
+                        || otherFaction == Faction.UNKNOWN;
+            }
+
+            /**
+             * **「某个阵营」与「某个玩家」是否敌对**：对方阵营 == 自身阵营且自身不是 UNKNOWN ⇒ 不敌对；
+             * 其余（对方 UNKNOWN / 阵营不同 / 自身 UNKNOWN）⇒ 敌对。与旧实现**逐字等价**。
+             * <p>消费者 = {@code core/RoleInfoImpl#isHostileTo(UUID)}（"我这个角色是否与它敌对"）。
+             */
+            @Override
+            public boolean isHostile(Faction self, UUID other) {
                 Faction otherFaction = factionOf(other);
                 return self != otherFaction || self == Faction.UNKNOWN;
             }

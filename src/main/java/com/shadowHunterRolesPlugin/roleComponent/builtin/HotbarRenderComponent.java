@@ -71,19 +71,8 @@ public class HotbarRenderComponent extends RoleComponent {
      */
     public static final String ID = "hotbarRender";
 
-    /**
-     * **渲染意图的置脏入口**（本组件对外暴露的那一条通道的落点）。
-     * <p>{@code null} 是**合法**状态：未装配时（例如单元测试直接构造组件）请求重绘是**静默无操作** ✓
-     * —— 与"未装配 ⇒ 无事可做"同义，**不是**错误 ✗。
-     */
-    @FunctionalInterface
-    public interface RepaintSink {
-        /** 置脏（幂等：同一 tick 多次请求与一次等价）。**不写物品** ✗。 */
-        void markDirty();
-    }
-
-    /** 置脏通道；装配期注入，未注入时为 {@code null}（见 {@link RepaintSink} 的 null 语义）。 */
-    private RepaintSink repaintSink;
+    //★ `RepaintSink`（注入式置脏回调）**已删除** —— 它的注入点在容器里失去调用者后，
+    //   回调恒为 null ⇒ `requestRepaint()` 静默变成空操作。现由本组件**自持脏标记**：见 `requestRepaint()`。
 
     /**
      * **渲染器**（唯一写点所在）—— 由本组件**持有并驱动** ✓。
@@ -449,30 +438,17 @@ public class HotbarRenderComponent extends RoleComponent {
     }
 
     /**
-     * **装配期绑定**（构造之后、{@code awake()} 之前）—— 与既有【装配期解析】同一条纪律
-     * （绑定一律在构造期完成）。
-     * <p>由 {@code RoleInstance} 在装配期调用（见该处注释）。
-     */
-    public void bindRepaintSink(RepaintSink sink) {
-        this.repaintSink = sink;
-    }
-
-    /**
-     * **请求重绘**：把"要重绘"这件事登记到本组件，并置脏 ⇒ **下一次帧末 flush** 才会写物品 ✓。
-     * <p>这是**唯一**的组件侧渲染意图入口 ✓ —— 取代此前并存的
-     * {@code RepaintRequestable} / {@code RepaintRequester} 两条老通道（**禁两套并存** ✗）。
+     * **请求重绘**：把"要重绘"这件事置到本组件的脏标记上 ⇒ **下一次帧末 flush** 才会写物品 ✓。
+     * <p>这是**唯一**的组件侧渲染意图入口 ✓。
+     * <p>★ **本组件自持脏标记**（{@link #markDirty()}）：早期形态是"注入一个 {@code RepaintSink} 回调"
+     * —— 那个注入点后来**失去调用者**（容器不再绑定）⇒ 该回调恒为 {@code null}
+     * ⇒ `requestRepaint()` 静默变成**空操作**（射击 / 能量变化 / 冷却置脏全部失效）✗。
+     * 现直接置本组件的字段：**自指的空转件已删除**，不可能再出现"没接线就静默失效" ✓。
      * <p><b>幂等</b>：脏标记是布尔量 ⇒ 同一 tick 内多次调用与一次等价 ✓。
      * <p><b>不写物品</b> ✗：返回后物品**尚未**被改写 ✓（「空闲 tick 零 {@code setItem}」逐字不变 ✓）。
      */
     public void requestRepaint() {
-        if (repaintSink != null) {
-            repaintSink.markDirty();
-        }
-    }
-
-    /** 是否已装配置脏通道（诊断读口；供探针与运行级取证使用）。 */
-    public boolean hasRepaintSink() {
-        return repaintSink != null;
+        markDirty();
     }
 
     /**

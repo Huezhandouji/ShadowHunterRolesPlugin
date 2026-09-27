@@ -51,6 +51,12 @@ public class HotbarSpecification<T extends RoleComponent>
     private final int cooldownTicks;
     private final int energyCost;
 
+    /**
+     * **栏位**（★ 栏位值的**持有者就是本类型** —— 基类描述符不含栏位语言）：
+     * {@code null} = 未设（**装配期未设 ⇒ {@link #freeze()} 抛异常**）。
+     */
+    private Integer slot;
+
     protected HotbarSpecification(String descriptorLabel, String id, Component displayName, Component description,
                                   Material icon, int cooldownTicks, int energyCost) {
         super(descriptorLabel);
@@ -72,18 +78,49 @@ public class HotbarSpecification<T extends RoleComponent>
         return new HotbarSpecification<>(descriptorLabel, id, displayName, description, icon, cooldownTicks, energyCost);
     }
 
- /** 本类型**必须**有栏位：见 {@link RoleComponent.Specification#freeze()} 的 fail-fast。 */
+    /** **本类型必须有栏位**：未设栏位 ⇒ 冻结期 fail-fast（绝不静默变成"不占栏位"）。 */
     @Override
-    protected boolean requiresSlot() {
-        return true;
+    protected void validateForFreeze() {
+        if (slot == null) {
+            throw new IllegalStateException("A hotbar specification of kind " + descriptorLabel()
+                    + " must be given a slot (setSlot) before assembly.");
+        }
     }
 
- /**
- * **装配器设置栏位**（这一支唯一会在装配期写入的参数；其余表现字段由组件自己的描述符声明默认值）。
- * 冻结后调用、重复改成别的位置、越界（非 0..8）一律抛异常。
- */
+    /** **栏位读口**（★ 唯一读口；{@code null} = 未设 / 不占栏位）。 */
+    @Override
+    public Integer slotOrNull() {
+        return slot;
+    }
+
+    /** 占不占栏位（{@code false} = 未设栏位 ⇒ 不进槽位表）。 */
+    public final boolean hasSlot() {
+        return slot != null;
+    }
+
+    /** 栏位（0..8）；**未设栏位 ⇒ 抛异常**（绝不回落 `-1` 哨兵）。 */
+    public final int slot() {
+        if (slot == null) {
+            throw new IllegalStateException("Component specification of kind " + descriptorLabel()
+                    + " has no slot assigned.");
+        }
+        return slot;
+    }
+
+    /**
+     * **装配器设置栏位**（这一支唯一会在装配期写入的参数；其余表现字段由组件自己的描述符声明默认值）。
+     * <p>非法值 / 重复改成别的位置 / 冻结后设置 ⇒ 一律抛异常（语义与文案**逐字保留**）。
+     */
     public final HotbarSpecification<T> setSlot(int slot) {
-        assignSlot(slot);
+        ensureMutable();
+        if (slot < 0 || slot > 8) {
+            throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
+        }
+        if (this.slot != null && this.slot != slot) {
+            throw new IllegalStateException("Slot already assigned to " + this.slot + " for kind "
+                    + descriptorLabel() + "; refusing to move it to " + slot + ".");
+        }
+        this.slot = slot;
         return this;
     }
 

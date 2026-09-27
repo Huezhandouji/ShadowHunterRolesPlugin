@@ -4,7 +4,6 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecificat
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -31,8 +30,7 @@ import org.bukkit.inventory.ItemStack;
  * {@link #onCast(CastSignal)} / {@link #onAttack(AttackSignal)} 与 {@link CastTrigger} /
  * {@link CastSignal} / {@link AttackSignal} 都归组件 —— 施放与攻击由**物品支持类组件**处理。
  */
-public abstract class ActiveComponent extends RoleComponent
-        implements EnergyComponent.EnergyCosting {
+public abstract class ActiveComponent extends RoleComponent {
 
     /** **热键栏触发的三种来源**（listener 只做"事件 → trigger"翻译；`onCast` 入口的输入词汇）。 */
     public enum CastTrigger {
@@ -116,8 +114,7 @@ public abstract class ActiveComponent extends RoleComponent
         return specification().getCooldownTicks();
     }
 
-    /** 耗能**声明值**（数据源 = 描述符）；同时满足 {@link EnergyComponent.EnergyCosting} 的声明。 */
-    @Override
+    /** 耗能**声明值**（数据源 = 描述符）；{@code 0} = 不耗能（{@code ENERGY_LACK} 态不可达）。 */
     public int getEnergyCost() {
         return specification().getEnergyCost();
     }

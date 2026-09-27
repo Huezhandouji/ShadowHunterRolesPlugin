@@ -121,7 +121,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         Collection<? extends Player> victims = loc.getNearbyPlayers(5);
 
         for (Player victim : victims) {
-            if (!svc().roleInfo().isHostile(victim)) continue;
+            if (!svc().roleInfo().isHostileTo(victim.getUniqueId())) continue;
             vitals.physicalDamage(victim, player, 14);
         }
 

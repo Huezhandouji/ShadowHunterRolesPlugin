@@ -185,8 +185,8 @@ public abstract class RoleComponent {
          */
         private final String descriptorLabel;
 
-        /** 栏位；{@code null} = 不占栏位（**类型的缺失，不是 -1 哨兵**）。 */
-        private Integer slot;
+ //★ **本基类不持有栏位字段** —— 栏位归「带栏位的那一支描述符」（`HotbarSpecification`）。
+ //   基类只声明一个可选读口 `slotOrNull()`（默认 null = 不占栏位）✓
 
         /** 冻结位：装配期 {@link #freeze()} 之后禁止再改（防止被共享后被串改）。 */
         private boolean frozen;
@@ -327,51 +327,36 @@ public abstract class RoleComponent {
             }
         }
 
-        /** 占不占热键栏；{@code false} = 不占（不进槽位表）。 */
-        public final boolean hasSlot() {
-            return slot != null;
-        }
+ //★ **栏位的持有者是「带栏位的那一支描述符」**（`builtin/hotbar/HotbarSpecification`），
+ //   **不是**本基类 —— 被动等组件根本没有栏位，基类不该出现栏位语言。
+ //   本基类只留**一个可选读口**：`slotOrNull()`（`null` = 不占栏位）。
 
-        /** 栏位（0..8）；**未设栏位 ⇒ 抛异常**（绝不回落 `-1` 哨兵）。 */
-        public final int slot() {
-            if (slot == null) {
-                throw new IllegalStateException(
-                        "Component specification of kind " + descriptorLabel + " has no slot assigned.");
-            }
-            return slot;
+        /**
+         * **本描述符**声明的栏位；**{@code null} = 不占栏位**。
+         *
+         * <p>默认 {@code null}（当前基类**不再持有**栏位字段 ⇒ 本方法只是"带栏位那一支"的读口契约）：
+         * {@code HotbarSpecification} 覆写它返回真正的栏位值；被动等无栏位描述符用默认值 ✓。
+         *
+         * <p><b>谁读它</b>：装配期冲突判定（{@code core/Role.Builder}）与渲染侧的登记入口。
+         */
+        public Integer slotOrNull() {
+            return null;
         }
 
         /**
-         * 装配器设置栏位（**唯一一处**会在装配期写入的参数；其余表现字段由组件自己的描述符声明默认值）。
-         * 非法值、重复设置、冻结后设置一律抛异常。
+         * **冻结校验**（供**子类**在自己的可写口里复用）：已冻结 ⇒ 抛异常。
+         * <p>冻结位是本类的私有状态 ⇒ 子类需要这个受保护读口，而不是各自重写一遍文案。
          */
-        protected final void assignSlot(int slot) {
+        protected final void ensureMutable() {
             if (frozen) {
                 throw new IllegalStateException(
                         "Component specification of kind " + descriptorLabel + " is frozen and cannot be changed.");
             }
-            if (slot < 0 || slot > 8) {
-                throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
-            }
-            if (this.slot != null && this.slot != slot) {
-                throw new IllegalStateException(
-                        "Slot already assigned to " + this.slot + " for kind " + descriptorLabel + "; refusing to move it to " + slot + ".");
-            }
-            this.slot = slot;
         }
 
-        /**
-         * **装配器绑定注册 id**（与 {@link #assignSlot(int)} 同族：都是"必须由装配器设置"的参数）。
-         * <p>为什么必须有它：组件自带的描述符用"不带 id 的构造"声明（id 属于注册处）⇒ 若不绑定，
-         * 描述符里任何读 id 的路径都会拿到 {@code null}。绑定后
-         * **描述符的 id 与注册处同源同值**，字段不再撒谎。
-         * <p>id 为空 / 已冻结 / 已绑定到**另一个** id ⇒ 抛异常（同 id 重复绑定是幂等的）。
-         */
+        /** 装配器绑定注册 id（与"栏位"同族：都是"必须由装配器设置"的参数）。 */
         public final void bindId(String id) {
-            if (frozen) {
-                throw new IllegalStateException(
-                        "Component specification of kind " + descriptorLabel + " is frozen and cannot be changed.");
-            }
+            ensureMutable();
             if (id == null || id.trim().isEmpty()) {
                 throw new IllegalArgumentException("Component ID cannot be null or empty.");
             }
@@ -393,26 +378,21 @@ public abstract class RoleComponent {
          * 并把本实例置为只读。
          * <p>装配入口 {@code Role.Builder.addComponent(String, Specification)} 只使用这份快照
          * ⇒ 角色模板**不持有描述符对象**，两个角色共用一个描述符实例也互不影响。
-         * <p><b>带栏位必填</b>：子类若声明"本类型必须有栏位"（{@link #requiresSlot()}），则未设栏位时
-         * **在此抛异常** —— 不占栏位必须由**类型**表达（用无栏位的描述符），不得静默降级。
+         * <p><b>栏位</b>：本方法只把 {@link #slotOrNull()}（多态）的值抄进快照 ——
+         * "带栏位必填"的 fail-fast 由**带栏位那一支描述符**自己做（{@code HotbarSpecification}）✓。
          * <p><b>依赖声明的自检</b>：同一个类型不得**既必需又可选择** ⇒ 抛
          * {@link IllegalStateException}（自相矛盾的声明必须在装配期就喊出来，而不是"看哪条先被读到"）。
          */
         /**
-         * **本描述符声明的栏位**（未设 ⇒ {@code null}）。
-         *
-         * <p>★ 这是「栏位值」的**唯一读口**（装配期冲突判定与渲染组件落位都读它）
-         * —— 条目与 `Role` 实例**都不再持有**栏位值 ✓。
+         * **冻结前的子类自检**（默认空）：带栏位那一支描述符在此做"必须有栏位"的 fail-fast。
+         * <p>为什么是钩子而不是覆写 {@link #freeze()}：freeze 是 `final` 的**单一实现点**
+         * （快照形状必须唯一）⇒ 子类只能插校验，不能改形状 ✓。
          */
-        public final Integer slotOrNull() {
-            return slot;
+        protected void validateForFreeze() {
         }
 
         public final Snapshot freeze() {
-            if (requiresSlot() && slot == null) {
-                throw new IllegalStateException(
-                        "A hotbar specification of kind " + descriptorLabel + " must be given a slot (setSlot) before assembly.");
-            }
+            validateForFreeze();
             for (Class<? extends RoleComponent> type : optionalTypes) {
                 if (requiredTypes.contains(type)) {
                     throw new IllegalStateException(
@@ -421,7 +401,7 @@ public abstract class RoleComponent {
                 }
             }
             this.frozen = true;
-            return new Snapshot(descriptorLabel, slot, this::create, providedType(), requiredTypes, optionalTypes);
+            return new Snapshot(descriptorLabel, slotOrNull(), this::create, providedType(), requiredTypes, optionalTypes);
         }
 
         /** 本类型的描述符是否**必须**有栏位（默认 `false`；带栏位分支覆写为 `true`）。 */

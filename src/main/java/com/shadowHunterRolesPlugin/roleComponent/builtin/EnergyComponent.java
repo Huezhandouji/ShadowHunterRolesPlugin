@@ -78,18 +78,10 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
     public record Listener(RoleComponent owner, Consumer<Change> listener) {
     }
 
-    /**
-     * **「这个组件耗能量」的能力接口**：耗能是**能量面**的声明 ⇒ 本接口归能量组件所有
-     * （能力各归其家：耗能声明与能量真值同属能量面）。
-     * 非零能量成本只有两个技能（`MeiqiheziBloodySlashSkill` = 8 / `MeiqiheziCircleSlashSkill` = 15）。
-     * <p>实现方式：由 `HotbarRenderComponent.HotbarPresentable` 的 `default` 满足，并由 `ActiveComponent`
-     * 显式转发（本组件不实现它，只承载声明面 ✓）。
-     */
-    public interface EnergyCosting {
-
-        /** 扔放所需能量（点）；{@code 0} = 不耗能（{@code ENERGY_LACK} 态不可达）。 */
-        int getEnergyCost();
-    }
+    //★ `EnergyCosting` 接口**已删除**（多此一举：它只有 `getEnergyCost()` 一个方法，
+    //   实现者只有 `ActiveComponent`，且**没有任何以它为类型的消费者** ⇒ 纯空转类型）。
+    //   耗能声明值仍由 {@code ActiveComponent#getEnergyCost()} 提供（数据源 = 描述符），
+    //   消费者照旧（技能 / 主武器的默认画法、两个按耗能扣减的技能）。
 
     /** **监听器名单** —— 顺序 = 添加先后 ✓（迭代序稳定 ⇒ "按注册序通知"可复现 ✓）。 */
     private final List<Listener> listeners = new ArrayList<>();

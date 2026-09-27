@@ -7,6 +7,8 @@ import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.*;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluBlueIceRevolverSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluTraumaPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
@@ -22,6 +24,8 @@ import com.shadowHunterRolesPlugin.core.RoleInstance;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Boss;
+import org.checkerframework.checker.index.qual.PolyUpperBound;
+import org.codehaus.plexus.interpolation.PrefixAwareRecursionInterceptor;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -63,7 +67,8 @@ public class RoleLoader {
         return List.of(
                 new Definition("meiqihezi", RoleLoader::meiqiheziBuilder),
                 new Definition("red", RoleLoader::redBuilder),
-                new Definition("selfUpdateExample", RoleLoader::selfUpdateExampleBuilder)
+                new Definition("selfUpdateExample", RoleLoader::selfUpdateExampleBuilder),
+                new Definition("canglu", RoleLoader::cangluBuilder)
         );
     }
 
@@ -177,6 +182,18 @@ public class RoleLoader {
                 .addComponent(RedEquipmentsPassive.ID, new RedEquipmentsPassive.Specification())
                 .addComponent(DefaultSanTEZeroPunishment.ID, new DefaultSanTEZeroPunishment.Specification())
                 .icon(Material.POPPY);
+    }
+
+    private static Role.Builder cangluBuilder(){
+        return withBuiltIns(new Role.Builder("canglu"))
+                .displayName(Component.text("苍鹭"))
+                .description(List.of(
+                        Component.text("聋子?")
+                ))
+                .faction(Faction.HUNTER)
+                .addComponent(CangluTraumaPassive.ID, new CangluTraumaPassive.Specification())
+                .addComponent(CangluBlueIceRevolverSkill.ID, new CangluBlueIceRevolverSkill.Specification().setSlot(1))
+                .icon(Material.BLUE_ICE);
     }
 
     /**

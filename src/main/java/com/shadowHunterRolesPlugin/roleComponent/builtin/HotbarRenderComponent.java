@@ -394,6 +394,52 @@ public class HotbarRenderComponent extends RoleComponent {
      * **物品**取自组件自己的默认画法读口（{@link #buildItemOf(RoleComponent)}）。
      * <p>不占栏位、或本帧画不出物品的组件**不进计划**（与"跳过该槽位"同义）。
      */
+    /**
+     * **「组件 id → 栏位」登记表**（★ 本组件自持；由组件在装配期向本组件**登记**自己的栏位）。
+     *
+     * <p>为什么不让渲染侧去描述符里读：那是"框架要认识带栏位描述符"，而栏位是**热键栏的契约**
+     * ⇒ 归本组件持有最自然 ✓（组件自己知道自己要占哪一格）。
+     * <p>顺序 = **登记顺序**（= 组件装配序）⇒ 落位结果可复现 ✓。
+     */
+    private final Map<String, Integer> slotByComponent = new LinkedHashMap<>();
+
+    /**
+     * **组件登记自己的栏位**（★ 唯一入口；`slot == null` ⇒ 撤销登记 = 不占栏位）。
+     *
+     * <p><b>仲裁</b>：同一栏位被两个组件占用 ⇒ **抛异常**（fail-fast，点名两个组件与栏位）
+     * —— 装配期判据在此保留，只是时机从"模板注册"移到"实例登记" ✓。
+     * <p>同一组件重复登记同一栏位 ⇒ 幂等 ✓（换栏位 ⇒ 先撤旧再记新）。
+     */
+    public void registerSlot(RoleComponent component, Integer slot) {
+        if (component == null) {
+            return;
+        }
+        if (slot == null) {
+            slotByComponent.remove(component.getId());
+            return;
+        }
+        if (slot < 0 || slot > 8) {
+            throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
+        }
+        for (Map.Entry<String, Integer> occupied : slotByComponent.entrySet()) {
+            if (!occupied.getKey().equals(component.getId()) && occupied.getValue().equals(slot)) {
+                throw new IllegalStateException("Slot " + slot + " is already occupied by '"
+                        + occupied.getKey() + "'; '" + component.getId() + "' cannot take it.");
+            }
+        }
+        slotByComponent.put(component.getId(), slot);
+    }
+
+    /** 某组件登记的栏位（未登记 ⇒ {@code null} = 不占热键栏）。 */
+    public Integer slotOf(String componentId) {
+        return componentId == null ? null : slotByComponent.get(componentId);
+    }
+
+    /** 已登记的栏位数（诊断读口）。 */
+    public int registeredSlotCount() {
+        return slotByComponent.size();
+    }
+
     private List<HotbarRenderer.Entry> renderPlan() {
         Map<Integer, ItemStack> bySlot = new LinkedHashMap<>();
         // ① 拉取式（既有）：物品来自组件自己的默认画法读口 —— ★ 画法归属不动（契约 §7.3）
@@ -401,9 +447,10 @@ public class HotbarRenderComponent extends RoleComponent {
             for (RoleComponent component : svc().components().all()) {
                 ItemStack item = buildItemOf(component);
                 if (item == null) continue;
-                HotbarSpecification<?> specification = specificationOf(component);
-                if (specification == null || !specification.hasSlot()) continue;
-                bySlot.put(specification.slot(), item);
+                //★ 落位读**登记表**（组件自己登记的栏位）；未登记 ⇒ 不占热键栏 ✓
+                Integer slot = slotByComponent.get(component.getId());
+                if (slot == null) continue;
+                bySlot.put(slot, item);
             }
         }
         // ② 提交式（新）：机制面在**绑键步**写身份键（恰好一次 setItemMeta）；同槽位**覆盖**拉取式条目
@@ -436,8 +483,8 @@ public class HotbarRenderComponent extends RoleComponent {
             return false;
         }
         for (RoleComponent component : svc().components().all()) {
-            HotbarSpecification<?> specification = specificationOf(component);
-            if (specification == null || !specification.hasSlot()) continue;
+            //★ "占栏位"读**登记表**（与渲染落位同源 ✓）
+            if (slotByComponent.get(component.getId()) == null) continue;
             if (component instanceof ActiveComponent active && active.isCoolingDown()) return true;
         }
         return false;
@@ -654,15 +701,15 @@ public class HotbarRenderComponent extends RoleComponent {
     /**
      * **按槽位反查组件 id**（★ 栏位知识的归属：本组件）。
      *
-     * <p>遍历给定的组件集，返回**第一个**描述符声明了该槽位的组件的 id；未占用 ⇒ {@code null}。
-     * 与 {@link #renderPlan()} 读槽位**同一来源**（描述符的 {@code slot()}）⇒ 不会与渲染结果脱节 ✓。
+     * <p>读的是本组件的**登记表**（`slotByComponent`）⇒ 与 {@link #renderPlan()} 落位**同源**
+     * ⇒ 反查结果与渲染结果不可能脱节 ✓。未占用 ⇒ {@code null}。
      *
-     * <p>★ **组件集由调用方传入**（本组件不自持"全部组件"）⇒ 它不依赖容器，只吃一份数据 ✓。
+     * <p>★ **实例方法**（不再是静态）：登记表是**实例状态** ⇒ 反查必须问"这一个实例" ✓。
      *
      * @param components 要扫的组件集（顺序 = 调用方给的顺序；命中即返回）
      * @param slot       槽位（0..8）
      */
-    public static String componentIdAtSlot(List<RoleComponent> components, int slot) {
+    public String componentIdAtSlot(List<RoleComponent> components, int slot) {
         if (components == null) {
             return null;
         }
@@ -670,8 +717,9 @@ public class HotbarRenderComponent extends RoleComponent {
             if (component == null) {
                 continue;
             }
-            HotbarSpecification<?> specification = specificationOf(component);
-            if (specification != null && specification.hasSlot() && specification.slot() == slot) {
+            //★ 读**登记表**（与 renderPlan 同源 ⇒ 不会与渲染结果脱节 ✓）；未登记 ⇒ 不占栏位
+            Integer registered = slotByComponent.get(component.getId());
+            if (registered != null && registered == slot) {
                 return component.getId();
             }
         }

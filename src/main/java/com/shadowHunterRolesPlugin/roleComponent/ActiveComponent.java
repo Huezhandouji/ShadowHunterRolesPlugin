@@ -56,6 +56,23 @@ public abstract class ActiveComponent extends RoleComponent {
      */
     private int cooldownUntilTick = 0;
 
+    /**
+     * **装配期把自己要占的栏位登记给渲染组件**（★ 栏位的运行期归属 = 渲染组件）。
+     *
+     * <p><b>为什么在 {@code awake()}</b>：框架**保证每个组件都被调用一次**，而多数子类不覆写它
+     * ⇒ 登记**不会被漏掉**（放在 {@code start()} 里则"子类覆写 start 忘记调 super"就会静默丢图标 ✗）。
+     * <p><b>登记内容 = 描述符声明的栏位</b>（{@link HotbarSpecification#slotOrNull()}）；
+     * 无栏位（被动 / 内建）⇒ 传 {@code null} ⇒ 渲染组件撤销登记 ✓。
+     * <p>渲染组件按注册序排在最前（内建块首位）⇒ 本方法执行时它**已在容器里** ✓。
+     */
+    @Override
+    public void awake() {
+        HotbarRenderComponent render = findComponent(HotbarRenderComponent.class);
+        if (render != null) {
+            render.registerSlot(this, specification().slotOrNull());
+        }
+    }
+
     protected ActiveComponent(String id, ComponentServices services, HotbarSpecification<?> specification) {
         super(id, services);
         this.specification = specification;

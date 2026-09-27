@@ -174,8 +174,6 @@ public class CangluBlueIceRevolverSkill extends Skill {
             return;
         }
         currentBulletCount--;
-        //TEMP-DIAG（结案即删）：证明"射击确实扣了弹"
-        org.bukkit.Bukkit.getLogger().info("[canglu-revolver] SHOOT ammo now=" + currentBulletCount);
         createBullet();
 
         Player self = svc().self().player();
@@ -389,20 +387,8 @@ public class CangluBlueIceRevolverSkill extends Skill {
                 .text(" (" + currentBulletCount + "/" + MAX_MAGAZINE_CAPACITY + ")")
                 .color(ammoColor)));
         stack.setItemMeta(meta);
-        //TEMP-DIAG（定位"余量总显示 8"用；结案即删）：只在**计数变化**时打一行，避免每帧刷屏
-        if(lastLoggedBulletCount != currentBulletCount){
-            lastLoggedBulletCount = currentBulletCount;
-            org.bukkit.Bukkit.getLogger().info("[canglu-revolver] buildItem ammo=" + currentBulletCount
-                    + "/" + MAX_MAGAZINE_CAPACITY
-                    + " cooling=" + isCoolingDown()
-                    + " name=" + net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-                            .plainText().serialize(meta.displayName()));
-        }
         return stack;
     }
-
-    /** TEMP-DIAG：上一次已打印的弹药数（只为"计数变化才打印"）。 */
-    private int lastLoggedBulletCount = Integer.MIN_VALUE;
 
     // ───────── 基类契约 ─────────
 

@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
+import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
@@ -7,6 +8,7 @@ import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -275,6 +277,90 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
     /** 减少 SanTE（内部按 0 下限 clamp；归零惩罚由既有组件监听真变化后触发）。 */
     public void decrease(int amount) {
         set(current - amount);
+    }
+
+    // ───────── ★ 跨实例：按**玩家 UUID** 增减**别人**的 SanTE（与能量组件同形）─────────
+
+    /**
+     * **给某个玩家（按 UUID）增加 SanTE**，并返回**真实增加量**。
+     *
+     * <p>对方可能已接近上限 ⇒ 实际只加到 `max` 为止，返回值是**真实**那个数 ✓。
+     *
+     * @param target 目标玩家 UUID
+     * @param amount 想增加的量（**≤ 0 ⇒ 不做任何事**，返回 0）
+     * @return ★ **真实增加量**；目标无角色实例 / 取不到本组件 / 无变化 ⇒ **0**
+     */
+    public int increaseSanTE(UUID target, int amount) {
+        SanTEComponent other = of(target);
+        if (other == null || other == this || amount <= 0) {
+            return 0;
+        }
+        int before = other.current();
+        other.set(before + amount);
+        return other.current() - before;
+    }
+
+    /**
+     * **给某个玩家（按 UUID）减少 SanTE**，并返回**真实减少量**。
+     *
+     * <p>对方可能不足 ⇒ 实际只扣到 `0` 为止。★ 要表达"不够就整个不生效"请用
+     * {@link #decreaseSanTEAtMost(UUID, int, int)}。
+     *
+     * @param target 目标玩家 UUID
+     * @param amount 想减少的量（**≤ 0 ⇒ 不做任何事**，返回 0）
+     * @return ★ **真实减少量**（恒 ≥ 0）；目标无角色实例 / 取不到本组件 / 无变化 ⇒ **0**
+     */
+    public int decreaseSanTE(UUID target, int amount) {
+        SanTEComponent other = of(target);
+        if (other == null || other == this || amount <= 0) {
+            return 0;
+        }
+        int before = other.current();
+        other.set(before - amount);
+        return before - other.current();
+    }
+
+    /**
+     * **门槛式减少 SanTE**：只有当对方当前 SanTE **≥ {@code minimumRequired}** 时才扣，
+     * 否则**一点都不扣**（返回 0）。
+     *
+     * @param minimumRequired 生效门槛（对方 SanTE < 它 ⇒ 返回 0；**≤ 0 ⇒ 门槛不设**）
+     * @return ★ 真实减少量（未过门槛 ⇒ 0）
+     */
+    public int decreaseSanTEAtMost(UUID target, int amount, int minimumRequired) {
+        SanTEComponent other = of(target);
+        if (other == null || other == this || amount <= 0) {
+            return 0;
+        }
+        if (minimumRequired > 0 && other.current() < minimumRequired) {
+            return 0;
+        }
+        int before = other.current();
+        other.set(before - amount);
+        return before - other.current();
+    }
+
+    /**
+     * **解析某个玩家实例上的 SanTE 组件**（跨实例；未命中一律 {@code null}）。
+     *
+     * <p>与能量组件的同形实现：经插件单例拿目标 {@code RoleInstance}，
+     * 再按**本组件自己的登记 id**（本类的 {@code ID}）取同类实例
+     * ⇒ 不新增端口、不持有 {@code RoleManager}、不写第二份 id 字面量 ✓。
+     */
+    private static SanTEComponent of(UUID target) {
+        if (target == null) {
+            return null;
+        }
+        ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
+        if (plugin == null) {
+            return null;
+        }
+        RoleInstance instance = plugin.roleInstanceOf(target);
+        if (instance == null) {
+            return null;
+        }
+        RoleComponent component = instance.componentRegistry().getById(ID);
+        return component instanceof SanTEComponent sante ? sante : null;
     }
 
     /**

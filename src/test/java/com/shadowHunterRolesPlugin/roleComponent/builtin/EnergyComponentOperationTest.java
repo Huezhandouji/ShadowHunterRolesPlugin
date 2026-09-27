@@ -256,21 +256,23 @@ public class EnergyComponentOperationTest {
     }
 
     /**
-     * **旧订阅面确已删除**（"删除旧嵌套接口与旧单播字段"的判据 ✓，用**反射**离线核验）：
-     * `ChangeSink` 类型与 `onEnergyChanged` 方法**都不存在** ✓；而 `EnergyCosting`（耗能声明面，
-     * 与订阅无关）**仍在** ✓。
+     * **旧订阅面确已删除**（"删除旧嵌套接口与旧单播字段"的判据，用**反射**离线核验）：
+     * `ChangeSink` 类型与 `onEnergyChanged` 方法**都不存在** ✓；
+     * ★ 且 `EnergyCosting`（耗能声明面的空转类型）**也已删除** ✓ —— 它只有一个方法
+     * `getEnergyCost()`、实现者只有 `ActiveComponent`、**零类型消费者** ⇒ 多此一举。
+     * 耗能声明值仍由 `ActiveComponent#getEnergyCost()` 提供（本件不覆盖它，那需要描述符）。
      */
     @Test
     public void legacyChangeSinkSurfaceIsGone() {
         for (Class<?> nested : EnergyComponent.class.getDeclaredClasses()) {
             assertFalse("旧嵌套接口 ChangeSink 必须已删除：发现了 " + nested.getSimpleName(),
                     nested.getSimpleName().equals("ChangeSink"));
+            assertFalse("空转类型 EnergyCosting 必须已删除：发现了 " + nested.getSimpleName(),
+                    nested.getSimpleName().equals("EnergyCosting"));
         }
         for (Method method : EnergyComponent.class.getDeclaredMethods()) {
             assertFalse("旧单播入口必须已删除：" + method.getName(),
                     method.getName().equals("onEnergyChanged"));
         }
-        assertTrue("耗能声明面 EnergyCosting 仍在（与订阅无关）",
-                EnergyComponent.EnergyCosting.class != null);
     }
 }

@@ -404,11 +404,6 @@ public abstract class RoleComponent {
             return new Snapshot(descriptorLabel, slotOrNull(), this::create, providedType(), requiredTypes, optionalTypes);
         }
 
-        /** 本类型的描述符是否**必须**有栏位（默认 `false`；带栏位分支覆写为 `true`）。 */
-        protected boolean requiresSlot() {
-            return false;
-        }
-
         /** 抽象创建：由具体描述符决定造哪个组件类。 */
         public abstract T create(String id, ComponentServices services);
 

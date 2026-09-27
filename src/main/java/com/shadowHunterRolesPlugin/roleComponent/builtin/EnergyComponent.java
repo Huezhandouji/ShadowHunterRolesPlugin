@@ -1,11 +1,14 @@
 package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
+import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
+import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -234,6 +237,97 @@ public class EnergyComponent extends RoleComponent implements OperationProvider 
     /** 减少能量（内部按 0 下限 clamp）。 */
     public void decrease(int amount) {
         set(current - amount);
+    }
+
+    // ───────── ★ 跨实例：按**玩家 UUID** 增减**别人**的能量（"削减敌人能量"这类技能用）─────────
+
+    /**
+     * **给某个玩家（按 UUID）增加能量**，并返回**真实增加量**。
+     *
+     * <p><b>为什么返回真实量</b>：对方可能已接近上限 ⇒ 实际只加了 `max - current`。
+     * 调用方（例如"按实际回复量结算"的技能）需要真实值，而不是自己请求的那个数 ✓。
+     *
+     * @param target 目标玩家 UUID
+     * @param amount 想增加的量（**≤ 0 ⇒ 不做任何事**，返回 0）
+     * @return ★ **真实增加量**（clamp 之后）；目标无角色实例 / 取不到能量组件 / 无变化 ⇒ **0**
+     */
+    public int increaseEnergy(UUID target, int amount) {
+        EnergyComponent other = energyOf(target);
+        if (other == null || other == this || amount <= 0) {
+            return 0;
+        }
+        int before = other.current();
+        other.set(before + amount);
+        return other.current() - before;
+    }
+
+    /**
+     * **给某个玩家（按 UUID）减少能量**，并返回**真实减少量**。
+     *
+     * <p><b>为什么返回真实量</b>：对方能量可能不足 ⇒ 实际只扣到 `0` 为止。
+     * ★ 若调用方要"能量不足就整个不生效"，请先用 {@code other.current()} 自行判定，
+     * 或用 {@link #decreaseAtMost(UUID, int, int)} 表达"至少要有这么多才扣"。
+     *
+     * @param target 目标玩家 UUID
+     * @param amount 想减少的量（**≤ 0 ⇒ 不做任何事**，返回 0）
+     * @return ★ **真实减少量**（clamp 之后，恒 ≥ 0）；目标无角色实例 / 取不到能量组件 / 无变化 ⇒ **0**
+     */
+    public int decreaseEnergy(UUID target, int amount) {
+        EnergyComponent other = energyOf(target);
+        if (other == null || other == this || amount <= 0) {
+            return 0;
+        }
+        int before = other.current();
+        other.set(before - amount);
+        return before - other.current();
+    }
+
+    /**
+     * **门槛式减少**：只有当对方当前能量 **≥ {@code minimumRequired}** 时才扣减，
+     * 否则**一点都不扣**（返回 0）。
+     *
+     * <p>用途：设计"抽能"类技能时常见的两种口径 ——
+     * ① 有多少扣多少 ⇒ 用 {@link #decreaseEnergy(UUID, int)}；
+     * ② 不够就整个不生效 ⇒ 用本方法（`minimumRequired = amount`）。
+     *
+     * @param minimumRequired 生效门槛（对方能量 < 它 ⇒ 返回 0；**≤ 0 ⇒ 门槛不设**）
+     * @return ★ 真实减少量（未过门槛 ⇒ 0）
+     */
+    public int decreaseAtMost(UUID target, int amount, int minimumRequired) {
+        EnergyComponent other = energyOf(target);
+        if (other == null || other == this || amount <= 0) {
+            return 0;
+        }
+        if (minimumRequired > 0 && other.current() < minimumRequired) {
+            return 0;
+        }
+        int before = other.current();
+        other.set(before - amount);
+        return before - other.current();
+    }
+
+    /**
+     * **解析某个玩家实例上的能量组件**（跨实例；未命中一律 {@code null}）。
+     *
+     * <p>★ 组件层**唯一**的跨实例取法：经插件单例拿到目标 {@code RoleInstance}，
+     * 再按**本组件自己的登记 id**（{@link #ID}）取同类实例。
+     * 本组件**不新增端口**、不持有 `RoleManager`，id 也不写第二份字面量 ✓。
+     * <p>目标无角色 / 未加载 ⇒ {@code null}（调用方按"无事可做"处理）。
+     */
+    private static EnergyComponent energyOf(UUID target) {
+        if (target == null) {
+            return null;
+        }
+        ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
+        if (plugin == null) {
+            return null;
+        }
+        RoleInstance instance = plugin.roleInstanceOf(target);
+        if (instance == null) {
+            return null;
+        }
+        RoleComponent component = instance.componentRegistry().getById(ID);
+        return component instanceof EnergyComponent energy ? energy : null;
     }
 
     // ───────── 组件操作面（能量试点） ─────────

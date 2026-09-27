@@ -1,14 +1,10 @@
 package com.shadowHunterRolesPlugin.registry;
-import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
-import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
-import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.*;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluBlueIceRevolverSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluTraumaPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluHysteriaPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
@@ -20,12 +16,8 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEquipmentsPassive
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
-import com.shadowHunterRolesPlugin.core.RoleInstance;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
-import org.bukkit.entity.Boss;
-import org.checkerframework.checker.index.qual.PolyUpperBound;
-import org.codehaus.plexus.interpolation.PrefixAwareRecursionInterceptor;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -191,7 +183,7 @@ public class RoleLoader {
                         Component.text("聋子?")
                 ))
                 .faction(Faction.HUNTER)
-                .addComponent(CangluTraumaPassive.ID, new CangluTraumaPassive.Specification())
+                .addComponent(CangluHysteriaPassive.ID, new CangluHysteriaPassive.Specification())
                 .addComponent(CangluBlueIceRevolverSkill.ID, new CangluBlueIceRevolverSkill.Specification().setSlot(1))
                 .icon(Material.BLUE_ICE);
     }

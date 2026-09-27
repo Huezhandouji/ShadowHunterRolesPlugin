@@ -28,7 +28,7 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
      * 本组件的**被动描述符**（迁移后被动走统一的 {@code addComponent} 入口 ⇒ 无栏位 ⇒ 天然不占热键栏）。
      * 表现数据**逐字沿用**组件构造器里那一对文案（不新拟）；依赖 = 实取清单（`start()` 内的两个调用点）。
      */
-    public static final class Specification extends PassiveSkill.Specification {
+    public static final class Specification extends PassiveSkill.Specification<AutoRecoverSanTEHealthPassive> {
 
         public Specification(){
             super(Component.text("自动恢复SanTE"), Component.text("当周围10格没有敌人五秒后, 开始自动恢复SanTE, 每秒3"));

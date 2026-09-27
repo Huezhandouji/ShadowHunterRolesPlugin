@@ -97,7 +97,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
         super(id, services, specification);
     }
 
-    public static final class Specification extends Skill.Specification {
+    public static final class Specification extends Skill.Specification<CangluBlueIceRevolverSkill> {
 
         public Specification(){
             super(Component.text("澜冰左轮"),

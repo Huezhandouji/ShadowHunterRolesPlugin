@@ -38,7 +38,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
      * 本组件的**描述符**：表现值默认值 = 原构造实参（名字 / 描述 / 图标 / 冷却逐字段一致；
      * 主武器的能量消耗由类型恒为 0），栏位由装配点 {@code setSlot} 指定。
      */
-    public static final class Specification extends MainWeapon.Specification {
+    public static final class Specification extends MainWeapon.Specification<MeiqiheziJuejueMainWeapon> {
 
         public Specification(){
             super(

@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.*;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluBlueIceRevolverSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluHysteriaPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluTraumaMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
@@ -183,8 +184,9 @@ public class RoleLoader {
                         Component.text("聋子?")
                 ))
                 .faction(Faction.HUNTER)
-                .addComponent(CangluHysteriaPassive.ID, new CangluHysteriaPassive.Specification())
+                .addComponent(CangluTraumaMainWeapon.ID, new CangluTraumaMainWeapon.Specification().setSlot(0))
                 .addComponent(CangluBlueIceRevolverSkill.ID, new CangluBlueIceRevolverSkill.Specification().setSlot(1))
+                .addComponent(CangluHysteriaPassive.ID, new CangluHysteriaPassive.Specification())
                 .icon(Material.BLUE_ICE);
     }
 

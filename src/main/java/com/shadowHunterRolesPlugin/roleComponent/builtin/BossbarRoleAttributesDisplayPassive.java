@@ -27,7 +27,7 @@ public class BossbarRoleAttributesDisplayPassive extends PassiveSkill {
         super(id, services, specification);
     }
 
-    public static final class Specification extends PassiveSkill.Specification {
+    public static final class Specification extends PassiveSkill.Specification<BossbarRoleAttributesDisplayPassive> {
 
 
         public Specification() {
@@ -36,7 +36,7 @@ public class BossbarRoleAttributesDisplayPassive extends PassiveSkill {
         }
 
         @Override
-        public PassiveSkill create(String id, ComponentServices services) {
+        public BossbarRoleAttributesDisplayPassive create(String id, ComponentServices services) {
             return new BossbarRoleAttributesDisplayPassive(id, services, this);
         }
     }

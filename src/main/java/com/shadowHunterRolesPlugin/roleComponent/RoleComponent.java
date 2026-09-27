@@ -196,7 +196,7 @@ public abstract class RoleComponent {
          * 并**跳过该角色**（不注册、不进游戏）。
          * <p><b>声明示例</b>（写在组件自己的嵌套 {@code Specification} 构造器里）：
          * <pre>{@code
-         * public static final class Specification extends Skill.Specification {
+         * public static final class Specification extends Skill.Specification<ExampleSkill> {
          *     public Specification() {
          *         super(Component.text("示例技能"), Component.text("示例描述"), 100, 0, Material.STONE);
          *         requires(EnergyComponent.class);              // 必需：没有能量组件就不许装配

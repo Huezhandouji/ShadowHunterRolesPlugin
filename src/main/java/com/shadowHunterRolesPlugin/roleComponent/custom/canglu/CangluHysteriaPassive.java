@@ -21,7 +21,6 @@ public class CangluHysteriaPassive extends PassiveSkill {
     private static final int RESOLVE_COUNT = 4;
 
     private static final int SAN_RECOVER_AMOUNT = 4;
-    private static final int TURE_DAMAGE_AMOUNT = 4;
     private static final int ABSORPTION_TIME = 160;
     private static final int ABSORPTION_LEVEL = 2;
 
@@ -39,7 +38,7 @@ public class CangluHysteriaPassive extends PassiveSkill {
         super(id, services, specification);
     }
 
-    public static final class Specification extends PassiveSkill.Specification {
+    public static final class Specification extends PassiveSkill.Specification<CangluHysteriaPassive> {
 
         public Specification(){
             super(Component.text("创伤"), Component.text("苍鹭的创伤被动，给自己叠层数"));
@@ -66,7 +65,7 @@ public class CangluHysteriaPassive extends PassiveSkill {
     }
 
     @Override
-    public void stop(){
+    public void stop()  {
         super.stop();
         vitals = null;
         sante = null;
@@ -77,10 +76,9 @@ public class CangluHysteriaPassive extends PassiveSkill {
         stackCount = Math.clamp(stackCount + amount, 0, MAX_STACK_COUNT);
     }
 
-    public boolean requestResolve(Player victim){
+    public boolean requestResolve(){
         if(stackCount < RESOLVE_COUNT) return false;
         stackCount -= RESOLVE_COUNT;
-        vitals.trueDamage(victim, svc().self().player(), 4);
         buff.applyPotionEffect(PotionEffectType.ABSORPTION.createEffect(ABSORPTION_TIME, ABSORPTION_LEVEL));
         sante.increase(12);
         return true;

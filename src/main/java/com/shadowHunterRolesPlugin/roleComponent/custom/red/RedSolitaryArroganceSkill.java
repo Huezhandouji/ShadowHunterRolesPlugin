@@ -43,7 +43,7 @@ public class RedSolitaryArroganceSkill extends Skill {
      * 本组件的**描述符**：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
      * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
      */
-    public static final class Specification extends Skill.Specification {
+    public static final class Specification extends Skill.Specification<RedSolitaryArroganceSkill> {
 
         public Specification(){
             super(Component.text("孤妄自赏"),

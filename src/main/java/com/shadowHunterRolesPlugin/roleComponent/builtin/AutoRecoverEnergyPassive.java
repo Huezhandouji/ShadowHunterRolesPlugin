@@ -24,7 +24,7 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
      * 表现数据**逐字沿用**组件构造器里那一对文案（不新拟）；依赖 = 实取清单（`start()` 内的
      * {@code svc().components().get(...)} 调用点）。
      */
-    public static final class Specification extends PassiveSkill.Specification {
+    public static final class Specification extends PassiveSkill.Specification<AutoRecoverEnergyPassive> {
 
         public Specification(){
             super(Component.text("自动恢复能量"), Component.text("周围10格没有敌人时，每秒恢复3点能量"));

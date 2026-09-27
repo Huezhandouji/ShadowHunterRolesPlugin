@@ -25,7 +25,7 @@ public class RedEquipmentsPassive extends PassiveSkill {
      * 表现数据**逐字沿用**组件构造器里那一对文案（不新拟）；**无依赖声明** —— 本组件实取 0 个组件
      * （只用 {@code svc().self().player()}）。
      */
-    public static final class Specification extends PassiveSkill.Specification {
+    public static final class Specification extends PassiveSkill.Specification<RedEquipmentsPassive> {
 
         public Specification(){
             super(Component.text("穿戴装备"), Component.text("ccb"));

@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.canglu;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.roleComponent.SoundUtil;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
@@ -225,6 +226,10 @@ public class CangluBlueIceRevolverSkill extends Skill {
         Player nearest = self == null ? null : findNearestEnemy(self, RELOAD_SEARCH_RADIUS);
         //★ 登记待办：目标在【此刻】锁定（可为 null = 附近没人，只换弹不瞬移）
         pendingReload = new PendingReload(nearest == null ? null : nearest.getUniqueId());
+
+        if (self != null) {
+            self.getWorld().playSound(self.getLocation(), Sound.BLOCK_PISTON_CONTRACT, 1, 0.8f);
+        }
     }
 
     /**
@@ -241,13 +246,21 @@ public class CangluBlueIceRevolverSkill extends Skill {
         pendingReload = null;
 
         Player self = svc().self().player();
-        if(self == null || pending.target == null){
+        if(self == null){
             return;
+        }
+        //★ 声音属于**换弹完成本身**（与"有没有目标"无关）⇒ 必须在所有 early-return 之前播；
+        //  否则附近没人时换弹会【没声音】（那是另一码事，跟瞬移无关）
+        SoundUtil.playGunReloadSound(self);
+
+        if(pending.target == null){
+            return;      //附近没人 ⇒ 只换弹：不瞬移、不真伤
         }
         Player target = Bukkit.getPlayer(pending.target);
         if(target == null || !target.isOnline() || target.isDead()){
             return;
         }
+
         //★ 取【执行时】的位置：目标在这 2 秒里可能已经移动 —— 落点必须贴合它现在的朝向 ✓
         if(!target.getWorld().equals(self.getWorld())){
             return;
@@ -260,6 +273,8 @@ public class CangluBlueIceRevolverSkill extends Skill {
         if(vitals != null){
             vitals.trueDamage(target, self, RELOAD_TRUE_DAMAGE);
         }
+
+
     }
 
     /**

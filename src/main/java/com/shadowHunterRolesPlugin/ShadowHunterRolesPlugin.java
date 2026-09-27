@@ -153,4 +153,17 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         return roleAPI;
     }
 
+    /**
+     * **按 UUID 取该玩家的角色实例**（未选角色 / 未加载 ⇒ {@code null}）。
+     *
+     * <p>★ <b>为什么开这个口</b>：组件层此前**没有任何**跨实例通道
+     * （`ComponentLookup` 只看本实例、插件单例也不暴露 `RoleManager`）
+     * ⇒ "削减敌人能量"这类**跨实例**技能无路可走。
+     * <p>本口只做一件事：**转发 {@code RoleManager} 的既有查询**（不新增状态、不做缓存）✓
+     * —— 语义与 {@code API} 侧的 {@code executeComponentOperation} 同源。
+     */
+    public RoleInstance roleInstanceOf(java.util.UUID uuid){
+        return roleManager != null ? roleManager.getRoleInstance(uuid) : null;
+    }
+
 }

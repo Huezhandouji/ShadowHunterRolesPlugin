@@ -81,7 +81,11 @@ public abstract class MainWeapon extends ActiveComponent {
     //  本类不再自带副本；`startCooldown()` / `startCooldown(int ticks)` / `stopCooldown()` /
     //  `isCoolingDown()` / `remainingCooldownTicks()` 均由父类提供 ✓。
 
-    public abstract static class Specification extends HotbarSpecification<MainWeapon> {
+    /**
+     * **主武器描述符**（★ 泛型化：`<M>` = **本组件自己的类型**；理由同 `Skill.Specification`）。
+     * <p>参数化后 `providedType()` 推导出**具体武器类** ⇒ 别的组件可以 `requires(某具体武器.class)` ✓
+     */
+    public abstract static class Specification<M extends MainWeapon> extends HotbarSpecification<M> {
 
         /** 声明式构造（推荐）：id 属于注册处，不写进组件描述符。 */
         protected Specification(Component displayName, Component description, Material icon, int cooldownTicks){
@@ -94,9 +98,9 @@ public abstract class MainWeapon extends ActiveComponent {
             super("MainWeapon", id, displayName, description, icon, cooldownTicks, 0);
         }
 
-        /** 具体组件必须给出创建逻辑（保留抽象 ⇒ 漏写是**编译错误**，不是运行期惊喜）。 */
+        /** 具体组件必须给出创建逻辑（**协变返回 `M`** ⇒ 推导落到具体类 ✓）。 */
         @Override
-        public abstract MainWeapon create(String id, ComponentServices services);
+        public abstract M create(String id, ComponentServices services);
     }
 
     /**

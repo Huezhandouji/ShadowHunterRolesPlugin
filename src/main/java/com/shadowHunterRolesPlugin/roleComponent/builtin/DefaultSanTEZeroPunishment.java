@@ -86,7 +86,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
      * 表现数据**逐字沿用**组件构造器自己的实参（本组件原本就传 {@code null, null} ⇒ 描述符同样传 null，不新拟）；
      * 依赖 = 实取清单（`start()` 内的四个调用点）。
      */
-    public static final class Specification extends PassiveSkill.Specification {
+    public static final class Specification extends PassiveSkill.Specification<DefaultSanTEZeroPunishment> {
 
         public Specification(){
             super(null, null);

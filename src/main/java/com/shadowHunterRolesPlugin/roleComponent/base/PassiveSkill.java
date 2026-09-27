@@ -58,7 +58,18 @@ public abstract class PassiveSkill extends RoleComponent {
      * <p>本类型**不实现** {@link #create(String, ComponentServices)} ⇒ 具体组件必须自己声明嵌套
      * `Specification` 并覆写它（编译期强制）。
      */
-    public abstract static class Specification extends RoleComponent.Specification<PassiveSkill> {
+    /**
+     * **被动描述符**（★ 泛型化：`<P>` = **本组件自己的类型**；理由同 `Skill.Specification`）。
+     *
+     * <p>参数化后 `providedType()` 推导出**具体被动类** ⇒ 别的组件可以 `requires(某具体被动.class)` ✓
+     * （实测事故：`CangluTraumaMainWeapon` 声明 `requires(CangluHysteriaPassive.class)`，
+     * 而后者推导成 `PassiveSkill.class` ⇒ 装配期报「缺必需依赖」）。
+     *
+     * <p>本类型**不实现** {@link #create(String, ComponentServices)} ⇒ 具体组件必须自己声明嵌套
+     * `Specification` 并覆写它（编译期强制）。
+     */
+    public abstract static class Specification<P extends PassiveSkill>
+            extends RoleComponent.Specification<P> {
 
         private final Component displayName;
         private final Component description;

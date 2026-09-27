@@ -121,7 +121,7 @@ public class ExampleSelfRefreshingSkill extends Skill {
     }
 
     /** 技能描述符（纯声明）：**冷却 200 刻** ⇒ 冷却期可用来演示"能力为 false ⇒ 不每刻刷"。 */
-    public static final class Specification extends Skill.Specification {
+    public static final class Specification extends Skill.Specification<ExampleSelfRefreshingSkill> {
 
         public Specification(){
             super(Component.text("自刷新示例"),

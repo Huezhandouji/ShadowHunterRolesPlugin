@@ -92,7 +92,18 @@ public abstract class Skill extends ActiveComponent {
     //  本类不再自带副本；`startCooldown()` / `startCooldown(int ticks)` / `stopCooldown()` /
     //  `isCoolingDown()` / `remainingCooldownTicks()` 均由父类提供 ✓。
 
-    public abstract static class Specification extends HotbarSpecification<Skill> {
+    /**
+     * **技能描述符**（★ 泛型化：`<S>` = **本组件自己的类型**）。
+     *
+     * <p><b>为什么需要 `<S>`</b>：`providedType()` 的推导（`Specification#deriveProvidedType()`）
+     * 沿 `getClass()` 链找**第一个** `...Specification<X>` 的泛型实参。
+     * 若本类写死 `HotbarSpecification<Skill>`，**任何**技能的嵌套描述符都会推导成 `Skill.class`（**族级**）
+     * ⇒ 别的组件写 `requires(某个具体技能.class)` **永远不满足**。
+     * <p>参数化后，具体组件把 `<自己>` 传上来 ⇒ 推导结果是**具体类** ✓
+     * （实测事故：`CangluTraumaMainWeapon` 声明 `requires(CangluHysteriaPassive.class)`，
+     * 而后者推导成 `PassiveSkill.class` ⇒ 装配期报「缺必需依赖」）。
+     */
+    public abstract static class Specification<S extends Skill> extends HotbarSpecification<S> {
 
         /** 声明式构造（推荐）：id 属于注册处，不写进组件描述符。 */
         protected Specification(Component displayName, Component description, int cooldownTicks,
@@ -106,9 +117,13 @@ public abstract class Skill extends ActiveComponent {
             super("Skill", id, displayName, description, icon, cooldownTicks, energyCost);
         }
 
-        /** 具体组件必须给出创建逻辑（保留抽象 ⇒ 漏写是**编译错误**，不是运行期惊喜）。 */
+        /**
+         * 具体组件必须给出创建逻辑（保留抽象 ⇒ 漏写是**编译错误**，不是运行期惊喜）。
+         * <p>★ 返回类型收窄到 {@code S}（**协变返回**）—— 与 `Specification<S>` 配套，
+         * 使 `providedType()` 的推导落到**具体组件类** ✓
+         */
         @Override
-        public abstract Skill create(String id, ComponentServices services);
+        public abstract S create(String id, ComponentServices services);
     }
 
     /**

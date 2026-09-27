@@ -406,8 +406,11 @@ public class HotbarRenderComponent extends RoleComponent {
     /**
      * **组件登记自己的栏位**（★ 唯一入口；`slot == null` ⇒ 撤销登记 = 不占栏位）。
      *
-     * <p><b>仲裁</b>：同一栏位被两个组件占用 ⇒ **抛异常**（fail-fast，点名两个组件与栏位）
-     * —— 装配期判据在此保留，只是时机从"模板注册"移到"实例登记" ✓。
+     * <p><b>仲裁</b>：同一栏位被两个组件占用 ⇒ **抛 {@link IllegalArgumentException}**（fail-fast）。
+     * <p>★ **两处判据的"同一种说法"**：本方法与装配期 {@code core/Role.Builder#addComponent}
+     * 扫描述符快照那一段，**共用同一套异常类型与文案** ⇒ 同一判据只有一种说法 ✓
+     * （两者拦的是不同阶段的坏法：装配期拦"模板写错"，本处拦"运行期登记错"，
+     * 且本处还覆盖**不经装配器的动态添加**那条路径）。
      * <p>同一组件重复登记同一栏位 ⇒ 幂等 ✓（换栏位 ⇒ 先撤旧再记新）。
      */
     public void registerSlot(RoleComponent component, Integer slot) {
@@ -418,13 +421,17 @@ public class HotbarRenderComponent extends RoleComponent {
             slotByComponent.remove(component.getId());
             return;
         }
+        //★ 校验与文案**与装配期逐字对齐**（`core/Role.Builder#addComponent` 扫快照的那一段）：
+        //   ① 越界 ⇒ 同一句 IllegalArgumentException
+        //   ② 冲突 ⇒ **同一句冻结文案**（`Slot N is already occupied by 'X'.`），
+        //      ★ 只**追加**一个分句点名"谁想占"——冻结的主句一字未动 ⇒ 既有断言不受影响 ✓
         if (slot < 0 || slot > 8) {
             throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
         }
         for (Map.Entry<String, Integer> occupied : slotByComponent.entrySet()) {
             if (!occupied.getKey().equals(component.getId()) && occupied.getValue().equals(slot)) {
-                throw new IllegalStateException("Slot " + slot + " is already occupied by '"
-                        + occupied.getKey() + "'; '" + component.getId() + "' cannot take it.");
+                throw new IllegalArgumentException("Slot " + slot + " is already occupied by '"
+                        + occupied.getKey() + "'. (registration refused for '" + component.getId() + "')");
             }
         }
         slotByComponent.put(component.getId(), slot);

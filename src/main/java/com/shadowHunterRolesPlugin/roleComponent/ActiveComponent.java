@@ -59,18 +59,34 @@ public abstract class ActiveComponent extends RoleComponent {
     /**
      * **装配期把自己要占的栏位登记给渲染组件**（★ 栏位的运行期归属 = 渲染组件）。
      *
-     * <p><b>为什么在 {@code awake()}</b>：框架**保证每个组件都被调用一次**，而多数子类不覆写它
-     * ⇒ 登记**不会被漏掉**（放在 {@code start()} 里则"子类覆写 start 忘记调 super"就会静默丢图标 ✗）。
+     * <p><b>为什么在 {@code awake()}</b>：框架**保证每个组件都被调用一次**，而多数子类不覆写它。
      * <p><b>登记内容 = 描述符声明的栏位</b>（{@link HotbarSpecification#slotOrNull()}）；
      * 无栏位（被动 / 内建）⇒ 传 {@code null} ⇒ 渲染组件撤销登记 ✓。
      * <p>渲染组件按注册序排在最前（内建块首位）⇒ 本方法执行时它**已在容器里** ✓。
+     *
+     * <h2>★★ 为什么本方法是 {@code final}</h2>
+     * 子类**不能**覆写它 —— 它只做"栏位登记"这一件事，而登记**绝不允许被漏掉**。
+     * 需要自己的装配期初始化 ⇒ 覆写钩子 {@link #onAwake()}（本方法会替你调用）✓
+     * <p>实测事故（本方法改为 final 之前）：`CangluBlueIceRevolverSkill` 覆写 `awake()` 未调 super
+     * ⇒ 登记没执行 ⇒ **热键栏里没有左轮，且无任何报错** ⇒ 靠 final 从**编译期**堵死这条路。
      */
     @Override
-    public void awake() {
+    public final void awake() {
         HotbarRenderComponent render = findComponent(HotbarRenderComponent.class);
         if (render != null) {
             render.registerSlot(this, specification().slotOrNull());
         }
+        onAwake();
+    }
+
+    /**
+     * **子类自己的装配期初始化钩子**（默认空）。
+     *
+     * <p>契约同 {@code awake()}：**幂等**、**不得改动任何玩家可见状态**、**不得取用其它组件**
+     * （依赖解析放 {@code start()}）。
+     * <p>★ 由 {@link #awake()} 在**栏位登记之后**调用 ⇒ 顺序有保证（登记先于子类初始化）。
+     */
+    protected void onAwake() {
     }
 
     protected ActiveComponent(String id, ComponentServices services, HotbarSpecification<?> specification) {

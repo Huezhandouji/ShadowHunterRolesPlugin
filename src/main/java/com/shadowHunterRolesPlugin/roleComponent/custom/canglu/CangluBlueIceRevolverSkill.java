@@ -120,7 +120,8 @@ public class CangluBlueIceRevolverSkill extends Skill {
     // ───────── 生命周期 ─────────
 
     @Override
-    public void awake(){
+    protected void onAwake(){
+        //★ 本钩子由基类 `awake()` 调用（栏位登记已在基类里完成）⇒ **不能**也不需要调 super.awake()
         //只做**不可见**的初始化（契约：awake 不得产生玩家可见副作用）
         currentBulletCount = MAX_MAGAZINE_CAPACITY;
         autoReloadTick = 0;

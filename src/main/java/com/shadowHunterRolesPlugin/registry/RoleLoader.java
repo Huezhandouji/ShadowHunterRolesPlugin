@@ -17,6 +17,12 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEquipmentsPassive
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.mainWeapon.SinThornFangMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.LawWordPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.SinThornPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.skill.JudgmentThornSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.skill.SinDefenseSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.skill.SinThornEntangleSkill;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 
@@ -61,7 +67,8 @@ public class RoleLoader {
                 new Definition("meiqihezi", RoleLoader::meiqiheziBuilder),
                 new Definition("red", RoleLoader::redBuilder),
                 new Definition("selfUpdateExample", RoleLoader::selfUpdateExampleBuilder),
-                new Definition("canglu", RoleLoader::cangluBuilder)
+                new Definition("canglu", RoleLoader::cangluBuilder),
+                new Definition("sinThorn", RoleLoader::sinThornBuilder)
         );
     }
 
@@ -209,6 +216,40 @@ public class RoleLoader {
                 .faction(Faction.SHADOW)
                 .addComponent(ExampleSelfRefreshingSkill.ID, new ExampleSelfRefreshingSkill.Specification().setSlot(0))
                 .icon(Material.CLOCK);
+    }
+
+    /**
+     * **罪棘**（阵营 SHADOW）：尖牙光环 + 律法罪罚 + 三个主动。
+     *
+     * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
+     * <ul>
+     *   <li><b>主武器「罪棘之牙」占 0 号栏</b> —— 插件只把攻击事件投递给主武器组件
+     *       （{@code listener/MainWeaponListener#onAttackPlayer}），而需求要求"玩家近战也触发律法之言"
+     *       ⇒ 必须有它作为落点（否则那条效果永远不触发）；</li>
+     *   <li>三个主动占 1 / 2 / 3 号栏，**全部 0 耗能**（按裁定：只靠冷却限制强度）；</li>
+     *   <li>两个被动同样经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏）；</li>
+     *   <li>基础属性**不显式声明** ⇒ 与 {@code red} / {@code meiqihezi} 一致，走框架默认；</li>
+     *   <li>数值：尖牙 6 点伤害 / 4 点 SanTE / 7 格 / 1.5 秒（强化期 0.5 秒且打全体）；
+     *       律法之言 15 秒、每 0.5 秒 1 点 SanTE；罪棘缠 CD 7 秒；罪恶的辩护 5 秒 + <b>结束后</b> CD 10 秒；
+     *       审判孤刺 CD 40 秒。</li>
+     * </ul>
+     */
+    private static Role.Builder sinThornBuilder() {
+        return withBuiltIns(new Role.Builder("sinThorn"))
+                .displayName(Component.text("罪棘"))
+                .description(List.of(
+                        Component.text("你负以荆棘，亦负以罪孽"),
+                        Component.text("罪棘：7格内的敌人每1.5秒被召唤者尖牙撕咬，受6点伤害并损失4点特殊值"),
+                        Component.text("律法之言：每次攻击附加15秒罪罚，每0.5秒削减目标1点特殊值")
+                ))
+                .faction(Faction.SHADOW)
+                .addComponent(SinThornFangMainWeapon.ID, new SinThornFangMainWeapon.Specification().setSlot(0))
+                .addComponent(SinThornEntangleSkill.ID, new SinThornEntangleSkill.Specification().setSlot(1))
+                .addComponent(SinDefenseSkill.ID, new SinDefenseSkill.Specification().setSlot(2))
+                .addComponent(JudgmentThornSkill.ID, new JudgmentThornSkill.Specification().setSlot(3))
+                .addComponent(SinThornPassive.ID, new SinThornPassive.Specification())
+                .addComponent(LawWordPassive.ID, new LawWordPassive.Specification())
+                .icon(Material.WITHER_ROSE);
     }
 
 }

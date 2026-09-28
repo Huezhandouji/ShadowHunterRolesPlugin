@@ -6,6 +6,11 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.*;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluBlueIceRevolverSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluHysteriaPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluTraumaMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.mainWeapon.MatinaMedicalShovelMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaKuangPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaJudgmentSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaRedstoneDroneSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaSeaCrystalLampSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
@@ -68,7 +73,8 @@ public class RoleLoader {
                 new Definition("red", RoleLoader::redBuilder),
                 new Definition("selfUpdateExample", RoleLoader::selfUpdateExampleBuilder),
                 new Definition("canglu", RoleLoader::cangluBuilder),
-                new Definition("sinThorn", RoleLoader::sinThornBuilder)
+                new Definition("sinThorn", RoleLoader::sinThornBuilder),
+                new Definition("matina", RoleLoader::matinaBuilder)
         );
     }
 
@@ -250,6 +256,51 @@ public class RoleLoader {
                 .addComponent(SinThornPassive.ID, new SinThornPassive.Specification())
                 .addComponent(LawWordPassive.ID, new LawWordPassive.Specification())
                 .icon(Material.WITHER_ROSE);
+    }
+
+    /**
+     * **狂躁牧师 · 马提娜(Matina)**（阵营 HUNTER）：医疗设备 + 诉说苦怒（狂暴值 {@code KUANG}）+ 三个主动。
+     *
+     * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
+     * <ul>
+     *   <li><b>主武器「医疗设备」占 0 号栏</b> —— 插件只把攻击事件投递给主武器组件
+     *       （{@code listener/MainWeaponListener#onAttackPlayer}）⇒ "每次命中"的回血 / 特殊值伤害 /
+     *       狂暴结算都必须落在这一把武器上；铁铲 = {@code Material.IRON_SHOVEL}，
+     *       攻速 0.1 秒（2 刻）且冷却中不出伤；</li>
+     *   <li>三个主动占 1 / 2 / 3 号栏：<b>海晶灯</b>（CD 6 秒 / 耗能 15）· <b>红石无人机</b>
+     *       （CD 20 秒，技能完全后起算 / 耗能 20）· <b>神罚</b>（CD 50 秒，技能完全后起算 / 耗能 0）；</li>
+     *   <li>被动「诉说苦怒」经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏），
+     *       它是<b>狂暴值的唯一持有者</b>：层数 / 每秒衰减 / 阈值加成 / 暴走死亡判定 / 层数粒子与 bossbar
+     *       全在它里面；</li>
+     *   <li>基础属性<b>不显式声明</b> ⇒ 与 {@code red} / {@code meiqihezi} 一致，走框架默认
+     *       （生命上限 40、能量上限 100、SanTE 上限 100）；</li>
+     *   <li>数值：普攻 4 点物理 + 目标回血 8 + 目标 5 点特殊值；海晶灯 r8 治疗 10 点 / 敌军 3 秒
+     *       缓慢 II + 凋零 II + 虚弱 II；无人机 r8 跟随 / r5 每秒治疗 4 点或 1 秒中毒 III / 持续 15 秒；
+     *       神罚 r25、引导 3 秒 + 7 秒、共 70 点特殊值。</li>
+     * </ul>
+     */
+    private static Role.Builder matinaBuilder() {
+        return withBuiltIns(new Role.Builder("matina"))
+                .displayName(Component.text("狂躁牧师·马提娜"))
+                .description(List.of(
+                        Component.text("狂暴值越高，越是接近神，也越是接近死"),
+                        Component.text("医疗设备：每次命中造成4点物理伤害，为目标回复8点生命并造成5点特殊值伤害"),
+                        Component.text("诉说苦怒：每次成功治疗或成功攻击增加1点狂暴值；每秒减少1层，高于60层时每秒可能直接死亡"),
+                        Component.text("海晶灯：洒出药物治疗同阵营并削弱敌人"),
+                        Component.text("远程医疗：放出爱心无人机跟随并持续治疗"),
+                        Component.text("神罚：引导3秒后展开魔法阵，对范围内敌人倾泻特殊值伤害")
+                ))
+                .faction(Faction.HUNTER)
+                .addComponent(MatinaMedicalShovelMainWeapon.ID,
+                        new MatinaMedicalShovelMainWeapon.Specification().setSlot(0))
+                .addComponent(MatinaSeaCrystalLampSkill.ID,
+                        new MatinaSeaCrystalLampSkill.Specification().setSlot(1))
+                .addComponent(MatinaRedstoneDroneSkill.ID,
+                        new MatinaRedstoneDroneSkill.Specification().setSlot(2))
+                .addComponent(MatinaJudgmentSkill.ID,
+                        new MatinaJudgmentSkill.Specification().setSlot(3))
+                .addComponent(MatinaKuangPassive.ID, new MatinaKuangPassive.Specification())
+                .icon(Material.SEA_LANTERN);
     }
 
 }

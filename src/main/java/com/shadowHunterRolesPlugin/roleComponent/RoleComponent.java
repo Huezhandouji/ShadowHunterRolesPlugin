@@ -118,27 +118,26 @@ public abstract class RoleComponent {
     // ───────────── 装配期描述符 ─────────────
 
     /**
-     * **装配期描述符根类型**（不含 kind）：把"这个组件怎么造"与"它占不占热键栏"从
-     * **工厂 + 值的哨兵**（旧：`slot = -1`）改成**一个有类型的声明**。
+     * **装配期描述符根类型**（不含 kind）：把"这个组件怎么造"从**工厂 + 值的哨兵**改成
+     * **一个有类型的声明**。
      * <p>
      * <b>职责</b>：
      * <ul>
      *   <li>{@link #descriptorLabel()} —— **诊断标签**（**不是行为分支**：没有任何行为按它分叉，
      *       只出现在装配期异常的文案里，取值如 "Skill" / "MainWeapon" / "Passive"）；</li>
-     *   <li>{@link #hasSlot()} / {@link #slot()} —— 占不占栏位。**"不占栏位"是栏位的缺失**（本类型内部
-     *       用可空的 `Integer` 表达），**不是 `-1` 哨兵**；无栏位时 {@link #slot()} **抛异常**而不是返回哨兵；</li>
      *   <li>{@link #freeze()} —— 装配期冻结：产出**不可变快照** {@link Snapshot}。此后描述符自身也拒绝再改
-     *       （`setSlot` 之类一律抛异常）⇒ 同一个描述符实例被两个角色共享时不可能被串改；</li>
+     *       （`bindId` 之类一律抛异常）⇒ 同一个描述符实例被两个角色共享时不可能被串改；</li>
      *   <li>{@link #create(String, ComponentServices)} —— 抽象创建：由**具体描述符**决定造哪个类。</li>
      * </ul>
-     * <b>规则进类型</b>：带栏位的分支是 {@code roleComponent/builtin/hotbar/HotbarSpecification}
-     * （它有 {@code setSlot}）；被动描述符 {@code PassiveSkill.Specification} **继承本根类型**、
-     * 因此**没有** {@code setSlot} —— "被动不占栏位"于是成为**编译期事实**，不再靠装配点自觉。
+     * <b>★ 本根类型不含任何「栏位」语言</b>：栏位归**带栏位的那一支描述符**
+     * （{@code roleComponent/builtin/hotbar/HotbarSpecification}，它才有 {@code setSlot}），
+     * 运行期仲裁归**渲染组件**（{@code HotbarRenderComponent#registerSlot}）
+     * ⇒ "被动等组件不占栏位"是**编译期事实**（它们的描述符没有那个口），不靠装配点自觉 ✓
      * <p><b>kind 已删</b>：kind 枚举（SKILL / MAIN_WEAPON / PASSIVE）与构造参数一起删除；
      * 表现面不再自述种类、行为分支也不再读它（热键栏物品完全由组件的 {@code buildItem()} 控制）。
      * <p>
      * <b>命名</b>：按本工程的 JavaBean 口径（设计 §4.3），不写成 record；访问器名沿用
-     * {@code slot()} / {@code hasSlot()} / {@code descriptorLabel()} 与既有 {@code HotbarSpec.kind()} 的口径（`HotbarSpec` 类已删除 ✓，此处只留作口径回溯）。
+     * {@code descriptorLabel()} 的口径。
      */
     public abstract static class Specification<T extends RoleComponent> {
 
@@ -148,8 +147,7 @@ public abstract class RoleComponent {
          */
         private final String descriptorLabel;
 
- //★ **本基类不持有栏位字段** —— 栏位归「带栏位的那一支描述符」（`HotbarSpecification`）。
- //   基类只声明一个可选读口 `slotOrNull()`（默认 null = 不占栏位）✓
+ //★ **本基类不持有栏位、也不声明栏位读口** —— 栏位语言整体归 `HotbarSpecification` ✓
 
         /** 冻结位：装配期 {@link #freeze()} 之后禁止再改（防止被共享后被串改）。 */
         private boolean frozen;
@@ -290,21 +288,9 @@ public abstract class RoleComponent {
             }
         }
 
- //★ **栏位的持有者是「带栏位的那一支描述符」**（`builtin/hotbar/HotbarSpecification`），
- //   **不是**本基类 —— 被动等组件根本没有栏位，基类不该出现栏位语言。
- //   本基类只留**一个可选读口**：`slotOrNull()`（`null` = 不占栏位）。
-
-        /**
-         * **本描述符**声明的栏位；**{@code null} = 不占栏位**。
-         *
-         * <p>默认 {@code null}（当前基类**不再持有**栏位字段 ⇒ 本方法只是"带栏位那一支"的读口契约）：
-         * {@code HotbarSpecification} 覆写它返回真正的栏位值；被动等无栏位描述符用默认值 ✓。
-         *
-         * <p><b>谁读它</b>：装配期冲突判定（{@code core/Role.Builder}）与渲染侧的登记入口。
-         */
-        public Integer slotOrNull() {
-            return null;
-        }
+ //★ **栏位语言已从本基类彻底移除**：持有者 = 带栏位的那一支描述符
+ //  （`builtin/hotbar/HotbarSpecification#slotOrNull()`），仲裁者 = 渲染组件
+ //  （`HotbarRenderComponent#registerSlot`）⇒ 基类描述符**一个字都不提栏位** ✓
 
         /**
          * **冻结校验**（供**子类**在自己的可写口里复用）：已冻结 ⇒ 抛异常。
@@ -341,7 +327,7 @@ public abstract class RoleComponent {
          * 并把本实例置为只读。
          * <p>装配入口 {@code Role.Builder.addComponent(String, Specification)} 只使用这份快照
          * ⇒ 角色模板**不持有描述符对象**，两个角色共用一个描述符实例也互不影响。
-         * <p><b>栏位</b>：本方法只把 {@link #slotOrNull()}（多态）的值抄进快照 ——
+         * <p><b>栏位不进快照</b>：栏位归「带栏位那一支描述符」与渲染组件，基类快照不含它 ✓
          * "带栏位必填"的 fail-fast 由**带栏位那一支描述符**自己做（{@code HotbarSpecification}）✓。
          * <p><b>依赖声明的自检</b>：同一个类型不得**既必需又可选择** ⇒ 抛
          * {@link IllegalStateException}（自相矛盾的声明必须在装配期就喊出来，而不是"看哪条先被读到"）。
@@ -364,7 +350,7 @@ public abstract class RoleComponent {
                 }
             }
             this.frozen = true;
-            return new Snapshot(descriptorLabel, slotOrNull(), this::create, providedType(), requiredTypes, optionalTypes);
+            return new Snapshot(descriptorLabel, this::create, providedType(), requiredTypes, optionalTypes);
         }
 
         /** 抽象创建：由具体描述符决定造哪个组件类。 */
@@ -372,13 +358,12 @@ public abstract class RoleComponent {
 
         /**
          * 装配期不可变快照：**装配表唯一持有的形态**（栏位（可有可无）+ 工厂 + 依赖声明 + 提供类型）。
-         * 字段全 `final`、无 setter ⇒ 拿不到可变面。
+         * 装配期不可变快照：**装配表唯一持有的形态**（工厂 + 依赖声明 + 提供类型）。
          */
         public static final class Snapshot {
 
             /** 诊断标签（与 {@link Specification#descriptorLabel()} 同源；只出现在异常文案里）。 */
             private final String descriptorLabel;
-            private final Integer slot;
             private final ComponentFactory<? extends RoleComponent> factory;
             /** 本组件**提供**的类型（依赖检查的供给面）。 */
             private final Class<? extends RoleComponent> providedType;
@@ -387,13 +372,12 @@ public abstract class RoleComponent {
             /** **可选**依赖（缺失不报错）。 */
             private final List<Class<? extends RoleComponent>> optionalTypes;
 
-            private Snapshot(String descriptorLabel, Integer slot,
+            private Snapshot(String descriptorLabel,
                              ComponentFactory<? extends RoleComponent> factory,
                              Class<? extends RoleComponent> providedType,
                              List<Class<? extends RoleComponent>> requiredTypes,
                              List<Class<? extends RoleComponent>> optionalTypes) {
                 this.descriptorLabel = descriptorLabel;
-                this.slot = slot;
                 this.factory = factory;
                 this.providedType = providedType;
                 this.requiredTypes = List.copyOf(requiredTypes);
@@ -403,19 +387,6 @@ public abstract class RoleComponent {
             /** **诊断标签**（只出现在装配期异常文案里；没有任何行为分支读它）。 */
             public String getDescriptorLabel() {
                 return descriptorLabel;
-            }
-
-            public boolean hasSlot() {
-                return slot != null;
-            }
-
-            /** 栏位（0..8）；**无栏位 ⇒ 抛异常**（本形态不再有 `-1` 哨兵）。 */
-            public int getSlot() {
-                if (slot == null) {
-                    throw new IllegalStateException(
-                            "Component '" + descriptorLabel + "' does not occupy a hotbar slot.");
-                }
-                return slot;
             }
 
             public ComponentFactory<? extends RoleComponent> getFactory() {

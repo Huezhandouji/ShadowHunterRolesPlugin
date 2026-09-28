@@ -53,8 +53,10 @@ public class DescriptorFreezeTest {
         assertEquals(4, spec.slot());
         RoleComponent.Specification.Snapshot snapshot = spec.freeze();
         assertNotNull(snapshot);
-        assertTrue(snapshot.hasSlot());
-        assertEquals(4, snapshot.getSlot());
+        //★ 快照**不再带栏位**：栏位归描述符自己（上面两行已断言）与渲染组件的登记表
+        //  ⇒ 装配期不再有栏位冲突判定（仲裁在 `HotbarRenderComponent#registerSlot`）✓
+        //  此处只断言快照本身可用（工厂 + 依赖声明的载体）
+        assertNotNull("快照必须带工厂（装配表只持有它）", snapshot.getFactory());
     }
 
     /** fail-fast ①：越界栏位 ⇒ IllegalArgumentException（文案冻结）。 */
@@ -95,13 +97,17 @@ public class DescriptorFreezeTest {
         assertTrue("文案要点名必须先 setSlot", e.getMessage().contains("must be given a slot"));
     }
 
-    /** 冻结**不改值**：Snapshot 里的栏位 = 冻结前设的值；未设栏位者不可能冻结成功。 */
+    /**
+     * **冻结不改值**：冻结**之后**描述符自己读到的栏位仍是冻结前设的那个值
+     * （★ 快照不再带栏位 ⇒ 断言点从"快照里的值"移到"描述符自己的值"，语义不变：
+     * 冻结是**封住写口**，不是**清掉数据**）。
+     */
     @Test
-    public void snapshotKeepsTheValueThatWasSetBeforeFreeze() {
+    public void descriptorKeepsTheSlotValueThatWasSetBeforeFreeze() {
         HotbarSpecification<?> spec = fresh();
         spec.setSlot(3);
         RoleComponent.Specification.Snapshot snapshot = spec.freeze();
-        assertEquals(3, snapshot.getSlot());
+        assertEquals("冻结后描述符仍持有栏位 3", 3, spec.slot());
         assertNotNull("快照必须带工厂（装配表只持有它）", snapshot.getFactory());
     }
 }

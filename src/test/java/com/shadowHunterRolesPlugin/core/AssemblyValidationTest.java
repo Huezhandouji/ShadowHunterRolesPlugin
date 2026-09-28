@@ -4,7 +4,6 @@ import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
 import org.junit.Test;
 
 import java.util.Map;
@@ -58,24 +57,42 @@ public class AssemblyValidationTest {
                 () -> b2.addComponent("c_a", new MeiqiheziBloodySlashSkill.Specification().setSlot(1)));
     }
 
-    /** fail-fast ④：重复槽位 ⇒ IllegalArgumentException（不"告警 + 覆盖"），文案点名占用者。 */
+    /**
+     * ★ **栏位冲突的判据已从装配期移到"实例登记期"**（口径变更的守卫）。
+     *
+     * <p>装配器**不再**认识栏位（快照里没有它）⇒ 两个组件声明同一栏位时，
+     * {@code addComponent} **不再抛异常** —— 冲突由
+     * {@code HotbarRenderComponent#registerSlot}（{@code ActiveComponent#awake()} 里调用）
+     * 用**同一句冻结文案** {@code Slot N is already occupied by 'X'.} 抛出。
+     *
+     * <p>★ 本用例锁住"装配期确实放行了"这一事实：否则有人把校验加回装配期，
+     * 就会与"栏位归渲染组件仲裁"的单一判据**重复**（两处判据必须只有一处，见 {@code 组件模型.md} §6.4）。
+     */
     @Test
-    public void duplicateSlotIsRejectedAndNamesTheOccupant() {
+    public void assemblyNoLongerRejectsDuplicateSlots() {
         Role.Builder b = builder("r");
-        b.addComponent("c_a", new MeiqiheziBloodySlashSkill.Specification().setSlot(1));
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> b.addComponent("c_b", new MeiqiheziCircleSlashSkill.Specification().setSlot(1)));
-        assertEquals("Slot 1 is already occupied by 'c_a'.", e.getMessage());
+        MeiqiheziBloodySlashSkill.Specification specA = new MeiqiheziBloodySlashSkill.Specification();
+        specA.setSlot(1);
+        MeiqiheziCircleSlashSkill.Specification specB = new MeiqiheziCircleSlashSkill.Specification();
+        specB.setSlot(1);
+
+        //★ 装配期放行（不再抛）—— 冲突留给渲染组件的登记期
+        b.addComponent("c_a", specA);
+        b.addComponent("c_b", specB);
+
+        //两侧各自都"声明了栏位 1"（真值在描述符里，未被装配期改动）
+        assertEquals(1, (int) specA.slotOrNull());
+        assertEquals(1, (int) specB.slotOrNull());
     }
 
     /** 正常装配：build() 成功、栏位由描述符持有、组件数正确。 */
     @Test
     public void validAssemblySucceeds() {
         Role.Builder b = builder("r");
-        HotbarSpecification<?> specA =
-                new MeiqiheziBloodySlashSkill.Specification().setSlot(1);
-        HotbarSpecification<?> specB =
-                new MeiqiheziCircleSlashSkill.Specification().setSlot(2);
+        MeiqiheziBloodySlashSkill.Specification specA = new MeiqiheziBloodySlashSkill.Specification();
+        specA.setSlot(1);
+        MeiqiheziCircleSlashSkill.Specification specB = new MeiqiheziCircleSlashSkill.Specification();
+        specB.setSlot(2);
         b.addComponent("c_a", specA);
         b.addComponent("c_b", specB);
         Role role = b.build();

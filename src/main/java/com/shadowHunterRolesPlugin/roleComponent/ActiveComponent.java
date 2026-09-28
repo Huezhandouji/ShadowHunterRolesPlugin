@@ -61,7 +61,7 @@ public abstract class ActiveComponent extends RoleComponent {
      *
      * <p><b>为什么在 {@code awake()}</b>：框架**保证每个组件都被调用一次**，而多数子类不覆写它。
      * <p><b>登记内容 = 描述符声明的栏位</b>（{@link HotbarSpecification#slotOrNull()}）；
-     * 无栏位（被动 / 内建）⇒ 传 {@code null} ⇒ 渲染组件撤销登记 ✓。
+     * 无栏位 ⇒ 传 {@code null} ⇒ 渲染组件撤销登记 ✓。
      * <p>渲染组件按注册序排在最前（内建块首位）⇒ 本方法执行时它**已在容器里** ✓。
      *
      * <h2>★★ 为什么本方法是 {@code final}</h2>
@@ -74,7 +74,10 @@ public abstract class ActiveComponent extends RoleComponent {
     public final void awake() {
         HotbarRenderComponent render = findComponent(HotbarRenderComponent.class);
         if (render != null) {
-            render.registerSlot(this, specification().slotOrNull());
+            //★ 栏位读口**只在带栏位的那一支描述符上**（`HotbarSpecification`）；
+            //  基类描述符**不含栏位语言** ⇒ 这里显式取那一支（本类的 spec 恒为它）✓
+            HotbarSpecification<?> slotSpec = specification();
+            render.registerSlot(this, slotSpec == null ? null : slotSpec.slotOrNull());
         }
         onAwake();
     }

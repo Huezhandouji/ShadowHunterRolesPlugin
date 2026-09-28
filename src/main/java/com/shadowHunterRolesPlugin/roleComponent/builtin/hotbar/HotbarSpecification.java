@@ -87,8 +87,10 @@ public class HotbarSpecification<T extends RoleComponent>
         }
     }
 
-    /** **栏位读口**（★ 唯一读口；{@code null} = 未设 / 不占栏位）。 */
-    @Override
+    /**
+     * **栏位读口**（★ 本类型**独有** —— 基类描述符不含栏位语言，所以这里**没有** {@code @Override}）；
+     * {@code null} = 未设 / 不占栏位。
+     */
     public Integer slotOrNull() {
         return slot;
     }

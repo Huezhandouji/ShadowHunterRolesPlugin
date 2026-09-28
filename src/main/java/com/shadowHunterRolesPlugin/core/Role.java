@@ -267,12 +267,11 @@ public class Role {
         private List<Component> description = new ArrayList<>();
         private Faction faction = Faction.UNKNOWN;
 
- /** 唯一有序组件表（声明序 = 装配调用序）—— 派发序载体，也是**栏位的唯一来源**。 */
+ /** 唯一有序组件表（声明序 = 装配调用序）—— 派发序载体。 */
         private final Map<String, ComponentEntry> components = new LinkedHashMap<>();
 
-        /** 已占用的栏位（★ 只在**装配期**用于冲突判定；不进条目、不进 Role 实例）。 */
-        private final Set<Integer> occupiedSlots = new LinkedHashSet<>();
-
+ //★ **`occupiedSlots` 已删除**：栏位的装配期冲突判定随"栏位不进基类"一并退场 ——
+ //  仲裁者是**渲染组件**（`HotbarRenderComponent#registerSlot`，同一套异常类型与文案）✓
 
         private Material icon;
 
@@ -322,21 +321,12 @@ public class Role {
  //"不带 id 的构造"声明，不绑定的话描述符里的 id 字段会恒为 null。
             specification.bindId(id);
             RoleComponent.Specification.Snapshot snapshot = specification.freeze();
- //★ 栏位值**不进条目** —— 它住在描述符快照里（渲染组件读那一份做落位）；
- // 但**装配期仍做冲突判定**（fail-fast 语义与文案逐字不变）：扫的是快照值，不是条目的字段。
-            if (snapshot.hasSlot()) {
-                int slot = snapshot.getSlot();
-                if (slot < 0 || slot > 8) {
-                    throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
-                }
-                for (Map.Entry<String, ComponentEntry> registered : components.entrySet()) {
-                    if (occupiedSlots.contains(slot)) {
-                        throw new IllegalArgumentException(
-                                "Slot " + slot + " is already occupied by '" + registered.getKey() + "'.");
-                    }
-                }
-                occupiedSlots.add(slot);
-            }
+ //★ **栏位不在装配期校验了**：栏位的持有者与仲裁者都是**渲染组件**
+ //  （`HotbarRenderComponent#registerSlot` —— 越界/冲突在那里按**同一套异常类型与文案**抛）
+ //  ⇒ 本方法不再认识"栏位"这个概念（快照里也不再带它）✓
+ //  ★ 失败时机因此从"模板注册期"移到"实例装配期（awake 登记处）"：
+ //    坏模板不再是"选不了这个角色"，而是"选中后该实例被隔离、其余角色不受影响"。
+ //    两处判据曾是**故意的双保险**，现收敛为一处（判据强度不变、只有时机不同）。
             return addComponentInternal(id, specification.getClass(),
                     snapshot.getFactory(), snapshot.getDescriptorLabel(),
                     snapshot.getProvidedType(), snapshot.getRequiredTypes(), snapshot.getOptionalTypes());

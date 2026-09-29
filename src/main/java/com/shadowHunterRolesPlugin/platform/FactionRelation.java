@@ -3,21 +3,23 @@ package com.shadowHunterRolesPlugin.platform;
 import com.shadowHunterRolesPlugin.core.Faction;
 
 /**
- * **阵营关系的真值**（★ **纯静态、无平台依赖** ⇒ 可**离线**测试）。
+ * 阵营关系的真值（纯静态、无平台依赖，因此可离线测试）。
  *
- * <p><b>为什么单独成类</b>：真值原本住在插件主类的 {@link FactionLookup} **匿名实现**里，
- * 而主类引 {@code JavaPlugin}（离线测不了）⇒ 那条口径**永远无法被测试覆盖**。
- * 现在生产实现与测试**共用同一份代码** ✓（测试不再"复述一份可能漂移的语义"）。
+ * <p>生产实现（插件主类的 {@link FactionLookup} 匿名实现）与测试共用这一份代码，
+ * 因此测试校验的是生产真值本身，而不是"复述一份可能漂移的语义"。
  *
- * <h2>★★ 「无角色」口径（本项目的有意约定）</h2>
- * <b>一个已选角色的玩家，与一个没选角色的玩家，视为【不敌对】</b>
- * ⇒ 未选角色的玩家**不会**被技能当作敌人选中/伤害（自动索敌、"附近是否有敌人"同理）。
+ * <h2>「无角色」口径（本项目的有意约定）</h2>
+ * 没有角色的玩家**算敌人**：一方没角色（或双方都没角色）即视为敌对，
+ * 因此未选角色的玩家会被技能当作敌人选中 / 伤害（自动索敌、"附近是否有敌人"同理）。
  *
  * <p>判据落点 = {@link #hasRole(Faction)}：{@link Faction#UNKNOWN} 即"没有角色"
- * —— 每个角色模板在注册期都必须声明真实阵营（{@code Role.Builder#faction(...)}）
- * ⇒ "阵营未知"与"没有角色"在生产数据里是同一件事。
+ * —— 每个角色模板在注册期都必须声明真实阵营（{@code Role.Builder#faction(...)}），
+ * 因此"阵营未知"与"没有角色实例"在生产数据里是同一件事。
  *
- * <p><b>边界</b>：{@code null} 一律按"不敌对 / 无角色"处理（比照"查不到就安全"）。
+ * <p><b>本类只管阵营这一维</b>：另一维是"在场"（创造 / 旁观不参与，见 {@link CombatPresence}），
+ * 由 {@link FactionLookup} 的生产实现合成，不落在这里 —— 本类因此保持零平台依赖、可直接断言真值表。
+ *
+ * <p><b>边界</b>：{@code null} 一律按"没有角色"处理（与 {@link Faction#UNKNOWN} 同结果：敌对）。
  */
 public final class FactionRelation {
 
@@ -25,7 +27,7 @@ public final class FactionRelation {
     }
 
     /**
-     * **该阵营是否代表"已选角色"**。
+     * 该阵营是否代表"已选角色"。
      *
      * @param faction 该玩家的阵营（{@code null} 视为未知）
      * @return {@code false} = 没有角色（{@link Faction#UNKNOWN} 或 {@code null}）
@@ -35,34 +37,28 @@ public final class FactionRelation {
     }
 
     /**
-     * **两个玩家之间是否敌对**（**对称**）。
+     * 两个玩家之间是否敌对（对称）。
      *
-     * <p>判据：**双方都有角色** 且 **阵营不同** ⇒ {@code true}；
-     * 任一方没有角色 ⇒ {@code false}。
+     * <p>判据：**双方都有角色且阵营相同**才不敌对；其余全是敌对 —— 即"阵营不同"与
+     * "任一方没有角色"两条都属于敌对（后者是"没有角色也算敌人"的落点）。
      *
-     * @param selfFaction  第一个玩家的阵营（{@code null} 视为未知）
-     * @param otherFaction 第二个玩家的阵营（{@code null} 视为未知）
+     * @param selfFaction  第一个玩家的阵营（{@code null} 视为未知 = 没有角色）
+     * @param otherFaction 第二个玩家的阵营（{@code null} 视为未知 = 没有角色）
      */
     public static boolean isHostile(Faction selfFaction, Faction otherFaction) {
-        if (!hasRole(selfFaction) || !hasRole(otherFaction)) {
-            return false;
-        }
-        return selfFaction != otherFaction;
+        return !(hasRole(selfFaction) && hasRole(otherFaction) && selfFaction == otherFaction);
     }
 
     /**
-     * **「某个阵营」与「某个玩家的阵营」是否敌对**（自身相对）。
+     * 「某个阵营」与「某个玩家的阵营」是否敌对（自身相对）。
      *
-     * <p>判据：对方**有角色** 且 阵营与 {@code selfFaction} 不同 ⇒ {@code true}；
-     * 对方没有角色 ⇒ {@code false}。
+     * <p>与 {@link #isHostile(Faction, Faction)} **同一口径、同一结果**：阵营关系是对称的，
+     * 两种判定的参数个数只表达"谁问的"（自身相对 / 两玩家之间），不表达不同语义。
+     * 保留本方法是因为调用点分两支：{@code FactionLookup#isHostile(Faction, UUID)} 用它，
+     * 两 UUID 那支用上面那个 —— 删掉任一都会让一方改名换义。
      *
-     * <p>★ 本条也要求 {@code selfFaction} **有角色** —— 口径是"**有角色者与没角色者互不敌对**"
-     * （方向无关）。实践中"自身无角色"不可达（没角色就没有组件、跑不了技能），
-     * 但口径必须一致：否则 {@code isHostileTo(UNKNOWN, SHADOW)} 会答"敌对"，
-     * 与"没角色者不当敌人"自相矛盾 ✗（★ 这条正是被 {@code FactionRelationTest} 抓出来的）。
-     *
-     * @param selfFaction  己方阵营（**无角色 ⇒ 不敌对**）
-     * @param otherFaction 对方阵营（{@code null} 视为未知 ⇒ 不敌对）
+     * @param selfFaction  己方阵营（无角色 ⇒ 己方也算敌人）
+     * @param otherFaction 对方阵营（{@code null} 视为未知 = 没有角色 ⇒ 敌对）
      */
     public static boolean isHostileTo(Faction selfFaction, Faction otherFaction) {
         return isHostile(selfFaction, otherFaction);

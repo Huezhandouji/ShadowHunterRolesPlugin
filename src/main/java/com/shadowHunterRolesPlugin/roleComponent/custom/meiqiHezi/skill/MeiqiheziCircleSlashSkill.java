@@ -3,7 +3,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 import com.shadowHunterRolesPlugin.core.util.ParticleUtil;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.destroystokyo.paper.ParticleBuilder;
 import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
@@ -19,10 +19,11 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import java.util.List;
 
 public class MeiqiheziCircleSlashSkill extends Skill {
 
-    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    /** 本组件的登记 id（id 由组件自己声明）。 */
     public static final String ID = "meiqihezi_skill_circle_slash";
 
 
@@ -31,16 +32,16 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     private VitalsComponent vitals;
     private TaskComponent timer;
 
-    //前摇任务句柄化：stop 时取消（平台 Task）
+    //前摇任务句柄：stop 时取消（平台 Task）
     private ScheduledHandle castTask;
 
 
-    public MeiqiheziCircleSlashSkill(String id, ComponentServices services, Specification specification){
+    public MeiqiheziCircleSlashSkill(String id, ComponentServicesPort services, Specification specification){
         super(id, services, specification);
     }
 
     /**
-     * 本组件的**描述符**：表现值默认值 = 原构造实参（名字 / 描述 / 冷却 / 耗能 / 图标逐字段一致），
+     * 本组件的描述符：名字 / 描述 / 冷却 / 耗能 / 图标由这里声明，
      * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
      */
     public static final class Specification extends Skill.Specification<MeiqiheziCircleSlashSkill> {
@@ -48,7 +49,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
         public Specification(){
             super(
                     Component.text("圆弧斩"),
-                    Component.text("前摇1秒后对7m范围内所有敌人造成20真实伤害"),
+                    List.of(Component.text("前摇1秒后对7m范围内所有敌人造成20真实伤害")),
                     200,
                     15,
                     Material.GOLD_INGOT
@@ -57,7 +58,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
         }
 
         @Override
-        public MeiqiheziCircleSlashSkill create(String id, ComponentServices services){
+        public MeiqiheziCircleSlashSkill create(String id, ComponentServicesPort services){
             return new MeiqiheziCircleSlashSkill(id, services, this);
         }
     }
@@ -71,14 +72,10 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     }
 
     /**
-     * 迁移：旧 `onRightClick(Player, RoleInstance)` 的**逐条等价**新写法。
-     * 判定顺序（2026-09-18 调整）：**先判 `canCastSkill`** —— 不满足 → 直接返回（被禁用，不施放、不扣能量），
-     * **再**做能量 `tryConsume` —— 不满足 → 直接返回（与旧路径一致、**不启冷却**）；
-     * 冷却由本组件在施放成功处按声明值 **200** 启动；
-     * 缓慢用 **5 参重载**（`ambient=true, particles=false` 逐字保真）；
-     * 前摇任务改由**计时组件**创建（不再经服务集端口、改为组件本身用，**请求者在首位**；
-     * **登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
-     * <p>返回类型改 {@code void}（施放结果枚举已删，返回值无消费点 ⇒ 零行为变化）。
+     * 右击施放，判定顺序：**先判 `canCastSkill`** —— 不满足则直接返回（被禁用，不施放、不扣能量）；
+     * **再**做能量 `tryConsume` —— 不满足则直接返回（不启冷却）；
+     * 冷却由本组件在施放成功处按声明值 200 启动；缓慢用 5 参重载（`ambient=true, particles=false`）；
+     * 前摇任务由计时组件创建（请求者在首位，**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
      */
     @Override
     public void onCast(CastSignal signal){
@@ -86,7 +83,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
         if(!buff.canCastSkill()) return;
         if(!energy.tryConsume(getEnergyCost())) return;
 
- //药水记账：经端口施加，clear() 时只回收本系统施加的效果（标志位逐字一致）
+ //药水记账：经 Buff 组件施加，clear() 时只回收本系统施加的效果（标志位逐字一致）
         buff.applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
 
         Location loc = caster.getLocation();
@@ -123,15 +120,14 @@ public class MeiqiheziCircleSlashSkill extends Skill {
                 loc.getWorld().playSound(loc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1f, 1f);
             }
         });
-        startCooldown();   //D1：组件自启冷却（框架不再代启动）
+        startCooldown();   //组件自启冷却（框架不再代启动）
     }
 
 
 
     /**
-     * 新基类（RoleComponent）的停止钩子：容器在 legacy 扇出之后、`cancelAllAndClear()`
-     * **之前**广播 ⇒ 与旧 `LifecycleAware.stop(...)` 的行为等价（前摇取消）；框架还会兜底取消本组件
-     * 资源表内的任务（重复取消幂等）。
+     * 停止钩子：容器在 `cancelAllAndClear()` 之前广播，因此本方法能先取消前摇任务；
+     * 框架还会兜底取消本组件资源表内的任务（重复取消幂等）。
      */
     @Override
     public void stop() {
@@ -142,7 +138,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     }
 
     /**
-     * **闸门放行？**（基类不再取 buff ⇒ 由本组件用**自己的字段**判）。
+     * **闸门放行？**（基类不取 buff，由本组件用自己的字段判）。
      */
     @Override
     protected boolean canUse(){
@@ -150,8 +146,8 @@ public class MeiqiheziCircleSlashSkill extends Skill {
     }
 
     /**
-     * **当前能量**：本组件**声明耗能 15** ⇒ 必须给出真实能量（否则"能量不足"态不出现 ✗）；
- * 与既有实现**逐字等价**：同一个能量组件实例（注册表装配期后冻结、同类型实例唯一 ⇒ 字段引用与按需查找恒等 ✓）。
+     * **当前能量**：本组件声明耗能 15，因此必须给出真实能量（否则"能量不足"态不出现）；
+     * 取的是同一个能量组件实例（注册表装配期后冻结、同类型实例唯一，因此字段引用与按需查找恒等）。
      */
     @Override
     protected int currentEnergy(){

@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
@@ -20,26 +20,26 @@ import java.util.List;
 /**
  * 「罪棘」的核心被动：召唤者尖牙。
  *
- * <p><b>一次撕咬的三段时序</b>（与需求逐条对应）：
+ * <p>一次撕咬的三段时序：
  * <ol>
- *   <li><b>生成前</b>（0.3 秒 = 6 刻，每 2 刻一帧共 3 帧）：目标周身一圈<b>旋转向上</b>的骨白螺旋；</li>
- *   <li><b>生成瞬间 = 特效最高峰</b>：在敌人身下破土一枚<b>真正的唤魔者尖牙实体</b>
+ *   <li>生成前（0.3 秒 = 6 刻，每 2 刻一帧共 3 帧）：目标周身一圈旋转向上的骨白螺旋；</li>
+ *   <li>生成瞬间 = 特效最高峰：在敌人身下破土一枚真正的唤魔者尖牙实体
  *       （{@code EvokerFangs}，owner 设为召唤者以免咬到自己）+ 一蓬爆点；</li>
- *   <li><b>生成后 0.3 秒</b>：在生成位置结算 <b>4 点 SanTE（特殊值）</b>，并顺带挂上「律法之言」罪罚。</li>
+ *   <li>生成后 0.3 秒：在生成位置结算 4 点 SanTE（特殊值），并顺带挂上「律法之言」罪罚。</li>
  * </ol>
  *
- * <p><b>★ 伤害口径（已与需求确认）</b>：被动总伤害<b>维持不变</b> —— 原来由代码结算的
- * 「6 点物理伤害」现在改由**尖牙实体自己那一下**承担（原版 {@code EvokerFangs} 咬一口 = 6 点），
- * 所以本类**不再**额外调 {@code physicalDamage}（否则会翻倍）；
+ * <p>伤害口径：被动总伤害维持不变 —— 原来由代码结算的
+ * 「6 点物理伤害」现在改由尖牙实体自己那一下承担（原版 {@code EvokerFangs} 咬一口 = 6 点），
+ * 所以本类不再额外调 {@code physicalDamage}（否则会翻倍）；
  * 而「4 点特殊值」仍由代码在生成后 0.3 秒结算。
- * 副作用：尖牙的 6 点是原版的**魔法伤害**（不是物理），且若目标在尖牙抬起前跑出判定框会咬空。
+ * 副作用：尖牙的 6 点是原版的魔法伤害（不是物理），且若目标在尖牙抬起前跑出判定框会咬空。
  *
- * <p>常态<b>每次只咬最近的一个</b>；「罪恶的辩护」生效期间（{@link #setEmpowered(boolean)}）
- * 攻速 1.5 秒 → <b>0.5 秒</b>、改为咬<b>范围内所有</b>敌人，并在<b>光环边缘</b>持续画出更大的旋转十字架。
+ * <p>常态每次只咬最近的一个；「罪恶的辩护」生效期间（{@link #setEmpowered(boolean)}）
+ * 攻速 1.5 秒 → 0.5 秒、改为咬范围内所有敌人，并在光环边缘持续画出更大的旋转十字架。
  */
 public class SinThornPassive extends PassiveSkill {
 
-    /** **本组件的登记 id**（★ 知识归属：组件自己）。 */
+    /** **本组件的登记 id**（知识归属：组件自己）。 */
     public static final String ID = "sinThorn_passive_thorn";
 
     /** 尖牙的攻击半径（格）。 */
@@ -70,8 +70,9 @@ public class SinThornPassive extends PassiveSkill {
     private LawWordPassive lawWord;
 
     /**
-     * **本实例的 SanTE 组件** —— 用它上面的**跨实例入口** {@code decreaseSanTE(UUID, int)} 削敌人的特殊值。
-     * <p>★ 上游 2026-09-27 补齐官方跨实例 API 后，这里不再是"越界写法"（旧版绕公开 {@code RoleAPI}，违反 R-6）。
+     * **本实例的 SanTE 组件** —— 用它上面的跨实例入口
+     * {@code decreaseSanTE(UUID, int)} 削敌人的特殊值。
+     * <p>跨实例削 SanTE 必须走这个官方入口，不绕公开 {@code RoleAPI}。
      */
     private SanTEComponent sante;
 
@@ -83,32 +84,32 @@ public class SinThornPassive extends PassiveSkill {
     private double crossPhase = 0d;
     private boolean empowered = false;
 
-    public SinThornPassive(String id, ComponentServices services, Specification specification) {
+    public SinThornPassive(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
     /**
-     * 本组件的**被动描述符**（无栏位 ⇒ 天然不占热键栏）。
+     * 本组件的被动描述符（无栏位，天然不占热键栏）。
      */
     public static final class Specification extends PassiveSkill.Specification<SinThornPassive> {
 
         public Specification() {
             super(Component.text("罪棘"),
-                    Component.text("靠近你的敌人（7格内）每1.5秒被召唤者尖牙撕咬，受到6点伤害并损失4点特殊值"));
+                    List.of(Component.text("靠近你的敌人（7格内）每1.5秒被召唤者尖牙撕咬，受到6点伤害并损失4点特殊值")));
             requires(TaskComponent.class);
-            //★ 上游 2026-09-27 把家族描述符泛型化后，`requires(具体被动.class)` 才真正按具体类推导
-            //  ⇒ 这两个依赖可以如实声明为**必需**（二者同属本角色，必然同时装配）
+            //`requires(具体被动.class)` 按具体类推导，因此这两个依赖如实声明为必需
+            //  （二者同属本角色，必然同时装配）
             requires(SanTEComponent.class);
             requires(LawWordPassive.class);
         }
 
         @Override
-        public SinThornPassive create(String id, ComponentServices services) {
+        public SinThornPassive create(String id, ComponentServicesPort services) {
             return new SinThornPassive(id, services, this);
         }
     }
 
-    /** **开始生效**：协作组件一次查好缓存进字段（R-4：只在 {@code start()} 取）。 */
+    /** **开始生效**：协作组件一次查好缓存进字段（只在 {@code start()} 取）。 */
     @Override
     public void start() {
         lawWord = svc().components().get(LawWordPassive.class);
@@ -130,8 +131,8 @@ public class SinThornPassive extends PassiveSkill {
             return;
         }
 
-        //强化期：光环边缘一圈「快速消散的白色粒子」绕角色旋转（★ 不再是十字架）
-        //Y 取 getLocation() ⇒ 方法内建 +1 ⇒ 正好是"比角色高 1 格"
+        //强化期：光环边缘一圈「快速消散的白色粒子」绕角色旋转（不再是十字架）
+        //Y 取 getLocation()，方法内建 +1，正好是"比角色高 1 格"
         if (empowered) {
             vfxTick++;
             if (vfxTick % 2 == 0) {
@@ -165,7 +166,7 @@ public class SinThornPassive extends PassiveSkill {
 
     /**
      * **一次完整撕咬**：前摇螺旋 → 尖牙破土（峰值）→ 0.3 秒后结算特殊值。
-     * <p>三段都经计时组件登记（{@code addScheduleLater}）⇒ 角色清除时自动取消，不留悬挂任务。
+     * <p>三段都经计时组件登记（{@code addScheduleLater}），因此角色清除时自动取消，不留悬挂任务。
      */
     private void bite(Player self, Player victim) {
         final Location at = victim.getLocation().clone();
@@ -174,7 +175,7 @@ public class SinThornPassive extends PassiveSkill {
             return;
         }
 
-        //① 生成前：0.3 秒内三帧「旋转向上」螺旋（相位与半径逐帧变大 ⇒ 越转越急、越高）
+        //① 生成前：0.3 秒内三帧「旋转向上」螺旋（相位与半径逐帧变大，越转越急、越高）
         for (int frame = 1; frame <= SPIRAL_FRAMES; frame++) {
             final int f = frame;
             timer.addScheduleLater(this, f * SPIRAL_FRAME_INTERVAL_TICKS, () -> {

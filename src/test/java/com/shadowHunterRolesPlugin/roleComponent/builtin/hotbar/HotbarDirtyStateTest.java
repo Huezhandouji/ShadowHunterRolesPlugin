@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import org.junit.Test;
 
@@ -10,7 +10,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * **帧末 flush 的状态机半边**：`HotbarRenderComponent` 的
  * `markDirty()` / `isDirty()` / `clearDirty()` 是**纯状态机**：三个方法只碰脏标记与变化基线、不碰服务集。
- * <p>为什么能单测：构造组件用**空服务集桩**（`new ComponentServices(null, null, null)`，
+ * <p>能单测的原因：构造组件用**空服务集桩**（`new ComponentServicesPort(null, null, null)`，
  * 与 `CapabilityDispatchTest` / `EnergyComponentOperationTest` 同一形态），
  * 断言不需要 Bukkit、不需要服务器、不需要背包 ⇒ 离线可跑。
  * <p>运行半边（"帧末只刷一次 / 刷完清脏"）仍留运行级：那要真背包写入计数。
@@ -20,7 +20,7 @@ public class HotbarDirtyStateTest {
 
     /** 空服务集桩（本测试只驱动状态机，不碰玩家 / 容器 / 角色信息服务）。 */
     private static HotbarRenderComponent component() {
-        return new HotbarRenderComponent("hotbarRender", new ComponentServices(null, null, null));
+        return new HotbarRenderComponent("hotbarRender", new ComponentServicesPort(null, null, null));
     }
 
     /** 初值 = true（构造后的首刷必须有机会发生，即使没人置脏）。 */

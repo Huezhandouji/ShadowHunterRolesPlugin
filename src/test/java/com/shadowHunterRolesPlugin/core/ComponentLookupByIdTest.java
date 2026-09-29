@@ -1,8 +1,8 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
-import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentLookupPort;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import org.junit.Test;
 
@@ -19,9 +19,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * 阶段 11 · t77（α）：**按 id 的查询语义**入库覆盖（F-5）。
+ * 按 id 的查询语义入库覆盖。
  *
- * <p>覆盖 {@link ComponentLookup} 的四个读口在同一容器上的**成对对称性**：
+ * <p>覆盖 {@link ComponentLookupPort} 的四个读口在同一容器上的**成对对称性**：
  * <ul>
  *   <li>按类型：{@code get(Type)} = 添加顺序**第一个**可赋值者 · {@code getAll(Type)} = **全部**（添加顺序）；</li>
  *   <li>按 id：{@code getById(id)} = 添加顺序**第一个**同 id 者 · {@code getAllById(id)} = **全部**同 id 者。</li>
@@ -30,12 +30,12 @@ import static org.junit.Assert.fail;
  * {@code getAll(type).get(0) == get(type)} · 无人符合 ⇒ **空列表**（不是 null）· 返回**不可变**列表 ·
  * {@code id == null} ⇒ 空列表（不抛）。
  *
- * <p><b>为什么能离线跑</b>：容器（{@code ComponentRegistry} + {@code ComponentLookupImpl}）按设计
- * **不碰 Bukkit** ⇒ 用全 null 的 {@link ComponentServices} 桩即可驱动（同一做法已在仓库外探针
- * `.scratch/t67/T67Probe.java` 上验证过）。本件因此**不需要起服**、也不需要 mocking 框架。
+ * <p>能离线跑的原因：容器（{@code ComponentRegistry} + {@code ComponentLookupImpl}）按设计
+ * **不碰 Bukkit**，因此用全 null 的 {@link ComponentServicesPort} 桩即可驱动。本件**不需要起服**，
+ * 也不需要 mocking 框架。
  *
- * <p><b>本件不覆盖</b>（如实申报，属 β 卡）：F-1/F-2/F-3 三条**状态面按实例**的反例 —— 它们需要
- * {@code RoleInstance}（进而需要 {@code Player}）⇒ 只能走运行级读数。
+ * <p>本件不覆盖（如实申报）：状态面按实例的三条反例 —— 它们需要 {@code RoleInstance}
+ * （进而需要 {@code Player}），只能走运行级读数。
  */
 public class ComponentLookupByIdTest {
 
@@ -46,19 +46,19 @@ public class ComponentLookupByIdTest {
     }
 
     public static abstract class Father extends RoleComponent {
-        Father(String id, ComponentServices services) {
+        Father(String id, ComponentServicesPort services) {
             super(id, services);
         }
     }
 
     public static final class C1 extends Father implements Tag {
-        C1(String id, ComponentServices services) {
+        C1(String id, ComponentServicesPort services) {
             super(id, services);
         }
     }
 
     public static final class C2 extends Father {
-        C2(String id, ComponentServices services) {
+        C2(String id, ComponentServicesPort services) {
             super(id, services);
         }
     }
@@ -66,15 +66,15 @@ public class ComponentLookupByIdTest {
     // ───────────── 描述符（providedType 由泛型实参推导） ─────────────
 
     static class Spec<T extends RoleComponent> extends RoleComponent.Specification<T> {
-        private final BiFunction<String, ComponentServices, T> factory;
+        private final BiFunction<String, ComponentServicesPort, T> factory;
 
-        Spec(String label, BiFunction<String, ComponentServices, T> factory) {
+        Spec(String label, BiFunction<String, ComponentServicesPort, T> factory) {
             super(label);
             this.factory = factory;
         }
 
         @Override
-        public T create(String id, ComponentServices services) {
+        public T create(String id, ComponentServicesPort services) {
             return factory.apply(id, services);
         }
     }
@@ -88,8 +88,8 @@ public class ComponentLookupByIdTest {
     }
 
     /** 全 null 的服务集桩：容器读口不需要服务集里的任何成员（组件也不会调用它们）。 */
-    private static final ComponentServices STUB =
-            new ComponentServices(null, null, null);
+    private static final ComponentServicesPort STUB =
+            new ComponentServicesPort(null, null, null);
 
     private static ComponentLookupImpl lookupOf(ComponentRegistry registry) {
         return new ComponentLookupImpl(registry, id -> STUB, Logger.getLogger("t77-test"));
@@ -103,12 +103,12 @@ public class ComponentLookupByIdTest {
         return out;
     }
 
-    // ───────────── A1：getById = 第一个 · getAllById = 全部（添加顺序） ─────────────
+    // ───────────── 按 id 的一对：getById = 第一个 · getAllById = 全部（添加顺序） ─────────────
 
     @Test
     public void getByIdReturnsFirstAndGetAllByIdReturnsAllInAddOrder() {
         ComponentRegistry registry = new ComponentRegistry();
-        ComponentLookup port = lookupOf(registry);
+        ComponentLookupPort port = lookupOf(registry);
         C1 first = port.add("dup", new C1Spec());
         C1 second = port.add("dup", new C1Spec());
         C1 third = port.add("dup", new C1Spec());
@@ -127,7 +127,7 @@ public class ComponentLookupByIdTest {
     @Test
     public void byIdPairIsSymmetric() {
         ComponentRegistry registry = new ComponentRegistry();
-        ComponentLookup port = lookupOf(registry);
+        ComponentLookupPort port = lookupOf(registry);
         port.add("x", new C1Spec());
         registry.freeze();
 
@@ -142,7 +142,7 @@ public class ComponentLookupByIdTest {
     @Test
     public void getAllByIdSingleItemBoundary() {
         ComponentRegistry registry = new ComponentRegistry();
-        ComponentLookup port = lookupOf(registry);
+        ComponentLookupPort port = lookupOf(registry);
         C1 only = port.add("solo", new C1Spec());
         port.add("other", new C2Spec());
         registry.freeze();
@@ -155,7 +155,7 @@ public class ComponentLookupByIdTest {
     @Test
     public void getAllByIdHandlesNullIdWithoutThrowing() {
         ComponentRegistry registry = new ComponentRegistry();
-        ComponentLookup port = lookupOf(registry);
+        ComponentLookupPort port = lookupOf(registry);
         port.add("a", new C1Spec());
         registry.freeze();
 
@@ -167,7 +167,7 @@ public class ComponentLookupByIdTest {
     @Test
     public void getAllByIdReturnsImmutableList() {
         ComponentRegistry registry = new ComponentRegistry();
-        ComponentLookup port = lookupOf(registry);
+        ComponentLookupPort port = lookupOf(registry);
         C1 one = port.add("a", new C1Spec());
         registry.freeze();
 
@@ -184,7 +184,7 @@ public class ComponentLookupByIdTest {
     @Test
     public void getAllByIdFollowsInsertAtOrder() {
         ComponentRegistry registry = new ComponentRegistry();
-        ComponentLookup port = lookupOf(registry);
+        ComponentLookupPort port = lookupOf(registry);
         C1 appended = port.add("dup", new C1Spec());
         C1 inserted = port.insertAt(0, "dup", new C1Spec());
         C1 tail = port.add("dup", new C1Spec());
@@ -202,7 +202,7 @@ public class ComponentLookupByIdTest {
     @Test
     public void byTypePairIsSymmetric() {
         ComponentRegistry registry = new ComponentRegistry();
-        ComponentLookup port = lookupOf(registry);
+        ComponentLookupPort port = lookupOf(registry);
         C1 c1 = port.add("c1", new C1Spec());
         C2 c2 = port.add("c2", new C2Spec());
         registry.freeze();
@@ -220,7 +220,7 @@ public class ComponentLookupByIdTest {
 
     /** 只用来验证"无人符合"的另一个族（避免与 C1/C2 的继承关系混淆）。 */
     public static final class Single extends RoleComponent {
-        Single(String id, ComponentServices services) {
+        Single(String id, ComponentServicesPort services) {
             super(id, services);
         }
     }
@@ -228,7 +228,7 @@ public class ComponentLookupByIdTest {
     @Test
     public void getAllIsImmutableAndEmptyForUnknownType() {
         ComponentRegistry registry = new ComponentRegistry();
-        ComponentLookup port = lookupOf(registry);
+        ComponentLookupPort port = lookupOf(registry);
         C1 c1 = port.add("c1", new C1Spec());
         registry.freeze();
 

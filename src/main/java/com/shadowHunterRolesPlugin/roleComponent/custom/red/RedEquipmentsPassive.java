@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Color;
 import org.bukkit.Material;
@@ -10,37 +10,37 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
+import java.util.List;
 
 public class RedEquipmentsPassive extends PassiveSkill {
 
-    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    /** 本组件的登记 id（id 由组件自己声明）。 */
     public static final String ID = "red_equippments_passive";
 
-    public RedEquipmentsPassive(String id, ComponentServices services, Specification specification) {
+    public RedEquipmentsPassive(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
     /**
-     * 本组件的**被动描述符**（迁移后被动走统一的 {@code addComponent} 入口 ⇒ 无栏位 ⇒ 天然不占热键栏）。
-     * 表现数据**逐字沿用**组件构造器里那一对文案（不新拟）；**无依赖声明** —— 本组件实取 0 个组件
-     * （只用 {@code svc().self().player()}）。
+     * 本组件的被动描述符：被动经统一 {@code addComponent} 入口装配且无栏位，因此天然不占热键栏。
+     * 显示名与描述只在本描述符里声明一处；本组件不声明依赖 —— 实取 0 个组件，
+     * 只用 {@code svc().self().player()}。
      */
     public static final class Specification extends PassiveSkill.Specification<RedEquipmentsPassive> {
 
         public Specification(){
-            super(Component.text("穿戴装备"), Component.text("ccb"));
+            super(Component.text("穿戴装备"), List.of(Component.text("ccb")));
         }
 
         @Override
-        public RedEquipmentsPassive create(String id, ComponentServices services){
+        public RedEquipmentsPassive create(String id, ComponentServicesPort services){
             return new RedEquipmentsPassive(id, services, this);
         }
     }
 
     /**
-     * 迁移：改**无参新钩子**（容器已广播），装备发放逻辑**逐字未动**
-     * （四槽 = IRON_HELMET / IRON_CHESTPLATE / LEATHER_LEGGINGS / LEATHER_BOOTS；
-     * 设置顺序 helmet→chestplate→leggings→boots 不变）。
+     * 装备发放：四槽 = IRON_HELMET / IRON_CHESTPLATE / LEATHER_LEGGINGS / LEATHER_BOOTS，
+     * 设置顺序 helmet→chestplate→leggings→boots。
      */
     @Override
     public void start() {
@@ -98,8 +98,8 @@ public class RedEquipmentsPassive extends PassiveSkill {
     public void stop() {
         Player player = svc().self().player();
         // 与 start 严格对称：回收 4 件装备。
-        // 按《最终重构指南》§10 裁决 3：无条件清空 helmet/chestplate/leggings/boots，
-        // 不判断归属、不加 PDC 标记（已知代价：玩家原本穿在这 4 个槽位的其它装备会被一并删除）。
+        // 无条件清空 helmet/chestplate/leggings/boots，不判断归属、不加 PDC 标记
+        // （已知代价：玩家原本穿在这 4 个槽位的其它装备会被一并删除）。
         player.getInventory().setHelmet(null);
         player.getInventory().setChestplate(null);
         player.getInventory().setLeggings(null);

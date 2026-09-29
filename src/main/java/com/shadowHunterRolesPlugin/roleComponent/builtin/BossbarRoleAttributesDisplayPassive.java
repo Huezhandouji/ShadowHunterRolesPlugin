@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import net.kyori.adventure.bossbar.BossBar;
@@ -12,6 +12,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Boss;
 
 import javax.inject.Named;
+import java.util.List;
 
 
 public class BossbarRoleAttributesDisplayPassive extends PassiveSkill {
@@ -23,7 +24,7 @@ public class BossbarRoleAttributesDisplayPassive extends PassiveSkill {
 
     private BossBar bossbar;
 
-    public BossbarRoleAttributesDisplayPassive(String id, ComponentServices services, Specification specification) {
+    public BossbarRoleAttributesDisplayPassive(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
@@ -32,11 +33,11 @@ public class BossbarRoleAttributesDisplayPassive extends PassiveSkill {
 
         public Specification() {
             super(Component.text("bossbar角色属性数值显示"),
-                    Component.text("ccb"));
+                    List.of(Component.text("ccb")));
         }
 
         @Override
-        public BossbarRoleAttributesDisplayPassive create(String id, ComponentServices services) {
+        public BossbarRoleAttributesDisplayPassive create(String id, ComponentServicesPort services) {
             return new BossbarRoleAttributesDisplayPassive(id, services, this);
         }
     }

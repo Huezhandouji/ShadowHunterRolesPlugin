@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import org.junit.Test;
 
@@ -18,24 +18,25 @@ import static org.junit.Assert.assertTrue;
 /**
  * `SanTEComponent` 的两族**离线**单测：
  * <ol>
- *   <li><b>组件操作面</b>（≥6 例 ✓）；</li>
- *   <li><b>监听器列表</b>（用户裁定「改用监听器列表，其他类只需要添加 {@code Consumer}」✓）。</li>
+ *   <li><b>组件操作面</b>；</li>
+ *   <li><b>监听器列表</b>（用户裁定「改用监听器列表，其他类只需要添加 {@code Consumer}」）。</li>
  * </ol>
- * <p>构造法照 `EnergyComponentOperationTest` 同形：`new SanTEComponent(id, new ComponentServices(null, null, null), max)`
- * —— 服务集空桩 + **记录型假件**（JDK {@code Consumer} ✓，不新增平行通道 ✗）。
+ * <p>构造法照 `EnergyComponentOperationTest` 同形：
+ * `new SanTEComponent(id, new ComponentServicesPort(null, null, null), max)`
+ * —— 服务集空桩 + **记录型假件**（JDK {@code Consumer}，不新增平行通道）。
  *
- * <p><b>两条通道</b>（与生产的分工逐字一致 ✓）：**平台侧通道** = 名单里 owner = **组件自身**的那一条
- * ⇒ 写入路径直调它（无变化写入也调 ✓、异常照常上抛 ✓）；**订阅者通道** = owner 为**别的组件**的登记
- * ⇒ 生产里由容器在派发边界通知，离线单测用 {@link SanTEComponent#notifyListeners} 显式驱动 ✓。
- * 两族假件都是 {@code Consumer}（{@link RecordingListener} ✓，比"写一个实现类"更简单 ✓）。
+ * <p>两条通道（与生产的分工逐字一致）：**平台侧通道** = 名单里 owner = **组件自身**的那一条
+ * ⇒ 写入路径直调它（无变化写入也调、异常照常上抛）；**订阅者通道** = owner 为**别的组件**的登记
+ * ⇒ 生产里由容器在派发边界通知，离线单测用 {@link SanTEComponent#notifyListeners} 显式驱动。
+ * 两族假件都是 {@code Consumer}（{@link RecordingListener}，比"写一个实现类"更简单）。
  */
 public class SanTEComponentOperationTest {
 
     private static final int MAX = 100;
 
     /**
-     * **记录型监听器** —— 一个 {@code Consumer} 把每次载荷记下来即可（**不再需要任何自定义接口** ✓）；
-     * 它既当**平台侧回调**（owner = 组件自身登记 ✓），也当**订阅者**（owner = 别的组件登记 ✓）。
+     * **记录型监听器** —— 一个 {@code Consumer} 把每次载荷记下来即可（**不再需要任何自定义接口**）；
+     * 它既当**平台侧回调**（owner = 组件自身登记），也当**订阅者**（owner = 别的组件登记）。
      */
     private static final class RecordingListener implements Consumer<SanTEComponent.Change> {
         final List<SanTEComponent.Change> seen = new ArrayList<>();
@@ -46,29 +47,29 @@ public class SanTEComponentOperationTest {
         }
     }
 
-    /** 订阅者用的假 owner（任意组件 ✓ —— 名单只按引用相等比较，不看具体类型）。 */
+    /** 订阅者用的假 owner（任意组件 —— 名单只按引用相等比较，不看具体类型）。 */
     private static final class StubOwner extends RoleComponent {
-        StubOwner() { super("stubOwner", new ComponentServices(null, null, null)); }
+        StubOwner() { super("stubOwner", new ComponentServicesPort(null, null, null)); }
     }
 
-    /** 订阅者共用的 owner 实例（幂等判据要的是**同一个** owner ✓）。 */
+    /** 订阅者共用的 owner 实例（幂等判据要的是**同一个** owner）。 */
     private static final StubOwner SUBSCRIBER = new StubOwner();
 
-    /** 带**平台侧登记**（owner = 组件自身 ✓）的组件：写入路径会直调它 ✓。 */
+    /** 带**平台侧登记**（owner = 组件自身）的组件：写入路径会直调它。 */
     private static SanTEComponent newComponent(RecordingListener platform) {
-        SanTEComponent sante = new SanTEComponent("sante", new ComponentServices(null, null, null), MAX);
+        SanTEComponent sante = new SanTEComponent("sante", new ComponentServicesPort(null, null, null), MAX);
         sante.addListener(sante, platform);
         return sante;
     }
 
-    /** 不带平台侧登记的组件（只有订阅者名单 ⇒ 便于逐条核对名单语义 ✓）。 */
+    /** 不带平台侧登记的组件（只有订阅者名单 ⇒ 便于逐条核对名单语义）。 */
     private static SanTEComponent newComponent() {
-        return new SanTEComponent("sante", new ComponentServices(null, null, null), MAX);
+        return new SanTEComponent("sante", new ComponentServicesPort(null, null, null), MAX);
     }
 
-    // ───────── ① 组件操作面 ─────────
+    // ───────── 组件操作面 ─────────
 
-    /** 写入动词回「写后值」；读动词回当前值（试点同风格 ✓）。 */
+    /** 写入动词回「写后值」；读动词回当前值（与能量组件同风格）。 */
     @Test
     public void writeVerbsReturnPostValueAndReadVerbsReturnCurrent() {
         RecordingListener platform = new RecordingListener();
@@ -83,7 +84,7 @@ public class SanTEComponentOperationTest {
         assertTrue("平台侧通道被走到（零新增通道 ✓）", platform.seen.size() >= 3);
     }
 
-    /** 未知动词（含大小写差异）⇒ 未识别 ⇒ null（不改状态 ✓）。 */
+    /** 未知动词（含大小写差异）⇒ 未识别 ⇒ null（不改状态）。 */
     @Test
     public void unknownVerbIsRejected() {
         SanTEComponent sante = newComponent(new RecordingListener());
@@ -94,7 +95,7 @@ public class SanTEComponentOperationTest {
         assertEquals("未知动词不得改状态", 40, sante.current());
     }
 
-    /** 空 / 空白 / null payload ⇒ null（已在 javadoc 写明 ✓）。 */
+    /** 空 / 空白 / null payload ⇒ null（已在 javadoc 写明）。 */
     @Test
     public void emptyPayloadIsRejected() {
         SanTEComponent sante = newComponent(new RecordingListener());
@@ -115,7 +116,7 @@ public class SanTEComponentOperationTest {
         assertNull("只读动词带参", sante.onOperationCommand("current 1"));
     }
 
-    /** 写入超上限 ⇒ 走既有 clamp（回写后值 = 上限 ✓，不是请求值）。 */
+    /** 写入超上限 ⇒ 走既有 clamp（回写后值 = 上限，不是请求值）。 */
     @Test
     public void setAboveMaxIsClampedByExistingPath() {
         SanTEComponent sante = newComponent(new RecordingListener());
@@ -123,7 +124,7 @@ public class SanTEComponentOperationTest {
         assertEquals(MAX, sante.current());
     }
 
-    /** 边界：`decrease` 不足 ⇒ **已识别**（回非空 ✓）且值单调不增（既有 clamp 语义 ✓）。 */
+    /** 边界：`decrease` 不足 ⇒ **已识别**（回非空）且值单调不增（既有 clamp 语义）。 */
     @Test
     public void decreaseBelowZeroStaysRecognisedAndMonotone() {
         SanTEComponent sante = newComponent(new RecordingListener());
@@ -134,7 +135,7 @@ public class SanTEComponentOperationTest {
         assertTrue("非负", sante.current() >= 0);
     }
 
-    /** `set 0` 是合法写入（0 是被允许的边界值 ✓）。 */
+    /** `set 0` 是合法写入（0 是被允许的边界值）。 */
     @Test
     public void zeroIsAValidWrite() {
         SanTEComponent sante = newComponent(new RecordingListener());
@@ -143,15 +144,15 @@ public class SanTEComponentOperationTest {
         assertEquals("gain 3 ⇒ 3", "3", sante.onOperationCommand("gain 3"));
     }
 
-    // ───────── ② 监听器列表（只添加 Consumer ✓）─────────
+    // ───────── 监听器列表（只添加 Consumer）─────────
 
     /**
      * 载荷与顺序（**行为等价的核心**）：监听器收到的 {@code previous}/{@code current} 与
-     * `set` 的 clamp 结果逐条一致 ✓，且顺序 = **添加先后** ✓。
-     * <p>对照旧形态：`onSanTEChange(int pre, int now)` 的两个入参**原样**搬进 {@code Change} 记录 ✓。
-     * <p>★ **写入路径自己就通知订阅者**（`set` → {@link SanTEComponent#notifyListeners}）——
+     * `set` 的 clamp 结果逐条一致，且顺序 = **添加先后**。
+     * <p>对照旧形态：`onSanTEChange(int pre, int now)` 的两个入参**原样**搬进 {@code Change} 记录。
+     * <p>**写入路径自己就通知订阅者**（`set` → {@link SanTEComponent#notifyListeners}）——
      * 与 {@code EnergyComponent} 逐字同形 ⇒ 离线单测**不需要**再手工补一次派发。
-     * <p>（生产路径里容器另有一层派发，带 `pre == now` 真变化闸门与逐条 `guardedCall` ✓。）
+     * <p>（生产路径里容器另有一层派发，带 `pre == now` 真变化闸门与逐条 `guardedCall`。）
      */
     @Test
     public void listenersReceiveChangeWithPreviousAndCurrentInRegistrationOrder() {
@@ -174,11 +175,11 @@ public class SanTEComponentOperationTest {
     }
 
     /**
-     * ★ **回归**（真 bug 的判据）：SanTE **归零**时订阅者**必须**收到那条变更。
+     * **回归**（真 bug 的判据）：SanTE **归零**时订阅者**必须**收到那条变更。
      *
      * <p>曾经的形态：写入路径只通知 `owner == 本组件` 的那条（"平台侧"），而**产线上不存在**这样的登记
      * ⇒ `decrease` 到 0 时**没有任何订阅者被通知** ⇒ 依赖"归零即结束"的技能（例：红的黯然销魂）
-     * 永远不结束 ✗。本测试锁住"归零必达"。
+     * 永远不结束。本测试锁住"归零必达"。
      */
     @Test
     public void decreaseToZeroNotifiesSubscribers() {
@@ -217,8 +218,8 @@ public class SanTEComponentOperationTest {
     }
 
     /**
-     * 移除语义 = **按引用相等** ✓：移除后的监听器**不再收到**通知 ✓；不在名单里的登记是 **no-op** ✓
-     * （返回 {@code false}，与旧 `unsubscribe` 的 no-op 语义逐字等价 ✓）。
+     * 移除语义 = **按引用相等**：移除后的监听器**不再收到**通知；不在名单里的登记是 **no-op**
+     * （返回 {@code false}，与旧 `unsubscribe` 的 no-op 语义逐字等价）。
      */
     @Test
     public void removeListenerIsByReferenceAndIdempotent() {
@@ -240,9 +241,9 @@ public class SanTEComponentOperationTest {
     }
 
     /**
-     * 幂等：**同一 owner + 同一监听器实例**重复添加**不重复登记** ✓（与旧 `subscribe` 的幂等语义一致 ✓）。
-     * <p>★ 注意：**两个不同的 lambda 即使代码相同也是两个实例** ⇒ 不幂等 —— 这正是"按引用相等"的
-     * 直接推论，也是消费者必须**把登记实例存进字段**的原因（两个既有消费者都已照此迁移 ✓）。
+     * 幂等：**同一 owner + 同一监听器实例**重复添加**不重复登记**（与旧 `subscribe` 的幂等语义一致）。
+     * <p>**两个不同的 lambda 即使代码相同也是两个实例** ⇒ 不幂等 —— 这正是"按引用相等"的
+     * 直接推论，也是消费者必须**把登记实例存进字段**的原因（两个既有消费者都已照此迁移）。
      */
     @Test
     public void addListenerIsIdempotentForTheSameInstance() {
@@ -260,7 +261,7 @@ public class SanTEComponentOperationTest {
 
     /**
      * **遍历期间增删的安全**：遍历中新增/移除监听器
-     * ⇒ 不抛 {@code ConcurrentModificationException} ✓，且**不影响本次遍历**（快照语义 ✓）。
+     * ⇒ 不抛 {@code ConcurrentModificationException}，且**不影响本次遍历**（快照语义）。
      */
     @Test
     public void mutatingListenersDuringIterationIsSafe() {
@@ -269,7 +270,7 @@ public class SanTEComponentOperationTest {
         RecordingListener existing = new RecordingListener();
         SanTEComponent.Listener existingEntry = sante.addListener(SUBSCRIBER, existing);
 
-        //遍历途中：先移除自己、再新增一条 —— 两者都不得影响本趟（快照 = 进入时已定 ✓）
+        //遍历途中：先移除自己、再新增一条 —— 两者都不得影响本趟（快照 = 进入时已定）
         sante.forEachListener(entry -> {
             sante.removeListener(existingEntry);
             sante.addListener(SUBSCRIBER, late);
@@ -282,7 +283,7 @@ public class SanTEComponentOperationTest {
         assertEquals("新加者从下一趟起收到", 1, late.seen.size());
     }
 
-    /** 空值面：{@code null} owner / {@code null} 监听器 ⇒ 忽略（回 {@code null} ✓，旧 `subscribe(null)` 同义 ✓）。 */
+    /** 空值面：{@code null} owner / {@code null} 监听器 ⇒ 忽略（回 {@code null}，旧 `subscribe(null)` 同义）。 */
     @Test
     public void nullInputsAreIgnored() {
         SanTEComponent sante = newComponent();
@@ -294,10 +295,10 @@ public class SanTEComponentOperationTest {
     }
 
     /**
-     * **旧订阅面确已删除**（"删除旧嵌套接口与旧入口"的判据 ✓，用**反射**离线核验）：
+     * **旧订阅面确已删除**（"删除旧嵌套接口与旧入口"的判据，用**反射**离线核验）：
      * `Subscriber` 类型与 `subscribe` / `unsubscribe` / `subscriberCount` / `forEachSubscriber` 四个入口
-     * **都不存在** ✓；`ChangeSink` 类型与 `onSanTEChanged` 单播入口**也都不存在** ✓
-     * （平台侧通道已改成构造期给出的 JDK {@code Consumer} ⇒ 名单里没有它的一条 ✓）。
+     * **都不存在**；`ChangeSink` 类型与 `onSanTEChanged` 单播入口**也都不存在**
+     * （平台侧通道已改成构造期给出的 JDK {@code Consumer} ⇒ 名单里没有它的一条）。
      */
     @Test
     public void legacySubscriberSurfaceIsGone() {

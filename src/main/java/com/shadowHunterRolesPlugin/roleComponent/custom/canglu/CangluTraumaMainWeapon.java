@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.canglu;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
@@ -13,12 +13,14 @@ import org.bukkit.Sound;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.UUID;
+import java.util.List;
 
 public class CangluTraumaMainWeapon extends MainWeapon {
 
     public static final String ID = "cangluTraumaMainWeapon";
 
-
+    private static final int DAMAGE = 6;
+    private static final float KNOCKBACK = 0.5f;
     private static final int EXTRA_TURE_DAMAGE_AMOUNT = 4;
     private static final int SANTE_DAMAGE_AMOUNT = 12;
     private static final int ENERGY_THEFT_AMOUNT = 2;
@@ -40,7 +42,7 @@ public class CangluTraumaMainWeapon extends MainWeapon {
      * @param services
      * @param specification
      */
-    public CangluTraumaMainWeapon(String id, ComponentServices services, Specification specification) {
+    public CangluTraumaMainWeapon(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
@@ -49,7 +51,7 @@ public class CangluTraumaMainWeapon extends MainWeapon {
         public Specification(){
             super(
                     Component.text("忧郁创痕-主武器"),
-                    Component.text("攻击造成12特殊值伤害并夺取2能量，增加移速。如果'创伤'层数不小于4，将结算4层创伤"),
+                    List.of(Component.text("攻击造成12特殊值伤害并夺取2能量，增加移速。如果'创伤'层数不小于4，将结算4层创伤")),
                     Material.DIAMOND_SWORD,
                     40
             );
@@ -61,7 +63,7 @@ public class CangluTraumaMainWeapon extends MainWeapon {
         }
 
         @Override
-        public CangluTraumaMainWeapon create(String id, ComponentServices services){
+        public CangluTraumaMainWeapon create(String id, ComponentServicesPort services){
             return new CangluTraumaMainWeapon(id, services, this);
         }
     }
@@ -100,6 +102,8 @@ public class CangluTraumaMainWeapon extends MainWeapon {
 
         hysteriaPassive.requestAddStackCount(1);
         boolean passiveCasted = hysteriaPassive.requestResolve();
+
+        vitals.physicalDamage(signal.victim(), svc().self().player(), DAMAGE, KNOCKBACK);
 
         if(passiveCasted){
             vitals.trueDamage(signal.victim(), svc().self().player(), EXTRA_TURE_DAMAGE_AMOUNT);

@@ -12,10 +12,9 @@ import java.util.*;
 
 public class SkillUtil {
 
-    //`hasEnemyInRange(RoleInstance, …)` 已**删除** —— 它当时唯一的剩余调用点是一个阵营适配器，
-    //其逻辑已**逐字搬入** `RoleInfo#hasEnemyInRange(radius)`（现由聚合根的只读服务面提供；
-    //含 `loc == null || world == null` 短路与"**未选角色的玩家也算敌人**"语义）。
-    //本类现在只剩**无状态几何工具** `getPlayersInSightLine`（纯射线几何、不查阵营、零插件依赖）。
+    // 本类只放无状态几何工具 `getPlayersInSightLine`（纯射线几何、不查阵营、零插件依赖）；
+    // 阵营判定（"自身半径内是否有敌人"及"没有角色算敌人 / 创造旁观不算"那套口径）归聚合根的只读服务面
+    // `RoleInfoPort#hasEnemyInRange(radius)`。
 
     public static List<Player> getPlayersInSightLine(Player player, double maxDistance, double range) {
         List<Player> result = new ArrayList<>();

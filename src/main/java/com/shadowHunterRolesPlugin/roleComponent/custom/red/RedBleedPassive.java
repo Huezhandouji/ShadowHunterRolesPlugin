@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.red;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -24,19 +24,13 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 
 /**
  * 红的流血被动。
- * <p><b>迁移口径</b>：
- * <ul>
- *   <li>**删除过渡桥**（两个上下文键常量 + 两处上下文写入）与 **legacy 生命周期接口声明** ——
- *       账本与其唯一外部使用者（`RedSanctifiedBladeMainWeapon`）都已改为经 `getComponent(...)` 读写
- *       **同一份私有账本** ⇒ 桥的最后使用者已消失（§2.0 第 ⑦ 条）。</li>
- *   <li>legacy 的带参 `start/stop` → **无参 `start()/stop()`**（新钩子；`stop()` 仍清空两个账本 Map，
- *       与原 `stop()` 语义一致；`start()` 无需再做任何事 ⇒ 不再覆写）。</li>
- * <li>保留 `update()` 的无参形态与全部端口化；**数值/结算节奏/记账路径逐字不变**。</li>
- * </ul>
+ * <p>流血账本（`playerBleedRecord` / `playerBleedResolveRequests`）为私有，外部经
+ * `getComponent(...)` 取到本组件后，再走下面三个公开入口读写同一份账本。
+ * <p>`update()` 保持无参形态与全部端口化，数值 / 结算节奏 / 记账路径逐字不变。
  */
 public class RedBleedPassive extends PassiveSkill {
 
-    /** **本组件的登记 id**（★ 知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
+    /** 本组件的登记 id（id 由组件自己声明）。 */
     public static final String ID = "red_bleed_passive";
 
     private VitalsComponent vitals;
@@ -63,32 +57,32 @@ public class RedBleedPassive extends PassiveSkill {
 
     private int secondCountdown = 0;
 
-    public RedBleedPassive(String id, ComponentServices services, Specification specification) {
+    public RedBleedPassive(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
     /**
-     * 本组件的**被动描述符**（迁移后被动走统一的 {@code addComponent} 入口 ⇒ 无栏位 ⇒ 天然不占热键栏）。
-     * 表现数据**逐字沿用**组件构造器里那一对文案（不新拟）；依赖 = 实取清单（`start()` 内的三个调用点）。
+     * 本组件的被动描述符：被动经统一 {@code addComponent} 入口装配且无栏位，因此天然不占热键栏。
+     * 显示名与描述只在本描述符里声明一处；依赖 = {@code start()} 实取的那三个组件。
      */
     public static final class Specification extends PassiveSkill.Specification<RedBleedPassive> {
 
         public Specification(){
-            super(Component.text("流血"), Component.text("红的流血被动"));
+            super(Component.text("流血"), List.of(Component.text("红的流血被动")));
             requires(VitalsComponent.class).requires(BuffComponent.class).requires(SanTEComponent.class);
         }
 
         @Override
-        public RedBleedPassive create(String id, ComponentServices services){
+        public RedBleedPassive create(String id, ComponentServicesPort services){
             return new RedBleedPassive(id, services, this);
         }
     }
 
     /**
-     * **写流血结算请求的唯一公开入口**（跨批 API 前移落地）。
-     * <p>语义与旧路径**逐条等价**：写入的是 `start()` 里发布出去的那**同一份** {@code playerBleedResolveRequests}
-     * （**不另建并行存储**），键 = 受害者 UUID、值 = 待结算层数；结算时点仍由 {@code update()} 的
-     * {@code resolveRequestedBleed(...)} 决定。保留本方法并完成账本私有化。
+     * **写流血结算请求的唯一公开入口**。
+     * <p>写入本组件私有的 {@code playerBleedResolveRequests}（不另建并行存储）：
+     * 键 = 受害者 UUID、值 = 待结算层数；结算时点由 {@code update()} 的
+     * {@code resolveRequestedBleed(...)} 决定。
      */
     public void requestResolve(UUID victimId, int stacks) {
         if (victimId == null) {
@@ -98,10 +92,10 @@ public class RedBleedPassive extends PassiveSkill {
     }
 
     /**
-     * **累加流血层数**（唯一写入口之一；两个主武器子类只允许调
-     * `requestResolve` / `applyStacks` / `stacksOf` 这三个公开入口，不得再碰账本内部结构）。
-     * <p>语义：键 = 受害者 `UUID`；累加后 `Math.clamp(…, 0, MAX_BLEED_STACK = 15)`（上限与旧逻辑一致）；
-     * 结算时点不变（仍由 {@code update()} 里 `secondCountdown >= BLEED_SETTLE_INTERVAL_TICKS = 20` 后触发）。
+     * **累加流血层数**（唯一写入口之一；外部只允许调
+     * `requestResolve` / `applyStacks` / `stacksOf` 这三个公开入口，不得触碰账本内部结构）。
+     * <p>语义：键 = 受害者 `UUID`；累加后 `Math.clamp(…, 0, MAX_BLEED_STACK = 15)`；
+     * 结算时点仍由 {@code update()} 里 `secondCountdown >= BLEED_SETTLE_INTERVAL_TICKS = 20` 后触发。
      * <b>一经冻结不得再改。</b>
      */
     public void applyStacks(UUID victimId, int amount) {
@@ -113,8 +107,7 @@ public class RedBleedPassive extends PassiveSkill {
     }
 
     /**
-     * **只读查询某受害者当前流血层数**（公开入口之一；无副作用）。
-     * <b>一经冻结不得再改。</b>
+     * **只读查询某受害者当前流血层数**（公开入口之一；无副作用）。一经冻结不得再改。
      */
     public int stacksOf(UUID victimId) {
         if (victimId == null) {
@@ -124,9 +117,8 @@ public class RedBleedPassive extends PassiveSkill {
     }
 
     /**
-     * 停止生效（新钩子，无参）：清空两个账本 Map。
-     * <p>与旧 `stop(Player, RoleInstance)` **语义一致**（原实现只做这两件清空）；
-     * 本类另覆写 `start()`（协作组件缓存进字段 ✓），两者成对 ✓。
+     * **停止生效**（无参钩子）：清空两个账本 Map。
+     * <p>本类另覆写 `start()`（把协作组件缓存进字段），两者成对。
      */
     @Override
     public void stop() {
@@ -135,9 +127,9 @@ public class RedBleedPassive extends PassiveSkill {
     }
 
     /**
-     * **开始生效**：把协作组件**一次查好**缓存进字段 ✓（与本族模型一致）。
-     * <p>取组件只能在本钩子（或新写/既有 `start()`）里做 ✗ —— 不得放 `awake()`；
-     * 注册表在装配期后冻结 ⇒ 缓存引用与按需解析**恒等** ✓。
+     * **开始生效**：把协作组件一次查好缓存进字段（与本族模型一致）。
+     * <p>取组件只能在本钩子里做，不得放 `awake()`；
+     * 注册表在装配期后冻结，因此缓存引用与按需解析恒等。
      */
     @Override
     public void start(){
@@ -148,9 +140,9 @@ public class RedBleedPassive extends PassiveSkill {
 
     /**
      * 这个受害者现在还能不能吃到流血。
-     * 注意不能用 Player#isDead() 判断死亡：它是 CraftEntity 的 !entity.isAlive()，
+     * 不能用 Player#isDead() 判断死亡：它是 CraftEntity 的 !entity.isAlive()，
      * 也就是"实体是否已经被移除"，躺在死亡界面上的玩家它依然返回 false，血量才是 0。
-     **/
+     */
     public static boolean canReceiveBleed(Player victim){
         return victim != null
                 && victim.isOnline()
@@ -160,7 +152,7 @@ public class RedBleedPassive extends PassiveSkill {
 
     @Override
     public void update() {
-        //等价说明：本组件与角色实例一对一 ⇒ `svc()` 恒定指向所属实例（旧签名里的 instance/player 由它代替）
+        //本组件与角色实例一对一，因此 `svc()` 恒指向所属实例
         Player player = svc().self().player();
 
         //每tick先清掉失效记录：受害者退出游戏、死亡(含死亡界面)或者层数已经结算完
@@ -198,7 +190,7 @@ public class RedBleedPassive extends PassiveSkill {
             BlockData bd = Bukkit.createBlockData(Material.RED_CONCRETE);
             player.spawnParticle(Particle.BLOCK, victim.getLocation().clone().add(0, 0.5, 0), 30, 0.3, 0.3, 0.3,0.1, bd);
             vitals.trueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
-            //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 **Buff 组件**的入口（与框架**同一条已记账路径**））
+            //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 Buff 组件的入口，与框架同一条已记账路径）
             buff.applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
             sante.increase(BLEED_SANTE_RECOVER);
 
@@ -283,7 +275,7 @@ public class RedBleedPassive extends PassiveSkill {
 
         vitals.trueDamage(victim, caster, finalResolveBleedAmount * BLEED_DAMAGE_PER_SECOND);
 
-        //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 **Buff 组件**的入口（与框架**同一条已记账路径**））
+        //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 Buff 组件的入口，与框架同一条已记账路径）
         buff.applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
         sante.increase(BLEED_SANTE_RECOVER);
 

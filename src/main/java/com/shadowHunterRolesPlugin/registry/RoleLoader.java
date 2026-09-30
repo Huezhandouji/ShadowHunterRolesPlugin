@@ -4,7 +4,9 @@ import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.*;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluBlueIceRevolverSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluDestinySkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluHysteriaPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluMelodySelectionSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluTraumaMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
@@ -32,15 +34,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * 显式角色装配器。
+ * 显式角色装配器：装配发生在 {@code onEnable} 里、由主类显式调用，时序可见、可测试。
  *
- * <p>取代原先 {@link RoleRegistry} 里的 {@code static { ... }} 初始化块：
- * <ul>
- *   <li>装配发生在 {@code onEnable} 里、由主类**显式调用**，时序可见、可测试；</li>
- *   <li>**fail-fast 且按角色隔离**：某个角色装配失败（例如 §10 裁决 1 的槽位冲突抛出的
- *       {@link IllegalArgumentException}）→ 记 {@code SEVERE}、**该角色不被注册**，
- *       其余角色继续装配；**不会**升级成 {@code ExceptionInInitializerError} 拖垮整个插件。</li>
- * </ul>
+ * <p><b>fail-fast 且按角色隔离</b>：某个角色装配失败（例如槽位冲突抛出的
+ * {@link IllegalArgumentException}）则记 {@code SEVERE}、该角色不被注册，其余角色继续装配，
+ * 不会升级成 {@code ExceptionInInitializerError} 拖垮整个插件。
  *
  * <p>角色定义（数值、文案、槽位、图标）逐字未改。
  */
@@ -58,9 +56,8 @@ public class RoleLoader {
     }
 
     /**
-     * 本插件的角色定义（原 {@code RoleRegistry} 静态块内容，逐字迁移）。
-     * <p>追加**第三个** = 示例角色（给"组件可请求重绘"这条能力一个生产使用点）。
-     * **既有两个角色的定义一字未动**（组件集合、注册序、表现值都不变）。
+     * 本插件的角色定义（自 {@code RoleRegistry} 静态块逐字迁移：组件集合、注册序、表现值都不变）。
+     * <p>示例角色 {@code selfUpdateExample} 的用途 = 给"组件可请求重绘"这条能力一个生产使用点。
      */
     public List<Definition> defaultDefinitions() {
         return List.of(
@@ -78,12 +75,12 @@ public class RoleLoader {
 
     /**
      * 逐条装配并注册。
-     * <p><b>在 {@code build()} 与 {@code register()} 之间插入</b>
-     * {@link Role#verifyDependencies()} —— 依赖不齐（或缺依赖环）的模板在**注册之前**就抛异常，
-     * 由下面的既有 {@code catch (Throwable)} 记一条 {@code SEVERE} 并**跳过该角色**
-     * ⇒ 它**根本不在注册表里**（既不会被 {@code /role set} 选中，也不会走到任何 {@code awake()}）。
-     * 检查时机因此被钉死：**`build()` 之后、任何 `awake()` 之前**（实例化发生在 {@code RoleInstance} 构造期，
-     * 而只有注册过的模板才会被实例化）。
+     * <p>在 {@code build()} 与 {@code register()} 之间插入 {@link Role#verifyDependencies()}：
+     * 依赖不齐（或缺依赖环）的模板在注册之前就抛异常，由下面的 {@code catch (Throwable)}
+     * 记一条 {@code SEVERE} 并跳过该角色，因此它根本不在注册表里
+     * （既不会被 {@code /role set} 选中，也不会走到任何 {@code awake()}）。
+     * 检查时机因此被钉死：{@code build()} 之后、任何 {@code awake()} 之前
+     * （实例化发生在 {@code RoleInstance} 构造期，而只有注册过的模板才会被实例化）。
      *
      * @return 成功注册的角色数
      */
@@ -97,7 +94,7 @@ public class RoleLoader {
             try {
                 Role.Builder builder = definition.builder().get();
                 Role role = builder.build();
-                //装配期依赖检查（缺必需依赖 / 依赖环 ⇒ 抛 ComponentDependencyException）
+                //装配期依赖检查（缺必需依赖 / 依赖环则抛 ComponentDependencyException）
                 role.verifyDependencies();
                 registry.register(role);
                 registered++;
@@ -112,16 +109,15 @@ public class RoleLoader {
     }
 
     /**
-     * **把 6 件内建组件加进装配表**（★ 与技能/被动**同一条路** ⇒ 它们就是普通组件）。
+     * 把内建组件加进装配表（与技能 / 被动同一条路，它们就是普通组件）。
      *
-     * <p><b>★ 必须排在最前</b>：`EnergyComponent` 的描述符要按 id 取到**渲染组件**并挂
-     * 「变更即置脏」的监听 ⇒ 渲染组件必须**先**注册（本方法内部也把它放在第一位）。
+     * <p><b>必须排在最前</b>：{@code EnergyComponent} 的描述符要按 id 取到渲染组件并挂
+     * 「变更即置脏」的监听，因此渲染组件必须先注册（本方法内部也把它放在第一位）。
      *
-     * <p>顺序 = 渲染 / 能量 / SanTE / 生命 / buff / 任务（与既有 `buildBuiltIns` 的语句顺序逐字相同
-     * ⇒ 装配序与行为都不变）。
+     * <p>顺序 = 渲染 / 能量 / SanTE / 生命 / buff / 任务（装配序与行为都不变）。
      *
-     * <p>★ 调用点 = 每个角色的 builder **开头**（三个角色都调）⇒ 内建块在模板组件之前，
-     * 与「服务组件登记在模板之后」的旧序不同，但**渲染/能量之间的相对序不变** ✓。
+     * <p>调用点 = 每个角色的 builder 开头，内建块在模板组件之前；
+     * 与「服务组件登记在模板之后」的旧序不同，但渲染 / 能量之间的相对序不变。
      */
     private static Role.Builder withBuiltIns(Role.Builder builder) {
         return builder
@@ -137,8 +133,8 @@ public class RoleLoader {
     private static Role.Builder meiqiheziBuilder() {
 
         return withBuiltIns(new Role.Builder("meiqihezi")
- //★ 「已被提供的类型」由**装配方**注入（`core/Role` 本身不认识任何组件类 ✓）——
- //  否则组件声明 `requires(框架级组件)` 会被模板侧的依赖校验误报成"缺必需依赖"。
+ //「已被提供的类型」由装配方注入（core/Role 本身不认识任何组件类），
+ //  否则组件声明 requires(框架级组件) 会被模板侧的依赖校验误报成"缺必需依赖"。
                 .displayName(Component.text("MeiqiHezi"))
                 //Component.text("战斗疯子\n普攻20能量以上左键造成范围伤害并消耗能量，20以下只能打一个人\n一技能加速\n二技能三段突进并造成伤害\n三技能圆弧斩，范围真伤")
                 .description(List.of(
@@ -149,7 +145,7 @@ public class RoleLoader {
                         Component.text("三技能圆弧斩，范围真伤")
                 ))
                 //表现值（名字/描述/冷却/耗能/图标）随组件自己的 Specification 走，
- //装配点**只写 setSlot**；注册顺序与既有实现逐字一致（= 派发序 = 渲染序）。
+ //装配点只写 setSlot；注册顺序与既有实现逐字一致（= 派发序 = 渲染序）。
                 .addComponent(MeiqiheziUnconcernSkill.ID, new MeiqiheziUnconcernSkill.Specification().setSlot(1))
                 .addComponent(MeiqiheziBloodySlashSkill.ID, new MeiqiheziBloodySlashSkill.Specification().setSlot(2))
                 .addComponent(MeiqiheziCircleSlashSkill.ID, new MeiqiheziCircleSlashSkill.Specification().setSlot(3))
@@ -184,26 +180,46 @@ public class RoleLoader {
                 .icon(Material.POPPY);
     }
 
+    /**
+     * 苍鹭（阵营 HUNTER）：创痕主武器 + 澜冰左轮 + 旋律选取 + 湛蓝命运，被动「深度癒症」。
+     *
+     * <p>装配口径：
+     * <ul>
+     *   <li><b>主武器「忧郁创痕」占 0 号栏</b> —— 插件只把攻击事件投递给主武器组件，
+     *       「每次攻击叠一层创伤」因此必须有它作为落点；</li>
+     *   <li>澜冰左轮占 1 号栏（右键射击、Q 换弹），旋律选取占 2 号栏（右键发射抓钩），
+     *       湛蓝命运占 3 号栏（右键清负面 + 叠满创伤 + 8 秒强化窗口）；</li>
+     *   <li>「深度癒症」经 {@code addComponent} 统一入口注册（被动无栏位，不占热键栏），
+     *       它是「创伤」层数的唯一持有者，也是湛蓝命运 8 秒窗口的订阅源；</li>
+     *   <li>基础属性不显式声明，与其余角色一致，走框架默认；</li>
+     *   <li>数值：创痕 6 点物伤 + 12 点 SanTE + 抽 2 能量；
+     *       左轮 每发 6 点物伤 / 8 发弹夹 / 换弹 8 能量 + 瞬移身后 4 点真伤；
+     *       旋律选取 12 点物伤 + 拉拽（抗性 IV），CD 4 刻、耗能 4、存量 2 个、储存冷却 15 秒；
+     *       湛蓝命运 速度 X 2 秒 + 叠满创伤 + 8 秒窗口，CD 16 刻、耗能 16。</li>
+     * </ul>
+     */
     private static Role.Builder cangluBuilder(){
         return withBuiltIns(new Role.Builder("canglu"))
                 .displayName(Component.text("苍鹭"))
                 .description(List.of(
-                        Component.text("聋子?")
+                        Component.text("忧郁创痕"),
+                        Component.text("深度癔症")
                 ))
                 .faction(Faction.HUNTER)
                 .addComponent(CangluTraumaMainWeapon.ID, new CangluTraumaMainWeapon.Specification().setSlot(0))
                 .addComponent(CangluBlueIceRevolverSkill.ID, new CangluBlueIceRevolverSkill.Specification().setSlot(1))
+                .addComponent(CangluMelodySelectionSkill.ID, new CangluMelodySelectionSkill.Specification().setSlot(2))
+                .addComponent(CangluDestinySkill.ID, new CangluDestinySkill.Specification().setSlot(3))
                 .addComponent(CangluHysteriaPassive.ID, new CangluHysteriaPassive.Specification())
                 .icon(Material.BLUE_ICE);
     }
 
     /**
-     * **示例角色**：唯一目的 = 给「组件可请求重绘」这条能力一个**生产使用点**
+     * 示例角色：唯一目的 = 给「组件可请求重绘」这条能力一个生产使用点
      * （没有使用点的能力 = 未验证的能力）。
-     * <p>它**不改动任何既有角色**：`red` / `meiqihezi` 的组件集合与注册序一字未动
-     * ⇒ 外观取证与帧入口边界读数对本角色完全无感（代际对拍可证）。
+     * <p>它不改动任何既有角色：{@code red} / {@code meiqihezi} 的组件集合与注册序一字未动。
      * <p>它的一个组件 = {@code ExampleSelfRefreshingSkill}（占槽 0），同时演示
-     * 「请求式刷新」与「{@code dependsOnLiveState()==false} ⇒ 不每 tick 重绘」两件事。
+     * 「请求式刷新」与「{@code dependsOnLiveState()==false} 则不每 tick 重绘」两件事。
      */
     private static Role.Builder selfUpdateExampleBuilder() {
 
@@ -219,16 +235,16 @@ public class RoleLoader {
     }
 
     /**
-     * **罪棘**（阵营 SHADOW）：尖牙光环 + 律法罪罚 + 三个主动。
+     * 罪棘（阵营 SHADOW）：尖牙光环 + 律法罪罚 + 三个主动。
      *
-     * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
+     * <p>装配口径（各组件 javadoc 里有更细的行为与口径申报）：
      * <ul>
      *   <li><b>主武器「罪棘之牙」占 0 号栏</b> —— 插件只把攻击事件投递给主武器组件
-     *       （{@code listener/MainWeaponListener#onAttackPlayer}），而需求要求"玩家近战也触发律法之言"
-     *       ⇒ 必须有它作为落点（否则那条效果永远不触发）；</li>
-     *   <li>三个主动占 1 / 2 / 3 号栏，**全部 0 耗能**（按裁定：只靠冷却限制强度）；</li>
-     *   <li>两个被动同样经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏）；</li>
-     *   <li>基础属性**不显式声明** ⇒ 与 {@code red} / {@code meiqihezi} 一致，走框架默认；</li>
+     *       （{@code listener/MainWeaponListener#onAttackPlayer}），而"玩家近战也触发律法之言"
+     *       要求有它作为落点（否则那条效果永远不触发）；</li>
+     *   <li>三个主动占 1 / 2 / 3 号栏，全部 0 耗能（只靠冷却限制强度）；</li>
+     *   <li>两个被动同样经 {@code addComponent} 统一入口注册（被动无栏位，不占热键栏）；</li>
+     *   <li>基础属性不显式声明，与 {@code red} / {@code meiqihezi} 一致，走框架默认；</li>
      *   <li>数值：尖牙 6 点伤害 / 4 点 SanTE / 7 格 / 1.5 秒（强化期 0.5 秒且打全体）；
      *       律法之言 15 秒、每 0.5 秒 1 点 SanTE；罪棘缠 CD 7 秒；罪恶的辩护 5 秒 + <b>结束后</b> CD 10 秒；
      *       审判孤刺 CD 40 秒。</li>

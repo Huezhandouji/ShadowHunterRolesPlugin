@@ -6,12 +6,12 @@ import org.bukkit.Particle;
 import org.bukkit.World;
 
 /**
- * 「罪棘」的**粒子特效工具箱**（纯几何绘制，不持有任何状态、不碰组件）。
+ * 「罪棘」的粒子特效工具箱（纯几何绘制，不持有任何状态、不碰组件）。
  *
  * <p>抽出来的理由：被动 / 一技能 / 二技能 / 大招四处都要画「螺旋」「十字架」「尖牙」，
  * 形状算法只写一遍，各组件只决定"画在哪、多大、多快、用什么粒子"。
  *
- * <p><b>纪律</b>：本类**只画粒子**（外加调用方自己 spawn 实体），不做伤害、不改状态 ——
+ * <p>纪律：本类只画粒子（外加调用方自己 spawn 实体），不做伤害、不改状态 ——
  * 特效与收益分开，出问题好定位。
  */
 public final class SinThornVfx {
@@ -52,7 +52,7 @@ public final class SinThornVfx {
 
     /**
      * **单个十字架**：以 {@code center} 为中心、朝外（{@code (dx,dz)} 方向）立着的一个"+"。
-     * <p>十字所在平面 = 竖直平面；一条臂沿世界 Y 轴，另一条臂沿水平切向 ⇒ 从外面看就是个十字。
+     * <p>十字所在平面 = 竖直平面；一条臂沿世界 Y 轴，另一条臂沿水平切向，因此从外面看就是个十字。
      *
      * @param size     单臂长度（格）
      * @param armSteps 单臂取样点数（两侧共 2*armSteps+1 个粒子）
@@ -133,9 +133,9 @@ public final class SinThornVfx {
     }
 
     /**
-     * **紫色引导柱**：一根<b>连续垂直 {@code height} 格</b>、并<b>绕目标旋转</b>的螺旋。
-     * <p>做法 = 沿高度取样 {@code points} 个点，每点相位随高度递增 ⇒ 单帧看上去是一根竖直螺旋线；
-     * 帧间 {@code phase} 递增 ⇒ 整根柱子绕着目标转。
+     * **紫色引导柱**：一根连续垂直 {@code height} 格、并绕目标旋转的螺旋。
+     * <p>做法 = 沿高度取样 {@code points} 个点，每点相位随高度递增，则单帧看上去是一根竖直螺旋线；
+     * 帧间 {@code phase} 递增，则整根柱子绕着目标转。
      */
     public static void spawnPurpleHelix(World world, Location base, double phase, double height,
                                         double radius, int points) {

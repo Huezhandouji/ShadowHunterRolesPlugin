@@ -7,8 +7,7 @@ import org.bukkit.entity.Player;
 
 /**
  * 子指令 {@code clear}：{@code /role clear [playerName]} —— 清除自己或指定在线玩家的角色。
- * <p>
- * 行为与原 {@code RoleCommand} 内联实现**逐字等价**，含参数个数不是 0/1 时的**静默返回**。
+ * <p>行为与原 {@code RoleCommand} 内联实现逐字等价，含参数个数不是 0/1 时的静默返回。
  */
 public class ClearRoleCommand implements SubCommand {
 
@@ -30,8 +29,8 @@ public class ClearRoleCommand implements SubCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args){
-        //★ 服务端也能执行（不必是玩家）—— 目标由第 1 参的选择器指定
-        //★ **目标必填**：`/role clear` 不再默认给自己
+        //服务端也能执行（不必是玩家）—— 目标由第 1 参的选择器指定
+        //目标必填：`/role clear` 不再默认给自己
         if(args.length == 0){
             sender.sendMessage(Component.text(PlayerTargets.targetRequired("/role clear <player|@s>")));
             return true;
@@ -45,7 +44,7 @@ public class ClearRoleCommand implements SubCommand {
     }
 
     private void handleClear(CommandSender sender, String targetName){
-        //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
+        //目标必填（统一解析：裸名 / @s / 选择器，且必须恰好命中 1 名在线玩家）
         PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
         Player target = resolved.player();
         if(target == null || !target.isOnline()){

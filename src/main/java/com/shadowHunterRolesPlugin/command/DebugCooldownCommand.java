@@ -16,9 +16,8 @@ import java.util.List;
 /**
  * 子指令 {@code debug cooldown}：{@code /role debug cooldown <status|end|restart> <slot|componentId>}
  * —— 冷却自管理（组件声明值为唯一真值源）的观察与干预四态。
- * <p>
- * **op 门控由 {@link DebugCommand} 在调试树入口承担**（原实现是在本段最前面判定，可见行为相同）。
- * 输出文案与既有内联实现**逐字相同**；{@code status|end|restart} 的语义、参数个数不足时的用法提示、
+ * <p>op 门控由 {@link DebugCommand} 在调试树入口承担（原实现是在本段最前面判定，可见行为相同）。
+ * 输出文案与既有内联实现逐字相同；{@code status|end|restart} 的语义、参数个数不足时的用法提示、
  * 以及"槽位 → 组件 id"的解析规则均未改动（本类只做指令面，不碰冷却语义）。
  */
 public class DebugCooldownCommand implements SubCommand {
@@ -66,15 +65,15 @@ public class DebugCooldownCommand implements SubCommand {
             return true;
         }
         RoleComponent component = instance.componentRegistry().getById(componentId);
-        //判据 = **组件类型**：本命令只需要"有冷却这回事 + 能读声明时长"的组件 ⇒ 与派发面同一套接受集
+        //判据 = 组件类型：本命令只需要"有冷却这回事 + 能读声明时长"的组件 ⇒ 与派发面同一套接受集
         //（`RoleInstance#handleCast` / `#handleAttack` 也判 `ActiveComponent` / `MainWeapon`）。
         //仓内满足该接受集的只有活动组件基类那一棵子树（表现规格对象只实现 HotbarItem，不在此列）。
         if(!(component instanceof ActiveComponent active)){
             send(player, "Not an active component (skill/main weapon): " + componentId);
             return true;
         }
-        //冷却读数与动作**直接问组件本身**（不经服务集端口取表 ✗）——
-        //  声明值由描述符给出（`getCooldownTicks()`），状态与动作由组件基类给出 ✓。
+        //冷却读数与动作直接问组件本身（不经服务集端口取表）——
+        //  声明值由描述符给出（`getCooldownTicks()`），状态与动作由组件基类给出。
         int declared = active.getCooldownTicks();
 
         switch (action){
@@ -113,8 +112,8 @@ public class DebugCooldownCommand implements SubCommand {
     }
 
     /**
-     * 双写：**玩家侧**（Adventure {@code Component}，文本与既有实现逐字相同）+ **服务端日志**（{@link DebugCommand#log}，
-     * 带 {@code [command-debug]} 前缀）—— 用户要求"调试信息**也**输出至服务端控制台"，故是相加而非取代。
+     * 双写：玩家侧（Adventure {@code Component}，文本与既有实现逐字相同）+ 服务端日志（{@link DebugCommand#log}，
+     * 带 {@code [command-debug]} 前缀）—— 两者相加而非取代。
      */
     private void send(Player player, String text){
         player.sendMessage(Component.text(text));
@@ -130,7 +129,7 @@ public class DebugCooldownCommand implements SubCommand {
     /**
      * 目标解析：纯数字 = 热键栏槽位，否则按组件 id（须在注册表内）。
      *
-     * <p>★ **槽位反查走渲染组件**：它自持「组件 id → 栏位」登记表 ⇒ 反查与渲染落位同源 ✓。
+     * <p>槽位反查走渲染组件：它自持「组件 id → 栏位」登记表 ⇒ 反查与渲染落位同源。
      * 本处先按 id 取到该实例的渲染组件，再问它（未取到 ⇒ 无法反查）。
      */
     private String resolveComponentId(RoleInstance instance, String target){

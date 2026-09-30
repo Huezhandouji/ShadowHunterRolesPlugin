@@ -9,11 +9,11 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
- * T-6（t50 §4）：锁住**配置解析与回落**（t50 §1 第 ⑫ 条的纯半边）= `ConfigKey.resolve(Object)` 的安全口径：
- * **永不抛异常**；缺失 / 类型不符 / 不可解析 ⇒ 默认值；数值越界 ⇒ 夹取。
- * <p>为什么能单测：`resolve` 只吃一个 `Object`（读盘原始值）、只吐一个不可变 `Resolution` ⇒
- * 不读文件、不碰 `Plugin`/`YamlConfiguration` ⇒ 离线可跑。运行侧只剩"改盘上文件 ≤5 s 生效"（t31 已做同轮正对照）。
- * <p>本测试**不读盘**（冻结件 §3.2：第一批不新增 `src/test/resources`）。
+ * 锁住配置解析与回落的纯半边 = {@code ConfigKey.resolve(Object)} 的安全口径：
+ * 永不抛异常；缺失 / 类型不符 / 不可解析 ⇒ 默认值；数值越界 ⇒ 夹取。
+ * <p>能单测的原因：`resolve` 只吃一个 `Object`（读盘原始值）、只吐一个不可变 `Resolution`，
+ * 不读文件、不碰 `Plugin`/`YamlConfiguration`，因此离线可跑。运行侧只剩"改盘上文件 ≤5 s 生效"。
+ * <p>本测试**不读盘**（不新增 `src/test/resources`）。
  */
 public class ConfigKeyResolutionTest {
 
@@ -32,7 +32,7 @@ public class ConfigKeyResolutionTest {
         assertSame("raw 必须是读盘原值本身", Integer.valueOf(2), r.getRaw());
     }
 
-    /** 越界**夹取**（上界 / 下界各一次），且**不被标成回落**（两者是不同语义）。 */
+    /** 越界夹取（上界 / 下界各一次），且不被标成回落（两者是不同语义）。 */
     @Test
     public void outOfRangeIsClampedNotFallenBack() {
         ConfigKey.Resolution<Integer> high = levelKey().resolve(9);
@@ -45,7 +45,7 @@ public class ConfigKeyResolutionTest {
         assertFalse(low.isDefaultValueUsed());
     }
 
-    /** 类型不符 / 缺失 / 不可解析 ⇒ 默认值（**永不抛**）。 */
+    /** 类型不符 / 缺失 / 不可解析 ⇒ 默认值（永不抛）。 */
     @Test
     public void badOrMissingValuesFallBackToDefault() {
         for (Object raw : new Object[]{null, "3", "abc", Boolean.TRUE, java.util.List.of(1), 3.5d}) {
@@ -95,7 +95,7 @@ public class ConfigKeyResolutionTest {
         assertTrue(key.resolve(null).isDefaultValueUsed());
     }
 
-    /** 声明期校验（fail-fast）：路径空 / 默认值越界 / min>max 都必须在**建键时**就抛。 */
+    /** 声明期校验（fail-fast）：路径空 / 默认值越界 / min>max 都必须在建键时就抛。 */
     @Test
     public void declarationTimeValidationIsFailFast() {
         assertThrows(IllegalArgumentException.class, () -> ConfigKey.integer("", 1, 0, 4, "d"));

@@ -22,40 +22,35 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 指令权限门禁 —— **全插件唯一的权限判定口径**：本插件的指令都要求权限等级 ≥ 3。
- * <p>
- * <b>为什么读 {@code ops.json}</b>：本版 `paper-api`（1.21.11-R0.1-SNAPSHOT）**不提供可读的等级 API**
+ * 指令权限门禁 —— 全插件唯一的权限判定口径：本插件的指令都要求权限等级 ≥ 3。
+ * <p><b>为什么读 {@code ops.json}</b>：本版 `paper-api`（1.21.11-R0.1-SNAPSHOT）不提供可读的等级 API
  * （全 jar 扫 `getOpLevel`/`setOpLevel`/`getPermissionLevel`/`permissionLevel`/`opLevel` 均 0 命中；
  * `Player` 内唯一含 `OpLevel` 的成员是只写向客户端的 {@code sendOpLevel(byte)}）⇒ 等级的唯一权威来源是
  * 服务器根目录的 {@code ops.json}。
- * <p>
- * <b>定位方式（不硬编码任何"启动目录名"）</b>：{@code Bukkit.getWorldContainer()}（= 世界目录的父目录 = 服务器根目录，
+ * <p><b>定位方式（不硬编码任何"启动目录名"）</b>：{@code Bukkit.getWorldContainer()}（= 世界目录的父目录 = 服务器根目录，
  * {@code ops.json} 与 {@code world/} 同级）。
- * <p>
- * <b>判定规则</b>：
+ * <p><b>判定规则</b>：
  * <ol>
- *   <li>{@link Player} 且等级 ≥ **要求等级** ⇒ 允许；</li>
- *   <li>{@link Player} 且等级 &lt; 要求等级（含**不在 `ops.json` 中**）⇒ 拒绝；</li>
- *   <li>控制台 / RCON ⇒ **允许**（等价等级 4）；</li>
+ *   <li>{@link Player} 且等级 ≥ 要求等级 ⇒ 允许；</li>
+ *   <li>{@link Player} 且等级 &lt; 要求等级（含不在 {@code ops.json} 中）⇒ 拒绝；</li>
+ *   <li>控制台 / RCON ⇒ 允许（等价等级 4）；</li>
  *   <li>其他 {@link CommandSender}（如命令方块）⇒ 拒绝。</li>
  * </ol>
  * <b>要求等级 = 配置字段</b>：{@code config.yml} 的 {@value #CONFIG_KEY}
  * （取值范围 0-{@value #MAX_LEVEL}，默认 {@value #DEFAULT_REQUIRED_LEVEL}；越界自动夹取、缺失/非整数/不可读回落默认且不抛异常）。
- * <p><b>生效时效</b>：本字段与 {@code ops.json} 等级表**同一套失效机制** —— 数据目录内配置文件的
- * {@value ConfigurationManager#TTL_MILLIS} ms TTL + 文件戳（mtime×长度）变更即失效 ⇒ 改完配置文件**最迟一个 TTL** 内生效，
- * **无需重启或 reload**（文件不存在时回落到 jar 内置默认值）。
- * <p><b>单一读盘口径</b>：本类**不再自己读配置** —— 字段的值一律委托
+ * <p><b>生效时效</b>：本字段与 {@code ops.json} 等级表同一套失效机制 —— 数据目录内配置文件的
+ * {@value ConfigurationManager#TTL_MILLIS} ms TTL + 文件戳（mtime×长度）变更即失效 ⇒ 改完配置文件最迟一个 TTL 内生效，
+ * 无需重启或 reload（文件不存在时回落到 jar 内置默认值）。
+ * <p><b>单一读盘口径</b>：本类不再自己读配置 —— 字段的值一律委托
  * {@link ConfigurationManager}（默认值 / 校验 / 说明集中在 {@link ConfigKey}）。
  * 本类只剩两件事：读 {@code ops.json} 的等级表，以及做这一次判定。
- * <p>
- * <b>失败关闭（fail-closed）</b>：{@code ops.json} 缺失 / 不可读 / JSON 非法 / 任一条目缺 `name` 或 `level`
- * ⇒ **整个文件视为不可信 ⇒ 所有玩家一律拒绝**，并打一条**含原因的 SEVERE**（不静默）；恢复后打一条 INFO。
- * <p>
- * <b>缓存与生效时效</b>：等级表带 **{@value #CACHE_TTL_MILLIS} ms TTL** + **文件戳（mtime×长度）变更即失效**
- * ⇒ 不每次执行都读盘；运维改完 {@code ops.json} 后**最迟一个 TTL** 内生效（且文件一旦变动立即失效）。
- * <p>
- * <b>日志</b>：每次判定打一行 INFO（{@code [command-access] allowed/denied … (level=…)}）⇒ 运行级证据可直接取原始行；
- * 该行是**服务端日志**，与玩家侧文案（{@link #NO_PERMISSION}）是两回事。
+ * <p><b>失败关闭（fail-closed）</b>：{@code ops.json} 缺失 / 不可读 / JSON 非法 / 任一条目缺 `name` 或 `level`
+ * ⇒ 整个文件视为不可信 ⇒ 所有玩家一律拒绝，并打一条含原因的 SEVERE（不静默）；恢复后打一条 INFO。
+ * <p><b>缓存与生效时效</b>：等级表带 {@value #CACHE_TTL_MILLIS} ms TTL + 文件戳（mtime×长度）变更即失效
+ * ⇒ 不每次执行都读盘；运维改完 {@code ops.json} 后最迟一个 TTL 内生效（且文件一旦变动立即失效）。
+ * <p><b>日志</b>：打一行 {@code [command-access] …}（拒绝行为 {@code denied <action> … (level=…, required=…)}，
+ * 走 {@code FINE} 级 ⇒ 默认不打印，排查时调高该 logger 即可）⇒ 运行级证据可直接取原始行；
+ * 该行是服务端日志，与玩家侧文案（{@link #NO_PERMISSION}）是两回事。
  */
 final class CommandAccess {
 
@@ -68,13 +63,13 @@ final class CommandAccess {
     /** 允许的等级上限（Minecraft 权限等级范围 0-4）。 */
     static final int MAX_LEVEL = ConfigurationManager.COMMAND_PERMISSION_LEVEL.getMax();
 
-    /** 玩家侧拒绝文案（与 `DebugCommand` 既有文案**逐字相同**；沿用工程既有风格）。 */
+    /** 玩家侧拒绝文案（与 `DebugCommand` 既有文案逐字相同）。 */
     static final String NO_PERMISSION = "You do not have permission to use this command.";
 
     /** 等级表缓存 TTL（毫秒）。 */
     private static final long CACHE_TTL_MILLIS = 5_000L;
 
-    /** 等级表：玩家名（小写）→ 等级；**失败关闭**时为空表（谁都不算有权限）。 */
+    /** 等级表：玩家名（小写）→ 等级；失败关闭时为空表（谁都不算有权限）。 */
     private static Map<String, Integer> levels = Map.of();
     /** 上次读盘时刻（ms）。 */
     private static long loadedAt = 0L;
@@ -104,8 +99,8 @@ final class CommandAccess {
     /**
      * 单一门禁判定：{@code true} = 允许本次指令。
      *
-     * <p>★ **只记「被拒绝」**（`FINE` 级）—— **通过不写日志**。理由：补全侧与执行侧共用本方法，
-     * 而补全**每按一个键就会调一次** ⇒ 若"通过"也记日志，输入一个指令会刷满日志 ✗。
+     * <p>只记被拒绝的那一次（`FINE` 级），通过不写日志。理由：补全侧与执行侧共用本方法，
+     * 而补全每按一个键就会调一次 ⇒ 若"通过"也记日志，输入一个指令会刷满日志。
      * 拒绝是异常事件，仍然留痕（`FINE` ⇒ 默认不打印，需要排查时开日志级别即可）。
      *
      * @param sender 指令发送者
@@ -132,11 +127,11 @@ final class CommandAccess {
     }
 
     /**
-     * 当前**要求等级**：**委托** {@link ConfigurationManager} 读数据目录内 {@code config.yml} 的
+     * 当前要求等级：委托 {@link ConfigurationManager} 读数据目录内 {@code config.yml} 的
      * {@value #CONFIG_KEY}（{@value ConfigurationManager#TTL_MILLIS} ms TTL + 文件戳失效，与 {@code ops.json} 同一机制）；
      * 文件不存在时回落 jar 内置默认；越界夹到 {@code 0}-{@value #MAX_LEVEL}；
-     * 缺失键 / 非整数 / 读不动 ⇒ 回落 {@value #DEFAULT_REQUIRED_LEVEL} 且**不抛异常**（指令不会因此不可用）。
-     * 取值变化时由配置管理器打一行含**新旧值**的 INFO（运行级证据可直接取原始行）。
+     * 缺失键 / 非整数 / 读不动 ⇒ 回落 {@value #DEFAULT_REQUIRED_LEVEL} 且不抛异常（指令不会因此不可用）。
+     * 取值变化时由配置管理器打一行含新旧值的 INFO（运行级证据可直接取原始行）。
      * <p>管理器未安装（插件未启用）⇒ 直接给字段的默认值，同样不抛异常。
      */
     static int requiredLevel() {
@@ -225,11 +220,7 @@ final class CommandAccess {
         plugin.getLogger().info("[command-access] " + text);
     }
 
-    /**
-     * **低噪日志**（`FINE` ⇒ 默认不打印）。
-     * <p>给**高频路径**用：门禁检查由补全侧与执行侧共用，而补全**每键一次** ⇒ 用 `INFO` 会刷屏 ✗。
-     * 需要排查时把该 logger 调到 `FINE` 即可看到。
-     */
+    /** 低噪日志（`FINE` ⇒ 默认不打印）：门禁检查每键一次，需要排查时把该 logger 调到 `FINE`。 */
     private static void fine(String text) {
         ShadowHunterRolesPlugin plugin = ShadowHunterRolesPlugin.getInstance();
         if (plugin == null) return;

@@ -12,12 +12,13 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
- * T-1（t50 §4）：锁住**装配期描述符的封冻与 fail-fast**（t50 §1 第 10 条 = **可单测**）。
- * <p>为什么能单测：{@code RoleComponent.Specification} 是**装配期数据** —— 全部判定只读写它自己的字段
- * （frozen / slot / boundId），不触 Bukkit 注册表、不构物品 ⇒ 离线可跑。
- * <p>为什么最贵：这一族**发生过真实回归**（描述符封冻被绕过 / 未设栏位静默降级 / 越界不校验）。
- * <p>本测试**只用公开 API**（不反射私有字段、不加测试后门）；被测描述符取真实组件的嵌套描述符
- * （{@link MeiqiheziBloodySlashSkill.Specification}，继承 {@link HotbarSpecification} ⇒ requiresSlot()==true）。
+ * 锁住装配期描述符的封冻与 fail-fast。
+ * <p>能单测的原因：{@code RoleComponent.Specification} 是装配期数据 —— 全部判定只读写它自己的字段
+ * （frozen / slot / boundId），不触 Bukkit 注册表、不构物品，因此离线可跑。
+ * <p>这一族发生过真实回归（描述符封冻被绕过 / 未设栏位静默降级 / 越界不校验），所以判据必须钉死。
+ * <p>本测试只用公开 API（不反射私有字段、不加测试后门）；被测描述符取真实组件的嵌套描述符
+ * （{@link MeiqiheziBloodySlashSkill.Specification}，继承 {@link HotbarSpecification} ⇒ 带栏位那一支：
+ * 装配期未 setSlot 就 freeze 必抛。这正是本类要锁的口径之一）。
  */
 public class DescriptorFreezeTest {
 
@@ -25,7 +26,7 @@ public class DescriptorFreezeTest {
         return new MeiqiheziBloodySlashSkill.Specification();
     }
 
-    /** 装配期绑定 id：绑定前 null，绑定后同值（t35 的 A7 选 (a)：id 属于注册处）。 */
+    /** 装配期绑定 id：绑定前 null，绑定后同值（id 属于注册处），重复绑定幂等。 */
     @Test
     public void idIsBoundAtAssemblyTime() {
         HotbarSpecification<?> spec = fresh();
@@ -53,8 +54,8 @@ public class DescriptorFreezeTest {
         assertEquals(4, spec.slot());
         RoleComponent.Specification.Snapshot snapshot = spec.freeze();
         assertNotNull(snapshot);
-        //★ 快照**不再带栏位**：栏位归描述符自己（上面两行已断言）与渲染组件的登记表
-        //  ⇒ 装配期不再有栏位冲突判定（仲裁在 `HotbarRenderComponent#registerSlot`）✓
+        //快照**不再带栏位**：栏位归描述符自己（上面两行已断言）与渲染组件的登记表
+        //  ⇒ 装配期不再有栏位冲突判定（仲裁在 `HotbarRenderComponent#registerSlot`）
         //  此处只断言快照本身可用（工厂 + 依赖声明的载体）
         assertNotNull("快照必须带工厂（装配表只持有它）", snapshot.getFactory());
     }
@@ -99,7 +100,7 @@ public class DescriptorFreezeTest {
 
     /**
      * **冻结不改值**：冻结**之后**描述符自己读到的栏位仍是冻结前设的那个值
-     * （★ 快照不再带栏位 ⇒ 断言点从"快照里的值"移到"描述符自己的值"，语义不变：
+     * （快照不再带栏位 ⇒ 断言点从"快照里的值"移到"描述符自己的值"，语义不变：
      * 冻结是**封住写口**，不是**清掉数据**）。
      */
     @Test

@@ -19,9 +19,9 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * T-4（t50 §4）：锁住**注册序**（t50 §1 第 ⑨ 条的纯半边），并且**专门锁 `LinkedHashMap` 的顺序性**。
- * <p>为什么能单测：装配表是一张纯内存表；`getComponents()` 只读它，不需要实例、不需要 Bukkit ⇒ 离线可跑。
- * <p>顺序为什么最贵：本项目"注册序 = 渲染序 = 派发序"是冻结面；把表换成 `HashMap` 就会静默乱序。
+ * 锁住注册序的纯半边，并且专门锁 `LinkedHashMap` 的顺序性。
+ * <p>能单测的原因：装配表是一张纯内存表；`getComponents()` 只读它，不需要实例、不需要 Bukkit，因此离线可跑。
+ * <p>顺序最贵的原因：本项目"注册序 = 渲染序 = 派发序"是冻结面；把表换成 `HashMap` 就会静默乱序。
  * 本测试因此内置一条**样本判别力守卫**：同一批 id 装进 {@link HashMap} 时的迭代序与登记序**必须不同**
  * （现算样本 `c_1…c_8` 满足）—— 若哪天 JDK 让两者巧合相同，这条守卫会先红，提示"该换样本了"，
  * 免得顺序断言在不知情的情况下失去判别力。
@@ -45,7 +45,7 @@ public class RegistrationOrderTest {
         expectedOrder.add("c_9_no_slot");
         assertEquals("遍历序必须等于登记序（LinkedHashMap 的语义）", expectedOrder, actualOrder);
 
- //★ 栏位值**只**住在描述符里（条目与 Role 实例都不再持有）⇒ 改为断言**登记序**本身
+ //栏位值**只**住在描述符里（条目与 Role 实例都不再持有）⇒ 改为断言**登记序**本身
         assertEquals("登记序必须与 IDS 逐位相同",
                 Arrays.asList(IDS), new ArrayList<>(role.getComponents().keySet()).subList(0, IDS.length));
     }
@@ -60,7 +60,7 @@ public class RegistrationOrderTest {
             b.addComponent("slot_" + i, specs[i]);
         }
         b.build();
- //★ 读描述符自身的栏位（与渲染组件同一来源）
+ //读描述符自身的栏位（与渲染组件同一来源）
         for (int i = 0; i <= 8; i++) {
             assertEquals("栏位 " + i + " 必须由描述符持有", i, (int) specs[i].slotOrNull());
         }
@@ -82,7 +82,7 @@ public class RegistrationOrderTest {
         Role role = b.build();
         assertEquals("组件表遍历序 = 登记序（不是字母序）",
                 Arrays.asList("zzz", "aaa", "mmm"), new ArrayList<>(role.getComponents().keySet()));
- //★ 栏位由各自描述符持有（条目不再持有）
+ //栏位由各自描述符持有（条目不再持有）
         assertEquals(3, (int) specZ.slotOrNull());
         assertEquals(1, (int) specA.slotOrNull());
         assertEquals(2, (int) specM.slotOrNull());

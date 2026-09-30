@@ -12,12 +12,11 @@ import java.util.List;
 
 /**
  * 子指令 {@code energy}：{@code /role energy get [playerName]} / {@code /role energy set <value> [playerName]}。
- * <p>
- * 行为与原 {@code RoleCommand} 内联实现**逐字等价**，含两处历史行为：
+ * <p>行为与原 {@code RoleCommand} 内联实现逐字等价，含两处历史行为：
  * <ul>
  *     <li>只写 {@code /role energy}（无动作）→ 输出统一报错文案并返回（原实现里这是 {@code energy} 分支自己的那句）；</li>
  *     <li>动作存在但参数个数不匹配、或动作未知（如 {@code /role energy get a b}、{@code /role energy foo}）
- *     → **回退到帮助文案**（原实现是内层 switch 的 break → {@code sendHelp(player)}），
+ *     → 回退到帮助文案（原实现是内层 switch 的 break → {@code sendHelp(player)}），
  *     因此这里复用 {@link HelpCommand#sendHelp(CommandSender)} 这一份文案，不再另抄一遍。</li>
  * </ul>
  */
@@ -41,7 +40,7 @@ public class EnergyCommand implements SubCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args){
-        //★ 服务端也能执行（不必是玩家）—— 目标由选择器指定
+        //服务端也能执行（不必是玩家）—— 目标由选择器指定
         if(args.length < 1){
             sender.sendMessage(Component.text("Wrong arguments. Use /role help to learn how to use."));
             return true;
@@ -49,7 +48,7 @@ public class EnergyCommand implements SubCommand {
 
         switch (args[0]){
             case "get":
-                //★ **目标必填**：`/role energy get` 不再默认给自己
+                //目标必填：`/role energy get` 不再默认给自己
                 if(args.length == 2){
                     handleGetEnergy(sender, args[1]);
                     return true;
@@ -61,7 +60,7 @@ public class EnergyCommand implements SubCommand {
                 break;
 
             case "set":
-                //★ **目标必填**：`/role energy set <n>` 不再默认给自己 —— 参数序 = set <n> <player|@s>
+                //目标必填：`/role energy set <n>` 不再默认给自己 —— 参数序 = set <n> <player|@s>
                 if(args.length == 3){
                     handleSetEnergy(sender, args[1], args[2]);
                     return true;
@@ -84,7 +83,7 @@ public class EnergyCommand implements SubCommand {
     }
 
     private void handleGetEnergy(CommandSender sender, String targetName){
-        //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
+        //目标必填（统一解析：裸名 / @s / 选择器，且必须恰好命中 1 名在线玩家）
         PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
         Player target = resolved.player();
         if(target == null || !target.isOnline()){
@@ -100,7 +99,7 @@ public class EnergyCommand implements SubCommand {
     }
 
     private void handleSetEnergy(CommandSender sender, String energyLevel, String targetName){
-        //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
+        //目标必填（统一解析：裸名 / @s / 选择器，且必须恰好命中 1 名在线玩家）
         PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
         Player target = resolved.player();
         if(target == null || !target.isOnline()){
@@ -124,9 +123,9 @@ public class EnergyCommand implements SubCommand {
 
 
     /**
-     * **读数 / 设值都自己按 id 取能量组件**（★ 容器已删两个能量视图 —— 它不再指名任何组件）。
-     * <p>★ 基类通用面（`readCurrentEnergy` / `writeCurrentEnergy`）**已删除**（那是能量组件的语言）
-     * ⇒ 本处取到**强类型的 `EnergyComponent`** 后直调它自己的 `current()` / `set(int)` ✓
+     * 读数 / 设值都自己按 id 取能量组件（容器已无能量视图，本类不指名任何组件）。
+     * <p>基类通用面（`readCurrentEnergy` / `writeCurrentEnergy`）已删除，故本处取到强类型的
+     * `EnergyComponent` 后直调它自己的 `current()` / `set(int)`。
      */
     private static int energyOf(RoleManager roleManager, Player target){
         EnergyComponent energy = energyComponentOf(roleManager, target);

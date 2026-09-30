@@ -9,28 +9,26 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * T-7（t50 §4）：锁住 {@link RoleAPI} 的**对外面**（「只增不改」）。
- * <p>断言 = 反射读到的**公开方法签名集合**（`getDeclaredMethods()`）与下面这份**冻结快照**逐字相等；
- * 删任一方法、加方法、或改任一参数/返回类型 ⇒ 立即红。
- * <p>快照来源 = 冻结件 `阶段9-测试缝范围-需求与验收.md` §6 C-10（现算 57）+ 本卡在 `f91776a` 代制品上
- * 用反射导出（导出脚本 = 仓库外 `.scratch/t57/T57Probe.java`，非交付物）。
- * <p><b>阶段 13 · t125（已批准的"只增"）</b>：快照 **57 → 58** ✓ —— 新增项**仅一条**：
- * {@code java.lang.String executeComponentOperation(java.util.UUID,java.lang.String,java.lang.String)}
- * （组件操作面的**唯一**操作入口 ✓，设计定案 §7.4 ②）；**旧 57 条一字未动** ✓（旧集合 ⊆ 新集合 ✓）。
- * <p>**不涉及运行时语义**（真能设置角色/清角色 = 运行级）：本测试只锁签名面。
- * <p>产物层判据（成品物品/背包/PDC）**不在**本测试内（那是假缝，见冻结件 §5）。
+ * 锁住 {@link RoleAPI} 的对外面（只增不改）：断言是反射读到的公开方法签名集合
+ * （{@code getDeclaredMethods()}）与下面这份冻结快照逐字相等；删任一方法、加方法、
+ * 或改任一参数/返回类型都会立即变红。
+ * <p>快照由冻结需求文档的签名清单加当前制品上的反射导出共同定下，其中包含
+ * {@code executeComponentOperation(UUID, String, String)} 这一条 ——
+ * 组件操作面的唯一操作入口（设计定案 §7.4 ②）。
+ * <p>本测试只锁签名面，不涉及运行时语义（真能设置角色/清角色属运行级；
+ * 成品物品/背包/PDC 属产物层，都不在这里）。
  */
 public class RoleApiSurfaceTest {
 
     /**
-     * 冻结快照（现算 **16** 条）。
+     * 冻结快照。
      *
-     * <p>★ **本轮收缩 58 → 16**：废弃方法已被删除（"直接操作组件"时代的空壳 —— 恒回中性哨兵值 / 空操作）：
-     * 阵营三条（读走 {@code RoleInfo#faction()}、写只在聚合根上）、生命 / 能量 / SanTE / 冷却读数与增减、
-     * 以及所有 {@code Player} 重载。
-     * <p>★ **保留** {@code areHostile}（它**不是**空壳 —— 转调 {@code RoleManager} 的可用实现，且判定链
-     * 只从聚合根读阵营）。
-     * <p>排序后逐字比较 ⇒ 与声明顺序无关。
+     * <p>废弃方法已被删除 —— 它们是"直接操作组件"时代的空壳
+     * （恒回中性哨兵值 / 空操作）：阵营三条（读走 {@code RoleInfo#faction()}、写只在聚合根上）、
+     * 生命 / 能量 / SanTE / 冷却读数与增减、以及所有 {@code Player} 重载。
+     * <p>保留 {@code areHostile}：它**不是**空壳，而是转调 {@code RoleManager} 的可用实现，
+     * 且判定链只从聚合根读阵营。
+     * <p>排序后逐字比较，因此与声明顺序无关。
      */
     private static final String[] FROZEN_SIGNATURES = {
             "boolean areHostile(java.util.UUID,java.util.UUID)",

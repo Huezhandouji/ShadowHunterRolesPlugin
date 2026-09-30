@@ -40,9 +40,9 @@ public class PlayerListener implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event){
         Player player = event.getPlayer();
         roleManager.clearRole(player.getUniqueId());
- //★ 掉线路径的物品清理**不在此处重复** —— `RoleManager.clearRole(UUID)` 已就地用
- //  {@code Bukkit.getPlayer(uuid)} 取到**仍在线**的 Player 并调 {@code HotbarItems.clearFrom} ✓
- //  （清理已中心化到两个 clearRole 重载 ⇒ 本处不再重复调用）。
+ //掉线路径的物品清理不在此处重复 —— {@code RoleManager.clearRole(UUID)} 已就地用
+ //  {@code Bukkit.getPlayer(uuid)} 取到仍在线的 Player 并调 {@code HotbarItems.clearFrom}，
+ //  （清理已中心化到两个 clearRole 重载，本处不再重复调用）。
     }
 
 }

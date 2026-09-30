@@ -10,10 +10,9 @@ import java.util.List;
 
 /**
  * 子指令 {@code set}：{@code /role set <roleId> [playerName]} —— 给自己或指定在线玩家装配角色。
- * <p>
- * 行为与原 {@code RoleCommand} 内联实现**逐字等价**，含两处易被改写掉的历史行为：
+ * <p>行为与原 {@code RoleCommand} 内联实现逐字等价，含两处易被改写掉的历史行为：
  * <ul>
- *     <li>参数个数不是 1 或 2 时（如 {@code /role set}、{@code /role set a b c}）**静默返回**，不输出任何内容；</li>
+ *     <li>参数个数不是 1 或 2 时（如 {@code /role set}、{@code /role set a b c}）静默返回，不输出任何内容；</li>
  *     <li>角色 id 不存在 / 目标玩家不在线 / 装配失败的文案逐字不变。</li>
  * </ul>
  */
@@ -39,8 +38,8 @@ public class SetRoleCommand implements SubCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args){
-        //★ 服务端也能执行（不必是玩家）—— 目标由第 2 参的选择器指定
-        //★ **目标必填**：`/role set <roleId>` 不再默认给自己
+        //服务端也能执行（不必是玩家）—— 目标由第 2 参的选择器指定
+        //目标必填：`/role set <roleId>` 不再默认给自己
         if(args.length == 1){
             sender.sendMessage(Component.text(PlayerTargets.targetRequired("/role set <roleId> <player|@s>")));
             return true;
@@ -65,7 +64,7 @@ public class SetRoleCommand implements SubCommand {
             return;
         }
 
-        //★ **目标必填**（统一解析：裸名 / @s / 选择器，且必须**恰好命中 1 名**在线玩家）
+        //目标必填（统一解析：裸名 / @s / 选择器，且必须恰好命中 1 名在线玩家）
         PlayerTargets.Result resolved = PlayerTargets.resolve(sender, targetName);
         Player target = resolved.player();
         if(target == null || !target.isOnline()){

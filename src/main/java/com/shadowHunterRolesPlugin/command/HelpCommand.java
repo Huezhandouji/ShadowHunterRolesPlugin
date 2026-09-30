@@ -5,9 +5,8 @@ import org.bukkit.command.CommandSender;
 
 /**
  * 子指令 {@code help}：{@code /role help} —— 打印帮助文案（一行标题 + 每个一级子指令的用法）。
- * <p>
- * 覆盖全部一级子指令（{@code set} / {@code clear} / {@code energy} / {@code debug} / {@code operation}）；
- * 本类**只做展示**，不参与权限判定（门禁在 {@link CommandAccess}）。{@link EnergyCommand} 的参数不匹配回退
+ * <p>覆盖全部一级子指令（{@code set} / {@code clear} / {@code energy} / {@code debug} / {@code operation}）；
+ * 本类只做展示，不参与权限判定（门禁在 {@link CommandAccess}）。{@link EnergyCommand} 的参数不匹配回退
  * 也调用同一个 {@link #sendHelp(CommandSender)}，避免同一段文案出现两份而走样。
  */
 public class HelpCommand implements SubCommand {

@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.skill;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
@@ -18,34 +18,35 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffectType;
+import java.util.List;
 
 /**
  * 「罪棘」技能之一：罪棘缠（下界石英）。
  *
- * <p><b>行为</b>：<b>1 秒</b>前摇后，以自身为中心 <b>7 格</b>内的所有敌人被荆棘缠绕 ——
- * 8 点物理伤害 + 2 秒<b>缓慢 255</b> + 2 秒失明。冷却 7 秒（140 刻），**不耗能**。
+ * <p>行为：1 秒前摇后，以自身为中心 7 格内的所有敌人被荆棘缠绕 ——
+ * 8 点物理伤害 + 2 秒缓慢 255 + 2 秒失明。冷却 7 秒（140 刻），不耗能。
  *
- * <p><b>特效</b>：
+ * <p>特效：
  * <ul>
- *   <li><b>引导期（整段 1 秒前摇）</b>：角色**四个角**旁各自生成一颗<b>农作物生长粒子</b>
- *       （{@code Particle.HAPPY_VILLAGER}，即骨粉催熟作物时冒的那种绿点），并<b>绕周身旋转</b>
- *       —— 相位逐帧递增 ⇒ 转起来；点数为 1（"单个"）；</li>
- *   <li><b>落点</b>：地面一圈荆棘环 + 前摇结束的音效。</li>
+ *   <li>引导期（整段 1 秒前摇）：角色四个角旁各自生成一颗农作物生长粒子
+ *       （{@code Particle.HAPPY_VILLAGER}，即骨粉催熟作物时冒的那种绿点），并绕周身旋转
+ *       —— 相位逐帧递增，因此转起来；点数为 1（"单个"）；</li>
+ *   <li>落点：地面一圈荆棘环 + 前摇结束的音效。</li>
  * </ul>
  *
- * <p>前摇用计时组件登记（{@code TaskComponent#addScheduleLater}）⇒ 角色清除时框架兜底取消，
- * {@code stop()} 里再显式取消一次（幂等）。缓慢 / 失明直接施加在**承受方**身上
- * ⇒ 与 {@code RedEvilShockSkill} 的既有做法一致。
+ * <p>前摇用计时组件登记（{@code TaskComponent#addScheduleLater}），角色清除时框架兜底取消，
+ * {@code stop()} 里再显式取消一次（幂等）。缓慢 / 失明直接施加在承受方身上，
+ * 与 {@code RedEvilShockSkill} 的既有做法一致。
  */
 public class SinThornEntangleSkill extends Skill {
 
-    /** **本组件的登记 id**（★ 知识归属：组件自己）。 */
+    /** **本组件的登记 id**（知识归属：组件自己）。 */
     public static final String ID = "sinThorn_skill_entangle";
 
-    /** 前摇：<b>1 秒</b> = 20 刻（需求：从 0.5 秒加长到 1 秒）。 */
+    /** 前摇：1 秒 = 20 刻。 */
     private static final long WINDUP_TICKS = 20L;
 
-    /** 前摇特效帧间隔：每 2 刻一帧 ⇒ 1 秒前摇共 10 帧。 */
+    /** 前摇特效帧间隔：每 2 刻一帧，1 秒前摇共 10 帧。 */
     private static final long WINDUP_FRAME_INTERVAL_TICKS = 2L;
 
     /** 前摇特效总帧数（10 帧 × 2 刻 = 20 刻 = 1 秒）。 */
@@ -60,7 +61,7 @@ public class SinThornEntangleSkill extends Skill {
     /** 缓慢 / 失明持续时间：2 秒 = 40 刻。 */
     private static final int DEBUFF_DURATION_TICKS = 40;
 
-    /** 缓慢的增幅（255 ⇒ 几乎无法移动）。 */
+    /** 缓慢的增幅（255，几乎无法移动）。 */
     private static final int SLOWNESS_AMPLIFIER = 255;
 
     private BuffComponent buff;
@@ -72,30 +73,28 @@ public class SinThornEntangleSkill extends Skill {
 
     /**
      * **是否正在前摇（引导）**。
-     * <p>只为一件事服务：{@link #buildItem()} 在引导期间给技能物品加**附魔光效**，
-     * 让"引导中"在快捷栏上看得见（需求）。
+     * <p>只为一件事服务：{@link #buildItem()} 在引导期间给技能物品加附魔光效，
+     * 让"引导中"在快捷栏上看得见。
      */
     private boolean channelling = false;
 
     /**
-     * **渲染组件**（热键栏）。
-     * <p>★ 上游 2026-09-27 重构后，基类**不再**提供 {@code requestRepaint()}
-     * （"the base stops speaking hotbar…"）⇒ 重绘要走"自己取渲染组件、调它的 {@code requestRepaint()}"这一条通道。
+     * **渲染组件**（热键栏）；重绘走"自己取渲染组件、调它的 {@code requestRepaint()}"这一条通道。
      */
     private HotbarRenderComponent render;
 
-    public SinThornEntangleSkill(String id, ComponentServices services, Specification specification) {
+    public SinThornEntangleSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
     /**
-     * 本组件的**描述符**（栏位由装配点 {@code setSlot} 指定）。
+     * 本组件的描述符（栏位由装配点 {@code setSlot} 指定）。
      */
     public static final class Specification extends Skill.Specification<SinThornEntangleSkill> {
 
         public Specification() {
             super(Component.text("罪棘缠"),
-                    Component.text("1秒前摇后，召唤荆棘缠绕7格内所有敌人：8点物理伤害、2秒缓慢255与失明"),
+                    List.of(Component.text("1秒前摇后，召唤荆棘缠绕7格内所有敌人：8点物理伤害、2秒缓慢255与失明")),
                     140,
                     0,
                     Material.QUARTZ);
@@ -104,7 +103,7 @@ public class SinThornEntangleSkill extends Skill {
         }
 
         @Override
-        public SinThornEntangleSkill create(String id, ComponentServices services) {
+        public SinThornEntangleSkill create(String id, ComponentServicesPort services) {
             return new SinThornEntangleSkill(id, services, this);
         }
     }
@@ -117,7 +116,7 @@ public class SinThornEntangleSkill extends Skill {
         render = svc().components().get(HotbarRenderComponent.class);
     }
 
-    /** **请求重绘热键栏**（新口径：取渲染组件再调；拿不到就静默跳过）。 */
+    /** **请求重绘热键栏**（取渲染组件再调；拿不到就静默跳过）。 */
     private void repaint() {
         if (render != null) {
             render.requestRepaint();
@@ -128,12 +127,12 @@ public class SinThornEntangleSkill extends Skill {
     public void onCast(CastSignal signal) {
         Player caster = svc().self().player();
 
-        //判定顺序与既有技能一致：先判能不能施放（被沉默/眩晕 ⇒ 不施放、不启冷却）
+        //判定顺序与既有技能一致：先判能不能施放（被沉默/眩晕则不施放、不启冷却）
         if (!buff.canCastSkill()) {
             return;
         }
 
-        //★ 冷却已挪到"前摇结束"那一刻才启动 ⇒ 前摇期间 isCoolingDown 为假，
+        //冷却已挪到"前摇结束"那一刻才启动，因此前摇期间 isCoolingDown 为假，
         //   这里必须自己挡住重复施放，否则连点会叠出两条前摇。
         if (channelling) {
             return;
@@ -141,18 +140,18 @@ public class SinThornEntangleSkill extends Skill {
 
         caster.getWorld().playSound(caster.getLocation().clone(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 0.7f);
 
-        //★「技能引导时给相应物品附魔」：引导期间让本技能物品带附魔光效（buildItem 覆写里加）
+        //「技能引导时给相应物品附魔」：引导期间让本技能物品带附魔光效（buildItem 覆写里加）
         channelling = true;
         repaint();
 
-        //① 引导期特效：10 帧、每 2 刻一帧 ⇒ 覆盖整段 1 秒前摇
+        //① 引导期特效：10 帧、每 2 刻一帧，覆盖整段 1 秒前摇
         for (int frame = 1; frame <= WINDUP_FRAMES; frame++) {
             final int f = frame;
             timer.addScheduleLater(this, f * WINDUP_FRAME_INTERVAL_TICKS, () -> windupFrame(f));
         }
 
         //② 前摇结束：摘掉附魔光效 → 启动冷却 → 荆棘落地 + 结算
-        //   ★「物品不会直接消失，而是存在一会再被替换」：冷却（图标换成结构空位）**推迟到这一刻**才发生，
+        //   「物品不会直接消失，而是存在一会再被替换」：冷却（图标换成结构空位）推迟到这一刻，
         //     前摇这 1 秒里物品一直是原样 + 附魔光效。
         castTask = timer.addScheduleLater(this, WINDUP_TICKS, () -> {
             channelling = false;
@@ -180,12 +179,12 @@ public class SinThornEntangleSkill extends Skill {
             center.getWorld().playSound(center, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1f, 0.6f);
         });
 
-        //★ 冷却**不在这里**启动 —— 见上面 castTask 里的注释（推迟到前摇结束）。
+        //冷却不在这里启动 —— 见上面 castTask 里的注释（推迟到前摇结束）。
     }
 
     /**
      * **一帧前摇特效**：角色四个角旁各冒一颗农作物生长粒子，并绕周身旋转。
-     * <p>相位随帧号递增 ⇒ "旋转"；每处只放 1 颗 ⇒ "单个"；四个方位用 45°/135°/225°/315°（即四个角）。
+     * <p>相位随帧号递增即"旋转"；每处只放 1 颗即"单个"；四个方位用 45°/135°/225°/315°（即四个角）。
      */
     private void windupFrame(int frame) {
         Player owner = svc().self().player();
@@ -222,8 +221,8 @@ public class SinThornEntangleSkill extends Skill {
     }
 
     /**
-     * **引导中给技能物品加附魔光效**（需求）。
-     * <p>做法：先按基类默认画法产出完整物品，再在**引导期间**补一个
+     * **引导中给技能物品加附魔光效**。
+     * <p>做法：先按基类默认画法产出完整物品，再在引导期间补一个
      * {@code setEnchantmentGlintOverride(true)} —— 只加光效、不加任何真实附魔
      * （不会多出附魔词条，也不改任何数值）。
      * <p>引导开始/结束各调一次 {@code repaint()} 触发重绘（见 {@code onCast} 与前摇任务）。
@@ -251,13 +250,13 @@ public class SinThornEntangleSkill extends Skill {
         channelling = false;
     }
 
-    /** **闸门放行？**（基类不查容器 ⇒ 用本组件自己的字段判）。 */
+    /** **闸门放行？**（基类不查容器，用本组件自己的字段判）。 */
     @Override
     protected boolean canUse() {
         return buff.canCastSkill();
     }
 
-    /** **当前能量**：本组件不参与能量维度（声明耗能 0）⇒ 返回声明值。 */
+    /** **当前能量**：本组件不参与能量维度（声明耗能 0），返回声明值。 */
     @Override
     protected int currentEnergy() {
         return getEnergyCost();

@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.platform;
 
 import org.bukkit.NamespacedKey;
 
-/** NamespacedKey 的唯一来源：领域层不再自己 new NamespacedKey(plugin, ...)。 */
+/** NamespacedKey 的唯一来源：领域层不自己 new NamespacedKey(plugin, ...)。 */
 public interface KeyFactory {
 
     NamespacedKey of(String key);
@@ -12,9 +12,9 @@ public interface KeyFactory {
      * <p>
      * {@code Skill.Utils.SKILL_KEY} / {@code MainWeapon.Utils.MAIN_WEAPON_KEY} /
      * {@code DamageUtil.LAST_DAMAGER_KEY} / {@code BuffManager.BUFF_MOVEMENT_SPEED_MODIFIER_KEY}
-     * 都是 {@code public static final}，必须在**类初始化时**取值（组件在渲染代码里直接引用 SKILL_KEY，
+     * 都是 {@code public static final}，必须在类初始化时取值（组件在渲染代码里直接引用 SKILL_KEY，
      * 统一渲染器之前不得删除）；而 {@link KeyFactory} 的实现在 onEnable 才可用，
-     * 故保留这一层**极窄**的静态桥：只暴露 {@code of(String)}，install 由主类在 onEnable 第一段完成。
+     * 故保留这一层极窄的静态桥：只暴露 {@code of(String)}，install 由主类在 onEnable 第一段完成。
      * 任何在这些常量之前触达 KeyFactory 的调用都会得到明确的 IllegalStateException，而不是 NPE。
      */
     final class Registry {

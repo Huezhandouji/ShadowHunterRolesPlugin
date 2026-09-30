@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.core;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ComponentDependencyException;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import org.junit.Test;
@@ -10,25 +10,25 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
- * 阶段 10 · t68：**允许组件环形依赖**（用户新路线图第三条）的装配期判据。
+ * 允许组件环形依赖的装配期判据。
  *
- * <p><b>本卡是一次口径反转</b>：{@code t54} 依据当时的裁定 Q2「禁止依赖循环」，把环检测实现成
- * {@link Role#verifyDependencies()} 里的硬失败。新路线图第三条**改为允许环形依赖** ⇒ 环分支已删除。
- * 本测试把**新的边界**钉住 —— 只放开环，**不动**另一半。
+ * <p>这是一次口径反转：环检测原先实现成 {@link Role#verifyDependencies()} 里的硬失败
+ * （依据当时的裁定「禁止依赖循环」），新路线图改为允许环形依赖 ⇒ 环分支已删除。
+ * 本测试把新的边界钉住 —— 只放开环，不动另一半。
  *
- * <p><b>为什么能单测</b>：{@code verifyDependencies()} 只读装配期的一张小表（每个组件的
- * "提供类型 + 必需类型"），**不建实例、不碰 Bukkit 注册表**（实例化发生在 {@code RoleInstance} 的构造期）
- * ⇒ 离线可跑。下面两个夹具组件的 {@code create(...)} **永不被调用**，正是这一点让本测试不需要任何
+ * <p>能单测的原因：{@code verifyDependencies()} 只读装配期的一张小表（每个组件的
+ * "提供类型 + 必需类型"），**不建实例、不碰 Bukkit 注册表**（实例化发生在 {@code RoleInstance} 的构造期），
+ * 因此离线可跑。下面两个夹具组件的 {@code create(...)} **永不被调用**，正是这一点让本测试不需要任何
  * 运行期依赖。
  *
- * <p><b>判据（逐条对应卡面 A1/A2/A3）</b>：
+ * <p>判据三条：
  * <ol>
  *   <li>A1 互环（A↔B 互相 {@code requires}）⇒ {@code verifyDependencies()} **不抛**；</li>
  *   <li>A3 自环（A 依赖自己）⇒ **仍抛**（A 不算自己的提供者 ⇒ 落成"缺必需依赖"，**不是**环检测）；</li>
  *   <li>A2 缺必需依赖（B 需要 C，而 C 不在表里）⇒ **仍抛**，且消息点名缺的类型；</li>
  *   <li>对照：B 的依赖被满足 ⇒ 不抛（证明上一条不是"永远抛"）。</li>
  * </ol>
- * <p>第 2、3 条是**边界**：它们保证"删掉环检测"**没有**顺手放松缺依赖的硬失败。
+ * <p>第 2、3 条是边界：它们保证"删掉环检测"**没有**顺手放松缺依赖的硬失败。
  */
 public class ComponentCycleAllowedTest {
 
@@ -40,14 +40,14 @@ public class ComponentCycleAllowedTest {
 
     /** 夹具组件 A：提供 {@code CycleComponentA}。 */
     public static final class CycleComponentA extends RoleComponent {
-        public CycleComponentA(String id, ComponentServices services) {
+        public CycleComponentA(String id, ComponentServicesPort services) {
             super(id, services);
         }
     }
 
     /** 夹具组件 B：提供 {@code CycleComponentB}。 */
     public static final class CycleComponentB extends RoleComponent {
-        public CycleComponentB(String id, ComponentServices services) {
+        public CycleComponentB(String id, ComponentServicesPort services) {
             super(id, services);
         }
     }
@@ -60,7 +60,7 @@ public class ComponentCycleAllowedTest {
         }
 
         @Override
-        public CycleComponentA create(String id, ComponentServices services) {
+        public CycleComponentA create(String id, ComponentServicesPort services) {
             throw new AssertionError("assembly-time check must not create instances (A)");
         }
     }
@@ -73,7 +73,7 @@ public class ComponentCycleAllowedTest {
         }
 
         @Override
-        public CycleComponentB create(String id, ComponentServices services) {
+        public CycleComponentB create(String id, ComponentServicesPort services) {
             throw new AssertionError("assembly-time check must not create instances (B)");
         }
     }
@@ -83,11 +83,11 @@ public class ComponentCycleAllowedTest {
         return new Role.Builder("r_cycle_missing").addComponent("c_a", new SpecA(true)).build();
     }
 
-    // ───────────── A1：互环必须装配通过（本卡的核心正向读数）─────────────
+    // ───────────── A1：互环必须装配通过（核心正向读数）─────────────
 
     /**
      * **A1 互环**：A 的必需类型由 B 提供、B 的必需类型由 A 提供 ⇒ **不得抛**。
-     * <p>本卡之前这里会抛 {@code ComponentDependencyException: … dependency cycle: c_a -> c_b -> c_a}。
+     * <p>本改动之前这里会抛 {@code ComponentDependencyException: … dependency cycle: c_a -> c_b -> c_a}。
      */
     @Test
     public void mutualCycleAssemblesSuccessfully() {
@@ -131,11 +131,11 @@ public class ComponentCycleAllowedTest {
                 1, role.missingRequiredDependencies().size());
     }
 
-    // ───────────── A2：缺必需依赖仍硬失败（t54 的另一半，原样保留）─────────────
+    // ───────────── A2：缺必需依赖仍硬失败（另一半，原样保留）─────────────
 
     /**
      * **A2 缺必需依赖**：只放了一个 A，而 A 要求 B（B 不在表里）⇒ **仍抛**，消息点名 B。
-     * <p>这是本卡"只放开环、不动另一半"的**直接判据**。
+     * <p>这是"只放开环、不动另一半"的直接判据。
      */
     @Test
     public void missingRequiredDependencyStillFails() {
@@ -168,7 +168,7 @@ public class ComponentCycleAllowedTest {
 
     /**
      * **A1 的另一半证据**：{@code dependencyCycles()} 这个公共入口**已从 {@link Role} 移除**。
-     * <p>为什么单独钉：留一个不再被调用的环检测，会让下一个读者以为"环仍被禁止"（死代码会撒谎）。
+     * <p>单独钉的理由：留一个不再被调用的环检测，会让下一个读者以为"环仍被禁止"（死代码会撒谎）。
      * 本测试用反射确认它**真的不在了** —— 这条会随"有人手滑把它加回来"而变红。
      */
     @Test

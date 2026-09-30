@@ -16,25 +16,25 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 子指令 {@code /role operation …} —— **组件操作面的指令面**。
+ * 子指令 {@code /role operation …} —— 组件操作面的指令面。
  *
  * <p><b>语法</b>：
  * <pre>
  * /role operation &lt;player|@s&gt; &lt;componentId[#index]&gt; &lt;payload…&gt;
  * </pre>
- * ★ **没有 query / modify 动词** —— 两者都走**同一个** API 入口（`onOperationCommand`），行为完全一致。
- * 动作由 **payload 的首 token** 表达（`current` / `add 5` / `set 50` …）。
- * <p>★ **目标必填**：第 1 个参数必须是玩家名（在线）或选择器（含 `@s`）⇒ 经 {@link PlayerTargets} 解析，
- * 且**必须恰好命中 1 名**在线玩家，否则按真实原因回绝。
- * <p><b>payload 一律原样交给组件自解析</b>（首 token 必为操作动词；本类**不解释**它）。
+ * 没有 query / modify 动词：两者都走同一个 API 入口（{@code onOperationCommand}），行为完全一致，
+ * 动作由 payload 的首 token 表达（{@code current} / {@code add 5} / {@code set 50} …）。
+ * <p>目标必填：第 1 个参数必须是玩家名（在线）或选择器（含 {@code @s}）⇒ 经 {@link PlayerTargets} 解析，
+ * 且必须恰好命中 1 名在线玩家，否则按真实原因回绝。
+ * <p>payload 一律原样交给组件自解析（首 token 必为操作动词；本类不解释它）。
  *
  * <p><b>注册</b>：本子指令由主指令 {@link RoleCommand} 在构造期登记（`/role` 根命令仍走 `plugin.yml` + `setExecutor`，
- * **未新增根命令** ⇒ 无需改 `plugin.yml`）。
+ * 未新增根命令 ⇒ 无需改 `plugin.yml`）。
  *
- * <p><b>Tab 补全</b>：第 1 段补**在线玩家名 + `@s`**；第 2 段补目标的组件 id。
- * ★ **op 名与参数不可补** —— 组件不自报可用操作 ⇒ 只能补到 `componentId`，op 与参数需**手写文档**；补全同样受根门禁约束。
+ * <p><b>Tab 补全</b>：第 1 段补在线玩家名 + {@code @s}；第 2 段补目标的组件 id。
+ * op 名与参数不可补：组件不自报可用操作 ⇒ 只能补到 {@code componentId}，op 与参数需手写文档；补全同样受根门禁约束。
  *
- * <p><b>文本</b>：一律 Adventure {@link Component} ✓（**不用 {@code ChatColor}** ✗）。
+ * <p><b>文本</b>：一律 Adventure {@link Component}（不用 {@code ChatColor}）。
  */
 public class ComponentOperationCommand implements SubCommand {
 
@@ -59,13 +59,13 @@ public class ComponentOperationCommand implements SubCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args) {
-        //★ 服务端也能执行（不必是玩家）—— 目标必填，故控制台只需给出目标名或选择器
+        //服务端也能执行（不必是玩家）—— 目标必填，故控制台只需给出目标名或选择器
         if (args.length < 2) {
             sender.sendMessage(Component.text(getUsage()));
             return true;
         }
 
-        //★ **目标必填**：第 1 个参数必须是玩家名（在线）或选择器（含 @s）—— 不再支持"省略 ⇒ 自己"
+        //目标必填：第 1 个参数必须是玩家名（在线）或选择器（含 @s）—— 不再支持"省略 ⇒ 自己"
         if (!isTargetToken(args[0])) {
             sender.sendMessage(Component.text("The target is required: pass a player name or a selector"
                     + " (players may use @s for themselves)."));
@@ -87,7 +87,7 @@ public class ComponentOperationCommand implements SubCommand {
                 ? ""
                 : String.join(" ", Arrays.copyOfRange(args, payloadFrom, args.length));
 
-        //★ 空 payload ⇒ 没有可交给组件的东西 ⇒ 回绝（原先靠 `modify` 动词判，现在没有动词 ⇒ 一律回绝）
+        //空 payload ⇒ 没有可交给组件的东西 ⇒ 回绝（无动词可判 ⇒ 一律回绝）
         if (payload.isBlank()) {
             sender.sendMessage(Component.text("This needs an operation payload,"
                     + " e.g. /role operation @s " + componentId + " set 50"));
@@ -100,7 +100,7 @@ public class ComponentOperationCommand implements SubCommand {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, String[] args) {
-        //★ 服务端也能补全：控制台没有"自己"，但**在线玩家名**与**目标的组件 id**照常可补
+        //服务端也能补全：控制台没有"自己"，但在线玩家名与目标的组件 id 照常可补
         //（`@s` 仅对玩家有意义 ⇒ 控制台仍列出来，但执行时会被按真实原因回绝）
         if (args.length == 1) {
             List<String> candidates = new ArrayList<>();
@@ -119,11 +119,11 @@ public class ComponentOperationCommand implements SubCommand {
                     : (sender instanceof Player player ? player : null);
             return SubCommand.filter(target == null ? List.of() : componentIdsOf(target), args[1]);
         }
-        //★ op 名与参数**不可补**（无自报清单 ⇒ 只能补到 componentId；如实说明见类 javadoc）
+        //op 名与参数不可补（组件不自报清单 ⇒ 只能补到 componentId）
         return List.of();
     }
 
-    /** 第 1 个参数是否**当目标**：以 `@` 开头（选择器 / `@s`）或是**在线**玩家名。 */
+    /** 第 1 个参数是否当目标：以 `@` 开头（选择器 / `@s`）或是在线玩家名。 */
     private boolean isTargetToken(String token) {
         if (token == null || token.isBlank()) {
             return false;
@@ -132,7 +132,7 @@ public class ComponentOperationCommand implements SubCommand {
                 || Bukkit.getPlayerExact(token) != null;
     }
 
-    /** 某玩家实例上的组件 id（无实例 ⇒ 空表 ✓；只经容器枚举 ✓）。 */
+    /** 某玩家实例上的组件 id（无实例 ⇒ 空表；只经容器枚举）。 */
     private List<String> componentIdsOf(Player player) {
         RoleInstance instance = roleManager.getRoleInstance(player);
         if (instance == null) {

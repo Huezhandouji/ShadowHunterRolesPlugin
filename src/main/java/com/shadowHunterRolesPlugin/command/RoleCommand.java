@@ -17,25 +17,22 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * 主指令 {@code /role}（别名 {@code r}）—— **只做路由 + 统一报错 + 补全**。
- * <p>
- * 本类是 {@link SubCommand} 体系的中央分发器（风格对齐 {@code SHDFGamePlugin} 的 {@code ShdfGameCommand}）：
+ * 主指令 {@code /role}（别名 {@code r}）—— 只做路由 + 统一报错 + 补全。
+ * <p>本类是 {@link SubCommand} 体系的中央分发器（风格对齐 {@code SHDFGamePlugin} 的 {@code ShdfGameCommand}）：
  * <ol>
  *     <li><b>权限门禁</b>：单一判定点 {@link CommandAccess#check} ——
- *         <b>等级 ≥ 3 的玩家</b>放行、控制台/RCON 放行、其余一律拒绝；<b>执行与 Tab 补全共用同一道门</b>；</li>
+ *         等级 ≥ 3 的玩家放行、控制台/RCON 放行、其余一律拒绝；执行与 Tab 补全共用同一道门；</li>
  *     <li>非玩家发送者 → 统一拒绝（既有文案逐字保留）；</li>
- *     <li>无参数 → **静默返回**（不输出任何内容）；</li>
- *     <li>按第一级参数路由到注册的子指令，**参数剥离后**交给该子指令；</li>
+ *     <li>无参数 → 静默返回（不输出任何内容）；</li>
+ *     <li>按第一级参数路由到注册的子指令，参数剥离后交给该子指令；</li>
  *     <li>未知子指令 → 统一报错文案（既有文案逐字保留）；</li>
  *     <li>Tab 补全：第一级补全子指令名，其余交给命中的子指令。</li>
  * </ol>
- * <p>
- * <b>门禁覆盖面（子指令路径一次覆盖）</b>：{@code help} / {@code set} / {@code clear} / {@code energy} /
+ * <p><b>门禁覆盖面（子指令路径一次覆盖）</b>：{@code help} / {@code set} / {@code clear} / {@code energy} /
  * {@code debug} / {@code debug cooldown} / {@code debug sched} / {@code operation} —— 它们都必须经本类
- * {@link #onCommand} 或 {@link #onTabComplete} 的**第一行**才能抵达子指令实现（见 {@link #gate} 的唯一调用形态）。
- * <p>
- * <b>既有顶层命令不迁移 Brigadier</b>：注册方式仍是 `plugin.yml` 的 {@code commands: role:} + 主类
- * {@code getCommand("role").setExecutor(...)}（`docs/插件文档/开发指南-新增角色或组件.md` §4.5.1/§4.5.2）。
+ * {@link #onCommand} 或 {@link #onTabComplete} 的第一行才能抵达子指令实现（见 {@link #gate} 的唯一调用形态）。
+ * <p><b>既有顶层命令不迁移 Brigadier</b>：注册方式仍是 `plugin.yml` 的 {@code commands: role:} + 主类
+ * {@code getCommand("role").setExecutor(...)}；本类实现 {@link CommandExecutor} 与 {@link TabCompleter}。
  */
 public class RoleCommand implements CommandExecutor, TabCompleter {
 
@@ -46,7 +43,7 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
         registerSubCommand(new ClearRoleCommand(roleManager));
         registerSubCommand(new EnergyCommand(roleManager));
         registerSubCommand(new DebugCommand(roleManager));
-        //组件操作面（`/role operation …`）—— 派发器**直接调公开 API** ✓（不提权、不加共享入口 ✓）
+        //组件操作面（`/role operation …`）—— 派发器直接调公开 API（不提权、不加共享入口）
         registerSubCommand(new ComponentOperationCommand(roleManager, roleAPI));
         registerSubCommand(new HelpCommand());
     }
@@ -67,16 +64,16 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
-        //等级 ≥ 3 门禁 —— 在**根入口第一行**，其下全部子指令路径都经过此处
+        //等级 ≥ 3 门禁 —— 在根入口第一行，其下全部子指令路径都经过此处
         if(!gate(sender, "/role")){
             return true;
         }
 
-        //★ **服务端（控制台 / 远程控制台）也能执行** —— 不再要求 sender 是玩家。
-        //  面向玩家的子指令（set / clear / energy / operation）经**目标选择器**指定玩家
-        //  ⇒ 控制台只需给出目标名或选择器即可（`@s` 对控制台无意义 ⇒ 会被按真实原因回绝）。
+        //服务端（控制台 / 远程控制台）也能执行 —— 不再要求 sender 是玩家。
+        //  面向玩家的子指令（set / clear / energy / operation）经目标选择器指定玩家，
+        //  因此控制台只需给出目标名或选择器即可（`@s` 对控制台无意义 ⇒ 会被按真实原因回绝）。
         if(args.length == 0){
-            //既有可见行为逐字保留：/role 空参数不输出任何内容（历史实现的 sendHelp 调用被注释掉）
+            //既有可见行为逐字保留：/role 空参数不输出任何内容
             return true;
         }
 
@@ -94,7 +91,7 @@ public class RoleCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
-        //补全侧与执行侧**同一道门**（不得只拦执行、补全仍泄漏子指令名）
+        //补全侧与执行侧同一道门（不得只拦执行、补全仍泄漏子指令名）
         if(!gate(sender, "/role (tab)")){
             return List.of();
         }

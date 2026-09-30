@@ -11,29 +11,27 @@ import java.util.Objects;
 import java.util.logging.Logger;
 
 /**
- * 配置管理器：本插件的**唯一读盘口径** —— 所有配置字段都经这里取值。
+ * 配置管理器：本插件的唯一读盘口径 —— 所有配置字段都经这里取值。
  *
- * <p><b>为什么要有它</b>：在此之前"读配置"与"读 {@code ops.json}"两套机制各写一遍缓存与回落，
- * 且主类**从不调用 {@code saveDefaultConfig()}** ⇒ jar 内置的默认值只在内存里生效、
- * **永不落盘**到 {@code plugins/ShadowHunterRolesPlugin/config.yml}，运维根本发现不了那些字段。
- * 现在：① 默认配置**落盘**（主类 `onEnable` 先 `saveDefaultConfig()`）；② 取值只剩这一处；
- * ③ 每个字段的定义集中在 {@link ConfigKey}（默认值 / 校验 / 说明一处）。
+ * <p>取值只剩这一处，每个字段的定义集中在 {@link ConfigKey}（默认值 / 校验 / 说明一处）；
+ * 默认配置由主类在 {@code onEnable} 先 {@code saveDefaultConfig()} 落盘到
+ * {@code plugins/ShadowHunterRolesPlugin/config.yml}，因此 jar 内置的默认值对运维可见。
  *
  * <p><b>生效时效（逐字一致，冻结语义）</b>：数据目录内 {@code config.yml} 带
- * {@value #TTL_MILLIS} ms TTL + **文件戳（mtime×31+长度）变更即失效** ⇒ 改完配置文件**最迟一个 TTL**
- * 内生效，**无需重启或 reload**。文件不存在时回落 **jar 内置默认值**（`plugin.getConfig()`）。
+ * {@value #TTL_MILLIS} ms TTL + <b>文件戳（mtime×31+长度）变更即失效</b>，
+ * 改完配置文件最迟一个 TTL 内生效，无需重启或 reload。文件不存在时回落 jar 内置默认值（{@code plugin.getConfig()}）。
  *
- * <p><b>安全口径</b>：缺失 / 类型不符 / 非整数 / 文件读不动 ⇒ 回落默认值且**不抛异常**
- * （指令不会因此不可用）；数值越界 ⇒ 夹取到 `[min, max]`。
+ * <p><b>安全口径</b>：缺失 / 类型不符 / 非整数 / 文件读不动则回落默认值且不抛异常
+ * （指令不会因此不可用）；数值越界则夹取到 {@code [min, max]}。
  *
- * <p><b>可观测</b>：首次读到某键、以及**因文件变更而重读导致取值变化**时，各打一行含
- * **新旧值**的 INFO（前缀 {@code [config]}）⇒ 运行级证据可直接取原始行。
+ * <p><b>可观测</b>：首次读到某键、以及因文件变更而重读导致取值变化时，各打一行含
+ * 新旧值的 INFO（前缀 {@code [config]}），运行级证据可直接取原始行。
  */
 public final class ConfigurationManager {
 
     /**
- * 指令权限等级（等价于 `CommandAccess.CONFIG_KEY`）：字段名、默认值 3、域 0-4
-     * **逐字沿用**已冻结的口径。
+     * 指令权限等级（等价于 {@code CommandAccess.CONFIG_KEY}）：字段名、默认值 3、域 0-4
+     * 逐字沿用已冻结的口径。
      */
     public static final ConfigKey<Integer> COMMAND_PERMISSION_LEVEL = ConfigKey.integer(
             "command-permission-level", 3, 0, 4,
@@ -42,7 +40,7 @@ public final class ConfigurationManager {
     /** 读盘缓存 TTL（毫秒）——与 {@code ops.json} 等级表同一机制（冻结语义）。 */
     private static final long TTL_MILLIS = 5_000L;
 
-    /** 已安装的实例（主类在 `onEnable` 安装；与 `KeyFactory.Registry` 同一种静态桥的写法）。 */
+    /** 已安装的实例（主类在 {@code onEnable} 安装；与 {@code KeyFactory.Registry} 同一种静态桥的写法）。 */
     private static ConfigurationManager installed;
 
     private final Plugin plugin;
@@ -53,14 +51,14 @@ public final class ConfigurationManager {
     private long loadedAt = 0L;
     /** 上次读盘时的文件戳（mtime×31+长度）；文件一变即失效。 */
     private long fileStamp = Long.MIN_VALUE;
-    /** 本次刷新的读取源（文件存在 ⇒ 数据目录文件；否则 ⇒ jar 内置默认值）；读失败 ⇒ `null`（⇒ 一律默认值）。 */
+    /** 本次刷新的读取源（文件存在则数据目录文件，否则 jar 内置默认值）；读失败则为 {@code null}（因此一律默认值）。 */
     private Configuration source;
     /** 读取源的标签（写进日志，便于运维判断"读的到底是哪一份"）。 */
     private String sourceLabel = "unread";
     /** 上次读盘失败的原因（只打一行，不刷屏）。 */
     private String loadFailure = null;
 
-    /** 每个键**上次已打日志的归一值**（取值变化时才再打一行，含新旧值）。 */
+    /** 每个键上次已打日志的归一值（取值变化时才再打一行，含新旧值）。 */
     private final Map<String, Object> loggedValue = new HashMap<>();
 
     public ConfigurationManager(Plugin plugin) {
@@ -69,12 +67,12 @@ public final class ConfigurationManager {
         this.logger = plugin.getLogger();
     }
 
-    /** 安装为全局实例（主类在 `onEnable` 调用；重复安装以后者为准）。 */
+    /** 安装为全局实例（主类在 {@code onEnable} 调用；重复安装以后者为准）。 */
     public static void install(ConfigurationManager manager) {
         installed = manager;
     }
 
-    /** 已安装的实例；**未安装 ⇒ `null`**（调用方自行回落默认值，不抛异常）。 */
+    /** 已安装的实例；未安装则为 {@code null}（调用方自行回落默认值，不抛异常）。 */
     public static ConfigurationManager installed() {
         return installed;
     }
@@ -85,7 +83,7 @@ public final class ConfigurationManager {
     }
 
     /**
-     * 取一个配置键的当前值：类型化 + 越界夹取 + 缺失/非法**安全回落**（**永不抛异常**）。
+     * 取一个配置键的当前值：类型化 + 越界夹取 + 缺失 / 非法安全回落（<b>永不抛异常</b>）。
      */
     public <T> T get(ConfigKey<T> key) {
         Objects.requireNonNull(key, "key");
@@ -108,11 +106,11 @@ public final class ConfigurationManager {
         fileStamp = stamp;
         try {
             if (file.isFile()) {
-                //数据目录里那份是运维的真实意愿 ⇒ 优先；loadConfiguration 对坏 YAML 不会抛（只告警）
+                //数据目录里那份是运维的真实意愿，优先；loadConfiguration 对坏 YAML 不会抛（只告警）
                 source = YamlConfiguration.loadConfiguration(file);
                 sourceLabel = "file";
             } else {
- //文件不在 ⇒ 回落 jar 内置默认值（同一条分支）
+ //文件不在则回落 jar 内置默认值（同一条分支）
                 source = plugin.getConfig();
                 sourceLabel = "jar-default";
             }
@@ -121,7 +119,7 @@ public final class ConfigurationManager {
                 loadFailure = null;
             }
         } catch (Throwable failure) {
-            //读不动 ⇒ 一律默认值，绝不抛异常、绝不让指令因此不可用
+            //读不动则一律默认值，绝不抛异常、绝不让指令因此不可用
             source = null;
             sourceLabel = "unreadable";
             String reason = failure.getClass().getSimpleName() + ": " + failure.getMessage();
@@ -151,7 +149,7 @@ public final class ConfigurationManager {
             log("config " + path + " = " + current + " (source=" + sourceLabel + ")");
         } else if (!previous.equals(current)) {
             loggedValue.put(path, current);
-            //因文件变更而重读时，**一行里同时给出新旧值** ⇒ 运行级证据可直接取原始行
+            //因文件变更而重读时，一行里同时给出新旧值，运行级证据可直接取原始行
             log("config " + path + ": " + previous + " -> " + current + " (source=" + sourceLabel + ")");
         }
     }

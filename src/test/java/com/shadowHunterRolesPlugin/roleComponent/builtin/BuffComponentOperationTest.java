@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.core.ports.Self;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
+import com.shadowHunterRolesPlugin.core.ports.SelfPort;
 import com.shadowHunterRolesPlugin.manager.BuffManager;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import org.bukkit.NamespacedKey;
@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -17,29 +18,38 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 /**
- * `BuffComponent` 的**组件操作面**离线单测（≥6 例）。
+ * `BuffComponent` 的**组件操作面**离线单测。
  *
- * <h2>为什么能离线跑：最小测试替身（两件）</h2>
- * ① 生产里 {@code BuffManager} 由容器以 {@code new BuffManager(player, this)} 构造 ⇒ **需要活 Player** ✗；
- * 但它的**构造器只把两个实参存进字段**（零解引用 ✓）⇒ 用 {@code super(null, null)} 构造的替身**不需要 Player** ✓。
- * 本类的 {@link StubBuffManager} 在此之上把**组件实际调用的那 5 个方法**换成内存实现 ✓ ⇒ 组件可离线构造 ✓。
- * <p>② ★ 真正的硬阻断其实在**类初始化** ✗：{@code BuffManager} 的静态常量
- * {@code BUFF_MOVEMENT_SPEED_MODIFIER_KEY} 走 {@code KeyFactory.Registry.of(...)}，而 {@code KeyFactory}
- * 的实现在插件 {@code onEnable} 才 install ⇒ 不装桩时**连类都加载不了** ✗（实测：{@code NoClassDefFoundError} ✗）
- * ⇒ 本类在 {@link BeforeClass} 里 install 一个**最小 KeyFactory 桩**（{@code new NamespacedKey("shadowhunterroles", key)} ✓，
- * 离线可构造 ✓）。
- * <p><b>★ 该桩的副作用（如实申报）</b> ✗：{@code KeyFactory.Registry} 是**全局静态** ⇒ 本类的 install 对本 JVM
- * 内**其它测试**同样生效 ✓（现算：`src/test` 里**零**处引用 {@code KeyFactory} ⇒ 无人依赖"未安装即抛" ✓）。
- * <p><b>替身的语义边界（如实申报）</b> ✗：替身**不**模拟真实 {@code BuffManager} 的取最大时长 / 到期判定 /
- * STUN 属性修饰符 / 药水施加 —— 那些是**生产行为**，归窗口级读数（见交付说明的未覆盖段 ✓）。
+ * <h2>能离线跑的原因：最小测试替身（两件）</h2>
+ * <p>① 生产里 {@code BuffManager} 由容器以 {@code new BuffManager(player, this)} 构造 ⇒ **需要活 Player**；
+ * 但它的**构造器只把两个实参存进字段**（零解引用），因此用 {@code super(null, null)} 构造的替身
+ * **不需要 Player**。本类的 {@link StubBuffManager} 在此之上把**组件实际调用的那 6 个方法**换成内存实现，
+ * 组件于是可离线构造。
+ * <p>② 真正的硬阻断其实在**类初始化**：{@code BuffManager} 的静态常量
+ * {@code BUFF_MOVEMENT_SPEED_MODIFIER_KEY} 走 {@code KeyFactory.Registry.of(...)}，
+ * 而 {@code KeyFactory} 的实现在插件 {@code onEnable} 才 install ⇒ 不装桩时**连类都加载不了**
+ * （实测：{@code NoClassDefFoundError}）。因此本类在 {@link BeforeClass} 里 install 一个
+ * **最小 KeyFactory 桩**（{@code new NamespacedKey("shadowhunterroles", key)}，离线可构造）。
+ * <p>该桩的副作用（如实申报）：{@code KeyFactory.Registry} 是全局静态，本类的 install 对本 JVM
+ * 内其它测试同样生效（现算：`src/test` 里零处引用 {@code KeyFactory} ⇒ 无人依赖"未安装即抛"）。
+ * <p>替身的语义边界（如实申报）：替身**不**模拟真实 {@code BuffManager} 的取最大时长 / 到期判定 /
+ * STUN 属性修饰符 / 药水施加 / **原版负面药水的枚举与移除** —— 那些是生产行为，属运行级读数。
  *
  * <h2>哪些动词能离线驱动</h2>
- * 全部 7 个动词都经替身 ✓；★ 例外：{@code clear} 只覆盖**空账本**路径 ✓ —— 账本非空时它会逐个
- * {@code player.removePotionEffect(...)} ⇒ 需要活 Player ✗（本卡如实申报，归窗口卡 ✓）。
+ * 全部 8 个动词都经替身；例外两条：
+ * <ul>
+ *   <li>{@code clear} —— 只覆盖**空账本**路径：账本非空时它会逐个
+ *       {@code player.removePotionEffect(...)} ⇒ 需要活 Player，因此归运行级。</li>
+ *   <li>{@code clear_debuff} —— 组件侧的转发与插件侧账本语义已全覆盖（替身把
+ *       {@code clearDebuffs()} 换成内存实现）；但生产 {@code BuffManager.clearDebuffs()} 的
+ *       **原版药水那一半**（{@code HARMFUL} 分类的枚举与移除）离线不可达：{@code PotionEffectType}
+ *       需要活服务端的注册表才能初始化（实测：离线引用任意常量即 {@code ExceptionInInitializerError}）
+ *       ⇒ 那半边同样归运行级。</li>
+ * </ul>
  */
 public class BuffComponentOperationTest {
 
-    /** **离线测试基设**：装一个最小 {@code KeyFactory} 桩，让带静态 {@code NamespacedKey} 常量的类可被加载 ✓。 */
+    /** **离线测试基设**：装一个最小 {@code KeyFactory} 桩，让带静态 {@code NamespacedKey} 常量的类可被加载。 */
     @BeforeClass
     public static void installKeyFactoryStub() {
         KeyFactory.Registry.install(key -> new NamespacedKey("shadowhunterroles", key));
@@ -51,7 +61,7 @@ public class BuffComponentOperationTest {
         private final Map<BuffType, Integer> ticks = new LinkedHashMap<>();
 
         StubBuffManager() {
-            super(null, null, null); // 基类构造只赋三个字段 ⇒ 零解引用 ✓
+            super(null, null, null); // 基类构造只赋三个字段 ⇒ 零解引用
         }
 
         @Override
@@ -78,10 +88,27 @@ public class BuffComponentOperationTest {
         public boolean canUseMainWeapon() {
             return !hasBuff(BuffType.STUN);
         }
+
+        /**
+         * 清负面效果的内存实现：按 {@link BuffType#isDebuff()} 枚举（与生产 `BuffManager.clearDebuffs()`
+         * 的插件侧**同一判据**）⇒ 本替身顺带把"哪些 buff 算负面"这条定义也纳入离线覆盖。
+         * <p>不模拟生产方法里的原版药水那一半（那需要活玩家 + 活注册表，见类 javadoc）。
+         */
+        @Override
+        public int clearDebuffs() {
+            int cleared = 0;
+            for (BuffType type : new ArrayList<>(ticks.keySet())) {
+                if (type.isDebuff()) {
+                    ticks.remove(type);
+                    cleared++;
+                }
+            }
+            return cleared;
+        }
     }
 
-    /** 玩家面替身：只提供 {@code player()} 的**空值**（空账本下不会被解引用 ✓）。 */
-    private static final class StubSelf implements Self {
+    /** 玩家面替身：只提供 {@code player()} 的**空值**（空账本下不会被解引用）。 */
+    private static final class StubSelf implements SelfPort {
 
         @Override
         public Player player() {
@@ -96,13 +123,13 @@ public class BuffComponentOperationTest {
 
     private static BuffComponent component() {
         return new BuffComponent("buffs",
-                new ComponentServices(new StubSelf(), null, null),
+                new ComponentServicesPort(new StubSelf(), null, null),
                 new StubBuffManager());
     }
 
-    // ───────── ① 合法读（闸门两个） ─────────
+    // ───────── 合法读（闸门两个） ─────────
 
-    /** 技能闸门：无 buff ⇒ `true`；`STUN` 后 ⇒ `false`（读的是既有强类型方法 ✓）。 */
+    /** 技能闸门：无 buff ⇒ `true`；`STUN` 后 ⇒ `false`（读的是既有强类型方法）。 */
     @Test
     public void canCastReadsTheExistingGate() {
         BuffComponent buffs = component();
@@ -120,9 +147,9 @@ public class BuffComponentOperationTest {
         assertEquals("false", buffs.onOperationCommand("can_weapon"));
     }
 
-    // ───────── ② 合法写 + 合法读（has / remaining） ─────────
+    // ───────── 合法写 + 合法读（has / remaining） ─────────
 
-    /** `add` 回**写后状态**；`has` / `remaining` 读同一份表（含"无该 buff"的 0 ✓）。 */
+    /** `add` 回**写后状态**；`has` / `remaining` 读同一份表（含"无该 buff"的 0）。 */
     @Test
     public void addHasAndRemainingShareOneTable() {
         BuffComponent buffs = component();
@@ -133,7 +160,7 @@ public class BuffComponentOperationTest {
         assertEquals("0", buffs.onOperationCommand("remaining STUN"));
     }
 
-    /** `0` 是合法的写入值（与既有 add 语义一致 ✓）。 */
+    /** `0` 是合法的写入值（与既有 add 语义一致）。 */
     @Test
     public void zeroTicksIsAValidWrite() {
         BuffComponent buffs = component();
@@ -141,9 +168,9 @@ public class BuffComponentOperationTest {
         assertEquals("true", buffs.onOperationCommand("has IMMUNE"));
     }
 
-    // ───────── ③ 账本读口（count / clear） ─────────
+    // ───────── 账本读口（count / clear） ─────────
 
-    /** `count` / `clear` 读同一份账本；空账本 ⇒ `0`（★ 非空路径需活 Player ⇒ 见类 javadoc ✗）。 */
+    /** `count` / `clear` 读同一份账本；空账本 ⇒ `0`（非空路径需活 Player，见类 javadoc）。 */
     @Test
     public void countAndClearReportTheEmptyLedger() {
         BuffComponent buffs = component();
@@ -152,9 +179,31 @@ public class BuffComponentOperationTest {
         assertEquals("0", buffs.onOperationCommand("count"));
     }
 
-    // ───────── ④ 未识别 / 拒绝（三态） ─────────
+    // ───────── 清负面效果（clear_debuff） ─────────
 
-    /** 未知动词（含**大小写不符**与多带参数的无参动词）⇒ 未识别 ⇒ `null`，且不改状态 ✓。 */
+    /**
+     * `clear_debuff` 只清**负面** buff：`STUN` / `SILENCE` 被清掉且闸门恢复，
+     * 免疫类 `IMMUNE` **不动**（它不是负面效果 —— 清了它，"给自己上免疫"就成了自毁）；
+     * 再清一次 ⇒ `0`（幂等，无副作用）。
+     */
+    @Test
+    public void clearDebuffClearsNegativeBuffsOnly() {
+        BuffComponent buffs = component();
+        assertEquals("100", buffs.onOperationCommand("add STUN 100"));
+        assertEquals("100", buffs.onOperationCommand("add SILENCE 100"));
+        assertEquals("0", buffs.onOperationCommand("add IMMUNE 0"));
+
+        assertEquals("写后状态 = 清掉的条数", "2", buffs.onOperationCommand("clear_debuff"));
+        assertEquals("false", buffs.onOperationCommand("has STUN"));
+        assertEquals("false", buffs.onOperationCommand("has SILENCE"));
+        assertEquals("闸门恢复", "true", buffs.onOperationCommand("can_cast"));
+        assertEquals("免疫不受影响", "true", buffs.onOperationCommand("has IMMUNE"));
+        assertEquals("再清一次无可清", "0", buffs.onOperationCommand("clear_debuff"));
+    }
+
+    // ───────── 未识别 / 拒绝（三态） ─────────
+
+    /** 未知动词（含**大小写不符**与多带参数的无参动词）⇒ 未识别 ⇒ `null`，且不改状态。 */
     @Test
     public void unknownVerbAndNoArgVerbsWithArgumentsAreRejected() {
         BuffComponent buffs = component();
@@ -163,10 +212,11 @@ public class BuffComponentOperationTest {
         assertNull("无参动词不得带参数", buffs.onOperationCommand("can_cast 1"));
         assertNull("无参动词不得带参数", buffs.onOperationCommand("count 1"));
         assertNull("无参动词不得带参数", buffs.onOperationCommand("clear 1"));
+        assertNull("无参动词不得带参数", buffs.onOperationCommand("clear_debuff 1"));
         assertEquals("拒绝不得改状态", "true", buffs.onOperationCommand("can_cast"));
     }
 
-    /** 空 / 空白 / null payload ⇒ 未识别 ⇒ `null`（javadoc 写明 ✓）。 */
+    /** 空 / 空白 / null payload ⇒ 未识别 ⇒ `null`（javadoc 写明）。 */
     @Test
     public void emptyPayloadIsRejected() {
         BuffComponent buffs = component();
@@ -175,7 +225,7 @@ public class BuffComponentOperationTest {
         assertNull("纯空白", buffs.onOperationCommand("   "));
     }
 
-    /** 参数非法：未知 buff id（含**大小写不符**）· 缺参 · 多参 · 非数字 · 负数 · 溢出 ⇒ `null` ✓。 */
+    /** 参数非法：未知 buff id（含**大小写不符**）· 缺参 · 多参 · 非数字 · 负数 · 溢出 ⇒ `null`。 */
     @Test
     public void malformedArgumentsAreRejected() {
         BuffComponent buffs = component();

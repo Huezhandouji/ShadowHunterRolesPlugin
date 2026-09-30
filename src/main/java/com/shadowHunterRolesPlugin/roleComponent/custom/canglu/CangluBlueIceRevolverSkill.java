@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.canglu;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
-import com.shadowHunterRolesPlugin.roleComponent.SoundUtil;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
+import com.shadowHunterRolesPlugin.core.util.SoundUtil;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
@@ -33,17 +33,17 @@ import java.util.UUID;
  *
  * <h2>玩法</h2>
  * <ul>
- *   <li><b>右键 = 射击</b>：每发子弹 **6 点物理伤害** + 击退；弹夹打空后若能量足够 ⇒ **自动开始换弹**；
- *       物品名上实时显示**剩余子弹数**；</li>
- *   <li><b>Q（丢弃键）= 换弹</b>：消耗 **8 点能量**，**瞬移到最近一名敌人身后**（半径 8），
- *       并对它造成 **4 点真实伤害**；★ 换弹会启动**冷却**（{@link #RELOAD_COOLDOWN_TICKS}）⇒
+ *   <li>右键 = 射击：每发子弹 6 点物理伤害 + 击退；弹夹打空后若能量足够则自动开始换弹；
+ *       物品名上实时显示剩余子弹数；</li>
+ *   <li>Q（丢弃键）= 换弹：消耗 8 点能量，瞬移到最近一名敌人身后（半径 8），
+ *       并对它造成 4 点真实伤害；换弹会启动冷却（{@link #RELOAD_COOLDOWN_TICKS}），
  *       图标按普通技能的冷却形态显示倒计时；</li>
- *   <li><b>子弹</b>：离开枪口后每 tick 前进，**撞墙**、**命中敌人**或**超时** ⇒ 销毁。</li>
+ *   <li>子弹：离开枪口后每 tick 前进，撞墙、命中敌人或超时则销毁。</li>
  * </ul>
  *
- * <h2>子弹为什么用 Marker 而不是真实投射物</h2>
- * Marker **无碰撞箱、不可被击退、不参与实体伤害**（纯视觉/坐标载体）⇒ 伤害与命中判定完全由本组件掌握，
- * 不会被原版投射物规则（爆炸、流体、被清除、`ProjectileHitEvent` 的取消）干扰 ✓。
+ * <h2>子弹用 Marker 而不是真实投射物</h2>
+ * Marker 无碰撞箱、不可被击退、不参与实体伤害（纯视觉/坐标载体），因此伤害与命中判定
+ * 完全由本组件掌握，不会被原版投射物规则（爆炸、流体、被清除、`ProjectileHitEvent` 的取消）干扰。
  *
  * <h2>数值都是常量（要调只改这一处）</h2>
  * 见下方 {@code MAX_MAGAZINE_CAPACITY} … {@code RELOAD_AUTO_CHECK_INTERVAL}。
@@ -58,30 +58,30 @@ public class CangluBlueIceRevolverSkill extends Skill {
     /** 换弹的能量消耗。 */
     private static final int RELOAD_ENERGY_CONSUMPTION = 8;
     /**
-     * **换弹冷却**（tick）：换弹成功后调 {@code startCooldown(RELOAD_COOLDOWN_TICKS)} ⇒
-     * 物品图标按普通技能的冷却形态显示（灰名 + `x.xs` 倒计时 + 状态行）✓，
+     * **换弹冷却**（tick）：换弹成功后调 {@code startCooldown(RELOAD_COOLDOWN_TICKS)}，则
+     * 物品图标按普通技能的冷却形态显示（灰名 + `x.xs` 倒计时 + 状态行），
      * 且期间框架按 {@code isCoolingDown()} 拦住再次施放（换弹占用时长 = 该值）。
      */
     private static final int RELOAD_COOLDOWN_TICKS = 40;
-    /** 每发子弹的**物理**伤害。 */
+    /** 每发子弹的物理伤害。 */
     private static final int BULLET_DAMAGE = 6;
     /** 每发子弹的击退强度（传给 {@code VitalsComponent#physicalDamage}）。 */
-    private static final double BULLET_KNOCKBACK = 1.0;
-    /** 换弹瞬移后对目标造成的**真实**伤害。 */
+    private static final double BULLET_KNOCKBACK = 0.1;
+    /** 换弹瞬移后对目标造成的真实伤害。 */
     private static final int RELOAD_TRUE_DAMAGE = 4;
     /** 换弹瞬移的搜索半径（格）。 */
     private static final double RELOAD_SEARCH_RADIUS = 8.0;
     /** 瞬移落点与目标之间的距离（"身后 1 格"）。 */
     private static final double RELOAD_BEHIND_DISTANCE = 1.0;
-    /** 子弹寿命（tick）⇒ 超时销毁，避免无限飞行。 */
+    /** 子弹寿命（tick），到点销毁，避免无限飞行。 */
     private static final int BULLET_MAX_LIVING_TIME = 20;
-    /** 子弹每 tick 前进的**步数**（步长 = 1 格 ⇒ 每 tick 最多 3 格）。 */
+    /** 子弹每 tick 前进的步数（步长 = 1 格，因此每 tick 最多 3 格）。 */
     private static final int BULLET_STEPS_PER_TICK = 3;
-    /** 命中判定半径（格）⇒ 圆心距小于它即算命中。 */
+    /** 命中判定半径（格）：圆心距小于它即算命中。 */
     private static final double BULLET_HIT_RADIUS = 0.6;
     /** 弹道粒子：每一步画几个点（纯视觉）。 */
     private static final int PARTICLES_PER_STEP = 5;
-    /** "弹夹空 + 有能量 ⇒ 自动换弹"的检查间隔（tick）。 */
+    /** "弹夹空 + 有能量则自动换弹"的检查间隔（tick）。 */
     private static final int RELOAD_AUTO_CHECK_INTERVAL = 20;
 
 
@@ -90,17 +90,17 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     /** 当前弹夹剩余子弹数。 */
     private int currentBulletCount;
-    /** 飞行中的子弹（**本组件私有**；实例销毁时必须全部清除 ⇒ 见 {@link #stop()}）。 */
+    /** 飞行中的子弹（本组件私有；实例销毁时必须全部清除，见 {@link #stop()}）。 */
     private final List<BulletData> bullets = new ArrayList<>();
     /** 自动换弹检查的节拍计数。 */
     private int autoReloadTick;
 
     /**
-     * **待办：换弹完成（冷却走完）那一刻要执行的瞬移 + 真伤**。
+     * **待办**：换弹完成（冷却走完）那一刻要执行的瞬移 + 真伤。
      *
-     * <p>★ 为什么要有它：瞬移必须发生在**换弹完成之后**（换弹期间不动位置），
-     * 而"完成"由**冷却到期**表达 ⇒ 到期检测在 {@link #update()} 里，执行体存在这里。
-     * <p>{@code null} = 没有待办（常态）⇒ 每 tick 的检测是**一次空引用比较**，零开销 ✓
+     * <p>瞬移必须发生在换弹完成之后（换弹期间不动位置），
+     * 而"完成"由冷却到期表达，因此到期检测在 {@link #update()} 里，执行体存在这里。
+     * <p>{@code null} = 没有待办（常态），每 tick 的检测只是一次空引用比较，零开销。
      */
     private PendingReload pendingReload;
 
@@ -117,7 +117,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
     private EnergyComponent energy;
     private CangluHysteriaPassive hysteriaPassive;
 
-    public CangluBlueIceRevolverSkill(String id, ComponentServices services, Specification specification) {
+    public CangluBlueIceRevolverSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
@@ -125,18 +125,19 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
         public Specification(){
             super(Component.text("澜冰左轮"),
-                    Component.text("苍鹭的左轮：右键射击，Q 换弹（消耗 8 能量并瞬移至最近敌人身后）"),
-                    //★ 冷却 = 0：本件是**武器**（靠弹夹节流），不是技能 ⇒ 若声明 600，图标会按 30 秒冷却画，
-                    //   而射击实际不受它拦（本组件不调 startCooldown）⇒ 声明与行为会不一致。
+                    List.of(Component.text("苍鹭的左轮：右键射击，Q 换弹（消耗 8 能量并瞬移至最近敌人身后）")),
+                    //冷却 = 0：本件是武器（靠弹夹节流），不是技能；若声明 600，
+                    //   图标会按 30 秒冷却画，而射击实际不受它拦（本组件不调 startCooldown），
+                    //   声明与行为会不一致。
                     0, 0, Material.CROSSBOW);
             //依赖 = 实取清单（`start()` 里的两个 get 调用点）
             requires(VitalsComponent.class).requires(EnergyComponent.class);
-            //SanTE 不在本组件实取清单里 ⇒ 保留旧骨架的"可选"声明（装配期不因它缺失而拒绝）
+            //SanTE 不在本组件实取清单里，声明为"可选"（装配期不因它缺失而拒绝）
             requiresOptional(SanTEComponent.class);
         }
 
         @Override
-        public CangluBlueIceRevolverSkill create(String id, ComponentServices services){
+        public CangluBlueIceRevolverSkill create(String id, ComponentServicesPort services){
             return new CangluBlueIceRevolverSkill(id, services, this);
         }
     }
@@ -145,8 +146,8 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     @Override
     protected void onAwake(){
-        //★ 本钩子由基类 `awake()` 调用（栏位登记已在基类里完成）⇒ **不能**也不需要调 super.awake()
-        //只做**不可见**的初始化（契约：awake 不得产生玩家可见副作用）
+        //本钩子由基类 `awake()` 调用（栏位登记已在基类里完成），不能也不需要调 super.awake()
+        //只做不可见的初始化（契约：awake 不得产生玩家可见副作用）
         currentBulletCount = MAX_MAGAZINE_CAPACITY;
         autoReloadTick = 0;
     }
@@ -160,12 +161,12 @@ public class CangluBlueIceRevolverSkill extends Skill {
     }
 
     /**
-     * **实例销毁**：★ 必须把**还在飞的子弹全部移除** —— Marker 是真实实体，
-     * 不清就会留在世界里（组件已死、再没人推它）⇒ 实体泄漏。
+     * **实例销毁**：必须把还在飞的子弹全部移除 —— Marker 是真实实体，
+     * 不清就会留在世界里（组件已死、再没人推它），造成实体泄漏。
      */
     @Override
     public void stop(){
-        //★ 丢弃换弹待办：实例已销毁 ⇒ 不该再瞬移/造成伤害（否则是"死后打人"）
+        //丢弃换弹待办：实例已销毁，不该再瞬移/造成伤害（否则是"死后打人"）
         pendingReload = null;
         for(BulletData bullet : bullets){
             bullet.getMarker().remove();
@@ -177,7 +178,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     @Override
     public void onCast(CastSignal signal) {
-        //★ **闸门**：被眩晕 / 沉默时不许开枪 / 换弹（禁用态靠闸门表达，与其余技能同一纪律）
+        //闸门：被眩晕 / 沉默时不许开枪 / 换弹（禁用态靠闸门表达，与其余技能同一纪律）
         if(!canUse()){
             return;
         }
@@ -192,9 +193,9 @@ public class CangluBlueIceRevolverSkill extends Skill {
     }
 
     /**
-     * **射击**：弹夹里有子弹 ⇒ 打一发（播放枪声）；**打空** ⇒ 尝试自动换弹
+     * **射击**：弹夹里有子弹则打一发（播放枪声）；打空则尝试自动换弹
      * （这一步让"子弹打光后自动开始换弹"成立）。
-     * <p>打空且**能量不足**时不换弹 —— 玩家之后可按 Q 手动重试。
+     * <p>打空且能量不足时不换弹 —— 玩家之后可按 Q 手动重试。
      */
     private void shoot(){
         if(currentBulletCount <= 0){
@@ -209,26 +210,26 @@ public class CangluBlueIceRevolverSkill extends Skill {
     }
 
     /**
-     * **换弹**：能量足够才成立（不足 ⇒ 什么都不做，玩家可见反馈是"没反应"）。
-     * <p>成立时按顺序：扣 8 能量 → **启动换弹冷却**（图标进入普通技能的冷却形态）→ 弹夹回满
-     * → **登记待办**（换弹完成那一刻再瞬移到目标身后并造成 4 点真实伤害）。
+     * **换弹**：能量足够才成立（不足则什么都不做，玩家可见反馈是"没反应"）。
+     * <p>成立时按顺序：扣 8 能量 → 启动换弹冷却（图标进入普通技能的冷却形态）→ 弹夹回满
+     * → 登记待办（换弹完成那一刻再瞬移到目标身后并造成 4 点真实伤害）。
      *
-     * <p>★ **瞬移发生在换弹【完成之后】**：目标在**登记时**锁定（此刻最近的敌人），
-     * 到期执行时才取它的**当时位置** —— 中途找不到/走远/目标消失 ⇒ 只跳过瞬移与真伤，**不影响换弹**。
-     * <p>★ **找不到敌人也照样换弹**（`pendingReload` 带 `null` 目标）——
+     * <p>瞬移发生在换弹【完成之后】：目标在登记时锁定（此刻最近的敌人），
+     * 到期执行时才取它的当时位置 —— 中途找不到/走远/目标消失则只跳过瞬移与真伤，不影响换弹。
+     * <p>找不到敌人也照样换弹（`pendingReload` 带 `null` 目标）——
      * 否则"附近没人时无法换弹"会很难用。
      */
     private void reload(){
         if(energy == null || !energy.tryConsume(RELOAD_ENERGY_CONSUMPTION)){
             return;
         }
-        //★ 换弹冷却：组件自己在"施放成功处"按声明值启动（框架不代启动）⇒ 图标显示倒计时 ✓
+        //换弹冷却：组件自己在"施放成功处"按声明值启动（框架不代启动），因此图标显示倒计时
         startCooldown(RELOAD_COOLDOWN_TICKS);
         currentBulletCount = MAX_MAGAZINE_CAPACITY;
 
         Player self = svc().self().player();
         Player nearest = self == null ? null : findNearestEnemy(self, RELOAD_SEARCH_RADIUS);
-        //★ 登记待办：目标在【此刻】锁定（可为 null = 附近没人，只换弹不瞬移）
+        //登记待办：目标在【此刻】锁定（可为 null = 附近没人，只换弹不瞬移）
         pendingReload = new PendingReload(nearest == null ? null : nearest.getUniqueId());
 
         if (self != null) {
@@ -239,7 +240,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
     /**
      * **冷却走完那一刻的收尾**（每 tick 检测）：执行 {@link #reload()} 登记的待办。
      *
-     * <p>判定 = "有待办 **且** 已不在冷却中"；执行后立刻清空待办 ⇒ **恰好执行一次** ✓
+     * <p>判定 = "有待办且已不在冷却中"；执行后立刻清空待办，因此恰好执行一次
      * （若被打断 —— 例如组件 {@code stop()} —— 待办随之丢弃，见 {@link #stop()}）。
      */
     private void finishPendingReload(){
@@ -253,24 +254,24 @@ public class CangluBlueIceRevolverSkill extends Skill {
         if(self == null){
             return;
         }
-        //★ 声音属于**换弹完成本身**（与"有没有目标"无关）⇒ 必须在所有 early-return 之前播；
+        //声音属于换弹完成本身（与"有没有目标"无关），必须在所有 early-return 之前播；
         //  否则附近没人时换弹会【没声音】（那是另一码事，跟瞬移无关）
         SoundUtil.playGunReloadSound(self);
 
         if(pending.target == null){
-            return;      //附近没人 ⇒ 只换弹：不瞬移、不真伤
+            return;      //附近没人则只换弹：不瞬移、不真伤
         }
         Player target = Bukkit.getPlayer(pending.target);
         if(target == null || !target.isOnline() || target.isDead()){
             return;
         }
 
-        //★ 取【执行时】的位置：目标在这 2 秒里可能已经移动 —— 落点必须贴合它现在的朝向 ✓
+        //取【执行时】的位置：目标在这 2 秒里可能已经移动 —— 落点必须贴合它现在的朝向
         if(!target.getWorld().equals(self.getWorld())){
             return;
         }
         if(self.getLocation().distanceSquared(target.getLocation()) > RELOAD_SEARCH_RADIUS * RELOAD_SEARCH_RADIUS){
-            return;      //走远了 ⇒ 只换弹，不瞬移
+            return;      //走远了则只换弹，不瞬移
         }
 
         teleportBehind(self, target);
@@ -283,11 +284,11 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     /**
      * **自动换弹检查**（每 {@link #RELOAD_AUTO_CHECK_INTERVAL} tick 一次）：
-     * 只有当"弹夹空 **且** 不在冷却中"时才尝试。
+     * 只有当"弹夹空且不在冷却中"时才尝试。
      *
-     * <p>★ **不判断"是否手持本左轮"**：弹夹空就自动换弹（枪收在背包里、或正拿着别的东西时也一样）。
-     * 代价 = 能量可能在玩家没留意时被扣掉 —— 这是**有意的**口径。
-     * <p>★ 能量是否够由 {@link #reload()} 自己判（唯一判定点）⇒ 这里不重复查。
+     * <p>不判断"是否手持本左轮"：弹夹空就自动换弹（枪收在背包里、或正拿着别的东西时也一样）。
+     * 代价 = 能量可能在玩家没留意时被扣掉 —— 这是有意的口径。
+     * <p>能量是否够由 {@link #reload()} 自己判（唯一判定点），这里不重复查。
      */
     private void tryAutoReload(){
         if(currentBulletCount > 0 || energy == null || isCoolingDown()){
@@ -299,7 +300,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     @Override
     public void update() {
-        //★ 换弹完成检测：冷却走完那一刻执行待办的瞬移 + 真伤（见 finishPendingReload）
+        //换弹完成检测：冷却走完那一刻执行待办的瞬移 + 真伤（见 finishPendingReload）
         finishPendingReload();
 
         if(autoReloadTick++ >= RELOAD_AUTO_CHECK_INTERVAL){
@@ -311,7 +312,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
         while(it.hasNext()){
             BulletData bullet = it.next();
             if(!advanceBullet(bullet)){
-                //撞墙 / 命中敌人 / 超时 ⇒ 销毁（三种情况都在 advanceBullet 里判定）
+                //撞墙 / 命中敌人 / 超时则销毁（三种情况都在 advanceBullet 里判定）
                 bullet.getMarker().remove();
                 it.remove();
             }
@@ -321,17 +322,17 @@ public class CangluBlueIceRevolverSkill extends Skill {
     /**
      * **推进一颗子弹**；返回 {@code false} = 该销毁。
      *
-     * <p>逐步（步长 1 格）推进，**每一步都判定**：
-     * ① 超时（{@link #BULLET_MAX_LIVING_TIME}）⇒ 销毁；
-     * ② 撞墙（脚下那格**不可通行**）⇒ 销毁；
-     * ③ 命中敌对玩家（圆心距 < {@link #BULLET_HIT_RADIUS}）⇒ 造成物理伤害 + 击退 ⇒ 销毁。
+     * <p>逐步（步长 1 格）推进，每一步都判定：
+     * ① 超时（{@link #BULLET_MAX_LIVING_TIME}）则销毁；
+     * ② 撞墙（脚下那格不可通行）则销毁；
+     * ③ 命中敌对玩家（圆心距 < {@link #BULLET_HIT_RADIUS}）则造成物理伤害 + 击退，随后销毁。
      *
-     * <p>★ 逐步判定的理由：一 tick 走 3 格，若只在终点判定，会**穿过**薄墙与敌人（隧穿）。
+     * <p>逐步判定的理由：一 tick 走 3 格，若只在终点判定，会穿过薄墙与敌人（隧穿）。
      */
     private boolean advanceBullet(BulletData bullet){
         Marker marker = bullet.getMarker();
         if(marker == null || !marker.isValid()){
-            return false;     //已被外部清除（例如世界卸载）⇒ 直接销毁
+            return false;     //已被外部清除（例如世界卸载）则直接销毁
         }
         if(bullet.getLivingTime() >= BULLET_MAX_LIVING_TIME){
             return false;
@@ -366,7 +367,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     // ───────── 查敌 / 瞬移 ─────────
 
-    /** **半径内最近的敌对玩家**（无 ⇒ {@code null}）。 */
+    /** 半径内最近的敌对玩家（无则 {@code null}）。 */
     private Player findNearestEnemy(Player self, double radius){
         Player nearest = null;
         double best = Double.MAX_VALUE;
@@ -387,7 +388,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
     }
 
     /**
-     * **瞬移到目标身后**（"身后" = 目标**朝向的反方向**一格）。
+     * **瞬移到目标身后**（"身后" = 目标朝向的反方向一格）。
      * <p>落点若不可站立（墙里），保持原位不动 —— 宁可不瞬移，也不把玩家塞进方块。
      */
     private void teleportBehind(Player self, Player target){
@@ -395,13 +396,13 @@ public class CangluBlueIceRevolverSkill extends Skill {
         Location destination = target.getLocation().clone().add(behind);
         destination.setDirection(target.getLocation().getDirection());
         if(!destination.getBlock().isPassable() || !destination.clone().add(0, 1, 0).getBlock().isPassable()){
-            return;     //落点被占（含头部空间）⇒ 放弃瞬移
+            return;     //落点被占（含头部空间）则放弃瞬移
         }
         self.teleport(destination);
         self.getWorld().playSound(self.getLocation(), Sound.ITEM_TRIDENT_RETURN, 1, 1.4f);
     }
 
-    /** 该位置附近是否有敌对玩家（命中判定用）；有 ⇒ 返回**最近的那一个**。 */
+    /** 该位置附近是否有敌对玩家（命中判定用）；有则返回最近的那一个。 */
     private Player firstHostileIn(Location location){
         Player self = svc().self().player();
         BoundingBox box = BoundingBox.of(location, BULLET_HIT_RADIUS, BULLET_HIT_RADIUS, BULLET_HIT_RADIUS);
@@ -423,7 +424,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
         return nearest;
     }
 
-    /** 从枪口生成一颗子弹（方向 = 玩家**视线**方向）。 */
+    /** 从枪口生成一颗子弹（方向 = 玩家视线方向）。 */
     private void createBullet(){
         Player self = svc().self().player();
         Location muzzle = self.getEyeLocation();
@@ -435,10 +436,10 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     /**
      * **物品增强**：先取基类的完整画法（三态材质 · 名称着色 · 冷却 `x.xs` 倒计时 · 状态行 · lore ·
-     * **识别键 PDC**），再在**名称末尾**追加剩余子弹数。
+     * 识别键 PDC），再在名称末尾追加剩余子弹数。
      *
-     * <p>★ **为什么不重写整套三态画法**：那套逻辑（含写识别键这一步）是**冻结面**，
-     * 复制一份会立刻产生"两处实现漂移" ⇒ 这里只做**取回 + 追加后缀**，其余原样保留 ✓。
+     * <p>不重写整套三态画法：那套逻辑（含写识别键这一步）是冻结面，
+     * 复制一份会立刻产生"两处实现漂移"，因此这里只做取回 + 追加后缀，其余原样保留。
      *
      * <p>显示形态：`<基类名> (5/8)` —— 打空时整段变红（一眼看出需要换弹）。
      */
@@ -467,13 +468,13 @@ public class CangluBlueIceRevolverSkill extends Skill {
         return buff == null || buff.canUseMainWeapon();
     }
 
-    /** 本组件**不参与能量维度**（声明耗能 0）⇒ 回声明值。 */
+    /** 本组件不参与能量维度（声明耗能 0），故回声明值。 */
     @Override
     protected int currentEnergy() {
         return getEnergyCost();
     }
 
-    /** 飞行中的子弹数据（**纯数据**；销毁时由调用方负责 {@code marker.remove()}）。 */
+    /** 飞行中的子弹数据（纯数据；销毁时由调用方负责 {@code marker.remove()}）。 */
     private static final class BulletData {
         private final Marker marker;
         private final Vector direction;

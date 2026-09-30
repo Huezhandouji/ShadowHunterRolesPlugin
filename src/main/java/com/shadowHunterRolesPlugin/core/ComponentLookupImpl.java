@@ -1,8 +1,8 @@
 package com.shadowHunterRolesPlugin.core;
 
 import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
-import com.shadowHunterRolesPlugin.core.ports.ComponentLookup;
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentLookupPort;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 
 import java.util.ArrayList;
@@ -12,38 +12,38 @@ import java.util.function.Function;
 import java.util.logging.Logger;
 
 /**
- * {@link ComponentLookup} 的独立适配器（包级私有；禁止 {@code RoleInstance} 直接 implements 端口）。
+ * {@link ComponentLookupPort} 的独立适配器（包级私有；禁止 {@code RoleInstance} 直接 implements 端口）。
  * 反向引用只存在这里。
- * <p><b>：本类成为"组件服务"的唯一实现点</b> —— 查找四件（类型第一个 / 类型全部 / id / 快照）
- * 直接转调 {@link ComponentRegistry}；动态三件（增 / 插位 / 删）在这里**编排**：
+ * <p>本类是"组件服务"的唯一实现点：查找四件（类型第一个 / 类型全部 / id / 快照）
+ * 直接转调 {@link ComponentRegistry}；动态三件（增 / 插位 / 删）在这里编排：
  * <pre>
- * add / insertAt : ① 校验（id 非空、描述符非空、**不在遍历窗口内**、下标合法）
- * ② 描述符 bindId + freeze ⇒ 拿到 (工厂, 提供类型, 必需依赖) 三元组
- * ③ **依赖预检**：必需依赖在容器内无人提供 ⇒ 拒绝（消息点名缺的类型）
- * ④ 取该 id 的服务集（servicesFactory，与装配期同一个工厂 ⇒ 组件拿到一对一端口）
+ * add / insertAt : ① 校验（id 非空、描述符非空、不在遍历窗口内、下标合法）
+ * ② 描述符 bindId + freeze，得到 (工厂, 提供类型, 必需依赖) 三元组
+ * ③ 依赖预检：必需依赖在容器内无人提供，则拒绝（消息点名缺的类型）
+ * ④ 取该 id 的服务集（servicesFactory，与装配期同一个工厂，组件拿到一对一端口）
  * ⑤ 构造 → ⑥ 注册/插位（连声明一起登记）→ ⑦ awake() → ⑧ start()
- * ⑨ 任一步失败 ⇒ 回滚（stop + 回收资源 + 移出容器）后原样抛出
- * remove : ① 按 id 找（**添加顺序第一个**）→ ② **反向依赖检查**：有阻止者 ⇒ 记日志 + 抛异常
+ * ⑨ 任一步失败，回滚（stop + 回收资源 + 移出容器）后原样抛出
+ * remove : ① 按 id 找（添加顺序第一个）→ ② 反向依赖检查：有阻止者则记日志 + 抛异常
  * ③ stop() → ④ 回收该组件资源 → ⑤ 移出容器
  * </pre>
- * ① 校验里**删掉了"id 未被占用"那一条** ⇒ **同一 id 可添加多次**；
- * ② 新增 {@link #getAll(Class)} 转发；③ {@link #get(Class)} 的语义按真实行为（**添加顺序第一个**）写明。
- * <p><b>为什么服务集由工厂注入而不是本类自造</b>：服务集与组件**一对一**（冷却端口按 id 选表、定时器端口
- * 按 id 定位资源表）⇒ 必须与装配期走**同一条**构造路径（{@code RoleInstance#createServices}）。
+ * ① 校验里删掉了"id 未被占用"那一条，同一 id 可添加多次；
+ * ② 新增 {@link #getAll(Class)} 转发；③ {@link #get(Class)} 的语义按真实行为（添加顺序第一个）写明。
+ * <p><b>为什么服务集由工厂注入而不是本类自造</b>：服务集与组件一对一（冷却端口按 id 选表、定时器端口
+ * 按 id 定位资源表），必须与装配期走同一条构造路径（{@code RoleInstance#createServices}）。
  * <p><b>为什么删除前必须算反向依赖</b>：删掉一个被他人 {@code requires} 的组件后，
- * 运行期 {@code getComponent} 就取不到它 ⇒ "必需"会**静默失效**。反向依赖表**从声明求得**
+ * 运行期 {@code getComponent} 就取不到它，"必需"会静默失效。反向依赖表从声明求得
  * （{@code ComponentRegistry#requiredBy}），不手工维护。
- * <p><b>可测性</b>：本类只依赖 {@code ComponentRegistry} + 一个 {@code String -> ComponentServices} 函数 +
- * 一个 {@link Logger}，**不碰 Bukkit** ⇒ 可以脱离服务器实例化并驱动（探针口径）。
+ * <p><b>可测性</b>：本类只依赖 {@code ComponentRegistry} + 一个 {@code String -> ComponentServicesPort} 函数 +
+ * 一个 {@link Logger}，不碰 Bukkit，因此可以脱离服务器实例化并驱动（探针口径）。
  */
-final class ComponentLookupImpl implements ComponentLookup {
+final class ComponentLookupImpl implements ComponentLookupPort {
 
     private final ComponentRegistry registry;
-    private final Function<String, ComponentServices> servicesFactory;
+    private final Function<String, ComponentServicesPort> servicesFactory;
     private final Logger logger;
 
     ComponentLookupImpl(ComponentRegistry registry,
-                        Function<String, ComponentServices> servicesFactory,
+                        Function<String, ComponentServicesPort> servicesFactory,
                         Logger logger) {
         this.registry = registry;
         this.servicesFactory = servicesFactory;
@@ -66,10 +66,10 @@ final class ComponentLookupImpl implements ComponentLookup {
     }
 
  /**
- * **按 id 取全部**：与 {@link #getAll(Class)} 对称。
- * <p><b>实现只用 {@code registry} 的公开读口</b>（{@code all()} 线性过滤）⇒ **不改 {@code core/component/}**
- * （它在 out of scope）；顺序 = 容器当前序 = **添加顺序**；无人符合 ⇒ **空列表**；
- * {@code id == null} ⇒ 空列表（与 {@code getById(null) == null} 同口径：都不抛）。
+ * 按 id 取全部：与 {@link #getAll(Class)} 对称。
+ * <p><b>实现只用 {@code registry} 的公开读口</b>（{@code all()} 线性过滤），因此不改 {@code core/component/}
+ * （它在 out of scope）；顺序 = 容器当前序 = 添加顺序；无人符合则空列表；
+ * {@code id == null} 也返回空列表（与 {@code getById(null) == null} 同口径：都不抛）。
  */
     @Override
     public List<RoleComponent> getAllById(String id) {
@@ -103,7 +103,7 @@ final class ComponentLookupImpl implements ComponentLookup {
         if (specification == null) {
             throw new NullPointerException("specification");
         }
- //检查先于构造：遍历窗口内**不做任何构造**（否则会造出一个马上要回滚的实例）
+ //检查先于构造：遍历窗口内不做任何构造（否则会造出一个马上要回滚的实例）
         if (registry.isIterating()) {
             throw new IllegalStateException("Cannot add component '" + id + "' while the container is iterating "
                     + "(the framework is broadcasting component hooks); defer it until after the broadcast.");
@@ -111,9 +111,7 @@ final class ComponentLookupImpl implements ComponentLookup {
         if (index < 0 || index > registry.size()) {
             throw new IndexOutOfBoundsException("Component index " + index + " is out of range [0, " + registry.size() + "].");
         }
- //**id 唯一性检查已删除** —— 同一个 id 可以添加多次。
- //（这里抛 "Component id already registered: " + id；只删 ComponentRegistry 里那一条
- // 是不够的，因为运行期 add 走的是本方法 ⇒ 两处都必须放开）
+ //id 唯一性检查已删除：同一个 id 可以添加多次。
 
  //声明来源 = 描述符（与装配期同一个 freeze() 快照）
         specification.bindId(id);
@@ -130,11 +128,10 @@ final class ComponentLookupImpl implements ComponentLookup {
             throw new IllegalStateException(message);
         }
 
-        ComponentServices services = servicesFactory.apply(id);
+        ComponentServicesPort services = servicesFactory.apply(id);
         T component = create(snapshot, id, services);
- //：原"创建后绑定"的**运行期落点已整体删除** （它唯一的绑定目标是计时端口，
- //端口面 已清理 ⇒ 该调用早已是 no-op）。组件侧改为各自在 `start()` 解析并持有强类型组件
- //引用；此处**不再有**任何绑定动作。
+ //原"创建后绑定"的运行期落点已删除（它唯一的绑定目标是计时端口，该调用早已是 no-op）。
+ // 组件侧改为各自在 `start()` 解析并持有强类型组件引用，此处不再有任何绑定动作。
         try {
             registry.insert(index, component, declaration);
             component.awake();
@@ -167,9 +164,9 @@ final class ComponentLookupImpl implements ComponentLookup {
     }
 
     /**
-     * **按类型删除添加顺序第一个匹配的组件**（不看 id）。
-     * <p>守卫、顺序与 {@link #remove(Class, String)} **逐条一致** —— 本方法就是它把 id 条件放宽为
-     * "任意 id"（`firstMatch(type, null)` ⇒ 只判可赋值性）。
+     * 按类型删除添加顺序第一个匹配的组件（不看 id）。
+     * <p>守卫、顺序与 {@link #remove(Class, String)} 逐条一致 —— 本方法就是它把 id 条件放宽为
+     * "任意 id"（`firstMatch(type, null)`，只判可赋值性）。
      */
     @Override
     public <T> boolean remove(Class<T> type) {
@@ -185,9 +182,9 @@ final class ComponentLookupImpl implements ComponentLookup {
     }
 
     /**
-     * **按（类型 + id）删全部**：逐个守卫 ⇒ **有阻止者的跳过**、其余照删，返回被跳过者。
+     * 按（类型 + id）删全部：逐个守卫，有阻止者的跳过、其余照删，返回被跳过者。
      *
-     * <p>★ 检查（遍历窗口 + type 非空）**先于任何删除** ⇒ 抛异常时**一个都不删**（不留半态）。
+     * <p>检查（遍历窗口 + type 非空）先于任何删除，因此抛异常时一个都不删（不留半态）。
      */
     @Override
     public <T> List<RoleComponent> removeAll(Class<T> type, String id) {
@@ -211,10 +208,10 @@ final class ComponentLookupImpl implements ComponentLookup {
     }
 
     /**
-     * **添加顺序第一个**匹配的组件；无 ⇒ {@code null}。
+     * 添加顺序第一个匹配的组件；无则 {@code null}。
      *
-     * <p>判据：{@code type.isInstance(candidate)}（**可赋值性** ⇒ 父类/接口查询命中子类实例）**且**
-     * {@code id == null || id.equals(candidate.getId())} —— ★ `id == null`（或空表）⇒ **只判类型**，
+     * <p>判据：{@code type.isInstance(candidate)}（可赋值性，因此父类/接口查询命中子类实例）且
+     * {@code id == null || id.equals(candidate.getId())} —— `id == null`（或空表）时只判类型，
      * 这正是 {@link #remove(Class)} 与 {@link #remove(Class, String)} 共用的原因。
      */
     private <T> RoleComponent firstMatch(Class<T> type, String id) {
@@ -230,8 +227,8 @@ final class ComponentLookupImpl implements ComponentLookup {
     }
 
     /**
-     * **带反向依赖守卫地删一个实例**（单数版与复数版共用的唯一实现）：
-     * 有阻止者 ⇒ 记日志并回 {@code false}（**不删、无副作用**）；否则 {@code stop()} → 回收资源 → 移出容器。
+     * 带反向依赖守卫地删一个实例（单数版与复数版共用的唯一实现）：
+     * 有阻止者则记日志并回 {@code false}（不删、无副作用）；否则 {@code stop()} → 回收资源 → 移出容器。
      */
     private boolean removeChecked(RoleComponent target) {
         if (target == null) {
@@ -258,13 +255,13 @@ final class ComponentLookupImpl implements ComponentLookup {
 
     @Override
     public boolean remove(String id) {
- //：id 可重复 ⇒ 目标是**添加顺序第一个**同 id 者（与 getById 同目标；
- //反向依赖表也按那一个实例计算 ⇒ 守卫保护的正是"会被删掉的那一个"），其余同 id 者留在容器里
+ //id 可重复，目标是添加顺序第一个同 id 者（与 getById 同目标；
+ //反向依赖表也按那一个实例计算，因此守卫保护的正是"会被删掉的那一个"），其余同 id 者留在容器里
         RoleComponent component = registry.getById(id);
         if (component == null) {
             return false;
         }
- //删除前先算反向依赖（从声明求得）—— 有阻止者 ⇒ 记日志 + 拒绝（不删、不留半态）
+ //删除前先算反向依赖（从声明求得）—— 有阻止者则记日志 + 拒绝（不删、不留半态）
         Map<String, Class<? extends RoleComponent>> blockers = registry.requiredBy(id);
         if (!blockers.isEmpty()) {
             StringBuilder detail = new StringBuilder();
@@ -288,7 +285,7 @@ final class ComponentLookupImpl implements ComponentLookup {
  /** 描述符快照 → 组件实例（快照里的工厂类型是通配，这里收敛到 {@code T}）。 */
     @SuppressWarnings("unchecked")
     private static <T extends RoleComponent> T create(RoleComponent.Specification.Snapshot snapshot,
-                                                      String id, ComponentServices services) {
+                                                      String id, ComponentServicesPort services) {
         T component = (T) snapshot.getFactory().create(id, services);
         if (component == null) {
             throw new IllegalStateException("Component factory for '" + id + "' returned null.");

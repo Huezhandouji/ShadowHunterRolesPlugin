@@ -5,10 +5,10 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /**
- * T-2（t50 §4）：锁住 {@link IconState} 的两件事 —— **判定顺序** 与 **三态材质映射**。
- * <p>为什么是单测（t50 §1 第 4/5 条）：判定与映射都在 {@link IconState} 这个**纯值对象**上
+ * 锁住 {@link IconState} 的两件事 —— **判定顺序** 与 **三态材质映射**。
+ * <p>能单测的原因：判定与映射都在 {@link IconState} 这个**纯值对象**上
  * （`of(...)` / `material(...)` 都不碰 Bukkit 注册表、不构物品）⇒ 离线可跑；运行侧只剩
- * "值出现在成品物品上"（外观取证，见 t43/t46 的三态 × 两 kind 六维对照）。
+ * "值出现在成品物品上"（外观取证）。
  * <p>**顺序是这里最贵的判据**：`of(true,false,5,10)` 同时满足"被禁用"与"能量不足"，
  * 断言它得 `DISABLED` 就把"禁用先于能量不足"钉住了（若两段次序被交换 ⇒ 立即红）。
  */

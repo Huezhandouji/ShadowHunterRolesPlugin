@@ -49,7 +49,7 @@ public class MainWeaponListener implements Listener {
 
         //取消原版事件
         event.setCancelled(true);
-        //★ 攻击管道**归本 listener**（容器已删 `handleAttack`）：按 id 取通用面 → 判类型 → 受保护调用 → 请求重绘
+        //攻击管道归本 listener：按 id 取通用面 → 判类型 → 受保护调用 → 请求重绘
         RoleComponent component = instance.componentRegistry().getById(weaponId);
         if(!(component instanceof ActiveComponent active)) return;
         instance.invokeComponentHook(component, "onAttack", () -> active.onAttack(new AttackSignal(victim)));
@@ -57,10 +57,10 @@ public class MainWeaponListener implements Listener {
     }
 
     /**
-     * **施放管道**（★ 原先住在容器 `handleCast`，现归本 listener）。
+     * 施放管道（归本 listener）。
      * <p>读物品 id → 按 id 取通用面 → 判「声明了主动入口」→ 判冷却 → 受保护调用 → 请求重绘。
      *
-     * @return 是否真的施放了（未命中 / 未声明主动入口 / 冷却中 ⇒ {@code false}）
+     * @return 是否真的施放了（未命中 / 未声明主动入口 / 冷却中则 {@code false}）
      */
     private boolean cast(RoleInstance instance, String weaponId, CastTrigger trigger){
         RoleComponent component = instance.componentRegistry().getById(weaponId);
@@ -71,9 +71,9 @@ public class MainWeaponListener implements Listener {
         return true;
     }
 
-    /** **请求热键栏重绘**（★ 按 id 取渲染组件后调它的通用面；容器不再代劳）。 */
+    /** 请求热键栏重绘（按 id 取渲染组件后调它的通用面；容器不代劳）。 */
     private void requestRepaint(RoleInstance instance){
-        //★ 渲染组件**由本 listener 自己按 id 取**（容器不持有它、也不认识它）
+        //渲染组件由本 listener 自己按 id 取（容器不持有它、也不认识它）
         RoleComponent render = instance.componentRegistry().getById(HotbarRenderComponent.ID);
         if(render instanceof HotbarRenderComponent hotbar) hotbar.markDirty();
     }
@@ -122,7 +122,7 @@ public class MainWeaponListener implements Listener {
         cast(instance, weaponId, CastTrigger.RIGHT_CLICK);
     }
 
-    //ignoreCancelled：已取消的丢弃不重复取消、也不触发施法 ✓
+    //ignoreCancelled：已取消的丢弃不重复取消、也不触发施法
     @EventHandler(ignoreCancelled = true)
     public void onQDrop(PlayerDropItemEvent event){
         Player player = event.getPlayer();
@@ -150,7 +150,7 @@ public class MainWeaponListener implements Listener {
 
     }
 
-    //ignoreCancelled：已取消的点击不重复取消 ✓
+    //ignoreCancelled：已取消的点击不重复取消
     @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event){
         if(!(event.getWhoClicked() instanceof Player player)) return;

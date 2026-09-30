@@ -6,7 +6,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassiv
 
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
@@ -31,28 +31,27 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * T-5（t50 §4）：锁住**能力模型的真值表**（t50 §1 第 ⑪ 条 = **可单测**）。
- * <p>为什么能单测：断言只问"这个对象实现了哪些能力接口"与"能力自报的真值"，不碰 Bukkit 注册表。
- * 组件的构造器只把 id / 服务集 / 描述符存起来（**不做副作用**）⇒ 可以用一个**空的 {@code ComponentServices}**
- * 把它们造出来（服务集从不被读：本测试不调 {@code update()} / {@code buildItem()}）。
- * 冻结件 §4 T-5 明写"本例只需手写一个 ComponentServices 空桩"⇒ 这是被冻结件批准的形态，不是绕过。
- * <p>真值表冻结的是**能力模型**：谁产出物品 = 主动组件家族（技能 ∪ 主武器）；"外观是否依赖活状态" =
- * 组件**自报**的 {@code dependsOnLiveState()}（框架不再点名任何具体组件类）。`ExampleSelfRefreshingSkill`
- * **故意**是"产出物品但外观不依赖活状态"的那一个 —— 它是这个模型存在的理由，本测试把它显式钉住。
- * <p><b>判据形态</b>：热键栏三件事已由"能力接口"改为"渲染组件按组件读的数据" ✗ ⇒ 本测试的判据是
- * 「是不是主动组件家族」+「自报的真值」，**不再**问"实现了哪个接口"（那三个接口已删除 ✗）。
- * 接受集与旧形态**逐字相同**（旧接口的唯一实现者就是主动组件家族）。
+ * 锁住能力模型的真值表。
+ * <p>能单测的原因：断言只问"这个对象实现了哪些能力接口"与"能力自报的真值"，不碰 Bukkit 注册表。
+ * 组件的构造器只把 id / 服务集 / 描述符存起来（**不做副作用**），因此可以用一个**空的
+ * {@code ComponentServicesPort}** 把它们造出来（服务集从不被读：本测试不调 {@code update()} /
+ * {@code buildItem()}）。
+ * <p>真值表冻结的是能力模型：谁产出物品 = 主动组件家族（技能 ∪ 主武器）；"外观是否依赖活状态" =
+ * 组件自报的 {@code dependsOnLiveState()}（框架不再点名任何具体组件类）。{@code ExampleSelfRefreshingSkill}
+ * 故意是"产出物品但外观不依赖活状态"的那一个 —— 它是这个模型存在的理由，本测试把它显式钉住。
+ * <p>判据形态：热键栏那三件事已不再是"实现了哪个接口"（那三个接口已删除），而改为
+ * "是不是主动组件家族" + "自报的真值"；接受集与旧形态逐字相同（旧接口的唯一实现者就是主动组件家族）。
  */
 public class CapabilityDispatchTest {
 
     /** 空服务集：三个成员全 null，构造组件时只被存下来（本测试从不读它）。 */
-    private static ComponentServices inertServices() {
-        return new ComponentServices(null, null, null);
+    private static ComponentServicesPort inertServices() {
+        return new ComponentServicesPort(null, null, null);
     }
 
-    /** 全部**既有**具体组件（含 t46 的示例组件）+ 每个组件的冻结期望（是否产出物品、是否依赖活状态）。 */
+    /** 全部**既有**具体组件（含示例组件）+ 每个组件的冻结期望（是否产出物品、是否依赖活状态）。 */
     private static Map<String, Object> components() {
-        ComponentServices svc = inertServices();
+        ComponentServicesPort svc = inertServices();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("MeiqiheziBloodySlashSkill", new MeiqiheziBloodySlashSkill("t_1", svc, new MeiqiheziBloodySlashSkill.Specification()));
         out.put("MeiqiheziCircleSlashSkill", new MeiqiheziCircleSlashSkill("t_2", svc, new MeiqiheziCircleSlashSkill.Specification()));

@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import org.junit.Test;
 
@@ -14,39 +14,39 @@ import static org.junit.Assert.assertTrue;
 /**
  * `EnergyComponent` 的两族**离线**单测：
  * <ol>
- *   <li><b>组件操作面</b>（payload 解析与返回值语义 ✓）：返回类型 {@code boolean → String} 之后
- *       断言一律为**字符串断言** ✓；</li>
- *   <li><b>监听器列表</b>（用户裁定「改用监听器列表，其他类只需要添加 {@code Consumer}」✓）。</li>
+ *   <li><b>组件操作面</b>（payload 解析与返回值语义）：返回类型 {@code boolean → String} 之后
+ *       断言一律为**字符串断言**；</li>
+ *   <li><b>监听器列表</b>（用户裁定「改用监听器列表，其他类只需要添加 {@code Consumer}」）。</li>
  * </ol>
  *
- * <p><b>判据来源</b>：设计定案 {@code debug-logs/测试记录/阶段13/阶段13-组件操作面-设计定案.md}
- * §2（接口契约）· §10.2 护栏①（**冻结为单方法**）· §10.4（首 token 必为动词 · grammar 写进组件 javadoc ✓）；
- * 返回约定：{@code null} = 未识别/拒绝 ✗ · {@code ""} = 已识别无回值 ✓ ·
- * **非空串** = 规范化值 ✓ ⇒ 能量组件一律回"写后/当前值"（它总有一个可回的值，**从不**回空串 ✓）。
+ * <p>判据：设计定案 {@code debug-logs/测试记录/阶段13/阶段13-组件操作面-设计定案.md} §2（接口契约）·
+ * §10.2 护栏①（**冻结为单方法**）· §10.4（首 token 必为动词 · grammar 写进组件 javadoc）；
+ * 返回约定：{@code null} = 未识别/拒绝 · {@code ""} = 已识别无回值 ·
+ * **非空串** = 规范化值 ⇒ 能量组件一律回"写后/当前值"（它总有一个可回的值，**从不**回空串）。
  *
- * <p><b>为什么能离线跑</b>：能量组件是**纯状态组件** —— 构造期只要一个**空服务集桩**（冻结件 §4 T-5
- * 批准的形态，与 {@code CapabilityDispatchTest} / {@code StateBindingByInstanceTest} 同一做法 ✓）
- * 与一个**可空的监听器**（传 {@code null} ⇒ 不登记任何监听 ✓）⇒ 不碰 Bukkit、无副作用 ✓。
+ * <p>能离线跑的原因：能量组件是**纯状态组件** —— 构造期只要一个**空服务集桩**
+ * （与 {@code CapabilityDispatchTest} / {@code StateBindingByInstanceTest} 同一做法）
+ * 与一个**可空的监听器**（传 {@code null} ⇒ 不登记任何监听）⇒ 不碰 Bukkit、无副作用。
  *
- * <p><b>判据边界（如实申报）</b>：本类**不**覆盖"变更通知是否真的触发置脏/事件"（那由容器注册的监听器
- * 承担，属运行级装配面 ✗）；也不覆盖指令面/派发器与 {@code RoleAPI} 收口（归后续片 ✗）。
+ * <p>判据边界（如实申报）：本类**不**覆盖"变更通知是否真的触发置脏/事件"（那由容器注册的监听器
+ * 承担，属运行级装配面）；也不覆盖指令面/派发器与 {@code RoleAPI} 收口。
  *
- * <p><b>订阅面的形态</b>：本组件持 **JDK {@code Consumer} 监听器列表** ✓（旧嵌套 {@code ChangeSink} 接口
- * 与旧单播字段已删除 ✗）⇒ 本类的记录型假件用 {@code Consumer}（{@link RecordingListener} ✓，
- * 比"写一个实现类"更简单 ✓）。
+ * <p>订阅面的形态：本组件持 **JDK {@code Consumer} 监听器列表**（旧嵌套 {@code ChangeSink} 接口
+ * 与旧单播字段已删除）⇒ 本类的记录型假件用 {@code Consumer}（{@link RecordingListener}，
+ * 比"写一个实现类"更简单）。
  */
 public class EnergyComponentOperationTest {
 
-    /** 与 {@code RoleInstance} 构造期一致：上限 100 ⇒ **构造后即满能量 100** ✓。 */
+    /** 与 {@code RoleInstance} 构造期一致：上限 100 ⇒ **构造后即满能量 100**。 */
     private static final int MAX = 100;
 
-    /** 空服务集桩 + 无监听器（{@code null} ⇒ 不登记监听 ✓）。 */
+    /** 空服务集桩 + 无监听器（{@code null} ⇒ 不登记监听）。 */
     private static EnergyComponent energy() {
-        return new EnergyComponent("energy", new ComponentServices(null, null, null), MAX, null);
+        return new EnergyComponent("energy", new ComponentServicesPort(null, null, null), MAX, null);
     }
 
     /**
-     * **记录型监听器** —— 一个 {@code Consumer} 把每次载荷记下来即可（**不需要任何自定义接口** ✓）。
+     * **记录型监听器** —— 一个 {@code Consumer} 把每次载荷记下来即可（**不需要任何自定义接口**）。
      */
     private static final class RecordingListener implements java.util.function.Consumer<EnergyComponent.Change> {
         final java.util.List<EnergyComponent.Change> seen = new java.util.ArrayList<>();
@@ -57,9 +57,9 @@ public class EnergyComponentOperationTest {
         }
     }
 
-    // ───────── ① 四个已识别动词（add / consume / set / current）—— 一律回"写后/当前值" ─────────
+    // ───────── 四个已识别动词（add / consume / set / current）—— 一律回"写后/当前值" ─────────
 
-    /** {@code add 5} ⇒ 回**写后值**（先把能量压到 50 ⇒ 加后 55，不触上限、可直接观测 ✓）。 */
+    /** {@code add 5} ⇒ 回**写后值**（先把能量压到 50 ⇒ 加后 55，不触上限、可直接观测）。 */
     @Test
     public void addIncreasesEnergy() {
         EnergyComponent energy = energy();
@@ -84,7 +84,7 @@ public class EnergyComponentOperationTest {
         assertEquals("set 42 后当前能量", 42, energy.current());
     }
 
-    /** {@code current} ⇒ 回**当前值**（读操作；**无副作用** ✓）。 */
+    /** {@code current} ⇒ 回**当前值**（读操作；**无副作用**）。 */
     @Test
     public void currentIsReadOnly() {
         EnergyComponent energy = energy();
@@ -92,7 +92,7 @@ public class EnergyComponentOperationTest {
         assertEquals("只读动词不得改动状态", MAX, energy.current());
     }
 
-    // ───────── ② 拒绝面：未识别 / 语法错 / 参数不合法（一律 null 且无副作用） ─────────
+    // ───────── 拒绝面：未识别 / 语法错 / 参数不合法（一律 null 且无副作用） ─────────
 
     /** 未知动词 / 大小写不符 ⇒ **{@code null}**（未识别）。 */
     @Test
@@ -104,7 +104,7 @@ public class EnergyComponentOperationTest {
         assertEquals("拒绝路径不得改动状态", MAX, energy.current());
     }
 
-    /** 空 payload（{@code null} / 空串 / 纯空白）⇒ **{@code null}**（本组件自定的语义 ✓）。 */
+    /** 空 payload（{@code null} / 空串 / 纯空白）⇒ **{@code null}**（本组件自定的语义）。 */
     @Test
     public void emptyPayloadIsRejected() {
         EnergyComponent energy = energy();
@@ -127,7 +127,7 @@ public class EnergyComponentOperationTest {
         assertEquals("拒绝路径不得改动状态", MAX, energy.current());
     }
 
-    /** 整数溢出（超出 {@code int}）⇒ **{@code null}**（不得静默截断 ✗）。 */
+    /** 整数溢出（超出 {@code int}）⇒ **{@code null}**（不得静默截断）。 */
     @Test
     public void numericOverflowIsRejected() {
         EnergyComponent energy = energy();
@@ -135,9 +135,9 @@ public class EnergyComponentOperationTest {
         assertEquals("拒绝路径不得改动状态", MAX, energy.current());
     }
 
-    // ───────── ③ 边界与返回值语义 ─────────
+    // ───────── 边界与返回值语义 ─────────
 
-    /** 写动词的 clamp **仍由组件承担**（字符串面只是薄适配层 ✓）⇒ 回值即 clamp 后的值 ✓。 */
+    /** 写动词的 clamp **仍由组件承担**（字符串面只是薄适配层）⇒ 回值即 clamp 后的值。 */
     @Test
     public void writesAreClampedByComponent() {
         EnergyComponent energy = energy();
@@ -148,8 +148,8 @@ public class EnergyComponentOperationTest {
     }
 
     /**
-     * {@code consume} 能量不足 ⇒ **已识别但语义未达成** ⇒ 回**未变的当前值**（**不是 {@code null}** ✓），
-     * 且状态无变更 ✓ —— 这正是 t124"回写后值"约定对"语义未达成"的处置 ✓。
+     * {@code consume} 能量不足 ⇒ **已识别但语义未达成** ⇒ 回**未变的当前值**（**不是 {@code null}**），
+     * 且状态无变更 —— 这正是"回写后值"约定对"语义未达成"的处置。
      */
     @Test
     public void insufficientConsumeIsRecognizedButChangesNothing() {
@@ -159,12 +159,12 @@ public class EnergyComponentOperationTest {
         assertEquals("能量不足 ⇒ 不扣、不产生变更", MAX, energy.current());
     }
 
-    // ───────── ④ 接口形状护栏（AK1①：独立顶层接口 + 冻结为单方法；AO2：返回类型钉死） ─────────
+    // ───────── 接口形状护栏（独立顶层接口 + 冻结为单方法；返回类型钉死） ─────────
 
     /**
      * 把设计定案 §2 / §10.2 护栏①**钉成可执行的判据**：
-     * 独立顶层接口（不内嵌 ✗）· 冻结为单方法（不得再加方法/默认实现 ✗）· 唯一方法签名
-     * （**阶段 13 · t124 起返回类型 = {@code String.class}** ✓）· 能量组件选择实现 ✓。
+     * 独立顶层接口（不内嵌）· 冻结为单方法（不得再加方法/默认实现）· 唯一方法签名
+     * （返回类型 = {@code String.class}）· 能量组件选择实现。
      */
     @Test
     public void operationProviderIsTopLevelAndFrozenAsSingleMethod() {
@@ -183,15 +183,15 @@ public class EnergyComponentOperationTest {
         assertTrue("能量组件必须**选择实现**该接口（试点 ✓）", energy() instanceof OperationProvider);
     }
 
-    // ───────── ⑤ 监听器列表（只添加 Consumer ✓） ─────────
+    // ───────── 监听器列表（只添加 Consumer） ─────────
 
     /**
      * 载荷与顺序（**行为等价的核心**）：监听器收到的 {@code previous}/{@code current}/{@code max} 与
-     * 写入路径的 clamp 结果逐条一致 ✓，且顺序 = **添加先后** ✓。
+     * 写入路径的 clamp 结果逐条一致，且顺序 = **添加先后**。
      */
     @Test
     public void listenersReceiveChangeWithPreviousCurrentAndMaxInRegistrationOrder() {
-        EnergyComponent energy = new EnergyComponent("energy", new ComponentServices(null, null, null), MAX, null);
+        EnergyComponent energy = new EnergyComponent("energy", new ComponentServicesPort(null, null, null), MAX, null);
         RecordingListener first = new RecordingListener();
         RecordingListener second = new RecordingListener();
         energy.addListener(energy, first);
@@ -211,11 +211,11 @@ public class EnergyComponentOperationTest {
     }
 
     /**
-     * 移除语义 = **按引用相等** ✓：移除后的监听器**不再收到**通知 ✓；不在名单里的登记是 **no-op** ✓。
+     * 移除语义 = **按引用相等**：移除后的监听器**不再收到**通知；不在名单里的登记是 **no-op**。
      */
     @Test
     public void removeListenerIsByReferenceAndIdempotent() {
-        EnergyComponent energy = new EnergyComponent("energy", new ComponentServices(null, null, null), MAX, null);
+        EnergyComponent energy = new EnergyComponent("energy", new ComponentServicesPort(null, null, null), MAX, null);
         RecordingListener kept = new RecordingListener();
         RecordingListener dropped = new RecordingListener();
         EnergyComponent.Listener keptEntry = energy.addListener(energy, kept);
@@ -233,12 +233,12 @@ public class EnergyComponentOperationTest {
     }
 
     /**
-     * **遍历期间增删的安全**：遍历中新增/移除监听器 ⇒ 不抛 {@code ConcurrentModificationException} ✓，
-     * 且**不影响本次遍历**（快照语义 ✓）。
+     * **遍历期间增删的安全**：遍历中新增/移除监听器 ⇒ 不抛 {@code ConcurrentModificationException}，
+     * 且**不影响本次遍历**（快照语义）。
      */
     @Test
     public void mutatingListenersDuringIterationIsSafe() {
-        EnergyComponent energy = new EnergyComponent("energy", new ComponentServices(null, null, null), MAX, null);
+        EnergyComponent energy = new EnergyComponent("energy", new ComponentServicesPort(null, null, null), MAX, null);
         RecordingListener late = new RecordingListener();
         RecordingListener existing = new RecordingListener();
         EnergyComponent.Listener existingEntry = energy.addListener(energy, existing);
@@ -257,8 +257,8 @@ public class EnergyComponentOperationTest {
 
     /**
      * **旧订阅面确已删除**（"删除旧嵌套接口与旧单播字段"的判据，用**反射**离线核验）：
-     * `ChangeSink` 类型与 `onEnergyChanged` 方法**都不存在** ✓；
-     * ★ 且 `EnergyCosting`（耗能声明面的空转类型）**也已删除** ✓ —— 它只有一个方法
+     * `ChangeSink` 类型与 `onEnergyChanged` 方法**都不存在**；
+     * 且 `EnergyCosting`（耗能声明面的空转类型）**也已删除** —— 它只有一个方法
      * `getEnergyCost()`、实现者只有 `ActiveComponent`、**零类型消费者** ⇒ 多此一举。
      * 耗能声明值仍由 `ActiveComponent#getEnergyCost()` 提供（本件不覆盖它，那需要描述符）。
      */

@@ -14,7 +14,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.IconState;
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 
 import java.util.ArrayList;
@@ -24,101 +24,90 @@ import java.util.List;
 /**
  * 主武器组件基类（继承 {@link ActiveComponent}；`energyCost` 恒传 0）。
  * <p>
- * 本类**给出主武器侧默认画法** {@link #buildItem()}。与技能侧的两条冻结差异：
+ * 本类给出主武器侧默认画法 {@link #buildItem()}。与技能侧的两条冻结差异：
  * <ul>
- *   <li>冷却名**不带** {@code " x.xs"} 秒数后缀（技能带）；</li>
- *   <li>{@code energyCost ≡ 0} 由类型封死 ⇒ {@link IconState#ENERGY_LACK} 对主武器**不可达**。</li>
+ *   <li>冷却名不带 {@code " x.xs"} 秒数后缀（技能带）；</li>
+ *   <li>{@code energyCost ≡ 0} 由类型封死 ⇒ {@link IconState#ENERGY_LACK} 对主武器不可达。</li>
  * </ul>
- * 识别键 = {@link Utils#MAIN_WEAPON_KEY}。
- * <p>原 `CombatHook`（唯一方法 {@link #onAttack(AttackSignal)}）**已被本类吸收**
- * —— 本类本来就声明 `onAttack`，那个接口只是重复声明 ⇒ 整体删除 ✗（派发按**本类**判，
- * 接受集逐字不变）；{@code AttackSignal} 随之成为 {@code ActiveComponent} 的嵌套类型 ✓。
+ * 识别键 = {@link Utils#MAIN_WEAPON_KEY}；{@code AttackSignal} 是 {@link ActiveComponent} 的嵌套类型。
  */
 public abstract class MainWeapon extends ActiveComponent {
 
-    // ───────── 基类**不持** buff / energy、**不查容器**、**不做该项判断** ─────────
-    //用户原话：「基类不需要存 buff 和 energy 字段。这些应该由子类判断。」
-    //⇒ 原先本类的两个按需取用入口已**整体删除** ✗（同 `Skill` 的那一段）。
-    //★ 能量维度：主武器的声明耗能由类型**封死 ≡ 0**（{@link Specification} 没有 `setEnergyCost`）
-    //  ⇒ 「能量不足」态对它**不可达**（冻结面口径）⇒ 本类**不设**能量钩子，判定直接传声明值 ✓。
+    // ───────── 基类不持 buff / energy、不查容器、不做该项判断 ─────────
+    // 能量维度：主武器的声明耗能由类型封死 ≡ 0（{@link Specification} 没有 `setEnergyCost`），
+    //  「能量不足」态对它不可达（冻结面口径），因此本类不设能量钩子，判定直接传声明值。
 
     /**
-     * **现在允许使用吗？**（**下放给子类**）—— 基类不查任何组件 ✗。
-     * <p>子类用**自己的 buff 字段**回答（主武器侧 = `canUseMainWeapon()`：非 STUN）。
-     * <p>★ 语义 = 三态判定里的「**禁用**」那一维：返回 `false` ⇒ 图标变红屏障（DISABLED）。
-     * <p><b>为什么是抽象</b>：「禁用」态完全由本值决定 ⇒ 若给默认值，漏写者会**静默**丢掉灰显 ✗。
+     * 现在允许使用吗？（下放给子类）—— 基类不查任何组件。
+     * <p>子类用自己的 buff 字段回答（主武器侧 = `canUseMainWeapon()`：非 STUN）。
+     * <p>语义 = 三态判定里的「禁用」那一维：返回 `false` ⇒ 图标变红屏障（DISABLED）。
+     * <p>为什么是抽象：「禁用」态完全由本值决定，若给默认值，漏写者会静默丢掉灰显。
      */
     protected abstract boolean canUse();
 
     /**
-     * 状态行与描述之间的分隔线（冻结字面量，值一字不变）。本类与 {@link Skill} 各持一份
-     * ⇒ 两份都落在**组件基类的默认实现**里，渲染器内 0 处。
+     * 状态行与描述之间的分隔线（冻结字面量，值一字不变）。本类与 {@link Skill} 各持一份，
+     * 两份都落在组件基类的默认实现里，渲染器内 0 处。
      */
     private static final String LORE_SEPARATOR = "====================";
 
     /**
-     * **描述符口径的构造**：表现值由组件自己的 {@link Specification} 提供，
+     * 描述符口径的构造：表现值由组件自己的 {@link Specification} 提供，
      * 本构造器只做"把描述符转交给基类"这一件事（主武器的能量消耗由类型恒为 0）。
      */
-    public MainWeapon(String id, ComponentServices services, Specification specification){
+    public MainWeapon(String id, ComponentServicesPort services, Specification specification){
         super(id, services, specification);
     }
 
-    /**
-     * **主武器描述符**（收敛为纯声明）：带栏位
-     * （继承 {@link HotbarSpecification} ⇒ 有 {@code setSlot}），kind 已删（不再自述种类）。
-     * <p>参数顺序 = 本类构造器去掉前两位（`id` / `services`）后的**原样顺序**。
-     * <p><b>规则进类型</b>：本类型**没有** `setEnergyCost` —— 能量消耗**根本不是参数**，
-     * 在构造期以字面量 {@code 0} 交给父类 ⇒ **"主武器 `energyCost ≡ 0`"由类型封死**，
-     * 不再是"装配点记得传 0"的自觉；`ENERGY LACK` 态因此对主武器**不可达**（冻结面口径不变）。
-     * <p>本类型**不实现** {@link #create(String, ComponentServices)} ⇒ 具体组件必须自己声明嵌套
-     * `Specification` 并覆写它（编译期强制）。
-     */
-    // ───────── 冷却：**由本组件实例自持** ────────────────────────────
-    //主武器 / 技能这两个组件**自己持有冷却和其判断**，并**写开启冷却 / 停止冷却方法供子类使用**；
-    //**框架不参与**（本类不向框架登记任何冷却状态、不新增组件、不新增端口）。
-    //冷却状态与 API 已**上提到 `ActiveComponent`**（两家族基类合一 ✓）——
-    //  本类不再自带副本；`startCooldown()` / `startCooldown(int ticks)` / `stopCooldown()` /
-    //  `isCoolingDown()` / `remainingCooldownTicks()` 均由父类提供 ✓。
+    // ───────── 冷却：由本组件实例自持 ────────────────────────────
+    // 框架不参与（不向框架登记任何冷却状态、不新增组件、不新增端口）；
+    //  `startCooldown()` / `startCooldown(int ticks)` / `stopCooldown()` / `isCoolingDown()` /
+    //  `remainingCooldownTicks()` 均由父类 `ActiveComponent` 提供。
 
     /**
-     * **主武器描述符**（★ 泛型化：`<M>` = **本组件自己的类型**；理由同 `Skill.Specification`）。
-     * <p>参数化后 `providedType()` 推导出**具体武器类** ⇒ 别的组件可以 `requires(某具体武器.class)` ✓
+     * 主武器描述符（纯声明）：带栏位（继承 {@link HotbarSpecification}，因此有 {@code setSlot}），
+     * 不自述种类。
+     * <p>参数顺序 = 本类构造器去掉前两位（`id` / `services`）后的原样顺序。
+     * <p>规则进类型：本类型没有 `setEnergyCost` —— 能量消耗根本不是参数，在构造期以字面量 {@code 0}
+     * 交给父类，因此"主武器 `energyCost ≡ 0`"由类型封死，不再是"装配点记得传 0"的自觉；
+     * `ENERGY LACK` 态因此对主武器不可达（冻结面口径不变）。
+     * <p>泛型化（`<M>` = 本组件自己的类型；理由同 `Skill.Specification`）：参数化后
+     * `providedType()` 推导出具体武器类，别的组件可以 `requires(某具体武器.class)`。
+     * <p>本类型不实现 {@link #create(String, ComponentServicesPort)}，具体组件必须自己声明嵌套
+     * `Specification` 并覆写它（编译期强制）。
      */
     public abstract static class Specification<M extends MainWeapon> extends HotbarSpecification<M> {
 
         /** 声明式构造（推荐）：id 属于注册处，不写进组件描述符。 */
-        protected Specification(Component displayName, Component description, Material icon, int cooldownTicks){
+        protected Specification(Component displayName, List<Component> description, Material icon, int cooldownTicks){
             this(null, displayName, description, icon, cooldownTicks);
         }
 
         /** 带 id 的构造（表现面需要 id 时用；{@code null} = 由注册处给出）。 */
-        protected Specification(String id, Component displayName, Component description, Material icon,
+        protected Specification(String id, Component displayName, List<Component> description, Material icon,
                                 int cooldownTicks){
             super("MainWeapon", id, displayName, description, icon, cooldownTicks, 0);
         }
 
-        /** 具体组件必须给出创建逻辑（**协变返回 `M`** ⇒ 推导落到具体类 ✓）。 */
+        /** 具体组件必须给出创建逻辑（协变返回 `M` ⇒ 推导落到具体类）。 */
         @Override
-        public abstract M create(String id, ComponentServices services);
+        public abstract M create(String id, ComponentServicesPort services);
     }
 
     /**
-     * **物品使用入口（攻击）的契约**（返回 {@code void}）：listener 在攻击后**无条件**启动武器冷却。
-     * <p>本方法从"覆写能力接口"变成**本类的声明**（原 `CombatHook` 被吸收 ✗）
-     * ⇒ `@Override` 已删（它已无超类型方法可覆写）；签名与默认体**逐字未变** ✓。
+     * 物品使用入口（攻击）的契约（返回 {@code void}）：listener 在攻击后无条件启动武器冷却。
      */
     public void onAttack(AttackSignal signal){
     }
 
     /**
-     * **主武器侧默认画法**：组件侧自判状态、产出**完整已装饰**的热键栏物品。
+     * 主武器侧默认画法：组件侧自判状态、产出完整已装饰的热键栏物品。
      * <p>序列与技能侧同构（冻结，顺序不可交换）：声明数据 → 状态判定 → 三态材质 → 名称着色/加粗
-     * → 后缀（**只有 ` DISABLED` / ` ENERGY LACK`，冷却态无秒数**）→ 状态行 lore + 分隔线 + 描述
-     * → **最后一步**写识别键 {@link Utils#MAIN_WEAPON_KEY}（值 = 本组件的注册 id）。
-     * <p><b>覆写者须知（键与文案均允许覆写，覆写者自负其责）</b>：本方法整体可覆写。
-     * 覆写后若**键写错**（与 {@code MainWeaponListener} 闸门读的键不一致）⇒ 点击该物品**无任何反应**；
-     * 若**键缺失** ⇒ 角色清除时 {@code HotbarItems.clearFrom()} 扫不到它 ⇒ **物品残留**在背包里。
+     * → 后缀（只有 ` DISABLED` / ` ENERGY LACK`，冷却态无秒数）→ 状态行 lore + 分隔线 + 描述
+     * → 最后一步写识别键 {@link Utils#MAIN_WEAPON_KEY}（值 = 本组件的注册 id）。
+     * <p>覆写者须知（键与文案均允许覆写，覆写者自负其责）：本方法整体可覆写。
+     * 覆写后若键写错（与 {@code MainWeaponListener} 闸门读的键不一致），点击该物品无任何反应；
+     * 若键缺失，角色清除时 {@code HotbarItems.clearFrom()} 扫不到它，物品残留在背包里。
      * 详见渲染组件 {@link HotbarRenderComponent#buildItemOf} 的读侧契约 javadoc。
      */
     @Override
@@ -131,10 +120,10 @@ public abstract class MainWeapon extends ActiveComponent {
         Component baseName = baseMeta != null && baseMeta.displayName() != null
                 ? baseMeta.displayName() : getDisplayName();
         List<Component> baseLore = baseMeta != null && baseMeta.lore() != null && !baseMeta.lore().isEmpty()
-                ? baseMeta.lore() : List.of(getDescription());
+                ? baseMeta.lore() : getDescription();
 
         //② 状态判定（读运行期状态）；主武器 energyCost ≡ 0 ⇒ ENERGY_LACK 不可达
-        //闸门由**子类**给出（基类不查容器 ✗）；能量维不参与 ⇒ 传声明值（恒 0）
+        //闸门由子类给出（基类不查容器）；能量维不参与 ⇒ 传声明值（恒 0）
         IconState state = IconState.of(
                 !isCoolingDown(),
                 canUse(),
@@ -146,7 +135,7 @@ public abstract class MainWeapon extends ActiveComponent {
         ItemMeta meta = stack.getItemMeta();
 
         List<Component> lore = new ArrayList<>();
-        //④⑤ 名称（着色 + 加粗 + 后缀）与状态行：**冷却名不带秒数**（与技能侧的冻结差异，不得"顺手统一"）
+        //④⑤ 名称（着色 + 加粗 + 后缀）与状态行：冷却名不带秒数（与技能侧的冻结差异，不得"顺手统一"）
         switch (state) {
             case COOLDOWN -> {
                 meta.displayName(baseName.color(NamedTextColor.GRAY).decorate(TextDecoration.BOLD));
@@ -166,7 +155,7 @@ public abstract class MainWeapon extends ActiveComponent {
             }
         }
 
-        //⑤ 分隔线 + 描述：对**所有**状态都追加
+        //⑤ 分隔线 + 描述：对所有状态都追加
         lore.add(Component.text(LORE_SEPARATOR));
         lore.addAll(baseLore);
         meta.lore(lore);
@@ -201,7 +190,7 @@ public abstract class MainWeapon extends ActiveComponent {
 
     }
 
-    //getters 已上移到 ActiveComponent（getId/getDisplayName/getDescription/getIcon/getCooldownTicks/getEnergyCost）
-    //getKind() 已随 kind 枚举一并删除（表现面不再自述种类）。
+    //getters 在 ActiveComponent（getId / getDisplayName / getDescription / getCooldownTicks /
+    // getEnergyCost）；图标（getIcon）在表现规格 HotbarSpecification。
 
 }

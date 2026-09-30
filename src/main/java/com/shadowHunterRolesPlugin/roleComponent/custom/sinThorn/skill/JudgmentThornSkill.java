@@ -1,6 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.skill;
 
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
@@ -19,38 +19,39 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
+import java.util.List;
 
 /**
  * 「罪棘」技能之三：审判孤刺（紫水晶碎片）。
  *
- * <p><b>行为</b>：引导 2 秒后，对 <b>20 格</b>内所有敌人进行一次刺击 ——
- * 12 点魔法伤害；<b>若目标承受前血量低于 20 则直接处决</b>。冷却 40 秒（800 刻），**不耗能**。
+ * <p>行为：引导 2 秒后，对 20 格内所有敌人进行一次刺击 ——
+ * 12 点魔法伤害；若目标承受前血量低于 20 则直接处决。冷却 40 秒（800 刻），不耗能。
  *
- * <p><b>★ 引导完毕后释放</b>：按下技能只是<b>开始引导</b>；伤害、尖牙形状特效与<b>冷却</b>
+ * <p>引导完毕后释放：按下技能只是开始引导；伤害、尖牙形状特效与冷却
  * 都发生在引导结束（{@code release()}）那一刻 —— 引导期间快捷栏图标仍是"就绪"，
  * 靠内部的 {@code channeling} 标志挡住重复施放（冷却这时候还没起算，挡不住）。
  *
- * <p><b>特效与引导期约束</b>（本次新增）：
+ * <p>特效与引导期约束：
  * <ul>
- *   <li><b>引导时不能移动</b>：每帧刷新<b>缓慢 255</b>（移速归零）并清掉水平速度（含击退），
+ *   <li>引导时不能移动：每帧刷新缓慢 255（移速归零）并清掉水平速度（含击退），
  *       另外一旦被推出锚点 0.8 格就拽回来 —— 双保险，确保"钉在原地"；</li>
- *   <li><b>同时获得抗性 2</b>：每帧刷新 {@code RESISTANCE} 增幅 1（= 抗性 II）；</li>
- *   <li>自身<b>四个方向</b>立着 4 个<b>静止</b>十字架（末地烛粒子，位置不随帧变化）；</li>
- *   <li>大招<b>范围边缘</b>（20 格）一圈<b>多个旋转的单个爆炸粒子</b>（每处只 spawn 一颗 ⇒ "单个"）；</li>
- *   <li>范围内<b>所有敌方身上</b>持续冒单个爆炸粒子 + 紫色引导特效；</li>
- *   <li><b>引导结束释放</b>：在自身位置升起一个由"单个爆炸粒子"排成的<b>尖牙形状</b>，
+ *   <li>同时获得抗性 2：每帧刷新 {@code RESISTANCE} 增幅 1（= 抗性 II）；</li>
+ *   <li>自身四个方向立着 4 个静止十字架（末地烛粒子，位置不随帧变化）；</li>
+ *   <li>大招范围边缘（20 格）一圈多个旋转的单个爆炸粒子（每处只 spawn 一颗，即"单个"）；</li>
+ *   <li>范围内所有敌方身上持续冒单个爆炸粒子 + 紫色引导特效；</li>
+ *   <li>引导结束释放：在自身位置升起一个由"单个爆炸粒子"排成的尖牙形状，
  *       并在每个被命中的敌人身上补一发小尖牙。</li>
  * </ul>
- * <p>缓慢慢 / 抗性走 {@code BuffComponent}（自己身上的效果由账本统一管，角色清除时一并回收）；
+ * <p>缓慢 / 抗性走 {@code BuffComponent}（自己身上的效果由账本统一管，角色清除时一并回收）；
  * 敌人身上的粒子是纯装饰，不涉及账本。
  *
- * <p><b>★ 伤害类型口径（如实申报）</b>：插件只有 {@code DamageKind.PHYSICAL}（走护甲）与
- * {@code TRUE}（无视护甲，工程内叫"真伤"）两种，**没有"魔法伤害"这一类型**。
+ * <p>伤害类型口径（如实申报）：插件只有 {@code DamageKind.PHYSICAL}（走护甲）与
+ * {@code TRUE}（无视护甲，工程内叫"真伤"）两种，没有"魔法伤害"这一类型。
  * 这里按"魔法伤害 = 无视护甲"取 {@code TRUE} 作为最接近的既有原语；若日后工程补了魔法类型，本处应改回。
  */
 public class JudgmentThornSkill extends Skill {
 
-    /** **本组件的登记 id**（★ 知识归属：组件自己）。 */
+    /** **本组件的登记 id**（知识归属：组件自己）。 */
     public static final String ID = "sinThorn_skill_judgment";
 
     /** 引导时长：2 秒 = 40 刻。 */
@@ -65,25 +66,24 @@ public class JudgmentThornSkill extends Skill {
     /** 刺击伤害。 */
     private static final double JUDGMENT_DAMAGE = 12.0;
 
-    /** 处决门槛：承受前血量低于该值 ⇒ 直接秒杀。 */
+    /** 处决门槛：承受前血量低于该值则直接秒杀。 */
     private static final double EXECUTE_HEALTH_THRESHOLD = 20.0;
 
     /** 处决时用的"足够大"的伤害量（保证一定归零，且仍走组件入口）。 */
     private static final double EXECUTE_OVERKILL = 1000d;
 
-    /** 引导期缓慢增幅（255 ⇒ 移速归零）。 */
+    /** 引导期缓慢增幅（255，移速归零）。 */
     private static final int ROOT_SLOWNESS_AMPLIFIER = 255;
 
-    /** 引导期抗性增幅：1 ⇒ 抗性 II。 */
+    /** 引导期抗性增幅：1 即抗性 II。 */
     private static final int RESISTANCE_AMPLIFIER = 1;
 
     /** 被推出锚点多少格就拽回来（0.8 格）。 */
     private static final double ROOT_MAX_DRIFT = 0.8d;
 
     /**
-     * 范围边缘爆炸粒子每帧的相位增量（弧度）——**已加快**。
-     * <p>每 2 刻一帧 ⇒ 每秒 10 帧 ⇒ 每帧 1.0 rad = 每秒 10 rad ⇒ 一圈约 <b>0.63 秒</b>
-     * （改版前每帧 0.5 ⇒ 约 1.26 秒一圈）。
+     * 范围边缘爆炸粒子每帧的相位增量（弧度）。
+     * <p>每 2 刻一帧，即每秒 10 帧，每帧 1.0 rad = 每秒 10 rad，一圈约 0.63 秒。
      */
     private static final double EDGE_PHASE_PER_FRAME = 1.0d;
 
@@ -115,29 +115,28 @@ public class JudgmentThornSkill extends Skill {
 
     /**
      * **是否正在引导**。
-     * <p>冷却被移到"释放"那一刻启动 ⇒ 引导期间 {@code isCoolingDown()} 为假，
-     * 这个标志就是**唯一的重复施放闸门**（见 {@code onCast}）。
+     * <p>冷却被移到"释放"那一刻启动，因此引导期间 {@code isCoolingDown()} 为假，
+     * 这个标志就是唯一的重复施放闸门（见 {@code onCast}）。
      */
     private boolean channeling = false;
 
     /**
-     * **渲染组件**（热键栏）。
-     * <p>★ 上游 2026-09-27 重构后基类不再提供 {@code requestRepaint()} ⇒ 重绘走"取渲染组件再调"这条通道。
+     * **渲染组件**（热键栏）；重绘走"取渲染组件再调它的 {@code requestRepaint()}"这条通道。
      */
     private HotbarRenderComponent render;
 
-    public JudgmentThornSkill(String id, ComponentServices services, Specification specification) {
+    public JudgmentThornSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
     /**
-     * 本组件的**描述符**（栏位由装配点 {@code setSlot} 指定）。
+     * 本组件的描述符（栏位由装配点 {@code setSlot} 指定）。
      */
     public static final class Specification extends Skill.Specification<JudgmentThornSkill> {
 
         public Specification() {
             super(Component.text("审判孤刺"),
-                    Component.text("引导2秒后，对20格内所有敌人刺出：12点魔法伤害；若其血量低于20则直接秒杀"),
+                    List.of(Component.text("引导2秒后，对20格内所有敌人刺出：12点魔法伤害；若其血量低于20则直接秒杀")),
                     800,
                     0,
                     Material.AMETHYST_SHARD);
@@ -146,7 +145,7 @@ public class JudgmentThornSkill extends Skill {
         }
 
         @Override
-        public JudgmentThornSkill create(String id, ComponentServices services) {
+        public JudgmentThornSkill create(String id, ComponentServicesPort services) {
             return new JudgmentThornSkill(id, services, this);
         }
     }
@@ -159,7 +158,7 @@ public class JudgmentThornSkill extends Skill {
         render = svc().components().get(HotbarRenderComponent.class);
     }
 
-    /** **请求重绘热键栏**（新口径：取渲染组件再调；拿不到就静默跳过）。 */
+    /** **请求重绘热键栏**（取渲染组件再调；拿不到就静默跳过）。 */
     private void repaint() {
         if (render != null) {
             render.requestRepaint();
@@ -174,14 +173,14 @@ public class JudgmentThornSkill extends Skill {
             return;
         }
 
-        //★ 冷却已移到"释放"那一刻启动 ⇒ 引导期间不再被 isCoolingDown 挡住，
+        //冷却已移到"释放"那一刻启动，因此引导期间不再被 isCoolingDown 挡住，
         //   所以这里必须自己挡重复施放，否则连点会叠出两条引导。
         if (channeling) {
             return;
         }
         channeling = true;
 
-        //★「技能引导时给相应物品附魔」：引导期间让技能物品带附魔光效（buildItem 覆写里加）
+        //「技能引导时给相应物品附魔」：引导期间让技能物品带附魔光效（buildItem 覆写里加）
         repaint();
 
         anchor = caster.getLocation().clone();
@@ -194,10 +193,10 @@ public class JudgmentThornSkill extends Skill {
         channelVfxTask = timer.addScheduleRepeating(this, CHANNEL_FRAME_INTERVAL_TICKS,
                 CHANNEL_FRAME_INTERVAL_TICKS, this::channelFrame);
 
-        //引导结束 ⇒ 释放（需求：「引导完毕后释放技能」）
+        //引导结束则释放
         castTask = timer.addScheduleLater(this, CHANNEL_TICKS, this::release);
 
-        //★ 冷却**不在这里**启动 —— 改由 release() 在引导结束、技能真正放出去的那一刻启动，
+        //冷却不在这里启动 —— 改由 release() 在引导结束、技能真正放出去的那一刻启动，
         //   这样"引导中 / 已释放"在快捷栏图标上也能区分（与二技能的"技能完全后冷却"同一口径）。
     }
 
@@ -216,7 +215,7 @@ public class JudgmentThornSkill extends Skill {
         }
 
         //①「引导时不能移动」：缓慢 255（移速归零）+ 清掉水平速度（含击退）+ 越界拽回锚点
-        //   ★ 时长只给"够撑到下一帧"（帧间隔 + 4 刻）—— 引导一结束不再刷新，效果自然过期；
+        //   时长只给"够撑到下一帧"（帧间隔 + 4 刻）—— 引导一结束不再刷新，效果自然过期；
         //     同时 release() 里还会显式移除一次，保证"引导结束定身立即消失"。
         int shortDuration = (int) CHANNEL_FRAME_INTERVAL_TICKS + 4;
         buff.applyPotionEffect(PotionEffectType.SLOWNESS, shortDuration, ROOT_SLOWNESS_AMPLIFIER);
@@ -238,7 +237,7 @@ public class JudgmentThornSkill extends Skill {
         channelTicks += (int) CHANNEL_FRAME_INTERVAL_TICKS;
         Location center = owner.getLocation();
 
-        //③「自身四个方向的 4 个静止十字架」：位置固定（不含相位）⇒ 不转
+        //③「自身四个方向的 4 个静止十字架」：位置固定（不含相位），所以不转
         for (int i = 0; i < 4; i++) {
             double angle = i * (Math.PI / 2d);
             double dx = Math.cos(angle);
@@ -247,10 +246,10 @@ public class JudgmentThornSkill extends Skill {
                     dx, dz, 0.95d, 5, Particle.END_ROD);
         }
 
-        //④「大招范围边缘产生多个旋转的单个爆炸粒子」（转速已加快）
+        //④「大招范围边缘产生多个旋转的单个爆炸粒子」
         SinThornVfx.spawnOrbitingExplosions(world, center, JUDGMENT_RADIUS, edgePhase, 12, 0.6d);
 
-        //⑤ 敌方身上：**每 0.5 秒**一次单个爆炸粒子；紫色引导柱**每帧**都画
+        //⑤ 敌方身上：每 0.5 秒一次单个爆炸粒子；紫色引导柱每帧都画
         //   —— 柱子是"连续垂直 4 格、绕目标旋转"的螺旋（见 SinThornVfx#spawnPurpleHelix）
         boolean explosionFrame = channelTicks % TARGET_EXPLOSION_INTERVAL_TICKS == 0;
 
@@ -265,27 +264,27 @@ public class JudgmentThornSkill extends Skill {
                 world.spawnParticle(Particle.EXPLOSION, base.clone().add(0, 1, 0), 1, 0, 0, 0, 0);
             }
 
-            //紫色引导柱：每帧重画，相位随帧推进 ⇒ 绕着目标转
+            //紫色引导柱：每帧重画，相位随帧推进，因此绕着目标转
             SinThornVfx.spawnPurpleHelix(world, base, edgePhase * 1.7d,
                     PURPLE_COLUMN_HEIGHT, PURPLE_COLUMN_RADIUS, 20);
         }
     }
 
-    /** **引导结束 ⇒ 释放大招**：尖牙形状特效 + 结算伤害/处决。 */
+    /** **引导结束即释放大招**：尖牙形状特效 + 结算伤害/处决。 */
     private void release() {
         stopChannelVfx();
         channeling = false;
         repaint();   //摘掉引导期的附魔光效
 
-        //★「引导结束定身效果消失」：显式摘掉引导期挂上的缓慢与抗性
-        //  （刷新时给的就是短时长，这里再删一次 ⇒ 结束瞬间立刻恢复行动）
+        //「引导结束定身效果消失」：显式摘掉引导期挂上的缓慢与抗性
+        //  （刷新时给的就是短时长，这里再删一次，结束瞬间立刻恢复行动）
         Player caster = svc().self().player();
         if (caster != null) {
             caster.removePotionEffect(PotionEffectType.SLOWNESS);
             caster.removePotionEffect(PotionEffectType.RESISTANCE);
         }
 
-        //★ 「引导完毕后释放技能」：技能真正放出去的这一刻才进冷却。
+        //「引导完毕后释放技能」：技能真正放出去的这一刻才进冷却。
         //  放在 owner 判空之前 —— 人死了/掉线也一样要进冷却，否则等于白嫖一次。
         startCooldown();
 
@@ -311,7 +310,7 @@ public class JudgmentThornSkill extends Skill {
 
             double healthBefore = victim.getHealth();
             if (healthBefore < EXECUTE_HEALTH_THRESHOLD) {
-                //直接处决：伤害量 = 当前血量 + 冗余（经生命组件 ⇒ 保留击杀归属与游戏模式判定）
+                //直接处决：伤害量 = 当前血量 + 冗余（经生命组件，保留击杀归属与游戏模式判定）
                 vitals.trueDamage(victim, owner, healthBefore + EXECUTE_OVERKILL);
             } else {
                 vitals.trueDamage(victim, owner, JUDGMENT_DAMAGE);
@@ -334,8 +333,8 @@ public class JudgmentThornSkill extends Skill {
     }
 
     /**
-     * **引导中给技能物品加附魔光效**（需求）。
-     * <p>先按基类默认画法产出完整物品，再在**引导期间**补一个
+     * **引导中给技能物品加附魔光效**。
+     * <p>先按基类默认画法产出完整物品，再在引导期间补一个
      * {@code setEnchantmentGlintOverride(true)} —— 只加光效、不加真实附魔（不会多出词条、不改数值）。
      * <p>引导开始/结束各调一次 {@code repaint()} 触发重绘（见 {@code onCast} 与 {@code release()}）。
      */
@@ -364,13 +363,13 @@ public class JudgmentThornSkill extends Skill {
         channeling = false;
     }
 
-    /** **闸门放行？**（基类不查容器 ⇒ 用本组件自己的字段判）。 */
+    /** **闸门放行？**（基类不查容器，用本组件自己的字段判）。 */
     @Override
     protected boolean canUse() {
         return buff.canCastSkill();
     }
 
-    /** **当前能量**：本组件不参与能量维度（声明耗能 0）⇒ 返回声明值。 */
+    /** **当前能量**：本组件不参与能量维度（声明耗能 0），返回声明值。 */
     @Override
     protected int currentEnergy() {
         return getEnergyCost();

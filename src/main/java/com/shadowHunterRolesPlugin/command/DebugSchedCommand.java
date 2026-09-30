@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.command;
 
 import com.shadowHunterRolesPlugin.ShadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
-import com.shadowHunterRolesPlugin.core.ports.ComponentServices;
+import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
 import com.shadowHunterRolesPlugin.platform.Task;
@@ -20,31 +20,28 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.List;
 
 /**
- * 子指令 {@code debug sched}：{@code /role debug sched [all]} —— **调度器实证探针**。
- * <p>
- * 入口与输出（正式子指令；入口由 {@code RoleCommand} 分发）：
- * **不新增注册路径、不在 onEnable 做常驻副作用**；全部探针任务在第 3 次触发时自取消 ⇒ 单次命令不留常驻任务
- * （状态全部是本方法局部变量）。**op 门控由 {@link DebugCommand} 在调试树入口承担**（可见行为与原内联实现相同）。
- * <p>
- * 逐条打印原始值：
+ * 子指令 {@code debug sched}：{@code /role debug sched [all]} —— 调度器实证探针。
+ * <p>入口与输出（正式子指令；入口由 {@code RoleCommand} 分发）：
+ * 不新增注册路径、不在 onEnable 做常驻副作用；全部探针任务在第 3 次触发时自取消 ⇒ 单次命令不留常驻任务
+ * （状态全部是本方法局部变量）。op 门控由 {@link DebugCommand} 在调试树入口承担（可见行为与原内联实现相同）。
+ * <p>逐条打印原始值：
  * ① {@code execute} 回调内线程名；
  * ② {@code run / runDelayed / runAtFixedRate} 的线程名 + 实际触发 tick（与声明值并排）+ {@code initialDelay=0}
  * 边界实测（{@code runAtFixedRate} vs {@code runTaskTimer}，异常原文照打）；
  * ③ 同周期 {@code Bukkit.getScheduler().runTaskTimer} 对照任务的线程名 + 实际触发 tick（声明值逐字相同）
  * + ③b {@code runTaskLater} 延时对照；
- * ③c/③d **新实现验证**：对**生产声明值 0/10** 做 A/B —— ③c 原生 Bukkit {@code runTaskTimer(0,10)} vs
+ * ③c/③d 新实现验证：对生产声明值 0/10 做 A/B —— ③c 原生 Bukkit {@code runTaskTimer(0,10)} vs
  * ③d 生产适配器 {@code BukkitSchedulerAdapter.runRepeating(0,10)}（内含 0→1 归一）；另测适配器
  * {@code run()} / {@code runLater(20)} 与 {@code Task} 句柄取消；
- * ④m **归一化矩阵**：8 组声明值（5 个生产形态 (1,1)/(0,1)/(0,2)/(0,40)/(1,6) + (0,10)/(1,2)/(1,10)）
+ * ④m 归一化矩阵：8 组声明值（5 个生产形态 (1,1)/(0,1)/(0,2)/(0,40)/(1,6) + (0,10)/(1,2)/(1,10)）
  *     分别走原生 Bukkit 与适配器，逐组打印首/次触发 tick ⇒ 判据 = 两路径首/次触发逐字相同；
- * ④p **组件链**：走组件侧真入口（**计时组件的强类型形态**：`runRepeating(requester, 0L, 10L, …)`，
- *     请求者在**首位**）⇒ 覆盖 计时组件 → Scheduler → 适配器 这条链；与 ④m 的 (0,10)=1/11 比对
- *     （无角色时打印 SKIPPED）。**输出键沿用历史名**（`portLeg` / `portFirstSecond`）= 既有证据的引用锚；
+ * ④p 组件链：走组件侧真入口（计时组件的强类型形态：`runRepeating(requester, 0L, 10L, …)`，请求者在首位）
+ *     ⇒ 覆盖 计时组件 → Scheduler → 适配器 这条链；与 ④m 的 (0,10)=1/11 比对（无角色时打印 SKIPPED）。
+ *     输出键沿用历史名（`portLeg` / `portFirstSecond`）= 既有证据的引用锚；
  * ④ {@code ScheduledTask.cancel()} 返回值 / {@code isCancelled()} / {@code getExecutionState()} / 重复 cancel；
  * ⑤ 一句话结论（由本次原始值导出，不只给结论）。
- * <p>
- * <b>关键输出行是既有证据的引用锚</b>（如 {@code [sched] ⑤ verdict | …} 里的 {@code matrixAllPairsMatch=}、
- * {@code portLegEquivalent=}、{@code CONCLUSION=}），迁移时**逐字保留**，不得改写键名或措辞。
+ * <p><b>关键输出行是既有证据的引用锚</b>（如 {@code [sched] ⑤ verdict | …} 里的 {@code matrixAllPairsMatch=}、
+ * {@code portLegEquivalent=}、{@code CONCLUSION=}），不得改写键名或措辞。
  */
 public class DebugSchedCommand implements SubCommand {
 
@@ -175,7 +172,7 @@ public class DebugSchedCommand implements SubCommand {
             }
         }, 1L, 10L);
 
-        //③ 对照：同周期 Bukkit 任务，**声明值与全局侧逐字相同**（delay=1 period=10；BukkitTask 句柄；第 3 次自取消）
+        //③ 对照：同周期 Bukkit 任务，声明值与全局侧逐字相同（delay=1 period=10；BukkitTask 句柄；第 3 次自取消）
         bukkitHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             int now = Bukkit.getCurrentTick();
             bukkitCount[0]++;
@@ -205,7 +202,7 @@ public class DebugSchedCommand implements SubCommand {
                     + " | delta=" + tick[7] + " | thread=" + Thread.currentThread().getName()));
         }, 20L);
 
-        //③c 对照（**生产声明值 0/10** 的原生 Bukkit 行为）：runTaskTimer(0,10) → 首次与第三次触发 tick
+        //③c 对照（生产声明值 0/10 的原生 Bukkit 行为）：runTaskTimer(0,10) → 首次与第三次触发 tick
         final int[] rawZeroCount = {0};
         final BukkitTask[] rawZeroHolder = new BukkitTask[1];
         rawZeroHolder[0] = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -221,7 +218,7 @@ public class DebugSchedCommand implements SubCommand {
             }
         }, 0L, 10L);
 
-        //③d **新实现验证**：直接调**生产适配器**（BukkitSchedulerAdapter = GlobalRegionScheduler 唯一实现），
+        //③d 新实现验证：直接调生产适配器（BukkitSchedulerAdapter = GlobalRegionScheduler 唯一实现），
         //    与 ③c 用同一生产声明值 0/10 做 A/B（适配器内部把 0 归一为 1）；另测 run() / runLater(20) 与 Task 句柄取消
         final BukkitSchedulerAdapter probeAdapter = new BukkitSchedulerAdapter(plugin);
         probeAdapter.run(() -> {
@@ -257,9 +254,9 @@ public class DebugSchedCommand implements SubCommand {
             }
         }, 0L, 10L);
 
-        //④m 归一化矩阵：8 组声明值 —— 含**全部 5 个生产形态** (1,1)/(0,1)/(0,2)/(0,40)/(1,6)
-        //    与网格 (0,10)/(1,2)/(1,10)。每组**用同一声明值分别走原生 Bukkit 与生产适配器**，
-        //    打印各自第 1/第 2 次触发 tick ⇒ 判据 = 两路径首/次触发**逐字相同**（第 2 次还须 > 第 1 次）
+        //④m 归一化矩阵：8 组声明值 —— 含全部 5 个生产形态 (1,1)/(0,1)/(0,2)/(0,40)/(1,6)
+        //    与网格 (0,10)/(1,2)/(1,10)。每组用同一声明值分别走原生 Bukkit 与生产适配器，
+        //    打印各自第 1/第 2 次触发 tick ⇒ 判据 = 两路径首/次触发逐字相同（第 2 次还须 > 第 1 次）
         final long[][] mPairs = {{0,1},{0,2},{0,10},{0,40},{1,1},{1,2},{1,6},{1,10}};
         final int[][] mTicks = new int[8][4];
         final int[] mCount = new int[16];
@@ -308,14 +305,14 @@ public class DebugSchedCommand implements SubCommand {
             sendKey(player, "[sched] ④m verdict | " + str[7]);
         }, 50L);
 
-        //④p **组件链实测**（规格 B③"双入口归一"：计时组件 → Scheduler → 适配器 → GlobalRegionScheduler）：
-        //    走组件侧真入口（**计时组件的强类型形态**：请求者在**首位**）⇒
-        //    与 ④m 的 (0,10) 期望值 **1/11** 比对。**仅当玩家已有角色时可测**（服务集构造期注入）；
+        //④p 组件链实测（双入口归一：计时组件 → Scheduler → 适配器 → GlobalRegionScheduler）：
+        //    走组件侧真入口（计时组件的强类型形态：请求者在首位）⇒
+        //    与 ④m 的 (0,10) 期望值 1/11 比对。仅当玩家已有角色时可测（服务集构造期注入）；
         //    无角色 ⇒ 明确打印 SKIPPED（不伪造）。输出键沿用历史名（portLeg / portFirstSecond）= 引用锚
         final int[] portTicks = {-1, -1};
         final int[] portCount = {0};
         final ScheduledHandle[] portHolder = new ScheduledHandle[1];
-        ComponentServices portServices = null;
+        ComponentServicesPort portServices = null;
         RoleInstance portInstance = null;
         if(roleManager.hasRole(player)){
             portInstance = roleManager.getRoleInstance(player);
@@ -336,9 +333,9 @@ public class DebugSchedCommand implements SubCommand {
             sendKey(player, "[sched] ④p port leg | " + str[8]);
         }
         else{
-            final ComponentServices portSvc = portServices;
+            final ComponentServicesPort portSvc = portServices;
             //请求者 = 这一对服务集所属的那个组件实例（与 servicesOf 同一条 id 解析口径）；
-            //计时组件 = 框架级服务组件（装配期已登记进实例容器 ⇒ **按 id** 取通用面，本类不点名具体组件类 ✓）
+            //计时组件 = 框架级服务组件（装配期已登记进实例容器 ⇒ 按 id 取通用面，本类不点名具体组件类）
             RoleComponent portRequester = portSvc.components().getById(str[8]);
             RoleComponent portTimer = portInstance != null
                     ? portInstance.componentRegistry().getById(TaskComponent.ID)
@@ -415,11 +412,10 @@ public class DebugSchedCommand implements SubCommand {
     }
 
     /**
-     * 关键行双写：**玩家侧**（Adventure {@code Component}，文本与既有实现逐字相同）+ **服务端日志**
+     * 关键行双写：玩家侧（Adventure {@code Component}，文本与既有实现逐字相同）+ 服务端日志
      * （{@link DebugCommand#log}，带 {@code [command-debug]} 前缀）。
-     * <p>
-     * 判定"关键行"的口径：结论/判据行与语义原始值行（probe start · ① execute · ② boundary · ④ cancel 三态 ·
-     * ③d adapter cancel · ④m verdict · ④p port leg · ⑤ raw · ⑤ verdict）；**逐行刷屏明细**
+     * <p>判定"关键行"的口径：结论/判据行与语义原始值行（probe start · ① execute · ② boundary · ④ cancel 三态 ·
+     * ③d adapter cancel · ④m verdict · ④p port leg · ⑤ raw · ⑤ verdict）；逐行刷屏明细
      * （矩阵逐行 tick、逐次触发 #n、逐 tick 端口链）仍只发玩家侧 —— 日志保持可 grep、不刷屏。
      */
     private void sendKey(Player player, String text){

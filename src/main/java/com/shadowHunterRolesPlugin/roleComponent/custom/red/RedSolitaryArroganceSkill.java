@@ -34,6 +34,12 @@ public class RedSolitaryArroganceSkill extends Skill {
     //服务集的白名单端口是对同一组件同一方法的**纯转发**，故两者逐字等价。
     private VitalsComponent vitals;
 
+    /**
+     * 红的进化被动（档位读口的来源）；{@code start()} 里一次取好。
+     * <p>取不到时退化为基线 4 次（装配期已声明 {@code requires(RedEvolutionPassive.class)} ⇒ 生产上不会发生）。
+     */
+    private RedEvolutionPassive evolution;
+
 
     public RedSolitaryArroganceSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
@@ -42,6 +48,7 @@ public class RedSolitaryArroganceSkill extends Skill {
     /**
      * 本组件的描述符：名字 / 描述 / 冷却 / 耗能 / 图标由这里声明，
      * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
+     * <p>进化被动进依赖表：档位读口在 {@code start()} 实取（见 {@link #onCast}）。
      */
     public static final class Specification extends Skill.Specification<RedSolitaryArroganceSkill> {
 
@@ -49,7 +56,8 @@ public class RedSolitaryArroganceSkill extends Skill {
             super(Component.text("孤妄自赏"),
                     List.of(Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命")),
                     200, 0, Material.FERMENTED_SPIDER_EYE);
-            requires(TaskComponent.class).requires(BuffComponent.class).requires(VitalsComponent.class);
+            requires(TaskComponent.class).requires(BuffComponent.class).requires(VitalsComponent.class)
+                    .requires(RedEvolutionPassive.class);
         }
 
         @Override
@@ -65,11 +73,17 @@ public class RedSolitaryArroganceSkill extends Skill {
      * 伤害 8、回血 4；冷却由本组件在施放成功处按声明值 200 启动。
      * <p>`isValid()` 守卫不需要：任务登记进资源表后，`clear()` 的 `cancelAllAndClear()` 必取消它，
      * 延迟体在 `valid=false` 之后不可达。
+     * <p><b>攻击次数</b>在施放那一刻定档（基线 4；2 级 鲜血横飞 ⇒ 6），整轮插击不因中途升级而变
+     * （否则同一轮里"捅到一半改了次数"是不可解释的时序）。每轮插击的伤害与回血数值一字未改。
      */
     @Override
     public void onCast(CastSignal signal){
         Player caster = svc().self().player();
         if(!buff.canCastSkill()) return;
+        //攻击次数：基线 4，2 级（鲜血横飞）起 6 —— 用 final 局部量，让匿名任务体读到的是定档值
+        final int totalAttacks = evolution != null
+                ? evolution.solitaryArroganceAttackCount()
+                : RedEvolutionPassive.BASE_SOLITARY_ARROGANCE_ATTACKS;
         attackTask = timer.addScheduleRepeating(this, 1L, 6,
                 new Runnable() {
                     private Player cas = caster;
@@ -82,9 +96,9 @@ public class RedSolitaryArroganceSkill extends Skill {
                             return;
                         }
 
-                        //执行4次
+                        //执行 totalAttacks 次（基线 4）
                         cnt++;
-                        if(cnt > 4){
+                        if(cnt > totalAttacks){
                             attackTask.cancel();
                             return;
                         }
@@ -126,12 +140,14 @@ public class RedSolitaryArroganceSkill extends Skill {
      * （awake 只做构造期自检 / 只读自身）；`start()` 时容器已冻结，容器查找合法。
      * <p>缓存理由：本技能每 6 tick 结算一次、回血点在循环体内，重复查容器是纯浪费；
      * 端口引用本身也是构造期就持有的引用，因此缓存与既有口径同族（该端口是纯转发 ⇒ 逐字等价）。
+     * <p>进化被动同为缓存：档位读口在施放那一刻取一次（见 {@link #onCast}）。
      */
     @Override
     public void start() {
         timer = svc().components().get(TaskComponent.class);
         buff = svc().components().get(BuffComponent.class);
         vitals = svc().components().get(VitalsComponent.class);
+        evolution = getComponent(RedEvolutionPassive.class);
     }
 
     /**

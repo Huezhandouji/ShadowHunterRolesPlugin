@@ -100,7 +100,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
      */
     @Override
     protected boolean canUse(){
-        return buff.canUseMainWeapon();
+        return buff.canUseMainWeapon() || isCoolingDown();
     }
 
 }

@@ -27,6 +27,20 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
  * <p>流血账本（`playerBleedRecord` / `playerBleedResolveRequests`）为私有，外部经
  * `getComponent(...)` 取到本组件后，再走下面三个公开入口读写同一份账本。
  * <p>`update()` 保持无参形态与全部端口化，数值 / 结算节奏 / 记账路径逐字不变。
+ *
+ * <h2>进化联动（红的两档都落在这里，因为账本在这里）</h2>
+ * <ul>
+ *   <li><b>1 级 · 红月落下</b>：每秒结算时，对每个**负有流血**的受害者额外扣
+ *       {@code RedEvolutionPassive#bleedSanTEDrainPerSecond()} 点特殊值（基线 0 ⇒ 未进化时这一行是 no-op）；</li>
+ *   <li><b>5 级 · 猩红已至</b>：每秒**结算的层数**由 1 变 3
+ *       （{@code RedEvolutionPassive#bleedSettleStacksPerSecond()}）。伤害仍按"每层
+ *       {@link #BLEED_DAMAGE_PER_SECOND} 点真伤"缩放（3 层 = 6 点），而抗性与
+ *       {@link #BLEED_SANTE_RECOVER} 仍是**每次结算各一次**（与既有的 {@code resolveBleed}
+ *       口径一致：它们按结算次数给，不按层数给 —— 这是照抄既有口径，不是新口径）。</li>
+ * </ul>
+ * 档位经 `getComponent(RedEvolutionPassive.class)` 在 `start()` 里取好缓存；
+ * 取不到时退化为基线值（装配期已声明 `requires(RedEvolutionPassive.class)` ⇒ 生产上取不到不会发生），
+ * 与既有"流血被动未注册时只跳过流血、不抛"的容错口径同源。
  */
 public class RedBleedPassive extends PassiveSkill {
 
@@ -36,6 +50,9 @@ public class RedBleedPassive extends PassiveSkill {
     private VitalsComponent vitals;
     private BuffComponent buff;
     private SanTEComponent sante;
+
+    /** 红的进化被动（档位读口的来源）；{@code start()} 里一次取好。 */
+    private RedEvolutionPassive evolution;
 
     //最大流血层数
     public static final int MAX_BLEED_STACK = 15;
@@ -63,13 +80,15 @@ public class RedBleedPassive extends PassiveSkill {
 
     /**
      * 本组件的被动描述符：被动经统一 {@code addComponent} 入口装配且无栏位，因此天然不占热键栏。
-     * 显示名与描述只在本描述符里声明一处；依赖 = {@code start()} 实取的那三个组件。
+     * 显示名与描述只在本描述符里声明一处；依赖 = {@code start()} 实取的那四个组件
+     * （进化被动只为读两档生效值，不持有任何账本）。
      */
     public static final class Specification extends PassiveSkill.Specification<RedBleedPassive> {
 
         public Specification(){
             super(Component.text("流血"), List.of(Component.text("红的流血被动")));
-            requires(VitalsComponent.class).requires(BuffComponent.class).requires(SanTEComponent.class);
+            requires(VitalsComponent.class).requires(BuffComponent.class).requires(SanTEComponent.class)
+                    .requires(RedEvolutionPassive.class);
         }
 
         @Override
@@ -136,6 +155,7 @@ public class RedBleedPassive extends PassiveSkill {
         vitals = svc().components().get(VitalsComponent.class);
         buff = svc().components().get(BuffComponent.class);
         sante = svc().components().get(SanTEComponent.class);
+        evolution = getComponent(RedEvolutionPassive.class);
     }
 
     /**
@@ -167,6 +187,15 @@ public class RedBleedPassive extends PassiveSkill {
         if(secondCountdown < BLEED_SETTLE_INTERVAL_TICKS) return;
         secondCountdown = 0;
 
+        //本秒的进化档位读数（每秒读一次即可：升级发生在下一秒之前都不会漏）
+        //5 级 猩红已至：每秒结算 3 层（基线 1）；1 级 红月落下：每个流血受害者每秒再扣 1 点特殊值（基线 0）
+        int settleStacks = evolution != null
+                ? evolution.bleedSettleStacksPerSecond()
+                : RedEvolutionPassive.BASE_BLEED_SETTLE_STACKS_PER_SECOND;
+        int santeDrainPerSecond = evolution != null
+                ? evolution.bleedSanTEDrainPerSecond()
+                : RedEvolutionPassive.BASE_BLEED_SANTE_DRAIN_PER_SECOND;
+
         //遍历过程中不能直接修改map(会抛ConcurrentModificationException)，先收集需要移除的条目
         List<UUID> toRemove = new ArrayList<>();
 
@@ -182,17 +211,25 @@ public class RedBleedPassive extends PassiveSkill {
                 continue;
             }
 
-            //结算这名受害者的一层流血
-            int newBleed = Math.clamp(curBleed - 1, 0, MAX_BLEED_STACK);
+            //结算这名受害者的 settleStacks 层流血（基线 1 层 = 既有行为；5 级起 3 层）
+            //实际结算层数以手上还剩的层数为上限（剩 2 层时按 2 层算，不能凭空多结算）
+            int settledStacks = Math.min(settleStacks, curBleed);
+            int newBleed = Math.clamp(curBleed - settleStacks, 0, MAX_BLEED_STACK);
             playerBleedRecord.put(pid, newBleed);
 
             //粒子
             BlockData bd = Bukkit.createBlockData(Material.RED_CONCRETE);
             player.spawnParticle(Particle.BLOCK, victim.getLocation().clone().add(0, 0.5, 0), 30, 0.3, 0.3, 0.3,0.1, bd);
-            vitals.trueDamage(victim, player, BLEED_DAMAGE_PER_SECOND);
+            //伤害随"实际结算层数"走（每层 2 点真伤）：1 层 = 既有的 2 点，3 层 = 6 点
+            vitals.trueDamage(victim, player, settledStacks * BLEED_DAMAGE_PER_SECOND);
             //赋予 红 5秒抗性1, 恢复4点SanTE（药水记账：经 Buff 组件的入口，与框架同一条已记账路径）
+            //这两项按"每次结算"各一次给（与既有的 resolveBleed 口径一致：不随层数翻倍）
             buff.applyPotionEffect(PotionEffectType.RESISTANCE, BLEED_RESISTANCE_DURATION_TICKS, 1);
             sante.increase(BLEED_SANTE_RECOVER);
+            //1 级 红月落下：这个负有流血的敌人同时被扣特殊值（走 SanTE 组件的跨实例入口，与「律法之言」同一条路）
+            if(santeDrainPerSecond > 0){
+                sante.decreaseSanTE(pid, santeDrainPerSecond);
+            }
 
             if(newBleed <= 0) {
                 toRemove.add(pid);

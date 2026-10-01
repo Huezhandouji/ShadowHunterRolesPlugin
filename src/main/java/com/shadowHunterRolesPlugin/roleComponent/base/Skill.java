@@ -139,7 +139,7 @@ public abstract class Skill extends ActiveComponent {
      *   <li>施加三态材质（{@link IconState#material(Material)}；就绪态沿用基础物品材质）；</li>
      *   <li>名称着色 / 加粗 + 后缀（冷却态 = {@code " x.xs"} 秒数，全仓唯一一处秒数格式串）；</li>
      *   <li>状态行 lore + 分隔线 + 描述（能量不足态没有状态行 —— 既有形态）；</li>
-     *   <li>最后一步写识别键 {@link Utils#SKILL_KEY}（值 = 本组件的注册 id）。</li>
+     *   <li>最后一步写识别键 {@link #identifyKey()}（默认值 = {@link Utils#SKILL_KEY}；值 = 本组件的注册 id）。</li>
      * </ol>
      * <p>覆写者须知（键与文案均允许覆写，覆写者自负其责）：本方法整体可覆写。
      * 覆写后若键写错（与 {@code SkillListener} 闸门读的键不一致），点击该物品无任何反应；
@@ -198,10 +198,27 @@ public abstract class Skill extends ActiveComponent {
         meta.lore(lore);
 
         //⑥ 最后一步：写识别键（写入点唯一；键名与值语义是冻结面）
-        meta.getPersistentDataContainer().set(Utils.SKILL_KEY, PersistentDataType.STRING, id);
+        //  键本身由 identifyKey() 给出（技能 = SKILL_KEY；弓弩家族覆写为自己的键）
+        meta.getPersistentDataContainer().set(identifyKey(), PersistentDataType.STRING, id);
 
         stack.setItemMeta(meta);
         return stack;
+    }
+
+    /**
+     * **本家族写进物品 PDC 的识别键**（{@link #buildItem()} 的最后一步读它）—— 画法只此一处，
+     * 家族差异只在这个键上。
+     * <p>默认值 = {@link Utils#SKILL_KEY}（技能物品的键，消费方 = {@code SkillListener}）；
+     * 弓弩家族 {@code BowWeapon} 覆写为它自己的键（它的右键归原版，不能落在
+     * {@code SkillListener} 的判据里 —— 那条管道会把右键整个取消）。
+     * <p><b>覆写者须知</b>：返回的键必须与消费它的 listener 读的键是同一个，且必须由 {@code KeyFactory}
+     * 造（{@code KeyFactory.Registry.of(...)}）；给错键 ⇒ 物品既不被任何输入管道认领，也不被
+     * {@code HotbarItems.clearFrom()} 清掉（与 {@link #buildItem()} 覆写须知同族）。
+     * <p>为什么是钩子而不是构造参数：键是"这一族物品的身份"，技能的身份由类型封死（技能 / 弓弩各一个键），
+     * 不是每个组件各传一个值；做成构造参数会让"传错键"变成运行期惊喜。
+     */
+    protected NamespacedKey identifyKey() {
+        return Utils.SKILL_KEY;
     }
 
     //技能物品识别工具（键名 / 读取面，冻结面；渲染器不再持有它们）

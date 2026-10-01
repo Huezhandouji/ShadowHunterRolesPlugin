@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
+import com.shadowHunterRolesPlugin.roleComponent.base.BowWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import org.bukkit.entity.Player;
@@ -13,8 +14,11 @@ import org.bukkit.inventory.ItemStack;
  * 职责（查取入口 / 隔离 / 生命周期），"清哪些物品"属物品关注点，归本工具，调用方 = 死亡 / 重生 / 清
  * 角色三条路径。
  * <h2>清除范围</h2>
- * **只清本系统写进去的**：识别键命中 {@link Skill.Utils#isSkillItem} 或
- * {@link MainWeapon.Utils#isMainWeapon} 的槽位则置空；玩家自己的物品一律不动。
+ * **只清本系统写进去的**：识别键命中 {@link Skill.Utils#isSkillItem} ·
+ * {@link MainWeapon.Utils#isMainWeapon} 或 {@link BowWeapon.Utils#isBowWeapon} 的槽位则置空；
+ * 玩家自己的物品一律不动。
+ * <p>三支识别键 = 三个家族基类各一个（道具 / 近战主武器 / 弓弩主武器）：**凡在热键栏里放东西的组件
+ * 家族，其键都必须在这里出现**，否则角色清除后它的物品会残留在背包里（这条是加家族时的必改点）。
  */
 public final class HotbarItems {
 
@@ -31,7 +35,8 @@ public final class HotbarItems {
         for (int i = 0; i < 9; i++) {
             ItemStack item = inv.getItem(i);
             if (Skill.Utils.isSkillItem(item)
-                    || MainWeapon.Utils.isMainWeapon(item)) {
+                    || MainWeapon.Utils.isMainWeapon(item)
+                    || BowWeapon.Utils.isBowWeapon(item)) {
                 inv.setItem(i, null);
             }
         }

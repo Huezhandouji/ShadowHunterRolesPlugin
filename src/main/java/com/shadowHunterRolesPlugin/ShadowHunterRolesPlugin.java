@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin;
 import com.shadowHunterRolesPlugin.listener.hook.HotbarItemProtectionListener;
 import com.shadowHunterRolesPlugin.listener.hook.DamageHookListener;
 import com.shadowHunterRolesPlugin.listener.hook.ImmunePotionListener;
+import com.shadowHunterRolesPlugin.listener.hook.PlayerKilledHookListener;
 
 import com.shadowHunterRolesPlugin.api.RoleAPI;
 import com.shadowHunterRolesPlugin.command.RoleCommand;
@@ -17,6 +18,7 @@ import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
 import com.shadowHunterRolesPlugin.platform.CombatPresence;
 import com.shadowHunterRolesPlugin.platform.FactionLookup;
 import com.shadowHunterRolesPlugin.platform.FactionRelation;
+import com.shadowHunterRolesPlugin.platform.Hostility;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.registry.RoleLoader;
@@ -69,35 +71,41 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
             }
 
             /**
-             * 两个玩家之间是否敌对（对称）：先过"在场"（任一方创造 / 旁观 ⇒ 不敌对），
-             * 再过阵营，因此 {@code isHostile(a,b)} 与 {@code isHostile(b,a)} 同值。
+             * 「{@code self} 是否视 {@code other} 为敌人」——<b>非对称</b>，方向由形参顺序表达
+             * （{@code self} = 发起方，{@code other} = 目标）。
              *
-             * <p>真值转发到 {@link CombatPresence}（在场维度）与
-             * {@link FactionRelation#isHostile(Faction, Faction)}（阵营维度）两件纯静态类，
-             * 本处只做接线、不自己持有语义，测试与生产共用同一份判据。
+             * <p>★ 口径（2026 语义变更）：只读<b>对方</b>的在场状态，
+             * <b>己方是创造 / 旁观不再豁免</b>（旧口径"双方都不敌对"的那道己方闸门已删除）。
+             * 因此 {@code isHostile(a,b)} 与 {@code isHostile(b,a)} 一般<b>不同值</b>。
+             *
+             * <p>本方法只是把「阵营 + 对方的在场」按「发起方 = self」展开一遍，
+             * 因此与下面 {@link #isHostile(Faction, UUID)} 逐条等价（同一条真值路径）。
+             *
+             * <p>真值转发到 {@link Hostility}（合成层）与两个维度真值 {@link CombatPresence} /
+             * {@link FactionRelation}，本处只做接线、不自己持有语义。
+             * 消费者 = {@code core/RoleInfoImpl#isHostileTo(UUID)} 与 {@code manager/RoleManager#areHostile}
+             * （后者是<b>公开 API</b> {@code RoleAPI.areHostile} 的落点）。
              */
             @Override
             public boolean isHostile(UUID self, UUID other) {
-                if (!participatesInHostility(self) || !participatesInHostility(other)) {
+                if (self == null || other == null) {
                     return false;
                 }
-                return FactionRelation.isHostile(factionOf(self), factionOf(other));
+                return isHostile(factionOf(self), other);
             }
 
             /**
-             * 「某个阵营」与「某个玩家」是否敌对：对方在场（非创造 / 旁观）且
-             * （没有角色，或阵营与 {@code self} 不同）则敌对。
-             * <p>对方没有角色也算敌对 —— 旧口径为"没角色则不敌对"，本条是有意变更。
-             * <p>己方是否在场本方法看不到（{@code self} 只是阵营）：那一半由
-             * {@code core/RoleInfoImpl#isHostileTo(UUID)} 挡。
-             * <p>消费者 = {@code core/RoleInfoImpl#isHostileTo(UUID)}（"我这个角色是否与它敌对"）。
-             * <p>真值转发到 {@link CombatPresence} 与
-             * {@link FactionRelation#isHostileTo(Faction, Faction)}（同上）。
+             * 「某个阵营」与「某个玩家」是否敌对：对方<b>在场</b>且（双方都有角色时阵营不同）则为敌对。
+             * <p>对方没有角色同样敌对（口径见类注释的「无角色」）。
+             * <p><b>己方是否在场不参与</b>：{@code self} 只是阵营，本方法看不到玩家对象也不需要看 ——
+             * 旧口径那道"自己不在场 ⇒ 一律不敌对"的前置闸门已随语义变更删除（落点已从
+             * {@code core/RoleInfoImpl#isHostileTo} 移到这里统一处理）。
+             * <p>真值转发到 {@link Hostility#isHostileTo(Faction, Faction, boolean)}（合成层）。
              */
             @Override
             public boolean isHostile(Faction self, UUID other) {
-                return participatesInHostility(other)
-                        && FactionRelation.isHostileTo(self, factionOf(other));
+                return other != null
+                        && Hostility.isHostileTo(self, factionOf(other), participatesInHostility(other));
             }
         };
 
@@ -128,11 +136,18 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
 
         Bukkit.getPluginManager().registerEvents(new SkillListener(roleManager, rolesContext), this);
         Bukkit.getPluginManager().registerEvents(new MainWeaponListener(roleManager, rolesContext), this);
+        //弓弩管道：与上面两条是"第三条输入管道"，差别在右键的归属 —— 弓弩的右键归原版
+        //（拉弓 / 装填 / 击发），系统只在箭矢离弦那一刻派发 onShoot；左键与 Q 则照技能家族口径派发 onCast。
+        //三条管道按各自的识别键判物，互不认领对方的物品。
+        Bukkit.getPluginManager().registerEvents(new BowWeaponListener(roleManager, rolesContext), this);
         Bukkit.getPluginManager().registerEvents(new PlayerListener(roleManager), this);
         Bukkit.getPluginManager().registerEvents(new DamageTrackerListener(), this);
         Bukkit.getPluginManager().registerEvents(new RoleEventListener(), this);
         //受伤 / 受治疗的平台事件面（钩子投递；ignoreCancelled、只读不取消）
         Bukkit.getPluginManager().registerEvents(new DamageHookListener(roleManager), this);
+        //击杀的平台事件面（玩家被玩家击杀 ⇒ 投给**击杀者**实例的击杀订阅名单）
+        //  优先级 LOWEST：必须早于 PlayerListener#onPlayerDeath(NORMAL) 读被杀者的角色 id（它之后会清角色）
+        Bukkit.getPluginManager().registerEvents(new PlayerKilledHookListener(roleManager), this);
         //热键栏物品的不可动保护（拖拽 / F 键 / 容器搬运 / 合成格 四类真缺口的取消型保护）
         //  与上一行的姿态相反：保护侧必须 setCancelled(true)；读侧只通知（见该类的 javadoc）
         Bukkit.getPluginManager().registerEvents(new HotbarItemProtectionListener(), this);

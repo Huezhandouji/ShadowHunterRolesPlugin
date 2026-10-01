@@ -41,8 +41,10 @@ import java.util.List;
  *       整段行进期间获得抗性 {@link #RESISTANCE_AMPLIFIER}（原版增幅，4 级 = 抗性 IV）；</li>
  *   <li><b>技能完全结束后才开始冷却</b>（{@link #startCooldown()} 只在 {@link #finishGrapnel()} 里调一次），
  *       与「罪恶的辩护」同一条口径；</li>
- *   <li><b>可储存 2 个</b>：{@link #MAX_CHARGE}，用掉后每 {@link #CHARGE_RESTORE_TICKS} 刻补 1 个
- *       （〈储存冷却 15 秒〉），掷出时消耗 {@link #ENERGY_COST} 点能量；</li>
+ *   <li><b>可储存 2 个</b>：{@link Charges#MAX_CHARGE}，用掉后每 {@link #CHARGE_RESTORE_TICKS} 刻补 1 个
+ *       （〈储存冷却 15 秒〉）；**手里还有 1 个就能放** —— 储存冷却只决定"什么时候补满"，
+ *       拦施放的只有 {@link #isCoolingDown()}（它只看"手里还有没有"），
+ *       掷出时消耗 {@link #ENERGY_COST} 点能量；</li>
  *   <li>物品名后缀实时显示剩余存量（形如 {@code (2/2)}），与澜冰左轮的弹夹显示同一形态。</li>
  * </ul>
  *
@@ -80,10 +82,8 @@ public class CangluMelodySelectionSkill extends Skill {
     private static final int COOLDOWN_TICKS = 40;
     /** 单次施放的能量消耗。 */
     private static final int ENERGY_COST = 4;
-    /** 存量上限（「可储存 2 个」）。 */
-    private static final int MAX_CHARGE = 2;
-    /** 存量恢复周期（tick）：「储存冷却 15 秒」。 */
-    private static final int CHARGE_RESTORE_TICKS = 80;
+    /** 存量恢复周期（tick）：「储存冷却 15 秒」；存量上限与就绪判据住在 {@link Charges}。 */
+    private static final int CHARGE_RESTORE_TICKS = 300;
     /** 抓钩命中的物理伤害（「对命中的敌人造成 12 点物理伤害」）。 */
     private static final int HOOK_DAMAGE = 12;
     /** 抓钩每刻前进的步数（步长 1 格 ⇒ 每刻最多 2 格）。 */
@@ -155,8 +155,8 @@ public class CangluMelodySelectionSkill extends Skill {
 
     // ───────── 状态 ─────────
 
-    /** 已结算的存量（0..{@link #MAX_CHARGE}）。 */
-    private int charge = MAX_CHARGE;
+    /** 已结算的存量（0..{@link Charges#MAX_CHARGE}）。 */
+    private int charge = Charges.MAX_CHARGE;
     /** 距下一次存量恢复还有多少刻。 */
     private int chargeRestoreTick = CHARGE_RESTORE_TICKS;
 
@@ -218,7 +218,7 @@ public class CangluMelodySelectionSkill extends Skill {
     protected void onAwake() {
         //本钩子由基类 `awake()` 调用（栏位登记已在基类里完成），不能也不需要调 super.awake()
         //只做不可见的初始化（契约：awake 不得产生玩家可见副作用）
-        charge = MAX_CHARGE;
+        charge = Charges.MAX_CHARGE;
         chargeRestoreTick = CHARGE_RESTORE_TICKS;
         grapnel = null;
         resolved = false;
@@ -307,32 +307,66 @@ public class CangluMelodySelectionSkill extends Skill {
         return energy == null ? 0 : energy.current();
     }
 
-    // ───────── 就绪判定：把「存量正在恢复」也算进冷却 ─────────
+    // ───────── 就绪判定：只看「手里还有没有」 ─────────
 
     /**
-     * **存量没满 ⇒ 视为冷却中**（把父类的自持冷却与本技能的存量恢复合成一个"可用吗"的读数）。
+     * **存量这件事里"能被离线钉住"的两样**：上限与就绪判据 —— 纯值（不碰 Bukkit、不读服务集、无副作用）；
+     * 恢复周期仍在组件里（{@code CHARGE_RESTORE_TICKS}，它是逐刻节奏，不属于判据）。
      *
-     * <h2>为什么必须在这里并进来</h2>
-     * 名称里的存量倒计时（{@code (1/2, 12s)}）要做到"逐秒在动"，就必须**每 tick 重绘**；
-     * 而帧末 flush 的每 tick 重绘条件只有两个（见 {@code HotbarRenderComponent#flush()}）：
-     * ① 有人置脏，或 ② **某个占栏位的、外观依赖活状态的组件正在冷却**（{@code hasCoolingTickingComponent}）。
-     * <p>本技能自己的冷却只有 {@link #COOLDOWN_TICKS} 刻（4 刻），抓钩一收线就到期；
-     * 而存量恢复要 {@link #CHARGE_RESTORE_TICKS} 刻。若只靠父类的冷却，第二个条件很快就不成立，
-     * 图标会**停在** {@code (1/2, 14s)} 一动不动 —— 秒数再也不减。
+     * <h2>为什么单独一个嵌套类（实测约束，别把它合并回外层）</h2>
+     * 判据要能被**离线件**钉住（见 {@code CangluMelodySelectionReadinessTest}），
+     * 而外层类（本组件）的静态初始化要碰 {@code Sound} 注册表 —— {@link #HIT_SOUND} 与
+     * {@link #HIT_MELODY} 是静态常量，无服务端的 JUnit 里那一句就会抛
+     * {@code ExceptionInInitializerError: No RegistryAccess implementation found}（实测踩到）。
+     * 嵌套类有自己的 class 文件 ⇒ 触碰它**不会**连带初始化外层类 ⇒ 判据在盘上就能跑。
+     */
+    static final class Charges {
+
+        /** 存量上限（「可储存 2 个」）。 */
+        static final int MAX_CHARGE = 2;
+
+        private Charges() {
+        }
+
+        /**
+         * **就绪判定（纯函数 · 离线可测）**：本组件"现在能不能放" = 手里还有存量 **且** 声明冷却已走完。
+         *
+         * <p>两个输入各占一维：{@code charge} = 已结算的存量（{@code 0..MAX_CHARGE}），
+         * {@code parentCoolingDown} = 父类自持的声明冷却（{@code startCooldown()} 那一路，
+         * 起点在 {@code finishGrapnel()}）。抽成静态纯函数的理由与 {@code IconState#of} 同一条：
+         * 判据的形状可以离线钉住，不必起服。
+         *
+         * <h2>为什么是「存量 &gt; 0」而不是「存量已满」</h2>
+         * 存量的两件事必须分开：**能不能放**只看手里有没有货，**什么时候补满**只决定下一发何时到手。
+         * 曾经把两者合成一条读数（{@code super.isCoolingDown() || charge < MAX_CHARGE}），
+         * 于是手里还剩 1 颗、储存冷却尚未走完的那 15 秒里，施放被 {@code SkillListener} 的预检
+         * （读的就是 {@link #isCoolingDown()}）整段拦下 ——
+         * 现象 =「还有抓钩，却按不出来」（本组件的 {@code onCast} 里那条判断一直是 {@code charge <= 0}，
+         * 两者从此同源）。
+         *
+         * @param charge             当前存量
+         * @param parentCoolingDown  父类自持的声明冷却是否未到期
+         */
+        static boolean readyToCast(int charge, boolean parentCoolingDown) {
+            return charge > 0 && !parentCoolingDown;
+        }
+    }
+
+    /**
+     * **就绪读数**：非就绪 = 冷却中（判据本体 = {@link Charges#readyToCast(int, boolean)}）。
      *
-     * <h2>为什么覆写读数而不是到处调 {@code requestRepaint()}</h2>
-     * 存量恢复是连续 {@value #CHARGE_RESTORE_TICKS} 刻的状态，逐刻去请求重绘等于自己造一条
-     * 与帧末 flush 并行的刷新节拍；而"我还没准备好"本来就是冷却这一维的语义 ——
-     * 并进这个读数后，框架自己就会逐刻刷（且只在真的有存量在恢复时才刷，满存量时零开销）。
-     *
-     * <p><b>顺带的一致性</b>：{@code SkillListener} 的施放前预检读的也是本方法，
-     * 因此"图标显示还在恢复"与"施放会被拦下"这两件事从此同源，
-     * 不会再出现"图标说冷却好了、点下去却没反应"（那原本由 {@link #onCast} 里的存量判断兜着）。
-     * <p>施放语义**没有变化**：拦下它的是同一个条件（没有可用存量），只是提前到了预检那一步。
+     * <p>本方法有两个消费者，两者读的是同一份真值，因此它的语义只能是"现在能不能放"：
+     * <ul>
+     *   <li>施放预检（{@code SkillListener#cast}）：非就绪 ⇒ 整次施放被丢弃；</li>
+     *   <li>图标三态（{@code Skill#buildItem} → {@code IconState#of}）：非就绪 ⇒ 画成冷却态。</li>
+     * </ul>
+     * 把「存量正在恢复」并进这条读数会让图标与闸门**一起说谎**：明明能放，图标说冷却、点下去没反应。
+     * <p>存量恢复期的逐秒刷新（名称里的 {@code ", 12s"}）改由 {@link #tickChargeRestore()}
+     * 自己每刻请求重绘 —— 那一维是"外观的刷新节拍"，不是"能不能用"。
      */
     @Override
     public boolean isCoolingDown() {
-        return super.isCoolingDown() || charge < MAX_CHARGE;
+        return !Charges.readyToCast(charge, super.isCoolingDown());
     }
 
     // ───────── 每刻：存量恢复 → 飞行 → 拉拽 ─────────
@@ -351,18 +385,30 @@ public class CangluMelodySelectionSkill extends Skill {
         }
     }
 
-    /** 存量恢复：每 {@link #CHARGE_RESTORE_TICKS} 刻补 1 个，补满则停止计时。 */
+    /**
+     * 存量恢复：每 {@link #CHARGE_RESTORE_TICKS} 刻补 1 个，补满则停止计时。
+     *
+     * <p><b>存量未满期间每刻请求一次重绘</b>：名称里的 {@code ", 12s"} 是逐秒在变的活外观
+     * （{@link #chargeRestoreCountdownSuffix()} 向上取整到秒），而帧末 flush 的每 tick 入口条件
+     * （本组件已置脏 或 某个占栏位组件正在冷却）在"手里还有货"时不成立 ⇒
+     * 恢复期必须由本组件自己置脏（这一维已从 {@link #isCoolingDown()} 里摘出来，理由见
+     * ）。
+     * <p>代价与摘出去之前**逐字相同**：那时是"存量没满 ⇒ 读数算冷却 ⇒ 框架每 tick 刷一次"，
+     * 现在是"存量没满 ⇒ 自己每 tick 置脏一次"，两者的写物品次数一样（脏标记是布尔量、幂等，
+     * 写物品仍只在帧末 flush 那一次）。存量满时本方法一次都不置脏 ⇒「空闲 tick 零 setItem」不变。
+     */
     private void tickChargeRestore() {
-        if (charge >= MAX_CHARGE) {
+        if (charge >= Charges.MAX_CHARGE) {
             chargeRestoreTick = CHARGE_RESTORE_TICKS;
             return;
         }
+        //倒计时秒数每刻都可能变（补满那一颗的那个 tick 也不例外，见下方 charge++）
+        repaint();
         if (--chargeRestoreTick > 0) {
             return;
         }
         chargeRestoreTick = CHARGE_RESTORE_TICKS;
         charge++;
-        repaint();
     }
 
     // ───────── 飞行段 ─────────
@@ -693,8 +739,9 @@ public class CangluMelodySelectionSkill extends Skill {
      *   <li>{@code 旋律选取-青金石 (0/2, 3s)} —— 用光，整段变红（一眼看出还在等存量）。</li>
      * </ul>
      * <p>秒数**只在缺存量时出现**：满存量时没有"正在恢复"这回事，写个 {@code 15s} 只会误导。
-     * <p>逐秒递减依赖每刻重绘 —— 本组件覆写了 {@link #dependsOnLiveState()} 返回 {@code true}
-     * （技能家族默认就是），因此冷却 / 恢复期间框架每 tick 至少刷一次。
+     * <p>逐秒递减依赖每刻重绘，两段各有一个来源：**声明冷却期**由框架的帧末入口条件刷
+     * （{@code isCoolingDown()} 为真 ⇒ 每 tick 至少刷一次），**存量恢复期**由
+     * {@link #tickChargeRestore()} 每刻请求一次重绘（那时本组件并不算"冷却中"，因此不再靠框架那一条）。
      *
      * <p>**抓钩在飞 / 正在拉拽期间给本物品加附魔光效**（{@link #isGrapnelOut()}）——
      * 与「罪恶的辩护」生效期、「罪棘缠」引导期同一形态：
@@ -715,7 +762,7 @@ public class CangluMelodySelectionSkill extends Skill {
         Component baseName = meta.displayName() != null ? meta.displayName() : getDisplayName();
         NamedTextColor chargeColor = charge <= 0 ? NamedTextColor.RED : NamedTextColor.YELLOW;
         meta.displayName(baseName.append(Component
-                .text(" (" + charge + "/" + MAX_CHARGE + chargeRestoreCountdownSuffix() + ")")
+                .text(" (" + charge + "/" + Charges.MAX_CHARGE + chargeRestoreCountdownSuffix() + ")")
                 .color(chargeColor)));
         stack.setItemMeta(meta);
         return stack;
@@ -729,7 +776,7 @@ public class CangluMelodySelectionSkill extends Skill {
      * 但那时其实还差一点。归零后不再显示（那一刻存量 +1、计时被重置）。
      */
     private String chargeRestoreCountdownSuffix() {
-        if (charge >= MAX_CHARGE || chargeRestoreTick <= 0) {
+        if (charge >= Charges.MAX_CHARGE || chargeRestoreTick <= 0) {
             return "";
         }
         long seconds = (chargeRestoreTick + 19L) / 20L;      // 向上取整到秒

@@ -41,7 +41,7 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
                     Component.text("至洁之刃"),
                     List.of(Component.text("攻击施加流血效果")),
                     Material.IRON_SWORD,
-                    100
+                    40
             );
             requires(VitalsComponent.class).requires(BuffComponent.class);
         }

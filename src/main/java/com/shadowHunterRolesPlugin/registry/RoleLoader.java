@@ -19,6 +19,7 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEquipmentsPassive
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.TestBowMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.mainWeapon.SinThornFangMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.LawWordPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.SinThornPassive;
@@ -65,7 +66,8 @@ public class RoleLoader {
                 new Definition("red", RoleLoader::redBuilder),
                 new Definition("selfUpdateExample", RoleLoader::selfUpdateExampleBuilder),
                 new Definition("canglu", RoleLoader::cangluBuilder),
-                new Definition("sinThorn", RoleLoader::sinThornBuilder)
+                new Definition("sinThorn", RoleLoader::sinThornBuilder),
+                new Definition("remoteness", RoleLoader::remotenessBuilder)
         );
     }
 
@@ -266,6 +268,14 @@ public class RoleLoader {
                 .addComponent(SinThornPassive.ID, new SinThornPassive.Specification())
                 .addComponent(LawWordPassive.ID, new LawWordPassive.Specification())
                 .icon(Material.WITHER_ROSE);
+    }
+
+    public static Role.Builder remotenessBuilder(){
+        return withBuiltIns(new Role.Builder("remoteness"))
+                .displayName(Component.text("冷识"))
+                .faction(Faction.SHADOW)
+                .addComponent(TestBowMainWeapon.ID, new TestBowMainWeapon.Specification().setSlot(0))
+                .icon(Material.SOUL_LANTERN);
     }
 
 }

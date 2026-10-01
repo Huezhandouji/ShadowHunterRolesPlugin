@@ -10,6 +10,12 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
+import org.bukkit.event.HandlerList;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * 生命组件：生命 / 治疗 / 伤害的持有者（每角色实例一个）。
@@ -36,6 +42,12 @@ import org.bukkit.entity.Player;
  * <h2>边界</h2>
  * `damage` / `heal` 只做结算：不投递回调 —— 受伤 / 受治疗由
  * {@code listener/hook/DamageHookListener} 在平台事件面派发（见 {@link Participant}）。
+ *
+ * <h2>击杀订阅面</h2>
+ * 「玩家被玩家击杀」也由本组件广播（见 {@link #addPlayerKilledListener(RoleComponent, Consumer)}）：
+ * 本组件是"死亡"这条链的终点（生命的唯一写入者），而**要发增益的是击杀者** ⇒ 投递对象 =
+ * **击杀者那一侧的**本组件。检测与投递写在 {@code listener/hook/PlayerKilledHookListener}
+ * （击杀者经 {@link DamageUtil#getLastDamager(Player)} 定出）；本组件只持有名单与载荷。
  */
 public class VitalsComponent extends RoleComponent {
 
@@ -326,5 +338,197 @@ public class VitalsComponent extends RoleComponent {
     /** 物理伤害 + 击退强度。 */
     public void physicalDamage(LivingEntity victim, LivingEntity source, double amount, double knockbackStrength) {
         DamageUtil.dealtPhysicalDamage(victim, source, amount, knockbackStrength);
+    }
+
+    // ───────────── 击杀订阅面（玩家被玩家击杀）─────────────
+
+    /**
+     * 「玩家被玩家击杀」的载荷（**自定义 Bukkit 事件**）—— 订阅者（JDK {@code Consumer}）收到的那一个对象。
+     *
+     * <h2>为什么用事件承载</h2>
+     * 一次击杀天然带四个值（两个玩家引用 + 两个角色 id），摊成四个入参就没法塞进一个 {@code Consumer}；
+     * 用事件承载则一次交清，访问器名也沿用 Bukkit 惯例（{@code getKiller()} / {@code getVictim()}）。
+     *
+     * <h2>它<b>不</b>进 Bukkit 事件总线（与工程口径一致）</h2>
+     * 本插件**不再发布 Bukkit 事件**（组件自己的监听器列表是唯一的变更通道）⇒ 本对象只经
+     * {@link #addPlayerKilledListener(RoleComponent, Consumer)} 的名单直接交给订阅者，
+     * **不会**被 {@code Bukkit.getPluginManager().callEvent(...)} 广播；{@link #getHandlers()} 那条
+     * HandlerList 因此空转（留着只是让它仍是一个合法的 {@code Event}）。若日后确要"供别的插件监听"，
+     * 那是「发布平台事件」这个决定本身，得另行裁定 —— 不在这里顺手 callEvent。
+     *
+     * <h2>字段口径</h2>
+     * <ul>
+     *   <li>{@code killer} —— 由 {@link DamageUtil#getLastDamager(Player)} 定出的击杀者
+     *       （**不是**原版 {@code getKiller()}：本系统一部分伤害绕过原版事件，只有那条 PDC 覆盖两侧）；</li>
+     *   <li>{@code victim} —— 死者（{@code PlayerDeathEvent} 的承受方，取值时其角色实例尚未被清）；</li>
+     *   <li>{@code killerRoleId} —— 击杀者当时所装角色的登记 id（如 {@code "red"}）；</li>
+     *   <li>{@code victimRoleId} —— 被杀者当时所装角色的 id；被杀者当时**没有**角色则为 {@code null}。</li>
+     * </ul>
+     * 四个字段一律不可变、且没有 setter（要改口径就在生产处改，不在载荷上开写口）。
+     */
+    public static final class PlayerKilledEvent extends Event {
+
+        /** 本事件的 HandlerList（只为满足 {@link Event} 的抽象面；本事件不上总线，故它空转）。 */
+        private static final HandlerList HANDLERS = new HandlerList();
+
+        private final Player killer;
+        private final Player victim;
+        private final String killerRoleId;
+        private final String victimRoleId;
+
+        /**
+         * @param killer       击杀者（不得为 {@code null} —— 没有击杀者就不会产生本事件）
+         * @param victim       被杀者（不得为 {@code null}）
+         * @param killerRoleId 击杀者所装角色的 id
+         * @param victimRoleId 被杀者所装角色的 id；被杀者无角色时为 {@code null}
+         */
+        public PlayerKilledEvent(Player killer, Player victim, String killerRoleId, String victimRoleId) {
+            this.killer = killer;
+            this.victim = victim;
+            this.killerRoleId = killerRoleId;
+            this.victimRoleId = victimRoleId;
+        }
+
+        /** 击杀者（经 {@link DamageUtil#getLastDamager(Player)} 定出，非原版 {@code getKiller()}）。 */
+        public Player getKiller() {
+            return killer;
+        }
+
+        /** 被杀者。 */
+        public Player getVictim() {
+            return victim;
+        }
+
+        /** 击杀者所装角色的登记 id。 */
+        public String getKillerRoleId() {
+            return killerRoleId;
+        }
+
+        /** 被杀者所装角色的登记 id；被杀者当时无角色则为 {@code null}。 */
+        public String getVictimRoleId() {
+            return victimRoleId;
+        }
+
+        @Override
+        public HandlerList getHandlers() {
+            return HANDLERS;
+        }
+
+        /** 与 {@link #getHandlers()} 同源（Bukkit 事件类的惯例；本事件不上总线，故当前无消费者）。 */
+        public static HandlerList getHandlerList() {
+            return HANDLERS;
+        }
+    }
+
+    /**
+     * 一条击杀监听登记：{@code owner}（谁订阅）+ {@code listener}（怎么通知）成对持有
+     * （与 {@link EnergyComponent.Listener} / {@link SanTEComponent.Listener} 同形）。
+     *
+     * <h2>为什么把 owner 一起登记</h2>
+     * 投递纪律是「逐个经 {@code RoleInstance#deliverHook} 调用」：某个监听器抛异常时只隔离抛异常的
+     * 那一个、其余照常收到。这条纪律需要每一条登记都知道自己属于哪个组件，而 {@code Consumer} 闭包
+     * 没有身份 ⇒ 由注册方在 {@link #addPlayerKilledListener(RoleComponent, Consumer)} 里显式给出。
+     * <p>record 不是接口（不违反"不新增自定义接口"）。
+     */
+    public record PlayerKilledListener(RoleComponent owner, Consumer<PlayerKilledEvent> listener) {
+    }
+
+    /** 击杀监听名单 —— 顺序 = 添加先后（迭代序稳定，因此"按装配序通知"可复现）。 */
+    private final List<PlayerKilledListener> playerKilledListeners = new ArrayList<>();
+
+    /** 逐条故障隔离的日志（与 SanTE 组件同规：报出是谁抛了）。 */
+    private static final java.util.logging.Logger LOG =
+            java.util.logging.Logger.getLogger("ShadowHunterRoles.vitals");
+
+    /**
+     * 添加「击杀监听」—— 唯一的订阅入口。
+     *
+     * <h2>投给谁（本挂载点最容易误解的一点）</h2>
+     * 名单挂在**本组件所属的那一个角色实例**上，而投递对象 = **击杀者那一侧**的本组件：
+     * 击杀者 K 杀了人 ⇒ 通知的是 **K 自己实例**里的这条名单（不是死者的）。
+     * 因此"杀人就给自己增益"的写法是：在**击杀者角色**的组件里（通常在它自己的 {@code start()} 里）
+     * <pre>{@code
+     * VitalsComponent vitals = getComponent(VitalsComponent.class);
+     * killedEntry = vitals.addPlayerKilledListener(this, event -> {
+     *     if (event.getKiller() != self()) return;     // 双保险：本名单只会在"我是击杀者"时被通知
+     *     heal(4);                                     // 例：击杀回血
+     * });
+     * }</pre>
+     * （被杀者一侧不会收到：那个实例在同一个 tick 里就被 {@code PlayerListener#onPlayerDeath} 清掉了，
+     * 通知它没有意义；"我被谁杀了"请自行挂 {@code PlayerDeathEvent}。）
+     *
+     * <h2>时机与线程</h2>
+     * 投递发生在 {@code PlayerDeathEvent}（主线程、优先级 {@code LOWEST} ⇒ 早于清角色）里，
+     * 每次击杀**恰好一次**（自杀 / 无击杀者 / 击杀者无角色 / 击杀者不是玩家都不产生通知）。
+     *
+     * <h2>幂等与移除</h2>
+     * 同一 {@code owner} + 同一 {@code listener} 重复添加不重复登记；{@code owner} 或 {@code listener}
+     * 为 {@code null} 则忽略（回 {@code null}）。返回值 = 本次登记对应的 {@link PlayerKilledListener}，
+     * 需要撤销时把它存进私有字段、用 {@link #removePlayerKilledListener(PlayerKilledListener)} 按引用移除
+     * （{@code Consumer} 闭包没有身份标识，故"按身份移除"在类型上不可表达）。
+     */
+    public PlayerKilledListener addPlayerKilledListener(RoleComponent owner, Consumer<PlayerKilledEvent> listener) {
+        if (owner == null || listener == null) {
+            return null;
+        }
+        PlayerKilledListener entry = new PlayerKilledListener(owner, listener);
+        if (!playerKilledListeners.contains(entry)) {
+            playerKilledListeners.add(entry);
+        }
+        return entry;
+    }
+
+    /**
+     * 移除击杀监听（按引用相等；不在名单里则 no-op 且返回 {@code false}）——
+     * 调用方必须持有同一个 {@link PlayerKilledListener} 实例（把
+     * {@link #addPlayerKilledListener(RoleComponent, Consumer)} 的返回值存进私有字段即可）。
+     */
+    public boolean removePlayerKilledListener(PlayerKilledListener entry) {
+        return entry != null && playerKilledListeners.remove(entry);
+    }
+
+    /** 当前击杀监听数（诊断读口；供探针与运行级取证使用）。 */
+    public int playerKilledListenerCount() {
+        return playerKilledListeners.size();
+    }
+
+    /**
+     * 逐个把击杀登记交给调用方（"逐监听器故障隔离"的承载面）—— 投递方（
+     * {@code listener/hook/PlayerKilledHookListener}）用它把每一条套进
+     * {@code RoleInstance#deliverHook}：某个监听器抛异常时只隔离那一个、其余照常收到。
+     *
+     * <p>本方法不替调用方做派发决策，只提供遍历。遍历前对名单取快照（{@code List.copyOf}）⇒
+     * 遍历途中添加 / 移除监听器既不抛 {@code ConcurrentModificationException}，也不影响本趟
+     * （本次通知的接受集在进入时已定，新加的从下一趟起收到）。
+     */
+    public void forEachPlayerKilledListener(Consumer<PlayerKilledListener> action) {
+        if (action == null) {
+            return;
+        }
+        for (PlayerKilledListener entry : List.copyOf(playerKilledListeners)) {
+            action.accept(entry);
+        }
+    }
+
+    /**
+     * 通知全部击杀监听（一趟直调）。
+     * <p><b>生产路径不走它</b>：真实投递在 {@code listener/hook/PlayerKilledHookListener} 里，
+     * 逐条经 {@code RoleInstance#deliverHook}（"逐监听器故障隔离"的唯一实现点）。本方法的存在理由是
+     * 给"没有容器"的离线单元测试一条与生产同源的派发路径（否则测试只能自己写循环，验的就成了测试自己的循环）。
+     * <p>与 {@code SanTEComponent#notifyListeners} 同规：逐条 try/catch，某个监听器抛异常时只记日志并继续。
+     * <p><b>不是第二条变更通道</b>：本方法只读名单并调监听器，不改任何状态、不产生事件。
+     */
+    public void notifyPlayerKilledListeners(PlayerKilledEvent event) {
+        if (event == null) {
+            return;
+        }
+        forEachPlayerKilledListener(entry -> {
+            try {
+                entry.listener().accept(event);
+            } catch (RuntimeException listenerFailure) {
+                LOG.warning("[vitals] playerKilled listener failed (owner=" + entry.owner().getId() + "): "
+                        + listenerFailure);
+            }
+        });
     }
 }

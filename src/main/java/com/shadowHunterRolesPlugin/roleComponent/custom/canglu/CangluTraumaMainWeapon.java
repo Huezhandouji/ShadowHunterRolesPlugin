@@ -19,6 +19,7 @@ public class CangluTraumaMainWeapon extends MainWeapon {
 
     public static final String ID = "cangluTraumaMainWeapon";
 
+    private static final int COOLDOWN = 16;
     private static final int DAMAGE = 6;
     private static final float KNOCKBACK = 0.5f;
     private static final int EXTRA_TURE_DAMAGE_AMOUNT = 4;
@@ -53,7 +54,7 @@ public class CangluTraumaMainWeapon extends MainWeapon {
                     Component.text("忧郁创痕-主武器"),
                     List.of(Component.text("攻击造成12特殊值伤害并夺取2能量，增加移速。如果'创伤'层数不小于4，将结算4层创伤")),
                     Material.DIAMOND_SWORD,
-                    40
+                    COOLDOWN
             );
             requires(SanTEComponent.class);
             requires(EnergyComponent.class);
@@ -91,6 +92,7 @@ public class CangluTraumaMainWeapon extends MainWeapon {
     public void onAttack(AttackSignal signal){
 
         if(!canUse()) return;
+        if(isCoolingDown()) return;
 
         UUID victimPid = signal.victim().getUniqueId();
         sante.decreaseSanTE(victimPid, SANTE_DAMAGE_AMOUNT);

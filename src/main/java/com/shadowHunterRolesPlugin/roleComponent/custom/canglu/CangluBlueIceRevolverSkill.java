@@ -52,7 +52,6 @@ public class CangluBlueIceRevolverSkill extends Skill {
 
     public static final String ID = "cangluBlueIceRevolverSkill";
     // ───────── 数值（唯一修改点）─────────
-
     /** 一个弹夹的容量。 */
     private static final int MAX_MAGAZINE_CAPACITY = 8;
     /** 换弹的能量消耗。 */
@@ -76,7 +75,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
     /** 子弹寿命（tick），到点销毁，避免无限飞行。 */
     private static final int BULLET_MAX_LIVING_TIME = 20;
     /** 子弹每 tick 前进的步数（步长 = 1 格，因此每 tick 最多 3 格）。 */
-    private static final int BULLET_STEPS_PER_TICK = 3;
+    private static final int BULLET_STEPS_PER_TICK = 5;
     /** 命中判定半径（格）：圆心距小于它即算命中。 */
     private static final double BULLET_HIT_RADIUS = 0.6;
     /** 弹道粒子：每一步画几个点（纯视觉）。 */

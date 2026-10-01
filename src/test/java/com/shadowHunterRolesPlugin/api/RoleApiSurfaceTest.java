@@ -26,6 +26,9 @@ public class RoleApiSurfaceTest {
      * <p>废弃方法已被删除 —— 它们是"直接操作组件"时代的空壳
      * （恒回中性哨兵值 / 空操作）：阵营三条（读走 {@code RoleInfo#faction()}、写只在聚合根上）、
      * 生命 / 能量 / SanTE / 冷却读数与增减、以及所有 {@code Player} 重载。
+     * <p>★ 上面"删掉所有 {@code Player} 重载"指的是**旧那批空壳**；现快照里的
+     * {@code getLastDamagerUuid(Player)} / {@code getLastDamager(Player)} 是**击杀归属读口**，
+     * 参数刻意收成 {@code Player}（只有玩家能进角色实例表，故调用方拿到的必是玩家），与那批不是一类。
      * <p>保留 {@code areHostile}：它**不是**空壳，而是转调 {@code RoleManager} 的可用实现，
      * 且判定链只从聚合根读阵营。
      * <p>排序后逐字比较，因此与声明顺序无关。
@@ -41,10 +44,11 @@ public class RoleApiSurfaceTest {
             "java.util.List getRoleDescription(java.lang.String)",
             "java.util.List getRoles()",
             "java.util.Set getAllRoleIds()",
-            "java.util.UUID getLastDamagerUuid(org.bukkit.entity.LivingEntity)",
+            "java.util.UUID getLastDamagerUuid(org.bukkit.entity.Player)",
             "net.kyori.adventure.text.Component getPlayerRoleDisplayName(java.util.UUID)",
             "net.kyori.adventure.text.Component getRoleDisplayName(java.lang.String)",
-            "org.bukkit.Material getRoleIcon(java.lang.String)"
+            "org.bukkit.Material getRoleIcon(java.lang.String)",
+            "org.bukkit.entity.Player getLastDamager(org.bukkit.entity.Player)"
     };
 
     /** 现算（与快照同一条口径：declared methods ⇒ 只数本接口自己的声明）。 */

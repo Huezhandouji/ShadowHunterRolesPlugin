@@ -14,7 +14,6 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -34,8 +33,12 @@ public class RoleAPIImpl implements RoleAPI {
     }
 
     @Override
-    public UUID getLastDamagerUuid(LivingEntity player) {
+    public UUID getLastDamagerUuid(Player player) {
         return DamageUtil.getLastDamagerUUID(player);
+    }
+    @Override
+    public Player getLastDamager(Player player) {
+        return DamageUtil.getLastDamager(player);
     }
 
 

@@ -2,7 +2,6 @@ package com.shadowHunterRolesPlugin.api;
 
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
@@ -16,7 +15,8 @@ public interface RoleAPI {
     //不建议使用所有以Player类型作参数的api
 
     //通过特殊设置的pdc查询最后攻击者
-    UUID getLastDamagerUuid(LivingEntity player);
+    UUID getLastDamagerUuid(Player player);
+    Player getLastDamager(Player player);
 
     //查询一个角色id是否存在，即这个角色是否被实现
     boolean isValidRoleId(String id);
@@ -49,13 +49,20 @@ public interface RoleAPI {
     //   写 = 只在聚合根上（{@code Role#setFaction} / {@code Role#resetFaction}），不由外部 API 直改
 
     /**
-     * 两个玩家是否敌对（阵营关系查询）。
+     * <b>是否视 {@code p2} 为敌人</b>（<b>非对称</b>：{@code p1} = 发起方，{@code p2} = 目标方）。
      *
-     * <p>判定链 = {@code RoleManager} → 平台关系表（{@code FactionLookup}），
-     * 关系表同时看"在场"与"阵营"两个维度，因此阵营真值只从聚合根读。
-     * <p>语义：任一方**没有角色**（含实例缺失）⇒ {@code true}；
-     * 任一方**不在场**（创造 / 旁观模式）⇒ {@code false}；
-     * 双方都有角色时，阵营不同 ⇒ {@code true}、同阵营 ⇒ {@code false}。
+     * <p>★ <b>语义变更（2026）</b>：本方法<b>曾经是对称的</b>——语义为"两个玩家之间是否敌对"，
+     * {@code areHostile(a,b)} 与 {@code areHostile(b,a)} 同值。<b>现语义下两者一般不同值</b>，
+     * 下游（如 {@code SHDFGamePlugin}）若依赖了对称性需同步调整。
+     *
+     * <p>判定链 = {@code RoleManager} → 平台关系表（{@code FactionLookup}）。三条规则<b>同阵营优先</b>：
+     * <ol>
+     *   <li><b>同阵营 ⇒ 任何情况下非敌对</b>：双方都有角色且阵营相同，无论双方各是什么游戏模式；</li>
+     *   <li><b>目标方（{@code p2}）是创造 / 旁观 ⇒ 非敌对</b>（目标方不在场就不打他）；</li>
+     *   <li><b>其余 ⇒ 敌对</b>：{@code p2} 在场且不同阵营（含"任一方没有角色"）。</li>
+     * </ol>
+     * ★ <b>发起方（{@code p1}）是否在场不参与判定</b>：旧口径下 p1 是创造 / 旁观会一律回
+     * {@code false}，该闸门已删除 —— 现按上述三条规则求值。
      *
      * @return 两个 uuid 为 {@code null} 则 {@code false}
      */

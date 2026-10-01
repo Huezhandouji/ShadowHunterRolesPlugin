@@ -18,6 +18,10 @@ import java.util.List;
  * （同一条已记账路径）；冷却由组件自持的 `startCooldown()` 启动（状态归组件实例、框架只转问）。
  * <p>数值与间隔：冷却 `600` / 能量 `0` / 每秒（`20` tick）一结算 / 扣 `10` 点 SanTE /
  * 生命恢复 `45, 5` 与力量 `45, 2` / 音效 `ENTITY_WITHER_DEATH 2,1` 与 `ENTITY_WITHER_SHOOT 1,1`。
+ * <p><b>进化联动（4 级 · 故不可知）</b>：每秒扣除的 SanTE 由
+ * {@code RedEvolutionPassive#deeplySorrowSanTEDrainPerSecond()} 给出（基线 10，该档起 4）；
+ * 其余数值（回血 / 力量 / 音效 / 间隔 / 冷却）一字未改。档位是**每秒结算时**现读的，
+ * 因此升级后下一次结算就按新值走，不需要重启技能。
  */
 public class RedDeeplySorrowSkill extends Skill {
 
@@ -26,6 +30,13 @@ public class RedDeeplySorrowSkill extends Skill {
 
     private BuffComponent buff;
     private SanTEComponent sante;
+
+    /**
+     * 红的进化被动（档位读口的来源）；{@code start()} 里一次取好。
+     * <p>取不到时退化为基线每秒 10 点（装配期已声明
+     * {@code requires(RedEvolutionPassive.class)} ⇒ 生产上不会发生）。
+     */
+    private RedEvolutionPassive evolution;
 
     /**
      * 本组件在 {@code SanTEComponent} 上的监听登记：由 {@code start()} 里 {@code addListener} 的返回值
@@ -56,6 +67,7 @@ public class RedDeeplySorrowSkill extends Skill {
     public void start() {
         buff = svc().components().get(BuffComponent.class);
         sante = svc().components().get(SanTEComponent.class);
+        evolution = getComponent(RedEvolutionPassive.class);
         if (sante != null) {
             santeListener = sante.addListener(this, this::onSanTEChange);
         }
@@ -72,6 +84,8 @@ public class RedDeeplySorrowSkill extends Skill {
                     List.of(Component.text("持续扣减[红]的TE值，每秒10点，在TE值归零前获得持续的生命恢复5与力量2，在TE值归零后结束这个技能")),
                     600, 0, Material.REDSTONE_BLOCK);
             requires(BuffComponent.class);
+            //进化被动进依赖表：每秒扣除量由它的档位读口给出（见 update()）
+            requires(RedEvolutionPassive.class);
             //sante 实取于 start() 但代码自带 null 兜底（订阅 / 退订两处）⇒ 按「实取但可为空」声明为**可选**；
             //它在装配期的「已被提供类型」清单内、由容器无条件构造 ⇒ 生产环境永不缺失（optional 与实际效果等价）
             requiresOptional(SanTEComponent.class);
@@ -103,7 +117,10 @@ public class RedDeeplySorrowSkill extends Skill {
 
         Player caster = svc().self().player();
 
-        sante.decrease(10);
+        //每秒扣除的 TE：基线 10；4 级（故不可知）起减慢为 4（档位现读 ⇒ 升级后下一次结算即生效）
+        sante.decrease(evolution != null
+                ? evolution.deeplySorrowSanTEDrainPerSecond()
+                : RedEvolutionPassive.BASE_DEEPLY_SORROW_SANTE_DRAIN_PER_SECOND);
         //药水记账：经 Buff 组件的入口（与框架同一条已记账路径），clear() 时只回收本系统施加的效果
         buff.applyPotionEffect(PotionEffectType.REGENERATION, 45, 5);
         buff.applyPotionEffect(PotionEffectType.STRENGTH, 45, 2);

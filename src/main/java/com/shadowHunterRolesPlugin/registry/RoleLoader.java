@@ -16,6 +16,7 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.Meiqihez
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedBleedPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedDeeplySorrowSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEquipmentsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvolutionPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
@@ -129,7 +130,7 @@ public class RoleLoader {
                 .addComponent(VitalsComponent.ID, new VitalsComponent.Specification())
                 .addComponent(BuffComponent.ID, new BuffComponent.Specification())
                 .addComponent(TaskComponent.ID, new TaskComponent.Specification())
-                .addComponent(BossbarRoleAttributesDisplayPassive.ID, new BossbarRoleAttributesDisplayPassive.Specification());
+                .addComponent(BossbarRoleAttributesDisplayComponent.ID, new BossbarRoleAttributesDisplayComponent.Specification());
     }
 
     private static Role.Builder meiqiheziBuilder() {
@@ -172,6 +173,9 @@ public class RoleLoader {
                 ))
                 .faction(Faction.SHADOW)
                 .addComponent(RedBleedPassive.ID, new RedBleedPassive.Specification())
+                //进化被动（无栏位、不占热键栏）：红的五档增益与升级消息都归它
+                //  紧跟在流血被动之后 —— 流血被动与两个技能都声明它为必需依赖（档位读口）
+                .addComponent(RedEvolutionPassive.ID, new RedEvolutionPassive.Specification())
                 .addComponent(RedSanctifiedBladeMainWeapon.ID, new RedSanctifiedBladeMainWeapon.Specification().setSlot(0))
                 .addComponent(RedSolitaryArroganceSkill.ID, new RedSolitaryArroganceSkill.Specification().setSlot(1))
                 .addComponent(RedEvilShockSkill.ID, new RedEvilShockSkill.Specification().setSlot(2))

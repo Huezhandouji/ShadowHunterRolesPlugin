@@ -31,7 +31,10 @@ import static org.junit.Assert.assertNull;
  * （实测：{@code NoClassDefFoundError}）。因此本类在 {@link BeforeClass} 里 install 一个
  * **最小 KeyFactory 桩**（{@code new NamespacedKey("shadowhunterroles", key)}，离线可构造）。
  * <p>该桩的副作用（如实申报）：{@code KeyFactory.Registry} 是全局静态，本类的 install 对本 JVM
- * 内其它测试同样生效（现算：`src/test` 里零处引用 {@code KeyFactory} ⇒ 无人依赖"未安装即抛"）。
+ * 内其它测试同样生效。**但不得把它当作别人的前提**：凡构造带静态 {@code NamespacedKey} 常量的组件的
+ * 套件（现算：{@link VitalsComponentKilledListenerTest} 与 {@code EvolutionPassiveLevelUpListenerTest}）
+ * 都各自在 {@code @BeforeClass} 里装同一份桩 —— 否则"谁先跑"会决定"谁能不能跑"（实测踩到过：
+ * 套件顺序一变，那些套件整片红）。
  * <p>替身的语义边界（如实申报）：替身**不**模拟真实 {@code BuffManager} 的取最大时长 / 到期判定 /
  * STUN 属性修饰符 / 药水施加 / **原版负面药水的枚举与移除** —— 那些是生产行为，属运行级读数。
  *

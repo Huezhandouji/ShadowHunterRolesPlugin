@@ -1,21 +1,17 @@
 package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
 import com.shadowHunterRolesPlugin.core.Faction;
-import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
-import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.entity.Boss;
 
-import javax.inject.Named;
 import java.util.List;
 
 
-public class BossbarRoleAttributesDisplayPassive extends PassiveSkill {
+public class BossbarRoleAttributesDisplayComponent extends PassiveSkill {
 
     public final static String ID = "bossbarRoleAttributesDisplayPassive";
 
@@ -24,11 +20,11 @@ public class BossbarRoleAttributesDisplayPassive extends PassiveSkill {
 
     private BossBar bossbar;
 
-    public BossbarRoleAttributesDisplayPassive(String id, ComponentServicesPort services, Specification specification) {
+    public BossbarRoleAttributesDisplayComponent(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
-    public static final class Specification extends PassiveSkill.Specification<BossbarRoleAttributesDisplayPassive> {
+    public static final class Specification extends PassiveSkill.Specification<BossbarRoleAttributesDisplayComponent> {
 
 
         public Specification() {
@@ -37,8 +33,8 @@ public class BossbarRoleAttributesDisplayPassive extends PassiveSkill {
         }
 
         @Override
-        public BossbarRoleAttributesDisplayPassive create(String id, ComponentServicesPort services) {
-            return new BossbarRoleAttributesDisplayPassive(id, services, this);
+        public BossbarRoleAttributesDisplayComponent create(String id, ComponentServicesPort services) {
+            return new BossbarRoleAttributesDisplayComponent(id, services, this);
         }
     }
 

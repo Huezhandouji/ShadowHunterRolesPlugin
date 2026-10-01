@@ -15,9 +15,13 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.Meiqihez
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedBleedPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedDeeplySorrowSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEquipmentsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvolutionPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
+import org.bukkit.NamespacedKey;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -44,6 +48,18 @@ import static org.junit.Assert.assertTrue;
  */
 public class CapabilityDispatchTest {
 
+    /**
+     * **离线测试基设**：装一个最小 {@code KeyFactory} 桩。
+     * <p>{@code RedEvolutionPassive} 有静态常量 {@code HEALTH_BONUS_KEY}（走 {@code KeyFactory.Registry.of(...)}），
+     * 而该实现只在插件 {@code onEnable} 才 install ⇒ 不装桩时连类都加载不了
+     * （{@code ExceptionInInitializerError}）。本套件**自己装**，不搭别人的便车
+     * （{@code Registry} 是全局静态，谁先跑不该决定本套件能不能跑 —— 这条顺序依赖是实测踩到的）。
+     */
+    @BeforeClass
+    public static void installKeyFactoryStub() {
+        KeyFactory.Registry.install(key -> new NamespacedKey("shadowhunterroles", key));
+    }
+
     /** 空服务集：三个成员全 null，构造组件时只被存下来（本测试从不读它）。 */
     private static ComponentServicesPort inertServices() {
         return new ComponentServicesPort(null, null, null);
@@ -68,6 +84,7 @@ public class CapabilityDispatchTest {
         out.put("MeiqiheziEquipmentsPassive", new MeiqiheziEquipmentsPassive("t_13", svc, new MeiqiheziEquipmentsPassive.Specification()));
         out.put("RedBleedPassive", new RedBleedPassive("t_14", svc, new RedBleedPassive.Specification()));
         out.put("RedEquipmentsPassive", new RedEquipmentsPassive("t_15", svc, new RedEquipmentsPassive.Specification()));
+        out.put("RedEvolutionPassive", new RedEvolutionPassive("t_16", svc, new RedEvolutionPassive.Specification()));
         return out;
     }
 
@@ -88,10 +105,11 @@ public class CapabilityDispatchTest {
             {"DefaultSanTEZeroPunishment", "false", "N/A"},
             {"MeiqiheziEquipmentsPassive", "false", "N/A"},
             {"RedBleedPassive", "false", "N/A"},
-            {"RedEquipmentsPassive", "false", "N/A"}
+            {"RedEquipmentsPassive", "false", "N/A"},
+            {"RedEvolutionPassive", "false", "N/A"}
     };
 
-    /** 逐组件比对冻结真值表（15 个具体组件；枚举里没有的面 = 新增组件 ⇒ 本断言会提醒补表）。 */
+    /** 逐组件比对冻结真值表（16 个具体组件；枚举里没有的面 = 新增组件 ⇒ 本断言会提醒补表）。 */
     @Test
     public void capabilityTruthTableIsFrozen() {
         Map<String, Object> actual = components();

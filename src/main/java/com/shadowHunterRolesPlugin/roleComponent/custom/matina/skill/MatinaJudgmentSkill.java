@@ -9,6 +9,8 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.MatinaRageVfx;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -18,6 +20,13 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
+
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import java.util.List;
 
@@ -30,6 +39,12 @@ import java.util.List;
  *   <li>对技能范围内 <b>r = {@value #AURA_RADIUS}</b> 的敌人<b>持续 {@value #DURATION_SECONDS} 秒</b>
  *       造成特殊值（SanTE）伤害，<b>共 {@value #TOTAL_SANTE_DAMAGE} 点</b>；</li>
  *   <li>整个技能是一个<b>大型魔法阵</b>：<b>旋转变换</b>、<b>魔法阵边缘就是技能边缘</b>（r = 25）；</li>
+ *   <li>★ <b>脚下那层已换成外部「pixelart 粒子画」数据包导出的<u>像素画魔法阵</u></b>
+ *       （2026-10-02 用户要求"用它替换掉脚下圆圈魔法阵"）：见
+ *       {@link #PIXEL_CIRCLE_RESOURCE} / {@link #PIXEL_CIRCLE_SLICES} / {@link #pixelArt()}。
+ *       <b>它不自转</b>（位图自转会糊，见 {@link #PIXEL_CIRCLE_PHASE}）；
+ *       <b>上方 3 格的 r=10 小魔法阵仍是原来的几何画法、照旧自转</b>
+ *       （用户只要求换脚下那层）—— 所以"旋转变换"这条在技能整体上仍然成立；</li>
  *   <li>自己周身环绕<b>白色旋转向上 10 格</b>粒子，且在自己<b>上方 3 格</b>处再生成一个
  *       <b>r = 10</b> 的魔法阵（粒子基本都是白色）；</li>
  *   <li>技能期间<b>定身</b>、获得<b>抗性 2</b>；</li>
@@ -126,8 +141,49 @@ public class MatinaJudgmentSkill extends Skill {
     /** 被推出锚点多少格就拽回来。 */
     private static final double ROOT_MAX_DRIFT = 0.8d;
 
-    /** 魔法阵点阵预算（越大越细）。 */
-    private static final int CIRCLE_POINT_BUDGET = 120;
+    /**
+     * **脚下像素魔法阵的直径（格）** —— 取 {@code 2 × } 技能半径。
+     *
+     * <p>即"魔法阵边缘就是技能边缘"这条既有需求在**新画法**下的延续：那张画本身带一圈外环，
+     * 铺到整个直径上就还兼着"标出技能范围"的作用。
+     */
+    private static final double PIXEL_CIRCLE_DIAMETER = AURA_RADIUS * 2d;
+
+    /**
+     * 像素画**分几片刻完一遍**（★ 性能阀门）。
+     *
+     * <p>画有 4554 个点；取 {@value #PIXEL_CIRCLE_SLICES} ⇒ **每刻约 455 颗**
+     * （与替换前的几何魔法阵同量级），每个点每 10 刻（0.5 秒）重画一次
+     * —— dust 有存活期，所以看上去是连续的一张画。
+     * <p>★ 调小 = 更亮但更费；调大 = 更省但会闪。改动前先读
+     * {@link MatinaRageVfx#pixelCircle} 的"为什么按片画"。
+     */
+    private static final int PIXEL_CIRCLE_SLICES = 10;
+
+    /**
+     * **脚下像素画魔法阵的自转相位：恒为 0（即不自转）** —— 这是**有意**的，不是漏了。
+     *
+     * <h2>★ 为什么位图不能转（实测结论）</h2>
+     * 原先的几何魔法阵（同心环 + 直径符线）**可以**自转：它**径向对称**，转过之后还是自己。
+     * 而这张像素画**不是**径向对称的 ⇒ 两个后果叠加：
+     * <ol>
+     *   <li>粒子有存活期（dust ≈ 0.5~1 秒）⇒ 客户端会把**相邻若干刻**的粒子一起显示；
+     *   <li>本实现按片交错绘制（每刻只画 1/{@value #PIXEL_CIRCLE_SLICES}），
+     *       一遍要 10 刻才画完 ⇒ 若这 10 刻里相位一直在走，各片就是在**不同角度**画的。
+     * </ol>
+     * ⇒ 结果是把画**糊成一片旋转残影**（离线仿真实测：相位每刻 +0.1 rad 时，
+     * 一遍累计转 57°，图上细节全被抹平；相位固定时才是清晰的法阵）。
+     * <p>粗算：半径 25 格处，转 0.012 rad 就位移约 0.3 格 = 一个像素宽
+     * ⇒ 想"不糊"就必须**几乎不转**，那还不如干脆不转。
+     *
+     * <p>★ 想让法阵动起来的话，只有两条路（都要付代价）：① 每刻画完整张（4554 颗/刻，
+     * 约 9 万粒子/秒，会明显加重客户端）；② 改成分段跳转（每遍换一个固定角度，会有台阶感）。
+     * 两条都没做 —— 阵面周围的动感由上方小阵与白色螺旋提供。
+     */
+    private static final double PIXEL_CIRCLE_PHASE = 0d;
+
+    /** 像素画资源路径（随 jar 打包；由外部「pixelart 粒子画」数据包转换而来）。 */
+    private static final String PIXEL_CIRCLE_RESOURCE = "/matina_magic_circle.txt";
 
     /** **引导期**技能边缘的点数（引导期不展开魔法阵，只画这一圈边）。 */
     private static final int EDGE_POINT_COUNT = 120;
@@ -161,6 +217,18 @@ public class MatinaJudgmentSkill extends Skill {
 
     /** 魔法阵自转相位。 */
     private double circlePhase;
+
+    /** 像素画的分片下标（每刻 +1、循环；见 {@link #PIXEL_CIRCLE_SLICES}）。 */
+    private int pixelSlice;
+
+    /**
+     * 像素画数据（**JVM 级懒加载一次**，所有马提娜实例共用）。
+     * <p>{@code null} = 资源缺失或解析失败 ⇒ 脚下不画阵（其余特效照常），并只报一次日志。
+     */
+    private static MatinaRageVfx.PixelArt pixelArt;
+
+    /** 是否已经尝试过加载（资源真缺失时避免每刻重试）。 */
+    private static boolean pixelArtLoadTried;
 
     /** 帧任务句柄。 */
     private com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle frameTask;
@@ -219,6 +287,7 @@ public class MatinaJudgmentSkill extends Skill {
         channelDone = false;
         elapsedTicks = 0L;
         circlePhase = 0d;
+        pixelSlice = 0;
         anchor = caster.getLocation().clone();
 
         //技能物品加附魔光效（需求：附魔来提示正在释放技能）
@@ -264,8 +333,16 @@ public class MatinaJudgmentSkill extends Skill {
         circlePhase += 0.10d;
         Location ground = owner.getLocation().clone().add(0d, 0.12d, 0d);
         if (channelDone) {
-            //引导已结束 ⇒ 大型魔法阵（脚下，r = 25 = 技能边缘）+ 上方 3 格的 r=10 小魔法阵
-            MatinaRageVfx.magicCircle(world, ground, AURA_RADIUS, circlePhase, CIRCLE_POINT_BUDGET);
+            //引导已结束 ⇒ 脚下【像素画魔法阵】+ 上方 3 格的 r=10 小魔法阵
+            //★ 脚下那层已由"几何魔法阵"换成外部「pixelart 粒子画」数据包导出的画；
+            //  按片交错绘制（每刻约 点数/sliceCount 颗）—— 见 MatinaRageVfx#pixelCircle 的说明。
+            MatinaRageVfx.PixelArt art = pixelArt();
+            if (art != null) {
+                //★ 相位恒为 PIXEL_CIRCLE_PHASE（= 0，不自转）—— 位图自转会糊，理由见该常量的注释
+                MatinaRageVfx.pixelCircle(world, ground, PIXEL_CIRCLE_DIAMETER, PIXEL_CIRCLE_PHASE,
+                        pixelSlice, PIXEL_CIRCLE_SLICES, art, MatinaRageVfx.PIXEL_DUST_SIZE);
+                pixelSlice = (pixelSlice + 1) % PIXEL_CIRCLE_SLICES;
+            }
             MatinaRageVfx.magicCircle(world, ground.clone().add(0d, SKY_CIRCLE_HEIGHT, 0d),
                     SKY_CIRCLE_RADIUS, -circlePhase * 1.5d, 56);
         } else {
@@ -448,5 +525,118 @@ public class MatinaJudgmentSkill extends Skill {
     /** 技能范围半径（读口：需求声明值 25 格，= 魔法阵边缘）。 */
     public static double auraRadius() {
         return AURA_RADIUS;
+    }
+
+    // ───────── 像素画魔法阵：资源加载（归组件；Vfx 侧保持"纯几何、零状态"）─────────
+
+    /**
+     * **懒加载像素画**（首次用到时读一次插件资源，之后走静态缓存）。
+     *
+     * <p>资源：{@link #PIXEL_CIRCLE_RESOURCE}，格式 {@code <x> <y> <RRGGBB>}，
+     * {@code x/y} 的单位是 **0.1 格**（由外部「pixelart 粒子画」数据包的三段 mcfunction
+     * 去重落格而来，共 4554 点，网格 247 × 251 ≈ 24.7 × 25.1 格）。
+     *
+     * <p>★ <b>归一化必须"两轴同除以最大边"</b>：源画两轴的像素间距并不相同
+     * （x 是 0.1 格、y 是 0.2 格），若按"格号"各自归一就会把画**横向拉伸一倍**
+     * —— 所以这里只用统一的比例因子，长宽比因此与源画逐格一致（实测宽/高 = 0.984）。
+     *
+     * @return 可用的画；资源缺失 / 为空 / 解析失败 ⇒ {@code null} 并**只报一次**日志
+     *         （脚下不画阵，其余特效不受影响 —— 与工程"可缺失即容忍"的既有口径一致）
+     */
+    private static synchronized MatinaRageVfx.PixelArt pixelArt() {
+        if (pixelArtLoadTried) {
+            return pixelArt;
+        }
+        pixelArtLoadTried = true;
+        try (InputStream in = MatinaJudgmentSkill.class.getResourceAsStream(PIXEL_CIRCLE_RESOURCE)) {
+            if (in == null) {
+                Bukkit.getLogger().warning("[matina] 像素画资源缺失（" + PIXEL_CIRCLE_RESOURCE
+                        + "）⇒ 神罚脚下魔法阵不画，其余特效不受影响");
+                return null;
+            }
+            MatinaRageVfx.PixelArt art = parsePixelArt(in);
+            if (art == null) {
+                Bukkit.getLogger().warning("[matina] 像素画资源为空 ⇒ 神罚脚下魔法阵不画");
+                return null;
+            }
+            pixelArt = art;
+            Bukkit.getLogger().info("[matina] 神罚像素画魔法阵已加载：" + art.size() + " 点");
+            return pixelArt;
+        } catch (Exception failure) {
+            Bukkit.getLogger().warning("[matina] 像素画加载失败 ⇒ 神罚脚下魔法阵不画：" + failure);
+            return null;
+        }
+    }
+
+    /**
+     * **纯解析**：把像素画资源流读成归一化的 {@link MatinaRageVfx.PixelArt}。
+     *
+     * <p>★ 与 {@link #pixelArt()} 分开的理由有二：① 本方法**不碰 Bukkit、不写日志**
+     * ⇒ 可离线单测（{@code pixelArt()} 里的 {@code Bukkit.getLogger()} 在测试 JVM 里会炸）；
+     * ② 于是"解析与归一化"这条最容易出错的口径能被测试钉住。
+     *
+     * <p>格式：每行 {@code <x> <y> <RRGGBB>}，{@code #} 开头为注释、空行忽略。
+     * <p>★ <b>归一化口径</b>：两轴**同除以最大边**（不是各自归一）—— 源画两轴像素间距不同
+     * （x 0.1 格 / y 0.2 格），各自归一会把画横向拉伸一倍。
+     *
+     * @param in 资源流
+     * @return 归一化后的画；没有任何有效行 ⇒ {@code null}
+     * @throws java.io.IOException 读流失败
+     */
+    static MatinaRageVfx.PixelArt parsePixelArt(InputStream in) throws java.io.IOException {
+        List<int[]> points = new ArrayList<>();
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(in, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.charAt(0) == '#') {
+                    continue;       //注释 / 空行
+                }
+                String[] token = line.split("\\s+");
+                if (token.length < 3) {
+                    continue;
+                }
+                int px = Integer.parseInt(token[0]);
+                int py = Integer.parseInt(token[1]);
+                int rgb = Integer.parseInt(token[2], 16);
+                points.add(new int[]{px, py, rgb});
+                if (px < minX) {
+                    minX = px;
+                }
+                if (px > maxX) {
+                    maxX = px;
+                }
+                if (py < minY) {
+                    minY = py;
+                }
+                if (py > maxY) {
+                    maxY = py;
+                }
+            }
+        }
+        if (points.isEmpty()) {
+            return null;
+        }
+        //★ 中心与跨度都取**真实 min/max**（不假定数据从 0 开始 —— 那样对非零起点的输入会偏移）；
+        //  两轴同除以"较大那一维的跨度"⇒ 局部坐标落在 −0.5~+0.5 且**长宽比与源画一致**
+        //  （各自归一会把画拉伸：源画两轴像素间距本就不同）。
+        double centerX = (minX + maxX) / 2d;
+        double centerY = (minY + maxY) / 2d;
+        double span = Math.max(1d, Math.max(maxX - minX, maxY - minY));
+        float[] localX = new float[points.size()];
+        float[] localY = new float[points.size()];
+        Color[] colors = new Color[points.size()];
+        for (int i = 0; i < points.size(); i++) {
+            int[] point = points.get(i);
+            localX[i] = (float) ((point[0] - centerX) / span);
+            localY[i] = (float) ((point[1] - centerY) / span);
+            colors[i] = Color.fromRGB(point[2]);
+        }
+        return new MatinaRageVfx.PixelArt(localX, localY, colors);
     }
 }

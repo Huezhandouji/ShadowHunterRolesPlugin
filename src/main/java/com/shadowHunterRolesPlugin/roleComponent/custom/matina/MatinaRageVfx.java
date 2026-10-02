@@ -330,4 +330,87 @@ public final class MatinaRageVfx {
         }
         return to.toVector().subtract(from.toVector());
     }
+
+    // ───────── 像素画魔法阵（数据源：外部「pixelart 粒子画」数据包）─────────
+
+    /**
+     * **一张已归一化的像素画**（纯数据容器；本类不缓存任何东西，由调用方持有并复用）。
+     *
+     * <p>{@code localX/localY} 是**归一化局部坐标**（−0.5 ~ +0.5，两轴同除以最大边
+     * ⇒ 长宽比与源画一致）；{@code colors} 与它们一一对应。
+     * <p>为什么做成 record 由调用方持有：本类的契约是"纯几何、零状态"
+     * （见类注释的边界申报）⇒ 资源读取与缓存归组件，本类只负责把坐标算出来并 spawn。
+     */
+    public record PixelArt(float[] localX, float[] localY, Color[] colors) {
+
+        /** 点数（三数组等长；空画回 0）。 */
+        public int size() {
+            return localX == null ? 0 : localX.length;
+        }
+    }
+
+    /**
+     * 像素画每颗点的 **dust 尺寸**（源数据包用的是 0.2）。
+     *
+     * <p>为什么这里调大：源画按 0.2 格间距密排，而我们要把它**铺满整个技能直径**
+     * （放大 ≈2 倍）⇒ 点间距变宽，沿用 0.2 会让画面显得稀疏发暗 ⇒ 取 0.5 补偿。
+     * <p>★ 想改观感只调这一个常量（想更接近源就调小、想更亮就调大）。
+     */
+    public static final float PIXEL_DUST_SIZE = 0.5f;
+
+    /**
+     * **像素画魔法阵**：把一张像素画**平铺在脚下**，替换原来的几何魔法阵。
+     *
+     * <h2>铺法与朝向</h2>
+     * <ul>
+     *   <li>画的局部 {@code x} 轴 → 世界 {@code +x}；画的局部 {@code y} 轴（源里 +y 朝上）
+     *       → 世界 <b>−z</b>（俯视时"上"= 北）⇒ 从上方看是正立的；</li>
+     *   <li>再整体绕 Y 轴旋转 {@code phase} 弧度 ⇒ 与几何魔法阵一样**自转**；</li>
+     *   <li>{@code diameter} 决定铺多大：局部坐标最大边 1.0 映射到 {@code diameter} 格。</li>
+     * </ul>
+     *
+     * <h2>★ 为什么按"片"画（sliceIndex / sliceCount）</h2>
+     * 这张画有 4554 个点，**每刻全画 ≈ 9 万粒子/秒**，会把客户端刷爆。
+     * 而 dust 粒子有存活期 ⇒ 只要**每隔几刻把同一个点重画一次**，玩家看到的就是连续的画。
+     * 因此本方法每刻只画"第 {@code sliceIndex} 片"（共 {@code sliceCount} 片），
+     * 由调用方逐刻递增下标 ⇒ 每刻的粒子数与"画全一遍所需刻数"成反比。
+     * <p>例：{@code sliceCount = 10} ⇒ 每刻约 455 颗粒子（**与替换前的几何魔法阵同量级**），
+     * 每个点每 10 刻（0.5 秒）重画一次。
+     *
+     * @param center     地面圆心（调用方给的位置就是阵面所在高度）
+     * @param diameter   阵面直径（格）—— 想铺满技能范围就传 {@code 2 × 技能半径}
+     * @param phase      自转相位（弧度）
+     * @param sliceIndex 本刻画第几片（内部取模，负数也安全）
+     * @param sliceCount 共分几片（≤ 0 ⇒ 当作 1 片，即整幅一次画完）
+     * @param art        像素画数据（{@code null} / 空 ⇒ 静默不画）
+     * @param dustSize   dust 尺寸（一般传 {@link #PIXEL_DUST_SIZE}）
+     */
+    public static void pixelCircle(World world, Location center, double diameter, double phase,
+                                   int sliceIndex, int sliceCount, PixelArt art, float dustSize) {
+        if (world == null || center == null || art == null || diameter <= 0d) {
+            return;
+        }
+        int n = art.size();
+        if (n <= 0) {
+            return;
+        }
+        int slices = Math.max(1, sliceCount);
+        int start = Math.floorMod(sliceIndex, slices);
+
+        double cos = Math.cos(phase);
+        double sin = Math.sin(phase);
+        float[] lx = art.localX();
+        float[] ly = art.localY();
+        Color[] colors = art.colors();
+
+        //★ 交错：只画 start, start+slices, start+2*slices … —— 每刻换个起手点，几刻内铺满一遍
+        for (int i = start; i < n; i += slices) {
+            double px = lx[i] * diameter;
+            double py = ly[i] * diameter;
+            // 绕 Y 轴旋转 + 把画的上方向映射到 −z
+            double dx = px * cos - py * sin;
+            double dz = px * sin + py * cos;
+            dust(world, center.clone().add(dx, 0d, dz), colors[i], dustSize);
+        }
+    }
 }

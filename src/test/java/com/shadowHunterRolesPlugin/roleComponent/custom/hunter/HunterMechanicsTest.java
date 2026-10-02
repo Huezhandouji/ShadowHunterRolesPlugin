@@ -246,6 +246,39 @@ public class HunterMechanicsTest {
                 2.5d, HunterPullSkill.PULL_MAX_TICKS / 20d, 1.0E-9d);
     }
 
+    // ───────── ⑧ 死亡后不再被继续拖拽（需求："死亡后不再会被继续控制拖拽"）─────────
+
+    /**
+     * 判据 = 在线 && 未死 && 血量 > 0；三条缺一条就必须**不再**拖。
+     * <p>这个判据在 `resolveThrust` / `update` / `beginPull` / `stepPull`（写坐标前）四处共用 ——
+     * 任一处漏了都会出现"拖着尸体走"。
+     */
+    @Test
+    public void draggableRequiresOnlineAliveAndPositiveHealth() {
+        assertTrue("活着且在线有血 ⇒ 可拖",
+                HunterPullSkill.isDraggable(true, false, 20d));
+
+        assertFalse("已死亡（血量归零）⇒ 不可拖",
+                HunterPullSkill.isDraggable(true, true, 0d));
+        assertFalse("血量归零但 isDead 还没翻 ⇒ 也不可拖（两侧都判，不赌引擎时点）",
+                HunterPullSkill.isDraggable(true, false, 0d));
+        assertFalse("血量是负数（某些来源会写成负）⇒ 不可拖",
+                HunterPullSkill.isDraggable(true, false, -3d));
+        assertFalse("掉线 ⇒ 不可拖",
+                HunterPullSkill.isDraggable(false, false, 20d));
+        assertFalse("掉线 + 死亡 ⇒ 不可拖",
+                HunterPullSkill.isDraggable(false, true, 0d));
+    }
+
+    /** 死亡判定必须是"血量为 0"就成立 —— 哪怕 `isDead()` 还没翻（不赌引擎的更新时点）。 */
+    @Test
+    public void draggableTreatsZeroHealthAsDeadEvenIfFlagLags() {
+        assertFalse("血量为 0 ⇒ 直接视为不可拖",
+                HunterPullSkill.isDraggable(true, false, 0d));
+        assertTrue("血量 0.5（还没死）⇒ 仍可拖",
+                HunterPullSkill.isDraggable(true, false, 0.5d));
+    }
+
     // ───────── ⑦ 击杀去重（需求："敌人死亡后只加一层，现在会加两层"）─────────
 
     @Test

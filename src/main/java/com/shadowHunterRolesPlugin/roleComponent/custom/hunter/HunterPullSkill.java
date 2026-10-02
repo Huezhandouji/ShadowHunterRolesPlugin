@@ -41,9 +41,17 @@ import java.util.UUID;
  *   <li><b>打空也有投出路径</b>：紫色穿刺路径**无条件**画 —— 有目标画到目标胸口，
  *       没目标从眼睛沿水平前向画满 {@value #THRUST_RANGE} 格
  *       （改前它在"命中"分支里 ⇒ 空放时一点粒子都没有）；</li>
- *   <li><b>被命中的敌人死亡 ⇒ 立刻清掉拖拽</b>：{@code update()} 每刻先查一次被命中者，
- *       它一没（死亡 / 掉线 / 换世界）就立刻 {@link #finishPullCycle()} ⇒
- *       尸身上不再画拉拽连线、也不会继续占着"正在进行"的状态。</li>
+ *   <li><b>被命中的敌人死亡 ⇒ 不再被继续控制拖拽</b>（需求 2026-10-02 二次明确）。
+ *       判据统一为纯函数 {@link #isDraggable(boolean, boolean, double)}，用在**四处**：
+ *       <ol>
+ *         <li>{@link #resolveThrust}：**被这一击本身打死**（15 点物理）⇒ 当场收工，
+ *             <b>不进等待相</b>（否则 0.8 秒后还会去拉一个尸体，冷却也拖到那时才起算）；</li>
+ *         <li>{@link #update()} 每刻先扫一次被命中者：死了/没了 ⇒ 立刻 {@link #finishPullCycle()}；</li>
+ *         <li>{@link #beginPull}：0.8 秒到点前再确认一次；</li>
+ *         <li>{@link #stepPull} 的**写坐标之前**：全技能唯一的他人位移点，防御性再确认一次
+ *             ⇒ <b>任何情况下都不会对尸体写坐标</b>。</li>
+ *       </ol>
+ *       收工都走 {@code reset()} ⇒ 拉拽连线不再画、状态不再占着"正在进行"。</li>
  * </ol>
  *
  * <h2>★ 音效（2026-10-02 用户指定）</h2>
@@ -410,7 +418,16 @@ public class HunterPullSkill extends Skill {
             HunterSound.tridentHitHunterPullImpactSound(world, chest);
         }
 
-        //★ 命中 ⇒ 不进冷却，转入等待相
+        //★ 需求："**被拉回命中的敌人，死亡后不再会被继续控制拖拽**"
+        //  ⇒ 如果这一击**本身就把它打死了**，就别进等待相了：否则 0.8 秒后还会去拉一个尸体，
+        //    而且冷却要拖到那时才起算（"白占着正在进行"）。
+        //  ⇒ 当场收工（`finishPullCycle` 会清状态并立刻起冷却）。
+        if (!isDraggable(target.isOnline(), target.isDead(), target.getHealth())) {
+            finishPullCycle();
+            return;
+        }
+
+        //★ 命中且目标仍然活着 ⇒ 不进冷却，转入等待相
         pullTargetId = target.getUniqueId();
         phase = Phase.DELAY;
         delayLeft = PULL_DELAY_TICKS;
@@ -536,6 +553,14 @@ public class HunterPullSkill extends Skill {
         Location next = actual.clone().add(direction);
         next.setYaw(actual.getYaw());
         next.setPitch(actual.getPitch());
+
+        //★ 防御性第二道（需求："死亡后不再会被继续控制拖拽"）：
+        //  本方法开头虽然已经取过一次"活着的目标"，但在**真正写入位置**这一步之前再确认一次 ——
+        //  这是全技能**唯一**对别人做位移的地方，宁可我方多读一次血量，也不要对尸体写坐标。
+        if (!isDraggable(target.isOnline(), target.isDead(), target.getHealth())) {
+            finishPullCycle();
+            return;
+        }
         target.teleport(next);
         expected = next.clone();
 
@@ -585,10 +610,32 @@ public class HunterPullSkill extends Skill {
             return null;
         }
         Player target = org.bukkit.Bukkit.getPlayer(pullTargetId);
-        if (target == null || !target.isOnline() || target.isDead() || target.getHealth() <= 0d) {
+        if (target == null) {
             return null;
         }
-        return target;
+        //判据抽成纯函数（离线可测）：在线 && 未死 && 有血量
+        return isDraggable(target.isOnline(), target.isDead(), target.getHealth()) ? target : null;
+    }
+
+    /**
+     * **目标此刻还能不能被拖拽**（纯函数 ⇒ 可离线单测）。
+     *
+     * <p>三条同时成立：<b>在线</b>、<b>未死</b>、<b>血量 &gt; 0</b>。
+     * <p>★ 需求：「被拉回命中的敌人，**死亡后不再会被继续控制拖拽**」——
+     * 于是这个判据被用在**三处**（都必须是同一口径，漏一处就会拖到尸体）：
+     * <ol>
+     *   <li>{@link #pullTarget()}（取目标时）；</li>
+     *   <li>{@link #update()}（每刻先扫一次被命中者：死了立刻收工）；</li>
+     *   <li>{@link #stepPull} 的**写坐标之前**（全技能唯一的他人位移点，防御性再确认一次）。</li>
+     * </ol>
+     * <p>另：{@link #resolveThrust} 里"被这一击打死就不进等待相"用的是同一个判据。
+     *
+     * @param online 目标是否在线
+     * @param dead   目标是否处于死亡状态
+     * @param health 目标当前血量
+     */
+    static boolean isDraggable(boolean online, boolean dead, double health) {
+        return online && !dead && health > 0d;
     }
 
     /** 锚点 = 施法者当前位置 + 视线水平前方 {@value #PULL_ANCHOR_DISTANCE} 格，高度取施法者脚底。 */

@@ -121,15 +121,35 @@ public class RoleAssemblyTest {
 
         assertTrue("特克缺必需依赖: " + role.missingRequiredDependencies(),
                 role.missingRequiredDependencies().isEmpty());
-        //组件表 = 7 个内建组件 + 5 个角色组件（主武器 + 三个技能 + 一个被动）
+        //组件表 = 内建组件 + 5 个角色组件（主武器 + 三个技能 + 一个被动）
         //断言点落在"这 5 个 id 都在"，比断言总数更准（内建组件数量变化不该让本测试变红）
         java.util.Set<String> present = role.getComponents().keySet();
         for (String id : List.of("tekTridentMainWeapon", "tekXiaoSkill", "tekYueSkill",
                 "tekTruthThrustSkill", "tekDestinyPassive")) {
             assertTrue("特克缺组件 " + id + "，实际 = " + present, present.contains(id));
         }
-        assertEquals("特克应有 5 个角色组件（7 个内建 + 5 = 12 条），实际 = " + present,
-                12, role.getComponents().size());
+        //★ 内建条数**从注册表推导**，不写死：上游 2026-10-02 把内建从 7 个加到 9 个，
+        //  写死的总数让本测试误报过一次 —— 而"框架有几个内建"不是本测试要管的事。
+        int builtIns = builtInComponentCount();
+        assertEquals("特克应有 5 个角色组件（= 内建 " + builtIns + " + 5）；实际 = " + present,
+                builtIns + 5, role.getComponents().size());
+    }
+
+    /**
+     * **内建组件的条数**（从注册表推导，不写死）。
+     *
+     * <p>为什么用 {@code selfUpdateExample} 当基准：这个框架示例角色的组件表 =
+     * **内建组件 + 它自己的 1 个示例组件**（{@code ExampleSelfRefreshingSkill}），
+     * 因此"内建数 = 它的组件数 − 1"。
+     * <p>★ 这样上游**新增 / 删除内建组件**时，本测试不会误报；而**某个角色的组件丢了**仍然会红。
+     */
+    private static int builtInComponentCount() {
+        for (RoleLoader.Definition definition : loader().defaultDefinitions()) {
+            if ("selfUpdateExample".equals(definition.id())) {
+                return definition.builder().get().build().getComponents().size() - 1;
+            }
+        }
+        throw new AssertionError("注册表里必须有 selfUpdateExample（框架示例角色）");
     }
 
     /**

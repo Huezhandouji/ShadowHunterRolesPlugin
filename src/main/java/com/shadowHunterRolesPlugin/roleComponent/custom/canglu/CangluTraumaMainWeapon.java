@@ -82,7 +82,12 @@ public class CangluTraumaMainWeapon extends MainWeapon {
         public Specification(){
             super(
                     Component.text("忧郁创痕-主武器"),
-                    List.of(Component.text("攻击造成12特殊值伤害并夺取2能量，增加移速。如果'创伤'层数不小于4，将结算4层创伤")),
+                    List.of(
+                            Component.text("攻击造成12特殊值伤害并夺取2能量，增加移速。如果'创伤'层数不小于4，将结算4层创伤"),
+                            Component.text("=============================="),
+                            Component.text("被动:"),
+                            Component.text("深度癔症: 每次攻击或使用技能叠加1层「创伤」,第4层时普通攻击造成额外4点灵魂伤害、获得4点不可叠加护盾并回复12点SAN值(最多24层)")
+                    ),
                     Material.DIAMOND_SWORD,
                     ATTACK_COOLDOWN_TICKS
             );

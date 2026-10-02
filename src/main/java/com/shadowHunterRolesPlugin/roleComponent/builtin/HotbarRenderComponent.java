@@ -140,6 +140,8 @@ public class HotbarRenderComponent extends RoleComponent {
     /**
      * 渲染器由本组件自建（计划 = 本组件的 {@link #renderPlan()}），构造点唯一在组件内部，框架侧不经手
      * 渲染器本身。
+     * <p>渲染器只吃"本帧写什么、写到哪一格"这一份计划；**它不判该格现在装着什么**（落位是强刷，
+     * 口径与代价见 {@link HotbarRenderer} 的类注释）。
      */
     public HotbarRenderComponent(String id, ComponentServicesPort services) {
         super(id, services);
@@ -377,12 +379,14 @@ public class HotbarRenderComponent extends RoleComponent {
             slotByComponent.remove(component.getId());
             return;
         }
-        // 校验与文案逐字对齐装配期（core/Role.Builder#addComponent 扫快照的那一段）：
+        // 校验与文案与装配期**同源**（`HotbarSpecification#setSlot`）：上界读同一个常量
+        //   `HotbarSpecification.MAX_SLOT`，异常类型与文案因此不可能是两套说法。
         // ① 越界则抛同一句 IllegalArgumentException
         // ② 冲突则抛同一句冻结文案（Slot N is already occupied by 'X'.），只追加一个分句点名"谁想占"，
         //    冻结的主句一字未动，因此既有断言不受影响。
-        if (slot < 0 || slot > 8) {
-            throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
+        if (slot < 0 || slot > HotbarSpecification.MAX_SLOT) {
+            throw new IllegalArgumentException("Slot must be between 0 and " + HotbarSpecification.MAX_SLOT
+                    + ", got: " + slot);
         }
         for (Map.Entry<String, Integer> occupied : slotByComponent.entrySet()) {
             if (!occupied.getKey().equals(component.getId()) && occupied.getValue().equals(slot)) {
@@ -616,8 +620,11 @@ public class HotbarRenderComponent extends RoleComponent {
      * <p>重复提交同一槽位 = 替换：旧实例句柄立即失效。成功则置一次脏（下一次帧末 flush 落位）。
      */
     public HotbarItemHandle submit(int slot, String componentId, ItemStack item) {
-        if (slot < 0) {
-            throw new IllegalArgumentException("[hotbar] slot must be >= 0: " + slot);
+        // 与 `registerSlot` / `HotbarSpecification#setSlot` 同源：上界读同一个常量。
+        // （本条曾只判 `>= 0`，于是同一件事在框架里有了三种说法 —— 放开上界时必然漏改一处。）
+        if (slot < 0 || slot > HotbarSpecification.MAX_SLOT) {
+            throw new IllegalArgumentException("Slot must be between 0 and " + HotbarSpecification.MAX_SLOT
+                    + ", got: " + slot);
         }
         if (componentId == null || componentId.isEmpty()) {
             throw new IllegalArgumentException("[hotbar] componentId must not be null/empty");
@@ -653,7 +660,7 @@ public class HotbarRenderComponent extends RoleComponent {
      * 与渲染结果不可能脱节。未占用则 {@code null}。
      * <p>实例方法：登记表是实例状态，反查必须问"这一个实例"。
      * @param components 要扫的组件集（顺序 = 调用方给的顺序；命中即返回）
-     * @param slot 槽位（0..8）
+     * @param slot 槽位（{@code 0..}{@link HotbarSpecification#MAX_SLOT}）
      */
     public String componentIdAtSlot(List<RoleComponent> components, int slot) {
         if (components == null) {

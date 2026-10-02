@@ -19,6 +19,12 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvolutionPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessEvolutionPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessFrostBowMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessOblivionSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessReconstructSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessShapingSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessStartEndPassive;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import org.bukkit.NamespacedKey;
 import org.junit.BeforeClass;
@@ -85,6 +91,13 @@ public class CapabilityDispatchTest {
         out.put("RedBleedPassive", new RedBleedPassive("t_14", svc, new RedBleedPassive.Specification()));
         out.put("RedEquipmentsPassive", new RedEquipmentsPassive("t_15", svc, new RedEquipmentsPassive.Specification()));
         out.put("RedEvolutionPassive", new RedEvolutionPassive("t_16", svc, new RedEvolutionPassive.Specification()));
+        //冷识（remoteness）一族（2026-10-02 立）：主武器是弓弩族（extends Skill ⇒ 仍是产出物品者）
+        out.put("RemotenessEvolutionPassive", new RemotenessEvolutionPassive("t_17", svc, new RemotenessEvolutionPassive.Specification()));
+        out.put("RemotenessStartEndPassive", new RemotenessStartEndPassive("t_18", svc, new RemotenessStartEndPassive.Specification()));
+        out.put("RemotenessFrostBowMainWeapon", new RemotenessFrostBowMainWeapon("t_19", svc, new RemotenessFrostBowMainWeapon.Specification()));
+        out.put("RemotenessOblivionSkill", new RemotenessOblivionSkill("t_20", svc, new RemotenessOblivionSkill.Specification()));
+        out.put("RemotenessReconstructSkill", new RemotenessReconstructSkill("t_21", svc, new RemotenessReconstructSkill.Specification()));
+        out.put("RemotenessShapingSkill", new RemotenessShapingSkill("t_22", svc, new RemotenessShapingSkill.Specification()));
         return out;
     }
 
@@ -106,10 +119,17 @@ public class CapabilityDispatchTest {
             {"MeiqiheziEquipmentsPassive", "false", "N/A"},
             {"RedBleedPassive", "false", "N/A"},
             {"RedEquipmentsPassive", "false", "N/A"},
-            {"RedEvolutionPassive", "false", "N/A"}
+            {"RedEvolutionPassive", "false", "N/A"},
+            //冷识一族：两个被动（不产物品）+ 弓弩主武器 + 三个技能（产出物品且外观带冷却秒数）
+            {"RemotenessEvolutionPassive", "false", "N/A"},
+            {"RemotenessStartEndPassive", "false", "N/A"},
+            {"RemotenessFrostBowMainWeapon", "true", "true"},
+            {"RemotenessOblivionSkill", "true", "true"},
+            {"RemotenessReconstructSkill", "true", "true"},
+            {"RemotenessShapingSkill", "true", "true"}
     };
 
-    /** 逐组件比对冻结真值表（16 个具体组件；枚举里没有的面 = 新增组件 ⇒ 本断言会提醒补表）。 */
+    /** 逐组件比对冻结真值表（22 个具体组件；枚举里没有的面 = 新增组件 ⇒ 本断言会提醒补表）。 */
     @Test
     public void capabilityTruthTableIsFrozen() {
         Map<String, Object> actual = components();

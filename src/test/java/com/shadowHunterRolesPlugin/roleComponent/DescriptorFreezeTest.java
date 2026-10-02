@@ -60,13 +60,37 @@ public class DescriptorFreezeTest {
         assertNotNull("快照必须带工厂（装配表只持有它）", snapshot.getFactory());
     }
 
-    /** fail-fast ①：越界栏位 ⇒ IllegalArgumentException（文案冻结）。 */
+    /**
+     * fail-fast ①：越界栏位 ⇒ IllegalArgumentException（文案冻结）。
+     * <p>上界已从热键栏的 9 格放开到**玩家背包的槽位总数**（{@link HotbarSpecification#MAX_SLOT}），
+     * 因此"越界"的取样点跟着上移；文案里的数字由常量拼出。
+     */
     @Test
     public void slotOutOfRangeThrows() {
-        assertThrows(IllegalArgumentException.class, () -> fresh().setSlot(9));
         assertThrows(IllegalArgumentException.class, () -> fresh().setSlot(-1));
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> fresh().setSlot(9));
-        assertEquals("Slot must be between 0 and 8, got: 9", e.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> fresh().setSlot(HotbarSpecification.MAX_SLOT + 1));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> fresh().setSlot(HotbarSpecification.MAX_SLOT + 1));
+        assertEquals("Slot must be between 0 and " + HotbarSpecification.MAX_SLOT + ", got: "
+                + (HotbarSpecification.MAX_SLOT + 1), e.getMessage());
+    }
+
+    /**
+     * 上界是**闭**的（差一错误最爱发生的位置）：{@code MAX_SLOT} 可设、{@code MAX_SLOT + 1} 不可设。
+     * <p>同时把上界的**值**冻住：{@code 40} = 41 个槽位（热键栏 9 + 背包主格 27 + 盔甲 4 + 副手 1）− 1。
+     * 依据是 1.21.11 paper-api 的 {@code PlayerInventory#setItem} 契约原文（见 {@link HotbarSpecification#MAX_SLOT}
+     * 的 javadoc）。这个数字要改，必须连同那份依据一起改 —— 这正是本断言的用途。
+     */
+    @Test
+    public void slotBoundaryIsInclusive() {
+        HotbarSpecification<?> spec = fresh();
+        spec.setSlot(HotbarSpecification.MAX_SLOT);
+        assertTrue("上界本身必须可设（闭区间）", spec.hasSlot());
+        assertEquals(HotbarSpecification.MAX_SLOT, spec.slot());
+
+        assertEquals("上界冻住：41 个背包槽位 ⇒ 合法索引 0..40", 40, HotbarSpecification.MAX_SLOT);
+        assertThrows(IllegalArgumentException.class,
+                () -> fresh().setSlot(HotbarSpecification.MAX_SLOT + 1));
     }
 
     /** fail-fast ②：重复改成别的位置 ⇒ IllegalStateException（拒绝静默搬家）。 */

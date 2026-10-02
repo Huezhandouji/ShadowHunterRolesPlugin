@@ -13,7 +13,7 @@ description: 在 ShadowHunterRolesPlugin 里**只做角色、不碰框架**地�
 1. 仓库根 = `ShadowHunterRoles/`；构建用 `gradlew`（Gradle wrapper）✓。
 2. 每个命令**必须先设** `GRADLE_USER_HOME`（否则会去下载第二份缓存 ✗）：
    ```powershell
-   cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"
+   cd C:\Users\ROG\Desktop\mcplugin\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"
    ```
 3. **用例基线 = 117**（`../../../../src/test` 共 17 个测试文件，逐行读盘 `@Test` 计数 = 117）✓ —— 你**不得**删/停用任何测试 ✗；改了框架才会动它，而你**不该**改框架 ✓。
    ```powershell
@@ -133,7 +133,7 @@ private static Role.Builder myroleBuilder() {
 
 ### 步骤 4：跑两条闸门（**真执行态** ✓）
 ```powershell
-cd C:\Users\ROG\Desktop\插件\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"
+cd C:\Users\ROG\Desktop\mcplugin\ShadowHunterRoles; $env:GRADLE_USER_HOME="$PWD\.gradle-work"
 .\gradlew compileJava --rerun --no-build-cache --console=plain    # 期望：> Task :compileJava 执行态 + BUILD SUCCESSFUL
 .\gradlew test      --rerun --no-build-cache --console=plain      # 期望：> Task :test 执行态 + 117 tests / 0 failures
 ```

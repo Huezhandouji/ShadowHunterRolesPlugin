@@ -8,6 +8,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.base.BowWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.base.BowWeapon.ProjectileHitSignal;
 import com.shadowHunterRolesPlugin.roleComponent.base.BowWeapon.ShootSignal;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import org.bukkit.entity.Player;
@@ -17,6 +18,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -42,10 +44,12 @@ import org.bukkit.inventory.ItemStack;
  *
  * <h2>事件 → 入口（逐条）</h2>
  * <table border="1">
- *   <caption>本类接下的六类事件</caption>
+ *   <caption>本类接下的七类事件</caption>
  *   <tr><th>事件</th><th>处理姿态</th><th>派发的入口</th></tr>
- *   <tr><td>{@link EntityShootBowEvent}</td><td>只读（不取消）</td>
+ *   <tr><td>{@link EntityShootBowEvent}</td><td>只读（不取消；顺手给箭矢打归属）</td>
  *       <td>{@code onShoot(ShootSignal)} + 请求重绘</td></tr>
+ *   <tr><td>{@link ProjectileHitEvent}</td><td>只读（不取消原版伤害与插地）</td>
+ *       <td>{@code onProjectileHit(ProjectileHitSignal)} + 请求重绘</td></tr>
  *   <tr><td>{@link PlayerInteractEvent}（右键）</td>
  *       <td><b>默认不取消</b>；仅"冷却中"取消（闸门）</td><td>无（本族不声明右键分支）</td></tr>
  *   <tr><td>{@link PlayerInteractEvent}（左键）</td><td>取消（保护：不许挖方块）</td>
@@ -121,8 +125,60 @@ public class BowWeaponListener implements Listener {
         RoleComponent component = instance.componentRegistry().getById(weaponId);
         if (!(component instanceof BowWeapon bow)) return;
 
+        //给这支箭打归属（"它归哪个弓组件"）：命中管道靠它把 {@link ProjectileHitEvent}
+        //  交回同一个组件。打在**离弦**这一刻，因为这是"射手 + 用的是哪把弓"都还在手上的最后时刻。
+        BowWeapon.Utils.tagArrow(projectile, weaponId);
+
         instance.invokeComponentHook(component, "onShoot",
                 () -> bow.onShoot(new ShootSignal(projectile, weapon, event.getForce())));
+        requestRepaint(instance);
+    }
+
+    // ───────── 命中：箭矢命中实体 / 方块 → onProjectileHit ─────────
+
+    /**
+     * **命中管道**：箭矢打中实体或方块之后，按箭矢的归属把它交回**射它的那个弓组件**。
+     *
+     * <h2>归属怎么定（唯一口径）</h2>
+     * 读箭矢身上的 {@link BowWeapon.Utils#ARROW_OWNER_KEY}（由 {@link #onShootBow} 在离弦时写入）。
+     * 因此判据是"这支箭是哪把弓射的"，而**不是**"射手现在手上拿着什么、现在是什么角色"——
+     * 中途换手 / 换角色 / 丢下弓，都不会把这支箭错记到别人头上；射手已无角色实例则整次跳过。
+     *
+     * <h2>不做的事（逐条申报）</h2>
+     * <ul>
+     *   <li><b>不取消</b>：原版箭矢伤害与"插在方块上"的原版行为都照常 —— 本族只管把"命中发生了"
+     *       告诉组件；"击中方块要不要把箭清掉"是**组件**的产品口径（组件在钩子里
+     *       {@code projectile.remove()} 即可），不是本管道的默认行为；</li>
+     *   <li><b>不判敌人 / 不判玩家</b>：信号原样交回（命中实体可为 {@code null} = 打在方块上），
+     *       判敌口径归组件（它才持有该角色的阵营视角）；</li>
+     *   <li><b>不重复派发</b>：{@code ignoreCancelled = true} —— 别的插件取消这次命中时，
+     *       这一次命中没有真的发生，不该被当成一次使用。</li>
+     * </ul>
+     *
+     * <h2>为什么这里可以读箭矢身上的 PDC</h2>
+     * 与物品侧读 {@code BOW_WEAPON_KEY} 是同一件事：身份的写入点唯一（离弦那一刻），
+     * 读取点唯一（这里），中间的飞行过程不参与判定。
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onProjectileHit(ProjectileHitEvent event) {
+        Projectile projectile = event.getEntity();
+        if (projectile == null) return;
+
+        String ownerId = BowWeapon.Utils.arrowOwnerOf(projectile);
+        if (ownerId == null) return;   //不是本系统射出的箭（没打过归属标签）
+
+        //射手：原版给出；非玩家（发射器 / 别的实体）则没有角色实例可投递
+        if (!(projectile.getShooter() instanceof Player shooter)) return;
+
+        RoleInstance instance = roleManager.getRoleInstance(shooter);
+        if (instance == null) return;
+
+        RoleComponent component = instance.componentRegistry().getById(ownerId);
+        if (!(component instanceof BowWeapon bow)) return;
+
+        instance.invokeComponentHook(component, "onProjectileHit",
+                () -> bow.onProjectileHit(new ProjectileHitSignal(
+                        projectile, event.getHitEntity(), event.getHitBlock())));
         requestRepaint(instance);
     }
 

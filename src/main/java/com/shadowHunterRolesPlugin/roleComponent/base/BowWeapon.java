@@ -8,6 +8,8 @@ import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Projectile;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -61,6 +63,8 @@ import java.util.List;
  *       <td>{@code onCast(DROP)}（<b>同规</b>，原版丢弃同样被取消）</td></tr>
  *   <tr><td><b>箭矢离弦</b></td><td>—（不存在这样的时刻）</td>
  *       <td><b>{@link #onShoot(ShootSignal)}</b>（弓弩专属）</td></tr>
+ *   <tr><td><b>箭矢命中实体 / 方块</b></td><td>—（不存在这样的时刻）</td>
+ *       <td><b>{@link #onProjectileHit(ProjectileHitSignal)}</b>（弓弩专属；原版箭矢伤害照常）</td></tr>
  * </table>
  *
  * <h2>钩子清单</h2>
@@ -72,7 +76,9 @@ import java.util.List;
  *       {@code startCooldown()} / {@code stopCooldown()} / {@code isCoolingDown()} /
  *       {@code remainingCooldownTicks()}、{@code submitToHotbar()}；</li>
  *   <li><b>本类新增</b>：{@link #onShoot(ShootSignal)}（弓弩专属：箭矢离弦那一刻）、
- *       {@link #identifyKey()} 覆写（弓弩物品的识别键）；</li>
+ *       {@link #onProjectileHit(ProjectileHitSignal)}（弓弩专属：箭矢命中那一刻）、
+ *       {@link #identifyKey()} 覆写（弓弩物品的识别键）、
+ *       {@link Utils#ARROW_OWNER_KEY}（箭矢归属键，由射击管道写入、命中管道读回）；</li>
  *   <li><b>本类封死</b>：{@link #currentEnergy()}（能量维度由类型封死 ≡ 0）与
  *       {@link #onAttack(AttackSignal)}（近战命中归 listener 直接拦截）。</li>
  * </ul>
@@ -101,6 +107,32 @@ public abstract class BowWeapon extends Skill {
      *                   需要"按蓄力分级"的效果直接读这里
      */
     public record ShootSignal(Projectile projectile, ItemStack weapon, float force) {
+    }
+
+    /**
+     * 命中信号：只带这**一次命中**的数据（不可变）。射手永远是 {@code svc().self().player()}，
+     * 因此信号里没有射手。
+     *
+     * <h2>三个字段的语义与「两者可同时非空」这一条</h2>
+     * <ul>
+     *   <li>{@code projectile} —— 命中的**箭矢本体**（同一个实例已在 {@link #onShoot} 交过一次，
+     *       这里再交一次是刻意的：命中处理往往要 {@code projectile.remove()} —— 例如"击中方块立即清除"）；</li>
+     *   <li>{@code hitEntity} —— 命中的实体；打在方块上是 {@code null}；</li>
+     *   <li>{@code hitBlock} —— 命中的方块；打在空中实体上是 {@code null}。</li>
+     * </ul>
+     * <p><b>为何两个都可能非空</b>：箭矢打在"贴着方块的实体"上时，原版把两侧都填上
+     * （{@code ProjectileHitEvent} 的两个访问器各自独立，不是互斥枚举）。因此组件在
+     * {@link #onProjectileHit(ProjectileHitSignal)} 里**不得**按"二选一"写分支 ——
+     * 正确姿态是"先处理实体（若有），再处理方块（若有）"。
+     *
+     * <h2>命中与伤害的时序（如实申报）</h2>
+     * 本信号由 {@code listener/BowWeaponListener} 在 {@code ProjectileHitEvent} 上派发。
+     * 原版箭矢自身的伤害**照常生效**（本族不拦原版箭矢伤害 —— 右键与飞行都归原版），
+     * 因此组件在这里施加的是"本角色追加的效果"，不是"替代原版伤害"。
+     * 要把口径改成"替代"，须在射击管道里另加一条 {@code EntityDamageByEntityEvent} 拦截，
+     * 那是一次产品口径变更，不在本条钩子里顺手改。
+     */
+    public record ProjectileHitSignal(Projectile projectile, Entity hitEntity, Block hitBlock) {
     }
 
     /**
@@ -168,6 +200,32 @@ public abstract class BowWeapon extends Skill {
      * <p>本方法不是覆写任何接口（本组件家族的单独声明），因此没有 {@code @Override}。
      */
     public void onShoot(ShootSignal signal) {
+    }
+
+    /**
+     * 命中入口（弓弩专属）：**射出的箭矢打中实体或方块之后**执行一次 —— 由
+     * {@code listener/BowWeaponListener} 在 {@code ProjectileHitEvent} 上派发。
+     *
+     * <h2>与另外两个入口的分工</h2>
+     * <ul>
+     *   <li>{@link #onCast(CastSignal)}：左键 / Q（原版行为先被取消）；</li>
+     *   <li>{@link #onShoot(ShootSignal)}：箭矢**离弦**那一刻（拉弓已放行）；</li>
+     *   <li><b>本方法</b>：箭矢**落地 / 命中**那一刻。三件事各发生一次，互不重叠。</li>
+     * </ul>
+     *
+     * <h2>闸门与冷却都不在这里</h2>
+     * 与另外两条入口**逐字同规**：冷却中 listener 不派发 {@code onCast}（拉弓被取消 ⇒ 射不出箭，
+     * 于是本方法自然也不会被调到），而冷却由组件在"确实做了事"之后自启
+     * （典型写法 = {@link #startCooldown()} 在 {@link #onShoot(ShootSignal)} 里）。
+     * 本方法因此**不必**自查冷却，也不该在这里启动冷却 —— 那是"射出"这件事的账，
+     * 记在"命中"上会让一次射击的账按命中次数重复记。
+     *
+     * <h2>默认空实现（不是为了"少写"）</h2>
+     * 绝大多数弓弩只关心"射出去了"（{@link #onShoot(ShootSignal)}），不关心落点；
+     * 默认空体让这些弓一行都不用写。要"命中才结算"的弓覆写本方法即可。
+     * <p>本方法不是覆写任何接口（本组件家族的单独声明），因此没有 {@code @Override}。
+     */
+    public void onProjectileHit(ProjectileHitSignal signal) {
     }
 
     /**
@@ -246,6 +304,44 @@ public abstract class BowWeapon extends Skill {
             ItemMeta meta = item.getItemMeta();
             if (meta == null) return null;
             return meta.getPersistentDataContainer().get(BOW_WEAPON_KEY, PersistentDataType.STRING);
+        }
+
+        // ───────── 箭矢归属（"这支箭是哪把弓射的"）─────────
+        //  与物品的识别键是**两件事**：那个键回答"手上这件物品是不是本系统的弓弩"，
+        //  这个键回答"飞在空中的这支箭归哪个弓组件"。它们在装配期挂钩（见
+        //  `BowWeaponListener#onShootBow` 的最后一步），在命中时被读回
+        //  （`BowWeaponListener#onProjectileHit`）。
+        //  为什么把归属写在箭矢身上而不是"记在某个组件字段里"：箭矢是平台实体，
+        //  它的命中事件由平台派发，投递方必须先回答"这次命中该交给谁"——
+        //  唯一的稳定答案只能是"射它的那把弓"，而那个信息只有在离弦那一刻才拿得到。
+
+        /**
+         * 箭矢的归属键（值 = 射它的弓弩组件的注册 id）。
+         * <p>与 {@link #BOW_WEAPON_KEY} 必须是**两个键**：前者是物品身份，后者是弹射物身份；
+         * 共用一个键会让"手上拿着弓"与"空中飞着箭"两种查询互相误命中。
+         * <p>键由 {@code KeyFactory} 造（与另外三个键同规）。
+         */
+        public static final NamespacedKey ARROW_OWNER_KEY = KeyFactory.Registry.of(
+                "bow_weapon_arrow_owner"
+        );
+
+        /**
+         * 给射出的箭矢打上归属（由射击管道在 {@code EntityShootBowEvent} 里调用一次）。
+         * <p>{@code projectile} 或 {@code weaponId} 为 {@code null} 时静默跳过（不打半个标签）。
+         */
+        public static void tagArrow(Projectile projectile, String weaponId) {
+            if (projectile == null || weaponId == null) return;
+            projectile.getPersistentDataContainer().set(ARROW_OWNER_KEY, PersistentDataType.STRING, weaponId);
+        }
+
+        /**
+         * 读箭矢的归属 id；不是本系统射出的箭（或没打过标签）回 {@code null}。
+         * <p>入参取 {@link Entity}（不是 {@code Projectile}）：调用方在
+         * {@code ProjectileHitEvent} 上拿到的可能先是通用实体面，判空与判型由调用方自己决定。
+         */
+        public static String arrowOwnerOf(Entity entity) {
+            if (entity == null) return null;
+            return entity.getPersistentDataContainer().get(ARROW_OWNER_KEY, PersistentDataType.STRING);
         }
     }
 

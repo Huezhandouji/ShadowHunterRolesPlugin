@@ -31,7 +31,7 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvolutionPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.TestBowMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.*;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.mainWeapon.SinThornFangMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.LawWordPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.SinThornPassive;
@@ -149,6 +149,8 @@ public class RoleLoader {
                 .addComponent(VitalsComponent.ID, new VitalsComponent.Specification())
                 .addComponent(BuffComponent.ID, new BuffComponent.Specification())
                 .addComponent(TaskComponent.ID, new TaskComponent.Specification())
+                .addComponent(AutoRecoverSanTEHealthPassive.ID, new AutoRecoverSanTEHealthPassive.Specification())
+                .addComponent(DefaultSanTEZeroPunishment.ID, new DefaultSanTEZeroPunishment.Specification())
                 .addComponent(BossbarRoleAttributesDisplayComponent.ID, new BossbarRoleAttributesDisplayComponent.Specification());
     }
 
@@ -173,9 +175,6 @@ public class RoleLoader {
                 .addComponent(MeiqiheziCircleSlashSkill.ID, new MeiqiheziCircleSlashSkill.Specification().setSlot(3))
                 .addComponent(MeiqiheziJuejueMainWeapon.ID, new MeiqiheziJuejueMainWeapon.Specification().setSlot(0))
                 .faction(Faction.HUNTER)
-                .addComponent(DefaultSanTEZeroPunishment.ID, new DefaultSanTEZeroPunishment.Specification())
-                .addComponent(AutoRecoverSanTEHealthPassive.ID, new AutoRecoverSanTEHealthPassive.Specification())
-                .addComponent(AutoRecoverEnergyPassive.ID, new AutoRecoverEnergyPassive.Specification())
                 .addComponent(MeiqiheziEquipmentsPassive.ID, new MeiqiheziEquipmentsPassive.Specification())
                 .icon(Material.DIAMOND_HOE));
     }
@@ -199,9 +198,7 @@ public class RoleLoader {
                 .addComponent(RedSolitaryArroganceSkill.ID, new RedSolitaryArroganceSkill.Specification().setSlot(1))
                 .addComponent(RedEvilShockSkill.ID, new RedEvilShockSkill.Specification().setSlot(2))
                 .addComponent(RedDeeplySorrowSkill.ID, new RedDeeplySorrowSkill.Specification().setSlot(3))
-                .addComponent(AutoRecoverSanTEHealthPassive.ID, new AutoRecoverSanTEHealthPassive.Specification())
                 .addComponent(RedEquipmentsPassive.ID, new RedEquipmentsPassive.Specification())
-                .addComponent(DefaultSanTEZeroPunishment.ID, new DefaultSanTEZeroPunishment.Specification())
                 .icon(Material.POPPY);
     }
 
@@ -338,11 +335,43 @@ public class RoleLoader {
                 .icon(Material.SEA_LANTERN);
     }
 
+    /**
+     * 冷识（阵营 SHADOW）：冷淡（弓）+ 忘怀 / 重构 / 塑造 + 「始末」与八档进化。
+     *
+     * <p>装配口径：
+     * <ul>
+     *   <li><b>主武器「冷淡」占 0 号栏</b> —— 本族是弓弩（{@code BowWeapon}）：右键归原版
+     *       （拉弓 / 击发），命中由 {@code BowWeaponListener} 在 {@code ProjectileHitEvent} 上
+     *       交回组件；</li>
+     *   <li>忘怀 / 重构 / 塑造 / 箭矢占 1 / 2 / 3 / 4 号栏（箭矢是"槽空即补发"的自愈式弹药），
+     *       全部 0 耗能（只靠冷却限制强度）；</li>
+     *   <li><b>进化被动排在消费者之前</b>：{@code start()} 按注册序广播，而「始末」与「塑造」
+     *       都在自己的 {@code start()} 里取它、并在逐刻节拍里读它的档位读数 ⇒ 先注册它，
+     *       "读口第一次被读到之前它已经生效"才是结构上的事实；</li>
+     *   <li>「始末」是冷识的持续增益与 5 级光环的节拍持有者（被动无栏位，不占热键栏）；</li>
+     *   <li>基础属性不显式声明，与其余角色一致，走框架默认；</li>
+     *   <li>数值：冷淡 9 点特殊值 + 6 点物伤（飞行途中 4 格内再 3 特殊值 + 2 真伤），CD 2 秒；
+     *       忘怀 标记 30 秒窗口、CD 20 秒（结束后开始）；重构 10 秒窗口、CD 15 秒（结束后开始）；
+     *       塑造 半径 20、漂浮 4 秒 + 30 特殊值、40 个粒子陷阱（碰到晕 1 秒），CD 20 秒；
+     *       进化八档见 {@code RemotenessEvolutionPassive}。</li>
+     * </ul>
+     */
     public static Role.Builder remotenessBuilder(){
         return withBuiltIns(new Role.Builder("remoteness"))
                 .displayName(Component.text("冷识"))
+                .description(List.of(
+                        Component.text("始末：永久速度一、跳跃提升一"),
+                        Component.text("冷淡：箭矢命中扣除9点特殊值并造成6点物理伤害；飞行途中4格内的敌人被扣除3点特殊值与2点真实伤害")
+                ))
                 .faction(Faction.SHADOW)
-                .addComponent(TestBowMainWeapon.ID, new TestBowMainWeapon.Specification().setSlot(0))
+                //进化被动（无栏位）：八档数值与升级消息都归它；排在消费者之前（见方法注释）
+                .addComponent(RemotenessEvolutionPassive.ID, new RemotenessEvolutionPassive.Specification())
+                .addComponent(RemotenessStartEndPassive.ID, new RemotenessStartEndPassive.Specification())
+                .addComponent(RemotenessFrostBowMainWeapon.ID, new RemotenessFrostBowMainWeapon.Specification().setSlot(0))
+                .addComponent(RemotenessOblivionSkill.ID, new RemotenessOblivionSkill.Specification().setSlot(1))
+                .addComponent(RemotenessReconstructSkill.ID, new RemotenessReconstructSkill.Specification().setSlot(2))
+                .addComponent(RemotenessShapingSkill.ID, new RemotenessShapingSkill.Specification().setSlot(3))
+                .addComponent(RemotenessArrowGivingSkill.ID, new RemotenessArrowGivingSkill.Specification().setSlot(17))
                 .icon(Material.SOUL_LANTERN);
     }
 

@@ -39,7 +39,20 @@ public class RedSanctifiedBladeMainWeapon extends MainWeapon {
         public Specification(){
             super(
                     Component.text("至洁之刃"),
-                    List.of(Component.text("攻击施加流血效果")),
+                    List.of(
+                            Component.text("攻击施加流血效果"),
+                            Component.text("=============================="),
+                            Component.text("进化:"),
+                            Component.text("1-红月落下,每个负有流血的敌人将会持续扣除特殊值, 1秒1点"),
+                            Component.text("2-鲜血横飞,[孤妄自赏]多出2次攻击"),
+                            Component.text("3-负罪凄凉-永久获得生命上限加10，并回满生命"),
+                            Component.text("4-故不可知-[黯然销魂]的TE扣除速度减慢, 1秒4点"),
+                            Component.text("5-猩红已至-流血每秒结算3层"),
+                            Component.text("=============================="),
+                            Component.text("被动:"),
+                            Component.text("流血: 攻击给敌人叠加流血层数(上限15层),每秒结算1层、每层造成2点真实伤害,并回复自身4点TE值"),
+                            Component.text("穿戴装备: 进入角色时发放一整套不可破坏的护甲(铁头盔/铁胸甲/皮革护腿/皮革靴)")
+                    ),
                     Material.IRON_SWORD,
                     40
             );

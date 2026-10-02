@@ -436,8 +436,18 @@ public class HunterMechanicsTest {
                 "hunter_evolution_passive")) {
             assertTrue("猎手缺组件 " + id + "，实际 = " + present, present.contains(id));
         }
-        //7 个内建组件 + 6 个角色组件 = 13 条
-        assertEquals("猎手应有的组件条数（7 内建 + 6 角色），实际 = " + present,
-                13, role.getComponents().size());
+        //★ 内建条数**从注册表推导**，不写死：上游 2026-10-02 把内建从 7 个加到 9 个，
+        //  写死的总数让本用例误报过一次 —— "框架有几个内建"不是本用例要管的事。
+        //  基准取 selfUpdateExample：它 = 内建 + 自己的 1 个示例组件。
+        int builtIns = 0;
+        for (RoleLoader.Definition definition : new RoleLoader(Logger.getLogger("HunterMechanicsTest"))
+                .defaultDefinitions()) {
+            if ("selfUpdateExample".equals(definition.id())) {
+                builtIns = definition.builder().get().build().getComponents().size() - 1;
+            }
+        }
+        assertTrue("注册表里必须有 selfUpdateExample（内建基准）", builtIns > 0);
+        assertEquals("猎手应有的组件条数（内建 " + builtIns + " + 6 角色）；实际 = " + present,
+                builtIns + 6, role.getComponents().size());
     }
 }

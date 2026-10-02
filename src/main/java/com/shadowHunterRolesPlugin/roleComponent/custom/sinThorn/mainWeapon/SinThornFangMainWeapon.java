@@ -60,7 +60,20 @@ public class SinThornFangMainWeapon extends MainWeapon {
 
         public Specification() {
             super(Component.text("罪棘之牙"),
-                    List.of(Component.text("召唤者的尖牙：攻击造成8点物理伤害，并施加「律法之言」——15秒内每0.5秒削减目标1点特殊值")),
+                    List.of(
+                            Component.text("召唤者的尖牙：攻击造成8点物理伤害，并施加「律法之言」——15秒内每0.5秒削减目标1点特殊值"),
+                            Component.text("=============================="),
+                            Component.text("进化:"),
+                            Component.text("1-你负以荆棘,获得抗性1"),
+                            Component.text("2-你负以罪孽,[罪棘]每次被动攻击获得1秒生命恢复4"),
+                            Component.text("3-你负以善良,[律法之言]攻击力上升"),
+                            Component.text("4-你负以丑恶,[罪恶的辩护]使用时回复16点生命"),
+                            Component.text("5-你负以公正,[审判孤刺]上升10点伤害可以直接处决30血以下目标"),
+                            Component.text("=============================="),
+                            Component.text("被动:"),
+                            Component.text("罪棘: 7格内的敌人每1.5秒被召唤者尖牙撕咬,受到6点伤害并损失4点特殊值"),
+                            Component.text("律法之言: 每次攻击附加15秒罪罚,每0.5秒削减目标1点特殊值")
+                    ),
                     Material.NETHERITE_AXE,
                     ATTACK_COOLDOWN_TICKS);
             requires(VitalsComponent.class).requires(BuffComponent.class).requires(LawWordPassive.class);

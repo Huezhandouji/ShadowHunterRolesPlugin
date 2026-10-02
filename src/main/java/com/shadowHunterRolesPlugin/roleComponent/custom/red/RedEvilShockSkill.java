@@ -47,6 +47,13 @@ public class RedEvilShockSkill extends Skill{
      * 右击施放：`canCastSkill` 不满足时直接返回（该路径不启冷却），
      * 冷却由本组件在施放成功处按声明值启动；
      * 触发条件 / 范围 / 持续时间 / 增幅 / 层数 / 音效均与既有口径一致。
+     *
+     * <p><b>失明 / 缓慢走 buff 组件的跨玩家入口</b>（{@link BuffComponent#applyPotionEffectTo(Player, PotionEffectType, int, int)}）：
+     * 效果进的是**受害者自己**的药水账本 ⇒ 他被清除角色 / 组件停用时一并回收，
+     * 也能被 {@code BuffComponent#clearDebuffOn(...)}（净化）摘掉。
+     * 原先直接 {@code p.addPotionEffect(...)}，那份效果没人认领（谁都不记账、谁都不回收）。
+     * <p><b>目标没有角色时本条不生效</b>（跨玩家入口的统一口径：没有账本就不写）⇒
+     * 那种玩家只吃流血结算，不吃失明 / 缓慢。这是本次口径迁移带来的**行为变更**，如实申报。
      */
     @Override
     public void onCast(CastSignal signal){
@@ -56,8 +63,8 @@ public class RedEvilShockSkill extends Skill{
         RedBleedPassive bleed = getComponent(RedBleedPassive.class);
         for(Player p : caster.getLocation().getNearbyPlayers(5)){
             if(svc().roleInfo().isHostileTo(p.getUniqueId())){
-                p.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(61, 1));
-                p.addPotionEffect(PotionEffectType.SLOWNESS.createEffect(61, 3));
+                buff.applyPotionEffectTo(p, PotionEffectType.BLINDNESS, 61, 1);
+                buff.applyPotionEffectTo(p, PotionEffectType.SLOWNESS, 61, 3);
                 //结算5层流血：写账本的唯一公开入口
                 //流血被动未注册时直接跳过，不能让本技能抛 NPE
                 if(bleed == null) continue;

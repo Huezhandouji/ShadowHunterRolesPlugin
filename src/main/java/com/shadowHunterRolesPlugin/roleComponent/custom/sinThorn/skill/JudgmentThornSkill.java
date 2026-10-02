@@ -278,10 +278,11 @@ public class JudgmentThornSkill extends Skill {
 
         //「引导结束定身效果消失」：显式摘掉引导期挂上的缓慢与抗性
         //  （刷新时给的就是短时长，这里再删一次，结束瞬间立刻恢复行动）
-        Player caster = svc().self().player();
-        if (caster != null) {
-            caster.removePotionEffect(PotionEffectType.SLOWNESS);
-            caster.removePotionEffect(PotionEffectType.RESISTANCE);
+        //  走 buff 组件的 removePotionEffect(type)：**效果与药水账本项一起摘掉**
+        //  （原先直接 player.removePotionEffect 只摘效果，账本里会留一个已不在身上的陈旧类型）
+        if (svc().self().player() != null) {
+            buff.removePotionEffect(PotionEffectType.SLOWNESS);
+            buff.removePotionEffect(PotionEffectType.RESISTANCE);
         }
 
         //「引导完毕后释放技能」：技能真正放出去的这一刻才进冷却。

@@ -624,6 +624,9 @@ public class CangluMelodySelectionSkill extends Skill {
      * 收尾时把抗性摘掉 —— **仅当**「拉拽总时长 + 余量 ≤ 一次刷新的时长」。
      * <p>否则说明拉拽比一次刷新还久（说明它早被更晚的一次刷新盖住了），
      * 这时主动移除反而会在行进还没结束的观感里留下空洞；让它自己过期更安全。
+     * <p>移除走 buff 组件的 {@link BuffComponent#removePotionEffect(PotionEffectType)}：
+     * **效果与药水账本项一起摘掉**（原先直接 {@code player.removePotionEffect} 只摘效果，
+     * 账本里会留一个已不在身上的陈旧类型）。
      */
     private void clearResistanceIfExpiring() {
         int first = firstResistanceTick;
@@ -635,9 +638,8 @@ public class CangluMelodySelectionSkill extends Skill {
         if (pullElapsed + RESISTANCE_BUFFER_TICKS > RESISTANCE_DURATION_TICKS) {
             return;
         }
-        Player self = svc().self().player();
-        if (self != null) {
-            self.removePotionEffect(PotionEffectType.RESISTANCE);
+        if (svc().self().player() != null) {
+            buff.removePotionEffect(PotionEffectType.RESISTANCE);
         }
     }
 

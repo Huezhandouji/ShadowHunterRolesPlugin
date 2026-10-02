@@ -164,8 +164,14 @@ public class RedEvolutionPassive extends EvolutionPassive {
 
     // ───────── 升级消息：前缀与两种形态（纯文本 / 带样式）─────────
 
-    /** 消息前缀：「进化」之后是**两个空格**（与产品口径逐字一致）。 */
-    private static final String EVOLUTION_TAG = "[进化]  ";
+    /**
+     * 消息前缀：「进化」。
+     * <p>★ 前缀之后**不留空格**，档位文案紧跟着它（{@code [进化]1-红月落下…}）——
+     * 这是用户口径（早期版本曾带两个尾随空格，已按用户指示收敛为无空格）。
+     * 改这个字面量要**同时**改 {@link #evolutionMessageOf(int)} 的 javadoc 与
+     * {@code RedEvolutionPassiveTest} 的逐字断言（三处说的是同一件事）。
+     */
+    private static final String EVOLUTION_TAG = "[进化]";
 
     /** 前缀样式：加粗淡紫。 */
     private static final TextColor EVOLUTION_TAG_COLOR = NamedTextColor.LIGHT_PURPLE;
@@ -174,7 +180,7 @@ public class RedEvolutionPassive extends EvolutionPassive {
     private static final TextColor EVOLUTION_BODY_COLOR = NamedTextColor.WHITE;
 
     /**
-     * 某一档发给玩家的整行消息（**纯文本投影**）：{@code "[进化]  N-<文案>"}。
+     * 某一档发给玩家的整行消息（**纯文本投影**）：{@code "[进化]N-<文案>"}（前缀后**无空格**）。
      *
      * <p>与 {@link #evolutionMessage(int)} 是同一行的两种形态，共用
      * {@link #EVOLUTION_TAG} 与 {@link #tierTextOf(int)} ⇒ 文案与排版只有一处来源；

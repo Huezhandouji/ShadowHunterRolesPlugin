@@ -9,22 +9,26 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 「猎手」被动之二：**进化指数**（把 {@link EvolutionPassive} 的「击杀 ⇒ 进化一级」接到猎手自己的五档增益上）。
  *
  * <h2>本类做/不做什么</h2>
  * <ul>
- *   <li><b>做</b>三件事：① 持有五档的**数值与文案**（每档只在这里声明一次）；
+ *   <li><b>做</b>四件事：① 持有五档的**数值与文案**（每档只在这里声明一次）；
  *       ② 每次升级向玩家发一条本档消息（{@code [进化]} 加粗淡紫 + 其后文案白色不加粗）；
- *       ③ 提供**只读效果读口**给猎手的其它组件取用当前档位下的生效值。</li>
+ *       ③ 提供**只读效果读口**给猎手的其它组件取用当前档位下的生效值；
+ *       ④ 在 {@link #onPlayerKilled} 里做两件**守卫**：**同一刻同一敌人去重**（需求：
+ *       "敌人死亡后只加一层，现在会加两层"）与**封顶 5 级**。</li>
  *   <li><b>不做</b>：等级怎么涨是基类的（击杀订阅 + {@code increaseEvolutionLevel()}），
- *       本类一个字不重写；封顶除外 —— 基类明写「要封顶就在自己的子类里拦」，见
- *       {@link #onPlayerKilled(VitalsComponent.PlayerKilledEvent)}。</li>
+ *       本类一个字不重写；上面那两条守卫除外 —— 基类明写「要封顶就在自己的子类里拦」，
+ *       见 {@link #onPlayerKilled(VitalsComponent.PlayerKilledEvent)}。</li>
  * </ul>
  *
  * <h2>五档（档位号 = 触发该档所需的进化等级）</h2>
@@ -204,6 +208,41 @@ public class HunterEvolutionPassive extends EvolutionPassive {
     private EvolutionLevelUpListener levelUpEntry;
 
     /**
+     * **去重键的上一次取值**：上一次"算过层"的那个死亡敌人的 UUID。
+     * <p>与 {@link #lastKilledAtTick} 一起构成 {@code (受害者, 刻)} 二元组 —— 见
+     * {@link #isDuplicateKill(UUID, int, UUID, int)}。
+     */
+    private UUID lastKilledVictim;
+
+    /** 上一次"算过层"的刻（{@code Integer.MIN_VALUE} = 还没算过）。 */
+    private int lastKilledAtTick = Integer.MIN_VALUE;
+
+    /**
+     * **这一条击杀通知是不是"同一刻、同一敌人"的重复投递**（纯函数 ⇒ 可离线单测）。
+     *
+     * <h2>为什么需要它（需求）</h2>
+     * 需求原话：「**修复一下进化层数，敌人死亡后只加一层，现在会加两层**」。
+     * ⇒ 一次击杀**必须**只涨一级，无论这条通知被投递几次。
+     *
+     * <h2>为什么判据是 (受害者, 刻) 二元组</h2>
+     * <ul>
+     *   <li><b>受害者</b>：同一刻内不同敌人死亡是**两次真实击杀**，都要算 ⇒ 必须能区分；</li>
+     *   <li><b>刻</b>：同一个玩家**复活后再次被杀**是新的击杀，必须照常算 ⇒ 只记 UUID 会把第二次吞掉；</li>
+     *   <li>⇒ 只有"同一刻 + 同一敌人"重叠时才是重复。</li>
+     * </ul>
+     * ★ 为什么不用"已计层名单"：那种集合要随人数增长、还要清理过期项；
+     * "上一次取值"只占一个槽位，天然免泄漏（与工程里"边沿判据"的取舍同族）。
+     *
+     * @param lastVictim 上次算过层的敌人（可 {@code null} = 还没算过）
+     * @param lastTick   上次算过层的刻
+     * @param victim     本次通知里的敌人（{@code null} = 载荷没带敌人 ⇒ 不去重）
+     * @param tick       本次的刻
+     */
+    static boolean isDuplicateKill(UUID lastVictim, int lastTick, UUID victim, int tick) {
+        return victim != null && victim.equals(lastVictim) && tick == lastTick;
+    }
+
+    /**
      * @param id            注册 id（装配期由 {@code Role.Builder.addComponent} 绑定）
      * @param services      该 id 的服务集
      * @param specification 本组件自己的描述符（声明数据的唯一来源）
@@ -264,11 +303,30 @@ public class HunterEvolutionPassive extends EvolutionPassive {
     /**
      * 击杀 ⇒ 进化一级（**生产上唯一的升级入口**）。
      *
-     * <p>覆写只为封顶：已到 {@link #MAX_EVOLUTION_LEVEL} 时不再调 {@code super}
-     * （于是不升级、不发消息）。判断"算不算一次击杀"仍然完全归基类，本类一个字不改。
+     * <p>当前做两件事：
+     * <ol>
+     *   <li>★ <b>去重</b>（需求："敌人死亡后只加一层，现在会加两层"）：
+     *       同一刻对**同一个敌人**的重复投递只算一次 —— 判据见
+     *       {@link #isDuplicateKill(UUID, int, UUID, int)}；</li>
+     *   <li><b>封顶</b>：已到 {@link #MAX_EVOLUTION_LEVEL} 时不再调 {@code super}
+     *       （于是不升级、不发消息）。</li>
+     * </ol>
+     * <p>注意**去重要排在封顶之前**：封顶是"满级了就别再涨"，去重是"这次压根不算一次击杀" ——
+     * 顺序反了会让"满级时刻的重复投递"在降级后又被吃掉一次。判断"算不算一次击杀"仍归基类。
      */
     @Override
     protected void onPlayerKilled(VitalsComponent.PlayerKilledEvent event) {
+        if (event == null) {
+            return;
+        }
+        UUID victimId = event.getVictim() == null ? null : event.getVictim().getUniqueId();
+        int tick = Bukkit.getCurrentTick();
+        if (isDuplicateKill(lastKilledVictim, lastKilledAtTick, victimId, tick)) {
+            return;     // 同一刻、同一敌人的重复投递 ⇒ 这一次不算击杀
+        }
+        lastKilledVictim = victimId;
+        lastKilledAtTick = tick;
+
         if (getCurrentEvolutionLevel() >= MAX_EVOLUTION_LEVEL) {
             return;
         }

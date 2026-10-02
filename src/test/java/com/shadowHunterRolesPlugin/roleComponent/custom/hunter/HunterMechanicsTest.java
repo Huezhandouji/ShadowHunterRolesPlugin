@@ -11,6 +11,7 @@ import org.junit.Test;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 import static org.junit.Assert.assertEquals;
@@ -211,34 +212,66 @@ public class HunterMechanicsTest {
                 HunterPullSkill.pullEscaped(0d, 0d, 0d, 100d, 0d, 0d, -3d));
     }
 
-    /** 拉回速度必须**恰好**等于每秒 8 格（逐刻匀速 ⇒ 平均速度 = 声明值）。 */
+    /** 拉回速度必须**恰好**等于每秒 10 格（需求："常规下为10格每秒"）。 */
     @Test
-    public void pullSpeedMatchesEightBlocksPerSecond() {
-        assertEquals("每秒 8 格 ⇒ 每刻 0.4 格", 0.4d, HunterPullSkill.PULL_SPEED_PER_TICK, 1.0E-9d);
-        assertEquals("20 刻的位移必须恰好 8 格",
-                8d, HunterPullSkill.PULL_SPEED_PER_TICK * 20d, 1.0E-9d);
+    public void pullSpeedMatchesTenBlocksPerSecond() {
+        assertEquals("每秒 10 格 ⇒ 每刻 0.5 格", 0.5d, HunterPullSkill.PULL_SPEED_PER_TICK, 1.0E-9d);
+        assertEquals("20 刻的位移必须恰好 10 格",
+                10d, HunterPullSkill.PULL_SPEED_PER_TICK * 20d, 1.0E-9d);
     }
 
     /**
-     * **加速拖拽**：0 次 = 基础 8 格/秒；每次 +4 格/秒；封顶 20 格/秒
-     * （需求："可以再次释放加速拖拽，或者就是正常速度慢慢拖拽"）。
+     * **加速拖拽**：不按 = 常规 10 格/秒；**按一次即封顶 20 格/秒**
+     * （需求："常规下为10格每秒，再次释放为20格每秒" —— 只有"再次释放"这一档）。
      */
     @Test
     public void acceleratedPullSpeedScalesByStepAndCaps() {
-        assertEquals("不按 = 正常速度（每秒 8 格）",
-                8d, HunterPullSkill.acceleratedPullSpeed(0) * 20d, 1.0E-9d);
-        assertEquals("按 1 次 = 每秒 12 格",
-                12d, HunterPullSkill.acceleratedPullSpeed(1) * 20d, 1.0E-9d);
-        assertEquals("按 2 次 = 每秒 16 格",
-                16d, HunterPullSkill.acceleratedPullSpeed(2) * 20d, 1.0E-9d);
-        assertEquals("按 3 次 = 每秒 20 格（到上限）",
-                20d, HunterPullSkill.acceleratedPullSpeed(3) * 20d, 1.0E-9d);
-        assertEquals("按 4 次仍封顶在每秒 20 格",
-                20d, HunterPullSkill.acceleratedPullSpeed(4) * 20d, 1.0E-9d);
+        assertEquals("不按 = 常规速度（每秒 10 格）",
+                10d, HunterPullSkill.acceleratedPullSpeed(0) * 20d, 1.0E-9d);
+        assertEquals("按 1 次 = 每秒 20 格（需求：再次释放为 20 格/秒）",
+                20d, HunterPullSkill.acceleratedPullSpeed(1) * 20d, 1.0E-9d);
+        assertEquals("按 2 次仍封顶在每秒 20 格",
+                20d, HunterPullSkill.acceleratedPullSpeed(2) * 20d, 1.0E-9d);
         assertEquals("按 8 次仍封顶",
                 20d, HunterPullSkill.acceleratedPullSpeed(8) * 20d, 1.0E-9d);
         assertEquals("负数按 0 次处理（不抛、不回退速度）",
-                8d, HunterPullSkill.acceleratedPullSpeed(-5) * 20d, 1.0E-9d);
+                10d, HunterPullSkill.acceleratedPullSpeed(-5) * 20d, 1.0E-9d);
+    }
+
+    /** 拉回时长上限必须**恰好 2.5 秒**（需求："最多只能拉着敌人2.5S"）。 */
+    @Test
+    public void pullLastsAtMostTwoAndAHalfSeconds() {
+        assertEquals("2.5 秒 = 50 刻", 50, HunterPullSkill.PULL_MAX_TICKS);
+        assertEquals("换算成秒必须恰好 2.5",
+                2.5d, HunterPullSkill.PULL_MAX_TICKS / 20d, 1.0E-9d);
+    }
+
+    // ───────── ⑦ 击杀去重（需求："敌人死亡后只加一层，现在会加两层"）─────────
+
+    @Test
+    public void duplicateKillSameVictimSameTickIsDeduped() {
+        UUID victim = UUID.randomUUID();
+        assertTrue("同一刻、同一敌人 ⇒ 判为重复投递（只算一层）",
+                HunterEvolutionPassive.isDuplicateKill(victim, 1234, victim, 1234));
+    }
+
+    @Test
+    public void killDedupeDistinguishesVictimAndTick() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        assertFalse("同一刻、不同敌人 ⇒ 两次真实击杀，都要算",
+                HunterEvolutionPassive.isDuplicateKill(a, 1234, b, 1234));
+        assertFalse("不同刻、同一敌人（复活后再死）⇒ 新的击杀，要算",
+                HunterEvolutionPassive.isDuplicateKill(a, 1234, a, 1235));
+        assertFalse("还没算过（last = null）⇒ 不是重复",
+                HunterEvolutionPassive.isDuplicateKill(null, Integer.MIN_VALUE, a, 7));
+    }
+
+    @Test
+    public void killDedupeDoesNotSwallowWhenVictimUnknown() {
+        UUID a = UUID.randomUUID();
+        assertFalse("载荷没带敌人 ⇒ 不去重（宁可按一次击杀算，也不吞掉玩家的层数）",
+                HunterEvolutionPassive.isDuplicateKill(a, 5, null, 5));
     }
 
     // ───────── ⑤ 标记集合（多标记 + 消费语义）─────────

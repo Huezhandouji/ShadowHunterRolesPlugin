@@ -66,13 +66,22 @@ public final class HunterSound {
 
     // ───────── 拉回（技能二）─────────
 
-    /** **引导开始** —— 类似蓄力的音效（需求原话：「2技能引导时给一次类似的蓄力音效」）。 */
+    /**
+     * **引导（蓄力）开始** —— **2 倍速**播放的弩蓄力音（需求原话：
+     * 「拉回是先蓄力0.3秒，后投出……蓄力改为0.3秒倍速播放的弩蓄力」）。
+     *
+     * <p>时长由调用方控制（{@code HunterPullSkill#CHANNEL_TICKS} = 6 刻 = 0.3 秒）；
+     * 这里用 {@link #DOUBLE_SPEED_PITCH}（pitch 2.0）让同一段音在**一半时间**里放完 ⇒ "倍速"。
+     * <p>★ 改前是"弩装填音 pitch 1.1 + 一层信标音"，两个音都不符合"倍速"这条口径 ⇒ 改成单音 + 2 倍速。
+     */
     public static void crossbowLoadHunterPullChannelSound(World world, Location at) {
-        play(world, at, Sound.ITEM_CROSSBOW_LOADING_MIDDLE, 1f, 1.1f);
-        play(world, at, Sound.BLOCK_BEACON_POWER_SELECT, 0.35f, 0.8f);
+        play(world, at, Sound.ITEM_CROSSBOW_LOADING_MIDDLE, 1f, DOUBLE_SPEED_PITCH);
     }
 
-    /** **投出** —— 三叉戟投出音效（需求原话：「投出时给一个三叉戟投出音效」）。 */
+    /**
+     * **蓄力结束、技能投出** —— 三叉戟投出音（需求原话：
+     * 「蓄力完成后投出技能，播放三叉戟投出音效」）。
+     */
     public static void tridentThrowHunterPullCastSound(World world, Location at) {
         play(world, at, Sound.ITEM_TRIDENT_THROW, 1f, 1.2f);
     }

@@ -47,6 +47,14 @@ import java.util.UUID;
  * 这句话在对方走出 30 格后就没有对象了。标记的失效条件只有三条：
  * 被杀 / 掉线 / 换世界（外加被普攻消费）。
  *
+ * <h2>★ 2026-10-02 用户新增：**被标记的敌人死亡 ⇒ 即刻刷新标记 CD**</h2>
+ * 需求原话：「标记的敌人死亡后会**即刻刷新标记 CD，立刻标记其它敌人**」。
+ * <p>实现：{@link #update()} 的"清理失效标记"一步现在会回报**是否有被标记的敌人死亡**
+ * （见 {@link #purgeInvalidMarks()}）—— 有就把 {@code markReadyAtTick} 清成当前刻，
+ * 于是同一刻的 CD 节点立即放行、当场挑一个新目标标记。
+ * <p>★ 只认**死亡**，不认"掉线 / 换世界"（见 {@link #isDeadNow(UUID)}）：
+ * 后两者不算"猎物被猎杀"，白送一次重新标记会让"卡掉线"变成刷标记的手段。
+ *
  * <h2>★ 口径申报：速度 III 绑在"CD 节点"上</h2>
  * 需求："标记的同时获得 10 秒速度 III"。CD（6 秒）短于速度时长（10 秒），
  * 因此只要场上持续有标记，速度 III 事实上常驻 —— 这是**按字面实现的结果**，
@@ -162,10 +170,15 @@ public class HunterPreyPassive extends PassiveSkill {
         }
 
         //① 清理失效标记（死亡 / 掉线 / 换世界）
-        purgeInvalidMarks();
+        //  ★ 需求："**标记的敌人死亡后会即刻刷新标记 CD，立刻标记其它敌人**"
+        //    ⇒ 只要有**被标记的敌人死了**，就把 CD 清零 ⇒ 下面的 CD 节点本刻就放行、立刻去标记别人。
+        //    只认"死亡"不认"掉线 / 换世界"：那两种不算"猎物被猎杀"，不该白送一次重新标记。
+        int now = Bukkit.getCurrentTick();
+        if (purgeInvalidMarks()) {
+            markReadyAtTick = now;
+        }
 
         //② CD 节点
-        int now = Bukkit.getCurrentTick();
         if (now < markReadyAtTick) {
             return;
         }
@@ -249,9 +262,36 @@ public class HunterPreyPassive extends PassiveSkill {
         return refreshed;
     }
 
-    /** 清掉已失效（死亡 / 掉线 / 换世界）的标记。 */
-    private void purgeInvalidMarks() {
-        markedIds.removeIf(id -> validTarget(id) == null);
+    /**
+     * 清掉已失效（死亡 / 掉线 / 换世界）的标记。
+     *
+     * @return 本次是否有**被标记的敌人死亡** —— 被调用方用来"即刻刷新标记 CD"（需求）。
+     *         与"掉线 / 换世界"区分开：那两种不算猎物被猎杀。
+     */
+    private boolean purgeInvalidMarks() {
+        boolean anyDied = false;
+        for (UUID id : new ArrayList<>(markedIds)) {
+            if (validTarget(id) != null) {
+                continue;
+            }
+            if (isDeadNow(id)) {
+                anyDied = true;
+            }
+            markedIds.remove(id);
+        }
+        return anyDied;
+    }
+
+    /**
+     * 该 UUID 此刻是否**躺着**（死亡 / 血量 ≤ 0）。
+     *
+     * <p>与 {@link #isTrackable(Player)} 的区别：那个把"掉线"也算不可用；
+     * 本方法只认**死亡** —— 需求只对"猎物死亡"给"即刻刷新标记 CD"这条待遇。
+     * 离线时 {@code Bukkit.getPlayer(...)} 回 {@code null} ⇒ 本方法回 {@code false}（按掉线处理）。
+     */
+    private static boolean isDeadNow(UUID id) {
+        Player player = id == null ? null : Bukkit.getPlayer(id);
+        return player != null && (player.isDead() || player.getHealth() <= 0d);
     }
 
     /** 在目标身上画「一簇灵魂沙粒子 + 脚底上方 {@value HunterVfx#DIAMOND_HEIGHT} 格的紫色菱形边框」。 */

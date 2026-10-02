@@ -27,16 +27,32 @@ import java.util.UUID;
  *       紫色菱形边框</b>；</li>
  *   <li><b>一次最多攻击一名敌人</b>；</li>
  *   <li>并在 <b>0.8 秒</b>后尝试将被命中的敌人<b>拉回</b>到角色**视角前方**；</li>
- *   <li>拉回方式 = 敌人以 <b>每秒 8 格</b>的速度向此角色视角前方位移；</li>
+ *   <li>拉回方式 = 敌人以 <b>每秒 10 格</b>的速度向此角色视角前方位移；
+ *       <b>再次释放 ⇒ 每秒 20 格</b>（加速拖拽）；</li>
+ *   <li><b>最多只能拉着敌人 2.5 秒</b>；</li>
  *   <li>期间，敌人可以**通过一次技能的主动位移来脱离控制**；</li>
  *   <li>CD <b>6 秒</b>。</li>
  * </ol>
  *
- * <h2>★ 音效与"屏幕微缩放"（2026-10-02 用户新增）</h2>
+ * <h2>★ 2026-10-02 用户新增的四条</h2>
+ * <ol>
+ *   <li><b>速度</b>：常规 10 格/秒、再次释放 20 格/秒（见下方量化口径）；</li>
+ *   <li><b>时长上限 2.5 秒</b>（{@value #PULL_MAX_TICKS} 刻）；</li>
+ *   <li><b>打空也有投出路径</b>：紫色穿刺路径**无条件**画 —— 有目标画到目标胸口，
+ *       没目标从眼睛沿水平前向画满 {@value #THRUST_RANGE} 格
+ *       （改前它在"命中"分支里 ⇒ 空放时一点粒子都没有）；</li>
+ *   <li><b>被命中的敌人死亡 ⇒ 立刻清掉拖拽</b>：{@code update()} 每刻先查一次被命中者，
+ *       它一没（死亡 / 掉线 / 换世界）就立刻 {@link #finishPullCycle()} ⇒
+ *       尸身上不再画拉拽连线、也不会继续占着"正在进行"的状态。</li>
+ * </ol>
+ *
+ * <h2>★ 音效（2026-10-02 用户指定）</h2>
  * <table border="1">
  *   <tr><th>时机</th><th>表现</th></tr>
- *   <tr><td>引导开始</td><td>{@link HunterSound#crossbowLoadHunterPullChannelSound}（蓄力）</td></tr>
- *   <tr><td>投出</td><td>{@link HunterSound#tridentThrowHunterPullCastSound} + **屏幕微小缩放**</td></tr>
+ *   <tr><td>蓄力开始</td><td>{@link HunterSound#crossbowLoadHunterPullChannelSound}
+ *       = **2 倍速**的弩蓄力音（时长 = 引导 {@value #CHANNEL_TICKS} 刻 = 0.3 秒）</td></tr>
+ *   <tr><td>蓄力完成、投出</td><td>{@link HunterSound#tridentThrowHunterPullCastSound}
+ *       = **三叉戟投出音** + **屏幕微小缩放**</td></tr>
  *   <tr><td>命中敌人</td><td>{@link HunterSound#tridentHitHunterPullImpactSound}</td></tr>
  *   <tr><td>再次释放加速</td><td>{@link HunterSound#riptideHunterPullAccelerateSound}</td></tr>
  * </table>
@@ -54,16 +70,17 @@ import java.util.UUID;
  *   <tr><th>情形</th><th>是否进 CD</th></tr>
  *   <tr><td>穿刺**没打中**任何人</td><td>**进 CD** —— 没有可拉的对象，不存在"等它到位"</td></tr>
  *   <tr><td>穿刺**打中**了</td><td>**不进 CD**（0.8 秒等待 + 拉回全程都可再次释放）</td></tr>
- *   <tr><td>拉回结束（到位 / 逃脱 / 目标死亡 / 5 秒超时）</td><td>**进 CD**</td></tr>
+ *   <tr><td>拉回结束（到位 / 逃脱 / 目标死亡 / 2.5 秒超时）</td><td>**进 CD**</td></tr>
  * </table>
  * ⇒ 因此"再次释放"这个入口只在 {@link Phase#DELAY} 与 {@link Phase#PULL} 两相可达，
  * 效果是**加速**而不是重新引导（见 {@link #acceleratePull}）。
  *
- * <h2>★ 加速拖拽的量化口径</h2>
- * 基础速度 = {@value #PULL_SPEED_PER_TICK} 格/刻（每秒 8 格，需求原话）。
- * 每次"再次释放"给速度加 {@value #PULL_ACCELERATION_STEP_PER_TICK} 格/刻（每秒 4 格），
- * 上限 {@value #PULL_SPEED_MAX_PER_TICK} 格/刻（每秒 20 格）—— 即**按 3 次到达上限**
- * （0.4 → 0.6 → 0.8 → 1.0）。换算见纯函数 {@link #acceleratedPullSpeed(int)}。
+ * <h2>★ 加速拖拽的量化口径（2026-10-02 用户明确）</h2>
+ * 基础速度 = {@value #PULL_SPEED_PER_TICK} 格/刻（**每秒 10 格**，需求原话"常规下为10格每秒"）。
+ * 每次"再次释放"给速度加 {@value #PULL_ACCELERATION_STEP_PER_TICK} 格/刻（每秒 10 格），
+ * 上限 {@value #PULL_SPEED_MAX_PER_TICK} 格/刻（每秒 20 格）
+ * ⇒ **按一次就封顶**（0.5 → 1.0；需求只给了"再次释放"这一档，连按不会更快）。
+ * 换算见纯函数 {@link #acceleratedPullSpeed(int)}。
  *
  * <h2>★ 口径申报："脱离控制"的判据 = 目标自己产生了我们没施加的位移</h2>
  * 插件**没有**"敌人使用了位移技能"这样的事件可监听 ⇒ 只能从**位置**反推：
@@ -75,10 +92,10 @@ import java.util.UUID;
  * 取 2.5 格可以把"自己走两步"与"用技能位移"区分开，又留足落地抖动余量。
  * <p>判据抽成纯函数 {@link #pullEscaped}（离线可穷举）。
  *
- * <h2>★ 口径申报：拉回有 5 秒上限</h2>
- * 需求没写拉回最多持续多久，但"以每秒 8 格速度向锚点位移"在没有上限时，若目标被地形卡住
- * （锚点在墙里 / 目标被方块挡）会**永远**拽下去、技能也**永远不进 CD**。因此设
- * {@value #PULL_MAX_TICKS} 刻（5 秒）上限，到点即收工并进 CD。
+ * <h2>★ 口径申报：拉回有 **2.5 秒**上限</h2>
+ * 需求原话（2026-10-02）：「**最多只能拉着敌人 2.5S**」⇒ 上限 = {@value #PULL_MAX_TICKS} 刻。
+ * <p>这个上限同时兜住一种病态情形：「以每秒 N 格向锚点位移」在没有上限时，若目标被地形卡住
+ * （锚点在墙里 / 目标被方块挡）会**永远**拽下去、技能也**永远不进 CD**。
  *
  * <h2>★ 口径申报：锚点取"视角水平前方 {@value #PULL_ANCHOR_DISTANCE} 格、高度取施法者脚底"</h2>
  * "拉回到角色视角前方"：本实现取施法者**当前位置** + **视线水平分量归一** ×
@@ -116,11 +133,17 @@ public class HunterPullSkill extends Skill {
     /** 命中后等多久开始拉（刻）—— 需求原话"0.8秒后"（16 刻）。 */
     private static final int PULL_DELAY_TICKS = 16;
 
-    /** 拉回基础速度（格/刻）—— 需求原话"每秒8格"（8 / 20 = 0.4）。 */
-    public static final double PULL_SPEED_PER_TICK = 8d / 20d;
+    /** 拉回基础速度（格/刻）—— 需求原话"常规下为10格每秒"（10 / 20 = 0.5）。 */
+    public static final double PULL_SPEED_PER_TICK = 10d / 20d;
 
-    /** 每次"再次释放"给速度加的增量（格/刻）—— 每秒 +4 格。 */
-    public static final double PULL_ACCELERATION_STEP_PER_TICK = 4d / 20d;
+    /**
+     * **每次"再次释放"给速度加的增量（格/刻）** —— 需求原话"再次释放为20格每秒"。
+     *
+     * <p>基础 {@value #PULL_SPEED_PER_TICK}（10 格/秒）+ 本增量 {@code 0.5}（10 格/秒）
+     * = {@value #PULL_SPEED_MAX_PER_TICK}（20 格/秒）⇒ **按一次即到上限**（需求只说了"再次释放"这一档）。
+     * <p>连按多次不会再快（上限封顶）—— 计数器只为不让它无限增长。
+     */
+    public static final double PULL_ACCELERATION_STEP_PER_TICK = 10d / 20d;
 
     /** 拉回速度上限（格/刻）—— 每秒 20 格。 */
     public static final double PULL_SPEED_MAX_PER_TICK = 20d / 20d;
@@ -134,8 +157,8 @@ public class HunterPullSkill extends Skill {
     /** 认为"已经拉到锚点"的距离（格）。 */
     private static final double PULL_ARRIVE_DISTANCE = 1.0d;
 
-    /** 拉回的时长上限（刻）—— 5 秒兜底（见类注释的口径申报）。 */
-    public static final int PULL_MAX_TICKS = 100;
+    /** 拉回的时长上限（刻）—— **2.5 秒**（需求原话"最多只能拉着敌人2.5S"；50 刻）。 */
+    public static final int PULL_MAX_TICKS = 50;
 
     /** 脱离控制的位移阈值（格）—— 见类注释的判据推导。 */
     public static final double ESCAPE_DISTANCE = 2.5d;
@@ -304,6 +327,17 @@ public class HunterPullSkill extends Skill {
             }
             return;
         }
+
+        //★ 需求："**被拉回命中的敌人死亡后将清除身上的拉回命中拖拽效果**"
+        //  ⇒ 每刻先查一次被命中者：只要它没了（死亡 / 掉线 / 换世界）就**立刻**收工。
+        //    reset() 会清掉 pullTargetId / expected / 加速计数 ⇒ 尸身上不再画拉拽连线，
+        //    也不会继续占着"正在进行"的状态。
+        //  （改前只由 beginPull / stepPull 兜底，最迟晚一刻才收工；DELAY 相更是一直不查。）
+        if (pullTargetId != null && pullTarget() == null) {
+            finishPullCycle();
+            return;
+        }
+
         switch (phase) {
             case CHANNEL -> {
                 channelLeft--;
@@ -346,8 +380,21 @@ public class HunterPullSkill extends Skill {
         applyScreenZoom(owner);
 
         Player target = findThrustTarget(owner);
+
+        //★ 需求："就算打空拉回，也会出现紫色的技能投出路径效果" ⇒ 路径**无条件**画：
+        //  有目标 ⇒ 画到目标胸口；没目标（空放）⇒ 从眼睛沿水平前向画满整段射程。
+        //  （改前这段在"打中"分支里 ⇒ 空放时什么粒子都没有）
+        if (world != null) {
+            Location from = owner.getEyeLocation();
+            Location to = target != null
+                    ? target.getLocation().clone().add(0d, 1.0d, 0d)
+                    : thrustEndpoint(owner);
+            //"用类似紫色的粒子来模拟攻击"
+            HunterVfx.purpleThrustHunterPullCast(world, from, to);
+        }
+
         if (target == null || vitals == null) {
-            //空放 ⇒ 进冷却
+            //空放 ⇒ 进冷却（路径已经在上面画过了）
             finishPullCycle();
             return;
         }
@@ -355,10 +402,7 @@ public class HunterPullSkill extends Skill {
         vitals.physicalDamage(target, owner, THRUST_DAMAGE);
 
         if (world != null) {
-            Location from = owner.getEyeLocation();
             Location chest = target.getLocation().clone().add(0d, 1.0d, 0d);
-            //"用类似紫色的粒子来模拟攻击"
-            HunterVfx.purpleThrustHunterPullCast(world, from, chest);
             //命中者身上：暴击粒子 + 单个爆炸粒子 + 紫色菱形边框
             HunterVfx.critBurstHunterPullHit(world, chest);
             HunterVfx.purpleDiamondHunterPullHit(world, target.getLocation());
@@ -370,6 +414,22 @@ public class HunterPullSkill extends Skill {
         pullTargetId = target.getUniqueId();
         phase = Phase.DELAY;
         delayLeft = PULL_DELAY_TICKS;
+    }
+
+    /**
+     * **空放时的投出路径终点**：从眼睛沿**水平前向**推满 {@value #THRUST_RANGE} 格。
+     *
+     * <p>高度与眼睛持平、方向取水平前向（不是含俯仰的视线）—— 与命中判据
+     * {@link #insideThrustCorridor} 的"水平长廊"同口径，让"看到的路径"与"能打中的范围"一致。
+     * 朝向退化（视线与身体朝向都近乎垂直）时退回起点 ⇒ 路径退化为一个点，不抛。
+     */
+    private static Location thrustEndpoint(Player owner) {
+        Location from = owner.getEyeLocation();
+        Vector axis = horizontalAxis(owner);
+        if (axis == null) {
+            return from.clone();
+        }
+        return from.clone().add(axis.clone().multiply(THRUST_RANGE));
     }
 
     /**

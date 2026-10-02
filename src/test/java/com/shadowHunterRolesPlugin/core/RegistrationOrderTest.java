@@ -50,7 +50,11 @@ public class RegistrationOrderTest {
                 Arrays.asList(IDS), new ArrayList<>(role.getComponents().keySet()).subList(0, IDS.length));
     }
 
-    /** 栏位 0..8 全覆盖：9 个条目都能各占一格（栏位由各自描述符持有）。 */
+    /**
+     * 热键栏 9 格全覆盖：9 个条目都能各占一格（栏位由各自描述符持有）。
+     * <p>本用例只覆盖前 9 格；上界本身（= 玩家背包槽位总数，已从 9 放开）那组边界在
+     * {@code DescriptorFreezeTest#slotOutOfRangeThrows} / {@code #slotBoundaryIsInclusive} 里钉。
+     */
     @Test
     public void everySlotCanBeOccupiedExactlyOnce() {
         Role.Builder b = new Role.Builder("r");

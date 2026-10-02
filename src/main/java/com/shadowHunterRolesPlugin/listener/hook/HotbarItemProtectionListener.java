@@ -1,5 +1,6 @@
 package com.shadowHunterRolesPlugin.listener.hook;
 
+import com.shadowHunterRolesPlugin.roleComponent.HotbarItems;
 import com.shadowHunterRolesPlugin.roleComponent.base.BowWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
@@ -44,15 +45,17 @@ import java.util.Map;
  * </ol>
  * 本类只补这四类；既有的两类不重复实现（避免两个监听器对同一事件各取消一次的无谓重复）。
  *
- * <h2>判据 = 既有 PDC 识别键（复用，不新增第二套）</h2>
- * 用 {@link Skill.Utils#isSkillItem(ItemStack)} ·
+ * <h2>判据 = 唯一的"本系统物品"判定点（复用，不新增第二套）</h2>
+ * 三个调用点统一走 {@link HotbarItems#isSystemItem(ItemStack)} —— 那是三支家族识别键的**唯一判定点**，
+ * 它内部读的就是 {@link Skill.Utils#isSkillItem(ItemStack)} ·
  * {@link MainWeapon.Utils#isMainWeapon(ItemStack)} 与 {@link BowWeapon.Utils#isBowWeapon(ItemStack)}
- * —— 它们各自读的识别键（{@code Skill.Utils.SKILL_KEY} · {@code MainWeapon.Utils.MAIN_WEAPON_KEY} ·
- * {@code BowWeapon.Utils.BOW_WEAPON_KEY}）由各组件的 {@code buildItem()} 最后一步写入。
- * 三者都自带 null / 空气判空，因此本类可放心调用。
- * <p>★ <b>凡在热键栏里放东西的组件家族，其识别键都必须出现在这里</b>（与
- * {@code roleComponent/HotbarItems#clearFrom} 同一份"家族键清单"），否则该家族的物品可以被拖拽 / F 键 /
+ * （键名 = {@code SKILL_KEY} / {@code MAIN_WEAPON_KEY} / {@code BOW_WEAPON_KEY}，由各组件的
+ * {@code buildItem()} 最后一步写入）。三者都自带 null / 空气判空，因此可直接吃事件给的物品。
+ * <p>★ <b>凡在物品栏里放东西的组件家族，其识别键都必须出现在 {@code HotbarItems#isSystemItem}</b>
+ * （与 {@code HotbarItems#clearFrom} 同一份"家族键清单"，只此一处），否则该家族的物品可以被拖拽 / F 键 /
  * 漏斗 / 合成格弄走 —— 漏一条就是保护上的真缺口。
+ * <p>本处理器**不再自己抄一份键清单**：历史形态是这里与 {@code HotbarItems} 各持一份三键判据，
+ * 属"同一判据两种说法"（加家族时漏改任一处都不会报错）。
  * <p><b>为何不自己写判据</b>：那会变成"两套识别逻辑"，与本工程"单一实现点"的纪律冲突。
  *
  * <h2>只对"真正在热键栏里"的物品保护（边界）</h2>
@@ -66,11 +69,14 @@ import java.util.Map;
  */
 public class HotbarItemProtectionListener implements Listener {
 
-    /** 受保护判定：技能物品 · 近战主武器物品 · 弓弩主武器物品（复用既有 PDC 识别键）。 */
+    /**
+     * 受保护判定：本系统写进物品栏的东西。
+     * <p>判据本体**只有一处** —— {@link HotbarItems#isSystemItem(ItemStack)}（三支家族识别键的唯一判定点），
+     * 本处理器的三个调用点都走它。历史形态是在这里把三支键各写一遍（与 {@code HotbarItems} 各持一份），
+     * 那正是"同一判据两种说法"：加一个家族时漏改这里，物品就能被拖走（漏改那边则清不掉）。
+     */
     private static boolean isProtected(ItemStack item) {
-        return Skill.Utils.isSkillItem(item)
-                || MainWeapon.Utils.isMainWeapon(item)
-                || BowWeapon.Utils.isBowWeapon(item);
+        return HotbarItems.isSystemItem(item);
     }
 
     /**

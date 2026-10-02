@@ -35,8 +35,12 @@ import java.util.List;
  * </ul>
  *
  * <p>前摇用计时组件登记（{@code TaskComponent#addScheduleLater}），角色清除时框架兜底取消，
- * {@code stop()} 里再显式取消一次（幂等）。缓慢 / 失明直接施加在承受方身上，
- * 与 {@code RedEvilShockSkill} 的既有做法一致。
+ * {@code stop()} 里再显式取消一次（幂等）。
+ * <p><b>缓慢 / 失明走 buff 组件的跨玩家入口</b>
+ * （{@link BuffComponent#applyPotionEffectTo(Player, PotionEffectType, int, int)}）：
+ * 效果进的是**承受方自己**的药水账本 ⇒ 他清除角色 / 组件停用时一并回收，也能被
+ * {@code BuffComponent#clearDebuffOn(...)} 净化。承受方没有角色（没有账本）时本条**不施加**
+ * （只吃物理伤害）—— 与 {@code RedEvilShockSkill} 的同一口径。
  */
 public class SinThornEntangleSkill extends Skill {
 
@@ -172,8 +176,12 @@ public class SinThornEntangleSkill extends Skill {
                 if (!svc().roleInfo().isHostile(victim)) continue;
 
                 vitals.physicalDamage(victim, owner, ENTANGLE_DAMAGE);
-                victim.addPotionEffect(PotionEffectType.SLOWNESS.createEffect(DEBUFF_DURATION_TICKS, SLOWNESS_AMPLIFIER));
-                victim.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(DEBUFF_DURATION_TICKS, 0));
+                //缓慢 / 失明走 buff 组件的跨玩家入口 ⇒ 进**受害者自己**的药水账本
+                //  （他清角色 / 组件停用时一并回收，也能被 clearDebuffOn 净化）；
+                //  原先直接 victim.addPotionEffect 的效果没人认领。
+                //  ★ 目标没有角色 ⇒ 本入口不写（没有账本）⇒ 那种玩家只吃伤害，不吃减益。行为变更，如实申报。
+                buff.applyPotionEffectTo(victim, PotionEffectType.SLOWNESS, DEBUFF_DURATION_TICKS, SLOWNESS_AMPLIFIER);
+                buff.applyPotionEffectTo(victim, PotionEffectType.BLINDNESS, DEBUFF_DURATION_TICKS, 0);
             }
 
             center.getWorld().playSound(center, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1f, 0.6f);

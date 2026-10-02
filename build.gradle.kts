@@ -65,6 +65,23 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
 
+// ── Javadoc 任务的同族前置（第四处"文本 I/O 必须各自钉死字符集"）─────────────────────────
+// 现象：`gradlew javadoc` 在**中文路径**下必红 ——
+//   `错误: 无法读取Input length = 1`（MalformedInputException）⇒ 不生成任何文档。
+// 根因：**写方与读方用的不是一套字符集**
+//   写方 = Gradle 用守护进程默认字符集（本工程被 t58 钉成 **GBK**）写 `build/tmp/javadoc/javadoc.options`；
+//   读方 = JDK 21 的 javadoc 按 **UTF-8** 读 @argfile（JEP 400 起 `file.encoding` 恒为 UTF-8，与系统区域无关）。
+//   ⇒ 参数文件里的 CJK 路径（本工程路径含「插件」）在 UTF-8 下是非法字节序列 ⇒ 解码失败 ⇒ 整个任务失败。
+// 关键：`options.encoding` 只影响**源码**怎么读，**管不到 @argfile 的读法**，所以必须另想办法。
+// 这里用的办法 = 让 javadoc 那个 JVM 的默认字符集回到 GBK（`-J-Dfile.encoding=GBK` 经 `options.jvmArgs`
+// 下发给工具进程）⇒ 读方与写方一致。★ 不要顺手把守护进程改回 UTF-8：那会让 `:test` 的 argfile 反过来炸
+// （t58 立 GBK 正是为它），两处必须各自钉自己的。
+// 另注：`charSet`/`docEncoding` 钉的是**产物 HTML / 索引**的字符集，与上面的读写 charset 是两件事。
+tasks.withType<Javadoc>().configureEach {
+    options.encoding = "UTF-8"   // 源码（本工程全部源码是 UTF-8）
+}
+
+
 // 阶段 10 · t55：`processResources` 的 `expand` **默认用平台默认字符集** ⇒ 守护进程被钉成 GBK 时
 // （t58 为 `:test` 的 argfile 立的前置），UTF-8 的 `plugin.yml` 会被回写成**非 UTF-8** ⇒
 // Paper 报 `Invalid plugin.yml / MalformedInputException` ⇒ **jar 不可加载**（产品级）。

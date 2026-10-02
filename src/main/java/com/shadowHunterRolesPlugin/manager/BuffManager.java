@@ -58,44 +58,61 @@ public class BuffManager {
         //启动点改为 buff 组件的 `start()`（第二相）⇒ {@link #startUpdater()}。
     }
 
-    public void addBuff(BuffType type, int durationTicks){
+    /**
+     * 施加插件侧 buff（时长 = 游戏刻）。
+     *
+     * <p><b>返回值 = 本账本的状态是否真的因此改变</b>（新增条目，或把已有条目的时长延长了），
+     * 供跨实例入口（{@code BuffComponent#addTo}）如实回报"这次施加到底有没有落地"：
+     * <ul>
+     *   <li>{@code false} —— 处于 {@code IMMUNE} 下（免疫早退，负面 buff 上不去）；
+     *       已有更长的同类 buff（取最大时长语义 ⇒ 本次请求不产生变化）；{@code type} 为 {@code null}；</li>
+     *   <li>{@code true} —— 账本里新增了该 buff，或该 buff 的时长被延长（此时才施加原版效果与属性修饰符，
+     *       与合并前的分支逐字一致）。</li>
+     * </ul>
+     * <p><b>既有调用点不受影响</b>：本方法原为 {@code void}，所有既有调用点都丢弃返回值
+     * （{@code BuffComponent#add} 起转发作用，技能侧直接调组件），改签名只是让"结果"可被读到。
+     */
+    public boolean addBuff(BuffType type, int durationTicks){
+        //null 类型是调用方 bug：早退而不是往账本里塞一个 null 键
+        //（那会留下"坏账" —— 后续 applyPotionEffect 的 switch 见 null 抛 NPE，账本却已经脏了）
+        if(type == null) return false;
+
         //处理免疫效果
         if(type == BuffType.IMMUNE){
-            addImmune(durationTicks);
-            return;
+            return addImmune(durationTicks);
         }
 
-        if(hasBuff(BuffType.IMMUNE)) return;
+        if(hasBuff(BuffType.IMMUNE)) return false;
 
         if(activeBuffs.containsKey(type)){
              Buff existing = activeBuffs.get(type);
              if(durationTicks > existing.getRemainingTicks()){
                  activeBuffs.put(type, new Buff(type, durationTicks));
+                 return true;
              }
-        }
-        else{
-            activeBuffs.put(type, new Buff(type, durationTicks));
-            if(type == BuffType.STUN){
-                    player.getAttribute(Attribute.MOVEMENT_SPEED).addModifier(
-                            new AttributeModifier(BUFF_MOVEMENT_SPEED_MODIFIER_KEY, -1, AttributeModifier.Operation.MULTIPLY_SCALAR_1)
-                    );
-            }
-            applyPotionEffect(type, durationTicks);
+             return false;
         }
 
-
-
-
+        activeBuffs.put(type, new Buff(type, durationTicks));
+        if(type == BuffType.STUN){
+                player.getAttribute(Attribute.MOVEMENT_SPEED).addModifier(
+                        new AttributeModifier(BUFF_MOVEMENT_SPEED_MODIFIER_KEY, -1, AttributeModifier.Operation.MULTIPLY_SCALAR_1)
+                );
+        }
+        applyPotionEffect(type, durationTicks);
+        return true;
     }
 
-    private void addImmune(int durationTicks){
+    /** 施加免疫（{@code IMMUNE} 那条路径）；返回口径与 {@link #addBuff(BuffType, int)} 一致。 */
+    private boolean addImmune(int durationTicks){
         //取最大时间
         if(activeBuffs.containsKey(BuffType.IMMUNE)){
             Buff existing = activeBuffs.get(BuffType.IMMUNE);
             if(durationTicks > existing.getRemainingTicks()){
                 activeBuffs.put(BuffType.IMMUNE, new Buff(BuffType.IMMUNE, durationTicks));
+                return true;
             }
-            return;
+            return false;
         }
 
         //IMMUNE = 净化 + 免疫：进场先清掉全部负面效果（插件侧 STUN / SILENCE + 原版 HARMFUL 药水），
@@ -106,6 +123,7 @@ public class BuffManager {
         clearDebuffs();
 
         activeBuffs.put(BuffType.IMMUNE, new Buff(BuffType.IMMUNE, durationTicks));
+        return true;
     }
 
     public boolean hasBuff(BuffType type){

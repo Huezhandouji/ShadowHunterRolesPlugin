@@ -47,8 +47,28 @@ public class HotbarSpecification<T extends RoleComponent>
     private final int energyCost;
 
     /**
+     * **合法栏位的上界（含）** —— 栏位上限 = 玩家背包的槽位总数，不再是热键栏的 9 格。
+     *
+     * <p>取值依据（1.21.11 的 {@code org.bukkit.inventory.PlayerInventory#setItem(int, ItemStack)}
+     * 契约原文，逐条对应）：索引 {@code 0-8} 热键栏 · {@code 9-35} 背包主格 · {@code 36-39} 盔甲 ·
+     * {@code 40} 副手 ⇒ 共 41 个槽位，合法索引 {@code 0..40}。
+     * <p>该契约里另有两个索引（{@code 41} body / {@code 42} saddle），原文注明
+     * "not visible in the player inventory menu" ⇒ **故意不含**：写进去既看不见也拿不到，
+     * 允许它只会把"物品不见了"这种故障变成静默的。
+     * <p><b>唯一真值来源</b>：本常量由三处共读 ——
+     * {@code HotbarSpecification#setSlot}（装配期 fail-fast）、
+     * {@code HotbarRenderComponent#registerSlot}（运行期登记仲裁）、
+     * {@code HotbarItems#clearFrom}（清理面）。**别再各写一个字面量**（那正是本次改动的起因：
+     * 同一判据散在多处时，改一处必然漏另一处）。
+     * <p>注意：本常量只管"栏位数字合法不合法"，**不代表该格在热键栏里**。落在 {@code 9..40} 的物品
+     * 不在热键栏 ⇒ 拿不到手上，三条按键管道（左/右/Q）都不会认得它；它只能当"背包里的物资"用。
+     */
+    public static final int MAX_SLOT = 40;
+
+    /**
      * 栏位（栏位值的持有者就是本类型 —— 基类描述符不含栏位语言）：{@code null} = 未设
      * （装配期未设则 {@link #freeze()} 时抛异常）。
+     * <p>合法区间 = {@code 0..}{@link #MAX_SLOT}（见该常量的依据）。
      */
     private Integer slot;
 
@@ -97,7 +117,7 @@ public class HotbarSpecification<T extends RoleComponent>
         return slot != null;
     }
 
-    /** 栏位（0..8）；未设栏位则抛异常（绝不回落 {@code -1} 哨兵）。 */
+    /** 栏位（{@code 0..}{@link #MAX_SLOT}）；未设栏位则抛异常（绝不回落 {@code -1} 哨兵）。 */
     public final int slot() {
         if (slot == null) {
             throw new IllegalStateException("Component specification of kind " + descriptorLabel()
@@ -109,11 +129,13 @@ public class HotbarSpecification<T extends RoleComponent>
     /**
      * 装配器设置栏位（这一支唯一会在装配期写入的参数；其余表现字段由组件自己的描述符声明默认值）。非法值 /
      * 重复改成别的位置 / 冻结后设置，一律抛异常（语义与文案逐字保留）。
+     * <p>合法区间 = {@code 0..}{@link #MAX_SLOT}；上界不再是热键栏的 9 格，而是玩家背包的槽位总数
+     * （依据见 {@link #MAX_SLOT}）。文案里的数字由常量拼出，因此改上界只需改那一处。
      */
     public final HotbarSpecification<T> setSlot(int slot) {
         ensureMutable();
-        if (slot < 0 || slot > 8) {
-            throw new IllegalArgumentException("Slot must be between 0 and 8, got: " + slot);
+        if (slot < 0 || slot > MAX_SLOT) {
+            throw new IllegalArgumentException("Slot must be between 0 and " + MAX_SLOT + ", got: " + slot);
         }
         if (this.slot != null && this.slot != slot) {
             throw new IllegalStateException("Slot already assigned to " + this.slot + " for kind "

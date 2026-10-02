@@ -8,6 +8,17 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluDestinySkil
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluHysteriaPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluMelodySelectionSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluTraumaMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterEvolutionPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterGrudgeMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPounceSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPreyPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPullSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterStealthSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.mainWeapon.MatinaMedicalShovelMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaKuangPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaJudgmentSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaRedstoneDroneSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaSeaCrystalLampSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
@@ -27,6 +38,11 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.SinThor
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.skill.JudgmentThornSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.skill.SinDefenseSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.skill.SinThornEntangleSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.tek.TekDestinyPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.tek.TekTridentMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.tek.TekTruthThrustSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.tek.TekXiaoSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.tek.TekYueSkill;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 
@@ -68,7 +84,10 @@ public class RoleLoader {
                 new Definition("selfUpdateExample", RoleLoader::selfUpdateExampleBuilder),
                 new Definition("canglu", RoleLoader::cangluBuilder),
                 new Definition("sinThorn", RoleLoader::sinThornBuilder),
-                new Definition("remoteness", RoleLoader::remotenessBuilder)
+                new Definition("matina", RoleLoader::matinaBuilder),
+                new Definition("remoteness", RoleLoader::remotenessBuilder),
+                new Definition("tek", RoleLoader::tekBuilder),
+                new Definition("hunter", RoleLoader::hunterBuilder)
         );
     }
 
@@ -274,12 +293,145 @@ public class RoleLoader {
                 .icon(Material.WITHER_ROSE);
     }
 
+    /**
+     * **狂躁牧师 · 马提娜(Matina)**（阵营 HUNTER）：医疗设备 + 诉说苦怒（狂暴值 {@code KUANG}）+ 三个主动。
+     *
+     * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
+     * <ul>
+     *   <li><b>主武器「医疗设备」占 0 号栏</b> —— 插件只把攻击事件投递给主武器组件
+     *       （{@code listener/MainWeaponListener#onAttackPlayer}）⇒ "每次命中"的回血 / 特殊值伤害 /
+     *       狂暴结算都必须落在这一把武器上；铁铲 = {@code Material.IRON_SHOVEL}，
+     *       攻速 0.1 秒（2 刻）且冷却中不出伤；</li>
+     *   <li>三个主动占 1 / 2 / 3 号栏：<b>海晶灯</b>（CD 6 秒 / 耗能 15）· <b>红石无人机</b>
+     *       （CD 20 秒，技能完全后起算 / 耗能 20）· <b>神罚</b>（CD 50 秒，技能完全后起算 / 耗能 0）；</li>
+     *   <li>被动「诉说苦怒」经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏），
+     *       它是<b>狂暴值的唯一持有者</b>：层数 / 每秒衰减 / 阈值加成 / 暴走死亡判定 / 层数粒子与 bossbar
+     *       全在它里面；</li>
+     *   <li>基础属性<b>不显式声明</b> ⇒ 与 {@code red} / {@code meiqihezi} 一致，走框架默认
+     *       （生命上限 40、能量上限 100、SanTE 上限 100）；</li>
+     *   <li>数值：普攻 4 点物理 + 目标回血 8 + 目标 5 点特殊值；海晶灯 r8 治疗 10 点 / 敌军 3 秒
+     *       缓慢 II + 凋零 II + 虚弱 II；无人机 r8 跟随 / r5 每秒治疗 4 点或 1 秒中毒 III / 持续 15 秒；
+     *       神罚 r25、引导 3 秒 + 7 秒、共 70 点特殊值。</li>
+     * </ul>
+     */
+    private static Role.Builder matinaBuilder() {
+        return withBuiltIns(new Role.Builder("matina"))
+                .displayName(Component.text("狂躁牧师·马提娜"))
+                .description(List.of(
+                        Component.text("狂暴值越高，越是接近神，也越是接近死"),
+                        Component.text("医疗设备：每次命中造成4点物理伤害，为目标回复8点生命并造成5点特殊值伤害"),
+                        Component.text("诉说苦怒：每次成功治疗或成功攻击增加1点狂暴值；每秒减少1层，高于60层时每秒可能直接死亡"),
+                        Component.text("海晶灯：洒出药物治疗同阵营并削弱敌人"),
+                        Component.text("远程医疗：放出爱心无人机跟随并持续治疗"),
+                        Component.text("神罚：引导3秒后展开魔法阵，对范围内敌人倾泻特殊值伤害")
+                ))
+                .faction(Faction.HUNTER)
+                .addComponent(MatinaMedicalShovelMainWeapon.ID,
+                        new MatinaMedicalShovelMainWeapon.Specification().setSlot(0))
+                .addComponent(MatinaSeaCrystalLampSkill.ID,
+                        new MatinaSeaCrystalLampSkill.Specification().setSlot(1))
+                .addComponent(MatinaRedstoneDroneSkill.ID,
+                        new MatinaRedstoneDroneSkill.Specification().setSlot(2))
+                .addComponent(MatinaJudgmentSkill.ID,
+                        new MatinaJudgmentSkill.Specification().setSlot(3))
+                .addComponent(MatinaKuangPassive.ID, new MatinaKuangPassive.Specification())
+                .icon(Material.SEA_LANTERN);
+    }
+
     public static Role.Builder remotenessBuilder(){
         return withBuiltIns(new Role.Builder("remoteness"))
                 .displayName(Component.text("冷识"))
                 .faction(Faction.SHADOW)
                 .addComponent(TestBowMainWeapon.ID, new TestBowMainWeapon.Specification().setSlot(0))
                 .icon(Material.SOUL_LANTERN);
+    }
+
+    /**
+     * **特克(Tek)**：逆命天理（三叉戟）+ 逆转天意（「真理」层数持有者）+ 三个主动。
+     *
+     * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
+     * <ul>
+     *   <li><b>主武器「逆命天理」占 0 号栏</b> —— 插件只把攻击事件投递给主武器组件
+     *       （{@code listener/MainWeaponListener#onAttackPlayer}），"每次攻击 4 物理 + 4 真实 + 叠真理"
+     *       因此必须落在这一把武器上；三叉戟 = {@code Material.TRIDENT}，
+     *       攻击间隔 0.2 秒（4 刻）且冷却中不出伤，长按右键 0.8 秒蓄力突进 6 格（突进 CD 3 秒）；</li>
+     *   <li>三个主动占 1 / 2 / 3 号栏：<b>刺霄</b>（CD 10 秒）· <b>落岳</b>（CD 12 秒）·
+     *       <b>真理之刺</b>（CD 20 秒，场上有人真理 ≥ 10 才解锁）；</li>
+     *   <li>被动「逆转天意」经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏），
+     *       它是<b>「真理」层数的门面</b>（真值在 {@code TekTruth} 静态账本，跨玩家实例可读），
+     *       并负责"命中减 1 秒所有技能 CD / 得 1 点能量 / 能量 ≥ 90 且残血给护盾"；</li>
+     *   <li>基础属性不显式声明 ⇒ 走框架默认（生命上限 40、能量上限 100、SanTE 上限 100）；</li>
+     *   <li>数值：普攻 4 物理 + 4 真实；突进 6 格 / 3 秒 CD；刺霄 6.5 格 / 10 点物理；
+     *       落岳 15 格高 / r5 / 15 点物理 + 1 秒眩晕；真理之刺 15 点真实 + 回自身 20 生命。</li>
+     * </ul>
+     */
+    private static Role.Builder tekBuilder() {
+        return withBuiltIns(new Role.Builder("tek"))
+                .displayName(Component.text("特克"))
+                .description(List.of(
+                        Component.text("真理在枪尖上，命运在枪尖外"),
+                        Component.text("逆命天理：每次攻击造成4点物理与4点真实伤害，并附加一层「真理」"),
+                        Component.text("逆转天意：命中减少1秒所有技能冷却并获得1点能量；能量≥90且残血时获得20点伤害吸收"),
+                        Component.text("刺霄：向前刺出一击并瞬移到最远被击中敌人身后"),
+                        Component.text("落岳：跃起后砸落，对范围内敌人造成伤害与眩晕"),
+                        Component.text("真理之刺：场上有真理≥10的角色时解锁，瞬移刺击并清空全场真理")
+                ))
+                .faction(Faction.HUNTER)
+                .addComponent(TekTridentMainWeapon.ID, new TekTridentMainWeapon.Specification().setSlot(0))
+                .addComponent(TekXiaoSkill.ID, new TekXiaoSkill.Specification().setSlot(1))
+                .addComponent(TekYueSkill.ID, new TekYueSkill.Specification().setSlot(2))
+                .addComponent(TekTruthThrustSkill.ID, new TekTruthThrustSkill.Specification().setSlot(3))
+                .addComponent(TekDestinyPassive.ID, new TekDestinyPassive.Specification())
+                .icon(Material.NETHERITE_SCRAP);
+    }
+
+    /**
+     * **猎手(Hunter)**（阵营 {@link Faction#SHADOW}）：遗愤（下界合金剑）+
+     * 猎杀（标记）+ 进化指数（五档）+ 三个主动。
+     *
+     * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
+     * <ul>
+     *   <li><b>主武器「遗愤」占 0 号栏</b> —— 插件只把攻击事件投递给主武器组件
+     *       （{@code listener/MainWeaponListener#onAttackPlayer}），"每次攻击回血 / 随机物理 +
+     *       随机 SanTE / 对被标记者额外灵魂伤害"因此必须落在这一把武器上；
+     *       下界合金剑 = {@code Material.NETHERITE_SWORD}，攻击间隔 0.3 秒（6 刻）且冷却中不出伤；</li>
+     *   <li>三个主动占 1 / 2 / 3 号栏：<b>扑击</b>（金锭，CD 3 秒）· <b>拉回</b>（垂泪藤，CD 6 秒）·
+     *       <b>遁形</b>（哭泣的黑曜石，CD 20 秒且 <b>技能完全后</b>起算）；三者<b>全部 0 耗能</b>
+     *       （需求未提耗能，只靠冷却限制强度 —— 与罪棘 / 特克同口径）；</li>
+     *   <li>两个被动经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏）：
+     *       <b>猎杀</b>（30 格内最近敌人的标记持有者 + 标记时给速度 III）与
+     *       <b>进化指数</b>（五档，击杀升级，封顶 5 级）；</li>
+     *   <li>基础属性<b>不显式声明</b> ⇒ 走框架默认（生命上限 40、能量上限 100、SanTE 上限 100）；</li>
+     *   <li>数值：遗愤 6~10 物理 + 4~10 SanTE + 回自己 4 生命（0.3 秒一击）；
+     *       扑击 4 格位移 → 3 格内 12 物理 + 3 秒缓慢 III + 回自己 4 生命；
+     *       拉回 0.3 秒引导 → 12 格穿刺 15 物理（最多一人）→ 0.8 秒后按每秒 8 格拽向视角前方；
+     *       遁形 15 秒速度 VI + 隐身 + 抗性 V + 免疫缓慢，用技能或攻击即中断。</li>
+     * </ul>
+     */
+    private static Role.Builder hunterBuilder() {
+        return withBuiltIns(new Role.Builder("hunter"))
+                .displayName(Component.text("猎手"))
+                .description(List.of(
+                        Component.text("猎手：先标记猎物，再把它拽回眼前"),
+                        Component.text("遗愤：每次攻击回复4点生命，造成6~10点物理与4~10点特殊值伤害"),
+                        Component.text("猎杀：标记30格内最近的敌人，标记时获得10秒速度III，普攻被标记者额外造成10点灵魂伤害"),
+                        Component.text("扑击：向前扑击4格，并撕咬3格内最近的一名敌人"),
+                        Component.text("拉回：引导0.3秒后穿刺12格，0.8秒后把命中者拽向视角前方"),
+                        Component.text("遁形：速度VI、隐身、抗性V并免疫缓慢，使用技能或攻击即中断"),
+                        Component.text("进化指数：击杀敌人可进化五档")
+                ))
+                .faction(Faction.SHADOW)
+                .addComponent(HunterGrudgeMainWeapon.ID,
+                        new HunterGrudgeMainWeapon.Specification().setSlot(0))
+                .addComponent(HunterPounceSkill.ID,
+                        new HunterPounceSkill.Specification().setSlot(1))
+                .addComponent(HunterPullSkill.ID,
+                        new HunterPullSkill.Specification().setSlot(2))
+                .addComponent(HunterStealthSkill.ID,
+                        new HunterStealthSkill.Specification().setSlot(3))
+                .addComponent(HunterPreyPassive.ID, new HunterPreyPassive.Specification())
+                .addComponent(HunterEvolutionPassive.ID, new HunterEvolutionPassive.Specification())
+                .icon(Material.NETHERITE_SWORD);
     }
 
 }

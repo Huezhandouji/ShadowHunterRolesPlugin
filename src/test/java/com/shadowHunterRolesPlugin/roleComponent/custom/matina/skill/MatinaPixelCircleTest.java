@@ -16,22 +16,24 @@ import static org.junit.Assert.assertTrue;
  * 马提娜大招「神罚」**脚下像素画魔法阵**的离线单测（数据来自外部 pixelart 粒子画数据包）。
  *
  * <h2>为什么这些断言重要</h2>
- * 这张画的**两轴像素间距并不相同**（x 是 0.1 格、y 是 0.2 格）——
- * 如果归一化时"每轴各自缩放到 1.0"，画会被**横向拉伸一倍**（实测宽/高 0.984 → 1.0/1.0 的假象，
- * 形状却歪了）。因此本测试把"**两轴同除以最大边**"这条口径钉死：
- * 归一化后 {@code x 跨度} 必须仍 ≈ 0.984 而不是 1.0。
+ * 这张画的**两轴跨度并不相同**（去重落格后 x 跨 256 个 0.1 格单位、y 跨 250）——
+ * 如果归一化时"每轴各自缩放到 1.0"，画会被**拉伸变歪**（实测 x/y = 1.0 / 0.977 的应然比例
+ * 会被人为抹平成 1.0 / 1.0）。因此本测试把"**两轴同除以最大边**"这条口径钉死：
+ * 归一化后 {@code y 跨度} 必须仍 ≈ 0.977 而不是 1.0。
  *
  * <h2>边界（如实申报）</h2>
  * 覆盖的是"资源内容 + 解析 + 归一化"这条纯链路；**不**覆盖真实的粒子落点与观感
  * （`spawnParticle` 要服务端，见 {@link MatinaRageVfx#pixelCircle} 的坐标变换说明）。
+ * <p>★ 亦**不**覆盖粒子种类：`pixelCircle` 已改为统一白色末地烛（需求指定），
+ * 但那是 `spawnParticle` 调用，离线测不到 ⇒ 只能靠代码复核。
  */
 public class MatinaPixelCircleTest {
 
     /** 打包在 jar 里的资源（与组件同源，从测试 classpath 读）。 */
     private static final String RESOURCE = "/matina_magic_circle.txt";
 
-    /** 源数据包解析后的点数（三段 mcfunction 去重落格的结果，4554）。 */
-    private static final int EXPECTED_POINTS = 4554;
+    /** 源数据包解析并去重落格后的点数（当前源包 = Desktop 存档 datapacks 版，1029）。 */
+    private static final int EXPECTED_POINTS = 1029;
 
     private static InputStream resource() {
         InputStream in = MatinaPixelCircleTest.class.getResourceAsStream(RESOURCE);
@@ -45,7 +47,7 @@ public class MatinaPixelCircleTest {
     public void 资源可解析且点数与源数据包一致() throws Exception {
         MatinaRageVfx.PixelArt art = MatinaJudgmentSkill.parsePixelArt(resource());
         assertNotNull("资源必须能解析成像素画", art);
-        assertEquals("点数必须等于数据包去重落格后的 4554", EXPECTED_POINTS, art.size());
+        assertEquals("点数必须等于数据包去重落格后的点数", EXPECTED_POINTS, art.size());
     }
 
     @Test
@@ -62,8 +64,8 @@ public class MatinaPixelCircleTest {
 
     /**
      * ★★ **核心断言：长宽比必须与源画一致**（两轴同除以最大边，而不是各自归一）。
-     * <p>源画的实际方块范围是 x 24.6 格、y 25.0 格 ⇒ 两轴同除以 25.0 后：
-     * x 跨度 = 0.984、y 跨度 = 1.0。
+     * <p>当前源画的方块范围是 x 25.6 格、y 25.0 格 ⇒ 两轴同除以 25.6 后：
+     * x 跨度 = 1.0、y 跨度 = 250/256 = 0.9766。
      * <p>若有人把它改成"每轴各自归一"，两者都会变成 1.0 ⇒ 本断言立刻变红。
      */
     @Test
@@ -83,11 +85,11 @@ public class MatinaPixelCircleTest {
         float spanX = maxX - minX;
         float spanY = maxY - minY;
 
-        //y 是"最大边"（250 个 0.1 格单位）= 1.0；x = 246/250 = 0.984
-        assertEquals("y 跨度应恰为 1.0（它是最大边）", 1.0f, spanY, 0.005f);
-        assertEquals("x 跨度应是 246/250 = 0.984（★ 不是 1.0 —— 那说明被各自归一再拉伸了）",
-                0.984f, spanX, 0.005f);
-        assertTrue("★ 两轴跨度必须不同（源画本就是 24.6×25.1 的近方形，不是正方形）",
+        //x 是"最大边"（256 个 0.1 格单位）= 1.0；y = 250/256 = 0.9766
+        assertEquals("x 跨度应恰为 1.0（它是最大边）", 1.0f, spanX, 0.005f);
+        assertEquals("y 跨度应是 250/256 = 0.9766（★ 不是 1.0 —— 那说明被各自归一再拉伸了）",
+                250f / 256f, spanY, 0.005f);
+        assertTrue("★ 两轴跨度必须不同（源画本就是 25.6×25.1 的近方形，不是正方形）",
                 Math.abs(spanX - spanY) > 0.01f);
     }
 

@@ -19,6 +19,9 @@ import org.bukkit.util.Vector;
  * （照 {@code custom/sinThorn/SinThornVfx} 的既有形态）⇒ 粒子几何不进组件、更不进框架。
  *
  * <p><b>边界</b>：不读玩家状态、不写任何状态、不注册任务、不调用组件；传入 {@code null} 一律静默返回。
+ *
+ * <p>★ <b>像素画魔法阵的粒子种类</b>（{@link #pixelCircle}）：一律用**白色末地烛**
+ * （{@link Particle#END_ROD}），位置取自外部「pixelart 粒子画」数据包，**颜色不取画里的 RGB**。
  */
 public final class MatinaRageVfx {
 
@@ -340,6 +343,10 @@ public final class MatinaRageVfx {
      * ⇒ 长宽比与源画一致）；{@code colors} 与它们一一对应。
      * <p>为什么做成 record 由调用方持有：本类的契约是"纯几何、零状态"
      * （见类注释的边界申报）⇒ 资源读取与缓存归组件，本类只负责把坐标算出来并 spawn。
+     *
+     * <p>★ {@code colors} 目前**只用于保留源画数据**：{@link #pixelCircle} 一律走白色末地烛，
+     * 不读颜色（需求指定）。留着它是因为资源格式本来就带 RGB 列，且将来想切回红石画法时
+     * 无需重新解析。
      */
     public record PixelArt(float[] localX, float[] localY, Color[] colors) {
 
@@ -352,14 +359,30 @@ public final class MatinaRageVfx {
     /**
      * 像素画每颗点的 **dust 尺寸**（源数据包用的是 0.2）。
      *
-     * <p>为什么这里调大：源画按 0.2 格间距密排，而我们要把它**铺满整个技能直径**
-     * （放大 ≈2 倍）⇒ 点间距变宽，沿用 0.2 会让画面显得稀疏发暗 ⇒ 取 0.5 补偿。
-     * <p>★ 想改观感只调这一个常量（想更接近源就调小、想更亮就调大）。
+     * <p>★ <b>现已不使用</b>：那张画统一改用**白色末地烛**（{@link Particle#END_ROD}）渲染，
+     * 而末地烛**没有尺寸参数**（它不是红石系粒子）。常量保留是为了不破坏既有读口与文档，
+     * 也让"想切回红石画法"时有个现成的默认值。
+     *
+     * <p>历史：源画按 0.2 格间距密排，要把它**铺满整个技能直径**（放大 ≈2 倍）
+     * ⇒ 点间距变宽，沿用 0.2 会让画面显得稀疏发暗 ⇒ 曾取 0.5 补偿。
      */
     public static final float PIXEL_DUST_SIZE = 0.5f;
 
+    /** 像素画各点的**末地烛爆点抖动**（末地烛自带一点速度 ⇒ 0 才是一颗静止的亮点）。 */
+    private static final double PIXEL_END_ROD_SPREAD = 0d;
+
     /**
      * **像素画魔法阵**：把一张像素画**平铺在脚下**，替换原来的几何魔法阵。
+     *
+     * <h2>粒子种类（★ 2026-10-03 起）</h2>
+     * 各点一律用**白色末地烛**（{@link Particle#END_ROD}）—— 这是需求方明确指定的：
+     * 位置取自外部粒子画，颜色不取画里的 RGB，而是"全部白色末地烛"。
+     * ⇒ 参数里的 {@code art} 只贡献**坐标**（{@code localX/localY}）与**点数**；
+     * {@code colors} 与 {@code dustSize} 在此路径下**不参与绘制**（保留形参是为了
+     * 不破坏既有签名与 {@code PixelArt} 的数据完整性，也便于将来切回红石画法）。
+     *
+     * <p>为什么这样换反而更好看：末地烛是原版里"亮白、细长、拖尾"的粒子，
+     * 存活期比 dust 长 ⇒ 按片绘制时**残影叠得更自然**，整幅画看上去更"发光"。
      *
      * <h2>铺法与朝向</h2>
      * <ul>
@@ -370,11 +393,11 @@ public final class MatinaRageVfx {
      * </ul>
      *
      * <h2>★ 为什么按"片"画（sliceIndex / sliceCount）</h2>
-     * 这张画有 4554 个点，**每刻全画 ≈ 9 万粒子/秒**，会把客户端刷爆。
-     * 而 dust 粒子有存活期 ⇒ 只要**每隔几刻把同一个点重画一次**，玩家看到的就是连续的画。
+     * 这张画有一千多个点，**每刻全画 ≈ 2 万粒子/秒**，会把客户端刷爆。
+     * 而粒子有存活期 ⇒ 只要**每隔几刻把同一个点重画一次**，玩家看到的就是连续的画。
      * 因此本方法每刻只画"第 {@code sliceIndex} 片"（共 {@code sliceCount} 片），
      * 由调用方逐刻递增下标 ⇒ 每刻的粒子数与"画全一遍所需刻数"成反比。
-     * <p>例：{@code sliceCount = 10} ⇒ 每刻约 455 颗粒子（**与替换前的几何魔法阵同量级**），
+     * <p>例：{@code sliceCount = 10} ⇒ 每刻约百来颗粒子（**与替换前的几何魔法阵同量级**），
      * 每个点每 10 刻（0.5 秒）重画一次。
      *
      * @param center     地面圆心（调用方给的位置就是阵面所在高度）
@@ -382,8 +405,8 @@ public final class MatinaRageVfx {
      * @param phase      自转相位（弧度）
      * @param sliceIndex 本刻画第几片（内部取模，负数也安全）
      * @param sliceCount 共分几片（≤ 0 ⇒ 当作 1 片，即整幅一次画完）
-     * @param art        像素画数据（{@code null} / 空 ⇒ 静默不画）
-     * @param dustSize   dust 尺寸（一般传 {@link #PIXEL_DUST_SIZE}）
+     * @param art        像素画数据（{@code null} / 空 ⇒ 静默不画）；只用到它的坐标
+     * @param dustSize   历史参数（现路径不读，见上文"粒子种类"）
      */
     public static void pixelCircle(World world, Location center, double diameter, double phase,
                                    int sliceIndex, int sliceCount, PixelArt art, float dustSize) {
@@ -401,7 +424,6 @@ public final class MatinaRageVfx {
         double sin = Math.sin(phase);
         float[] lx = art.localX();
         float[] ly = art.localY();
-        Color[] colors = art.colors();
 
         //★ 交错：只画 start, start+slices, start+2*slices … —— 每刻换个起手点，几刻内铺满一遍
         for (int i = start; i < n; i += slices) {
@@ -410,7 +432,9 @@ public final class MatinaRageVfx {
             // 绕 Y 轴旋转 + 把画的上方向映射到 −z
             double dx = px * cos - py * sin;
             double dz = px * sin + py * cos;
-            dust(world, center.clone().add(dx, 0d, dz), colors[i], dustSize);
+            //★ 一律白色末地烛（需求指定；位置来自画，颜色不取画的 RGB）
+            world.spawnParticle(Particle.END_ROD, center.clone().add(dx, 0d, dz), 1,
+                    0d, 0d, 0d, PIXEL_END_ROD_SPREAD);
         }
     }
 }

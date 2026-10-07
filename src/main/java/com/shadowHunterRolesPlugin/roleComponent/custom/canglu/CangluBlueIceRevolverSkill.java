@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.core.util.SoundUtil;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
@@ -131,6 +132,8 @@ public class CangluBlueIceRevolverSkill extends Skill {
                     0, 0, Material.CROSSBOW);
             //依赖 = 实取清单（`start()` 里的两个 get 调用点）
             requires(VitalsComponent.class).requires(EnergyComponent.class);
+            //"附近有没有敌人"读阵营组件 ⇒ 缺它则本技能不索敌，装配期就拦住
+            requires(FactionComponent.class);
             //SanTE 不在本组件实取清单里，声明为"可选"（装配期不因它缺失而拒绝）
             requiresOptional(SanTEComponent.class);
         }
@@ -374,7 +377,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
             if(!(entity instanceof Player candidate) || candidate.equals(self)){
                 continue;
             }
-            if(!svc().roleInfo().isHostileTo(candidate.getUniqueId())){
+            if(!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())){
                 continue;
             }
             double distance = candidate.getLocation().distanceSquared(self.getLocation());
@@ -411,7 +414,7 @@ public class CangluBlueIceRevolverSkill extends Skill {
             if(!(entity instanceof Player candidate) || candidate.equals(self) || candidate.isDead()){
                 continue;
             }
-            if(!svc().roleInfo().isHostileTo(candidate.getUniqueId())){
+            if(!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())){
                 continue;
             }
             double distance = candidate.getLocation().distanceSquared(location);

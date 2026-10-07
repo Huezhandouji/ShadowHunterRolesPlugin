@@ -30,6 +30,8 @@ public class BossbarRoleAttributesDisplayComponent extends PassiveSkill {
         public Specification() {
             super(Component.text("bossbar角色属性数值显示"),
                     List.of(Component.text("ccb")));
+            //阵营分支（配色与显示名）读阵营组件；缺它则本组件不做展示 —— 装配期就拦住
+            requires(FactionComponent.class);
         }
 
         @Override
@@ -48,7 +50,7 @@ public class BossbarRoleAttributesDisplayComponent extends PassiveSkill {
             svc().components().remove(getClass());
         }
 
-        if(svc().roleInfo().faction() == Faction.SHADOW){
+        if(svc().components().get(FactionComponent.class).faction() == Faction.SHADOW){
             energy = null;
         }
 
@@ -66,7 +68,7 @@ public class BossbarRoleAttributesDisplayComponent extends PassiveSkill {
     public void update(){
         Component newName = Component.empty();
         if(sante != null){
-            switch (svc().roleInfo().faction()){
+            switch (svc().components().get(FactionComponent.class).faction()){
                 case Faction.SHADOW -> {
                     newName = newName.append(Component.text("TE " + sante.current() + "/" + sante.max()).color(NamedTextColor.LIGHT_PURPLE).decorate(TextDecoration.BOLD));
                 }

@@ -87,7 +87,9 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
         public Specification(){
             super(null, null);
-            requires(TaskComponent.class).requires(VitalsComponent.class).requires(BuffComponent.class);
+            requires(TaskComponent.class).requires(VitalsComponent.class).requires(BuffComponent.class)
+                    //归零惩罚的标题文案按自己的阵营分叉 ⇒ 阵营组件是必需依赖
+                    .requires(FactionComponent.class);
             //sante 实取但代码自带 null 兜底（`start()` 的 if (sante != null) 订阅 / `stop()` 的退订），
             //因此按「实取但可为空」声明为可选。
             requiresOptional(SanTEComponent.class);
@@ -160,7 +162,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
         //(3) 忽略重入：惩罚进行中直接返回 —— 不取消、不重启、不刷新 count、不重放表现层
         if(inSanTEPunishment) return;
         if(now > 0) return;
-        Faction faction = svc().roleInfo().faction();
+        Faction faction = svc().components().get(FactionComponent.class).faction();
 
         //单一活动任务不变量：先取消仍在跑的旧任务，因此不产生任务泄漏。
         //注意：这里不是"重入保护" —— 重入由上面的 (3) 守卫处理，本行只保证同时最多一个任务对象。

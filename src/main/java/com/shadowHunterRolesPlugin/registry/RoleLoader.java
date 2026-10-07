@@ -3,6 +3,14 @@ package com.shadowHunterRolesPlugin.registry;
 import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.*;
+import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertAssembleSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertDroneSystem;
+import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertHuntOrderSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertLockOnPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertOverloadSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertThrustSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluBlueIceRevolverSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluDestinySkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluHysteriaPassive;
@@ -88,7 +96,8 @@ public class RoleLoader {
                 new Definition("matina", RoleLoader::matinaBuilder),
                 new Definition("remoteness", RoleLoader::remotenessBuilder),
                 new Definition("tek", RoleLoader::tekBuilder),
-                new Definition("hunter", RoleLoader::hunterBuilder)
+                new Definition("hunter", RoleLoader::hunterBuilder),
+                new Definition("albert", RoleLoader::albertBuilder)
         );
     }
 
@@ -493,5 +502,58 @@ public class RoleLoader {
                 .icon(Material.NETHERITE_SWORD);
     }
 
+    /**
+     * **艾尔伯特(Albert)**：构筑者铳剑 + 锁定（标记 / 零件）+ 过度响应协议（无人机编队）
+     * + 四个主动。
+     *
+     * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
+     * <ul>
+     *   <li><b>主武器「构筑者铳剑」占 0 号栏</b> —— 插件只把攻击事件投递给主武器组件
+     *       （{@code listener/MainWeaponListener#onAttackPlayer}），
+     *       "近战 9 物理 + 3~6 特殊值 / 积攒零件"必须落在这一把武器上；
+     *       右键射击也走它的 {@code onCast}（同一把武器，两种攻击形态）；</li>
+     *   <li>四个主动占 <b>1 / 2 / 3 / 4</b> 号栏：<b>高斯装配</b>（铁锭，CD 8 秒 / 耗能 10）·
+     *       <b>猎杀指令</b>（金锭，CD 12 秒 / 耗能 10）· <b>全功率推进</b>（末影珍珠，
+     *       无 CD、储存 2 次、每 8 秒耗 6 能量回一次）· <b>过载协议</b>（下界之星，
+     *       CD 30 秒<b>技能完全后</b>起算 / 耗能 70）；</li>
+     *   <li><b>两个被动经 {@code addComponent} 统一入口注册</b>（被动无栏位 ⇒ 不占热键栏）：
+     *       <b>锁定</b>（「猎杀目标」标记与「零件」层数的持有者）与
+     *       <b>过度响应协议</b>（无人机编队 + 主动防御 + 光环 + actionbar HUD）；</li>
+     *   <li>★ <b>注册序有语义</b>：锁定被动排在无人机系统之前 —— 后者在自己的 {@code start()} 里
+     *       取前者（依赖解析走装配期，但"读口第一次被读到之前它已经在表里"仍应成立）；</li>
+     *   <li>悬浮文本「独白」最后注册（它是依赖图的叶子，别的组件单方向依赖它）；</li>
+     *   <li>基础属性<b>不显式声明</b> ⇒ 走框架默认（生命上限 40、能量上限 100、SanTE 上限 100）；</li>
+     *   <li>★ <b>阵营 = {@link Faction#HUNTER}</b>（需求未指定 ⇒ 取默认假设，
+     *       要改只需动这一行）。</li>
+     * </ul>
+     */
+    private static Role.Builder albertBuilder() {
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.HUNTER;
+        return withBuiltIns(new Role.Builder("albert"), faction)
+                .displayName(Component.text("艾尔伯特"))
+                .description(List.of(
+                        Component.text("未来像雾……可我已经学会在雾里装填"),
+                        Component.text("构筑者铳剑：近战 9 物理 + 3~6 特殊值，每命中积攒 1 层「零件」"),
+                        Component.text("满 4 层零件自动部署一架高斯无人机（最多 4 架）"),
+                        Component.text("右键射击：6 发弹匣的亚音速穿甲弹，命中标记「猎杀目标」20 秒"),
+                        Component.text("锁定：无人机优先打猎杀目标；击杀猎杀目标立刻补充一架无人机"),
+                        Component.text("过度响应协议：无人机主动防御抵消攻击，主动防御期间获得抗性 255"),
+                        Component.text("高斯装配 / 猎杀指令 / 全功率推进 / 过载协议")
+                ))
+                .faction(faction)
+                //被动先行：锁定（标记 + 零件）→ 无人机编队（读标记、部署、主动防御、HUD）
+                .addComponent(AlbertLockOnPassive.ID, new AlbertLockOnPassive.Specification())
+                .addComponent(AlbertDroneSystem.ID, new AlbertDroneSystem.Specification())
+                //主武器 + 四个主动（0 / 1 / 2 / 3 / 4 号栏）
+                .addComponent(AlbertMainWeapon.ID, new AlbertMainWeapon.Specification().setSlot(0))
+                .addComponent(AlbertAssembleSkill.ID, new AlbertAssembleSkill.Specification().setSlot(1))
+                .addComponent(AlbertHuntOrderSkill.ID, new AlbertHuntOrderSkill.Specification().setSlot(2))
+                .addComponent(AlbertThrustSkill.ID, new AlbertThrustSkill.Specification().setSlot(3))
+                .addComponent(AlbertOverloadSkill.ID, new AlbertOverloadSkill.Specification().setSlot(4))
+                //悬浮文本（叶子：只依赖 VitalsComponent）
+                .addComponent(AlbertFloatingTextComponent.ID, new AlbertFloatingTextComponent.Specification())
+                .icon(Material.IRON_SWORD);
+    }
 
 }

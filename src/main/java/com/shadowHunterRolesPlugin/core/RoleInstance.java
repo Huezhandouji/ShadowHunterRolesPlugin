@@ -6,8 +6,11 @@ import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.core.ports.ComponentLookupPort;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
- //聚合根只读服务面：阵营读取的唯一入口（框架侧读口 {@link #roleInfo()} 的类型）。
+ //聚合根只读服务面：角色模板的只读信息（id / 描述），不含阵营。
 import com.shadowHunterRolesPlugin.core.ports.RoleInfoPort;
+//★ 明列例外（见 docs/ai-generated/约束-框架禁止认识组件.md 的裁决记录）：本容器允许按 id + 类型
+// 取回阵营组件的通用面（读写阵营的唯一落点），并引用它的 ID 常量。阵营真值住组件、不在本类。
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
@@ -86,9 +89,10 @@ public class RoleInstance {
  //组件注册表（组件集合 + 每组件资源表 + getComponent 查找）。
     private final ComponentRegistry componentRegistry = new ComponentRegistry();
  /**
- * 聚合根只读服务面：{@link Role} 的只读视图（id / 描述 / 阵营 / 两个行为）。
- * <p>阵营读取一律走本端口（组件侧 = `svc().roleInfo()`，框架侧 = {@link #roleInfo()}）。
- * <p>只读，不带写面：写入仍在聚合根 {@link Role#setFaction} / {@link Role#resetFaction}。
+ * 角色信息服务面：**本实例**的只读视图（角色模板的 id / 描述）。
+ * <p><b>不含阵营</b>：阵营的真值与判定都在阵营组件（{@code roleComponent/builtin/FactionComponent}），
+ * 读取走组件、写入经本类的 {@link #setFaction(Faction)} / {@link #resetFaction()} 转发
+ * （公开入口 = `RoleAPI` 的两条玩家级方法）。
  */
     private final RoleInfoPort roleInfo = new RoleInfoImpl(this);
 
@@ -105,12 +109,14 @@ public class RoleInstance {
 // ── 服务的持有者先于角色组件存在 ────────────────────────────────
 //① buff 记账表由 buff 组件自己创建（账本与持有者成对建立）：容器既不 `new BuffManager`、也不持有它。
 
-//② 内建组件也走模板装配：6 件由 `registry/RoleLoader#withBuiltIns(...)` 注册进装配表，
+//② 内建组件也走模板装配（含阵营组件）：由 `registry/RoleLoader#withBuiltIns(...)` 注册进装配表，
 // 与技能 / 被动同一条路 ⇒ 本类不构造任何组件。
 
-//③ 阵营的真值就是聚合根 `Role` 的 `faction` 字段（构造期由描述符写入）；
-// 关系表仍留平台（静态数据 ⇒ 外部单例许可，不进依赖图）：`RoleInfoImpl` / 平台自带 lookup 直接读它。
-// ⇒ 本相不构造任何阵营组件，也不登记任何阵营服务组件（阵营不是容器里的状态拥有者）。
+//③ 阵营的真值是**每实例一份**的状态 —— 它住阵营组件（见下方「阵营」一节），
+// 初值 = 角色模板声明的默认阵营（`Role#getDefaultFaction()`，装配期由描述符携带进组件）。
+// 关系表仍留平台（静态数据 ⇒ 外部单例许可，不进依赖图）：它按 UUID 查到该玩家的阵营组件后取值
+// ⇒ 生产路径不读任何模板级可变值。
+// ⇒ 本类不持有任何阵营字段，只按 id + 类型取回组件并转发读写。
 
 //④ 伤害：四个原语由生命组件承载（伤害与生命只有一个持有者），没有独立的伤害组件。
  //动态删除路径入口（隔离时「移除全部组件」走它 ⇒ 与运行期增删同一条路径 + 删除守卫）。
@@ -177,9 +183,11 @@ public class RoleInstance {
     public ComponentRegistry componentRegistry() { return componentRegistry; }
 
  /**
- * 角色信息服务面的框架侧读口：阵营读取与两个行为（{@code isHostile} / {@code hasEnemyInRange}）都经它，
+ * 角色信息服务面的框架侧读口：角色模板的只读信息（id / 描述）经它，
  * 与组件侧拿到的 {@code svc().roleInfo()} 是同一个实例（{@code createServices} 交出去的就是它）。
- * <p>只读：本端口不带写面；写侧在聚合根上（{@link Role#setFaction} / {@link Role#resetFaction}）。
+ * <p><b>不含阵营</b>：阵营的真值与判定都在阵营组件；容器上的两个写口
+ * （{@link #setFaction(Faction)} / {@link #resetFaction()}）只由组件操作面转发进来
+ * （{@code RoleAPI#executeComponentOperation} + 组件 id {@code faction} 的 {@code set} / {@code reset}）。
  */
     public RoleInfoPort roleInfo() { return roleInfo; }
 
@@ -352,15 +360,58 @@ public class RoleInstance {
  //药水施加入口（记账）归 buff 组件（账本的持有者）：调用方（`BuffManager`）自己按 id 取到
  //该组件，再调它自己的 `applyPotionEffect` ⇒ 容器既不需要转发视图，也不认识 buff 组件。
 
- // ───────── 阵营：读侧视图已删除 / 写侧视图保留 ─────────
- //真值所在：聚合根 `Role` 的 `faction` 字段（构造期由描述符写入）。
- //读取唯一入口 = `roleInfo` 服务面：组件侧 `svc().roleInfo()`、框架侧 {@link #roleInfo()} ⇒
- //本类不再提供 `getFaction()` / `isHostileTo(...)` 三个读视图（调用点已改走 RoleInfoPort：
- //`manager/RoleManager#areHostile` 的两个重载）。
- //查表语义（`FactionLookup#isHostile`，关系表仍留平台）= 旧 {@code isHostileTo(Faction)} 逐字等价。
- //写视图也已删除（`setFaction(Faction)` / `resetFaction()` 两条）：它们原为
- //`RoleAPI#setFaction/resetFaction` 的落点，而那两条 API 已删除、不再生效 ⇒ 写视图无消费者；
- //真值写入仍在聚合根（{@link Role#setFaction} / {@link Role#resetFaction}），不由外部直改。
+ // ───────── 阵营：真值与判定都在阵营组件（本类只转发读写）─────────
+ //真值所在 = 本实例的阵营组件（`roleComponent/builtin/FactionComponent` 的 `current` 字段）：
+ // 初值 = 角色模板声明的默认阵营（{@link Role#getDefaultFaction()}，装配期经描述符写进组件），
+ // 此后可被组件操作面（`executeComponentOperation` + 组件 id `faction` 的 `set` / `reset`）按玩家改写
+ // ⇒ 同一个角色的两份实例互不影响。
+ //组件侧的读取与判定入口就是组件本身（`svc().components().get(FactionComponent.class)`），
+ // 跨实例读取走 `platform/FactionManager` 的注册表 ⇒ 本类不提供任何阵营读视图。
+ //实例随「清角色 / 死亡 / 掉线」销毁 ⇒ 组件注销 ⇒ 阵营不跨局留存，下次选角色从默认阵营重新起步。
+
+ /**
+ * 写本实例的阵营（**只影响这一份实例**）。
+ * <p>外部入口 = 组件操作面（{@code RoleAPI#executeComponentOperation} + 组件 id {@code faction}
+ * 的 {@code set <阵营名>}）：它解析到本实例后转发到这里，再转发给阵营组件。
+ *
+ * @param faction 目标阵营
+ * @return {@code true} = 已写入；{@code false} = 未写入（本实例没有阵营组件 = 装配不变量被破坏，
+ *         或 {@code faction} 为 {@code null}）
+ */
+    public boolean setFaction(Faction faction){
+        FactionComponent component = factionComponent();
+        if (component == null || faction == null) {
+            return false;
+        }
+        component.set(faction);
+        return true;
+    }
+
+ /**
+ * 复位为本角色<b>声明</b>的默认阵营（= {@link Role#getDefaultFaction()}）—— 幂等：
+ * 已复位时再调用不改变任何值。
+ * <p>外部入口 = 组件操作面（{@code RoleAPI#executeComponentOperation} + 组件 id {@code faction}
+ * 的 {@code reset}）。
+ *
+ * @return {@code true} = 已复位；{@code false} = 未复位（本实例没有阵营组件）
+ */
+    public boolean resetFaction(){
+        FactionComponent component = factionComponent();
+        if (component == null) {
+            return false;
+        }
+        component.reset();
+        return true;
+    }
+
+ /**
+ * 本实例的阵营组件（按 {@link FactionComponent#ID} 取回通用面再收窄类型）；
+ * 容器里没有它 ⇒ {@code null}（装配不变量被破坏：内核服务组件由 `withBuiltIns` 无条件加）。
+ */
+    private FactionComponent factionComponent(){
+        RoleComponent component = componentRegistry.getById(FactionComponent.ID);
+        return component instanceof FactionComponent faction ? faction : null;
+    }
 
 //生命周期触发（四个口全部 private）：消费者只有容器自己（`activate()` 调 awake/start、
 //`clear()` 调 stop、构造期 ticker 用 `this::triggerUpdate`）⇒ 它们是容器职责的实现细节，

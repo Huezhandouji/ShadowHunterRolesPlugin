@@ -6,6 +6,7 @@ import com.shadowHunterRolesPlugin.core.util.SoundUtil;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
@@ -203,7 +204,9 @@ public class CangluMelodySelectionSkill extends Skill {
                     ENERGY_COST,
                     Material.LAPIS_LAZULI);
             requires(BuffComponent.class).requires(EnergyComponent.class).requires(VitalsComponent.class)
-                    .requires(HotbarRenderComponent.class);
+                    .requires(HotbarRenderComponent.class)
+                    //命中判定逐个受害者读阵营组件 ⇒ 缺它则本技能不索敌，装配期就拦住
+                    .requires(FactionComponent.class);
         }
 
         @Override
@@ -713,7 +716,7 @@ public class CangluMelodySelectionSkill extends Skill {
             if (!(entity instanceof Player candidate) || candidate.equals(self) || candidate.isDead()) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 continue;
             }
             double distance = candidate.getLocation().distanceSquared(location);

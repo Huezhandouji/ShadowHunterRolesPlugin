@@ -30,6 +30,8 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
         public Specification(){
             super(Component.text("自动恢复能量"), List.of(Component.text("周围10格没有敌人时，每秒恢复3点能量")));
             requires(EnergyComponent.class);
+            //"周围 10 格有没有敌人"读阵营组件 ⇒ 缺它则本被动不做判定，装配期就拦住
+            requires(FactionComponent.class);
         }
 
         @Override
@@ -41,12 +43,12 @@ public class AutoRecoverEnergyPassive extends PassiveSkill {
     /**
      * 容器在 tick 里对该组件广播 {@code update()} 钩子。
      * 数值/间隔逐字不变：半径 {@code 10}、无敌人累计上限 {@code 200} tick、每秒判定 {@code 20} tick、
-     * {@code +3} 能量。阵营判定走 {@code svc().roleInfo().hasEnemyInRange(10)}，含
+     * {@code +3} 能量。阵营判定走 {@code svc().components().get(FactionComponent.class).hasEnemyInRange(10)}，含
      * 「未选角色的玩家也算敌人」这条口径；能量走 {@code energy.increase(3)} ⇒ 同一条记账 / 真值路径。
      */
     @Override
     public void update() {
-        if(svc().roleInfo().hasEnemyInRange(10)){
+        if(svc().components().get(FactionComponent.class).hasEnemyInRange(10)){
             if(noEnemySurroundTime != 0) noEnemySurroundTime = 0;
         }
         else{

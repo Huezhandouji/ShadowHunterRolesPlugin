@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.remoteness;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Entity;
@@ -46,8 +47,8 @@ import java.util.List;
  * <h2>为什么光环也在这里（而不是在进化里）</h2>
  * 与「谁持有数据谁动手」一致：本类**持有节拍**（它已经每 tick 跑一次），进化类只持有档位数值。
  * 于是"每秒 / 每刻"的结算落在持有节拍者身上，进化类保持"只回答数字"而不去摸别的组件。
- * 判敌口径走 {@code svc().roleInfo().isHostileTo(...)}（与既有的索敌实现同一条路），
- * 因此"没有角色算敌人 / 同阵营不算 / 创造旁观不算"三条不需要在本类重写。
+ * 判敌口径走 {@code svc().components().get(FactionComponent.class).isHostileTo(...)}（与既有的索敌实现同一条路），
+ * 因此"没有阵营算敌人 / 同阵营不算 / 创造旁观不算"三条不需要在本类重写。
  *
  * <h2>不在本类里验的（如实申报）</h2>
  * 施加药水效果与查周围实体都要求真实玩家；离线（{@code self} 为 {@code null}）时整段安静跳过。
@@ -103,7 +104,9 @@ public class RemotenessStartEndPassive extends PassiveSkill {
                             Component.text("5级起：身边半径10内的敌人每秒被扣除2点特殊值")
                     ));
             requires(BuffComponent.class).requires(SanTEComponent.class)
-                    .requires(RemotenessEvolutionPassive.class);
+                    .requires(RemotenessEvolutionPassive.class)
+                    //索敌读阵营组件 ⇒ 缺它则本被动不索敌，装配期就拦住
+                    .requires(FactionComponent.class);
         }
 
         @Override
@@ -209,7 +212,7 @@ public class RemotenessStartEndPassive extends PassiveSkill {
      * {@link RemotenessEvolutionPassive#auraSanteDrainPerSecond()} 点特殊值。
      *
      * <p>三条边界：① 未达 5 级时读数为 0 ⇒ 整段 no-op（不遍历、不查敌）；
-     * ② 只算**敌对**玩家（判敌口径归 {@code roleInfo}，本类不重写"没有角色算敌人"等规则）；
+     * ② 只算**敌对**玩家（判敌口径归阵营组件，本类不重写"没有阵营算敌人"等规则）；
      * ③ 扣的是**对方实例**的特殊值（走特殊值组件的跨实例入口，与「流血」的既有做法同一条路）。
      */
     private void applyAura(Player self) {
@@ -230,7 +233,7 @@ public class RemotenessStartEndPassive extends PassiveSkill {
             if (victim.isDead() || !victim.isOnline()) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(victim.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) {
                 continue;
             }
             sante.decreaseSanTE(victim.getUniqueId(), drain);

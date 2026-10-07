@@ -9,6 +9,7 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import java.util.List;
 
@@ -35,6 +36,8 @@ public class RedEvilShockSkill extends Skill{
                     List.of(Component.text("对周围5格范围内的敌人造成3秒致盲和缓慢III，结算他们5层流血。恢复[红]的10点TE值")),
                     120, 0, Material.REDSTONE);
             requires(BuffComponent.class).requires(SanTEComponent.class);
+            //"周围 5 格内的敌人"读阵营组件 ⇒ 缺它则本技能不索敌，装配期就拦住
+            requires(FactionComponent.class);
         }
 
         @Override
@@ -62,7 +65,7 @@ public class RedEvilShockSkill extends Skill{
 
         RedBleedPassive bleed = getComponent(RedBleedPassive.class);
         for(Player p : caster.getLocation().getNearbyPlayers(5)){
-            if(svc().roleInfo().isHostileTo(p.getUniqueId())){
+            if(svc().components().get(FactionComponent.class).isHostileTo(p.getUniqueId())){
                 buff.applyPotionEffectTo(p, PotionEffectType.BLINDNESS, 61, 1);
                 buff.applyPotionEffectTo(p, PotionEffectType.SLOWNESS, 61, 3);
                 //结算5层流血：写账本的唯一公开入口

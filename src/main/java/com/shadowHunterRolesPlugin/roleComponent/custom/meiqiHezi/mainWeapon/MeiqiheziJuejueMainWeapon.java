@@ -16,6 +16,7 @@ import org.bukkit.entity.Player;
 import java.util.Collection;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import java.util.List;
 
@@ -49,6 +50,8 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
                     20
             );
             requires(VitalsComponent.class).requires(EnergyComponent.class).requires(BuffComponent.class);
+            //范围伤害逐个受害者判敌 ⇒ 读阵营组件；缺它则本武器不索敌，装配期就拦住
+            requires(FactionComponent.class);
         }
 
         @Override
@@ -120,7 +123,7 @@ public class MeiqiheziJuejueMainWeapon extends MainWeapon {
         Collection<? extends Player> victims = loc.getNearbyPlayers(5);
 
         for (Player victim : victims) {
-            if (!svc().roleInfo().isHostileTo(victim.getUniqueId())) continue;
+            if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) continue;
             vitals.physicalDamage(victim, player, 14);
         }
 

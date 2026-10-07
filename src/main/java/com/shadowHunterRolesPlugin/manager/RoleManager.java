@@ -225,23 +225,10 @@ public class RoleManager {
     }
 
     //这两个查询归数据所有者（core 不再依赖单例）。
-    //★ 语义（2026 变更）：areHostile(p1, p2) = **p1 是否视 p2 为敌人**，**非对称** ——
-    //  旧口径是"两者之间是否敌对（对称）"，旧对称断言已作废。
-    //判定路径：直接问平台关系表（落点 = `FactionLookup#isHostile(UUID,UUID)`）——
-    //  三条规则、同阵营优先：① 同阵营 ⇒ 任何情况下不敌对；
-    //  ② **p2** 是创造 / 旁观 ⇒ 不敌对；③ 其余（p2 在场且阵营不同 / 任一方无角色）⇒ 敌对。
-    //  ★ **p1 自身是否在场不参与**（旧口径的"p1 不在场 ⇒ false"闸门已删）。
-    //「无角色」口径：任一方没有角色 ⇒ `true`（算敌人）。本方法因此**不再**先解析双方实例：
-    //  "实例缺失"不是短路条件（旧口径为缺实例即不敌对，属有意变更）；
-    //  没有角色的一方在关系表里读到的阵营就是 UNKNOWN，判定照样成立。
-    public boolean areHostile(Player p1, Player p2){
-        if(p1 == null || p2 == null) return false;
-        return areHostile(p1.getUniqueId(), p2.getUniqueId());
-    }
-    public boolean areHostile(UUID p1, UUID p2){
-        if(p1 == null || p2 == null) return false;
-        return context.factions().isHostile(p1, p2);
-    }
+    //★ 阵营的判定不在这里：本管理器不再提供 areHostile —— 判敌没有对外 API 成员，
+    //  需要判敌的一方走组件操作面（`executeComponentOperation` + 组件 id `faction` 的 `hostile <uuid>`），
+    //  落点 = 阵营组件的 `isHostileTo(...)` → `platform/FactionManager#isHostile(Faction, UUID)`。
+    //  （旧口径的 areHostile 与它的两个重载已随阵营 API 一并删除；判定法则未变。）
 
 
     //插件禁用/重载时：走 instance.clear() 逐个回收（属性修饰符、记账内的药水、热键栏、任务），不再只把 map 清空

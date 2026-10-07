@@ -3,10 +3,12 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.MatinaRageVfx;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaKuangPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaFloatingTextComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -39,7 +41,7 @@ import java.util.List;
  *   <li><b>本技能没有第二个半径参数</b>：需求只给了"r = 8"。敌对光晕与治疗<b>共用
  *       r = 8</b>（这就是"洒出去的药物"的同一个范围），若日后要拆成两个半径，改
  *       {@link #ENEMY_RADIUS} 一处即可。</li>
- *   <li><b>"同阵营"的判据</b> = {@code !roleInfo().isHostileTo(uuid)}（未选角色的玩家按平台口径算敌对）。</li>
+ *   <li><b>"同阵营"的判据</b> = {@code !getComponent(FactionComponent.class).isHostileTo(uuid)}（未选角色的玩家按平台口径算敌对；★ 2026-10-07 上游把阵营搬进组件后，旧口 {@code roleInfo()} 已不再含阵营）。</li>
  *   <li><b>音效的"2 倍速"</b> = 原版 {@code ENTITY_ZOMBIE_VILLAGER_CONVERTED} 以
  *       {@code pitch 2.0} 播放（音高翻倍即 2 倍速的听感）。</li>
  *   <li><b>持续型药水效果的时长</b>：{@code 3 秒 = 60 刻}，按"能盖住 3 秒"给
@@ -82,6 +84,8 @@ public class MatinaSeaCrystalLampSkill extends Skill {
     private EnergyComponent energy;
     private BuffComponent buff;
     private MatinaKuangPassive kuang;
+    /** 施法台词（砸地风格）；装配期声明依赖 ⇒ 这里直接取。 */
+    private MatinaFloatingTextComponent floatingText;
 
     public MatinaSeaCrystalLampSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
@@ -101,7 +105,8 @@ public class MatinaSeaCrystalLampSkill extends Skill {
                     ENERGY_COST,
                     Material.SEA_LANTERN);
             requires(VitalsComponent.class).requires(EnergyComponent.class)
-                    .requires(BuffComponent.class).requires(MatinaKuangPassive.class);
+                    .requires(BuffComponent.class).requires(MatinaKuangPassive.class)
+                    .requires(MatinaFloatingTextComponent.class).requires(FactionComponent.class);
         }
 
         @Override
@@ -117,6 +122,7 @@ public class MatinaSeaCrystalLampSkill extends Skill {
         energy = svc().components().get(EnergyComponent.class);
         buff = svc().components().get(BuffComponent.class);
         kuang = svc().components().get(MatinaKuangPassive.class);
+        floatingText = svc().components().get(MatinaFloatingTextComponent.class);
     }
 
     @Override
@@ -128,6 +134,11 @@ public class MatinaSeaCrystalLampSkill extends Skill {
         //能量门槛（声明耗能由 currentEnergy() 读出；不足 ⇒ 不施放、不进冷却）
         if (energy != null && !energy.tryConsume(ENERGY_COST)) {
             return;
+        }
+
+        // ★ 施法台词：一次吐 1~3 句（砸地风格 + 泛光白 + 颤抖），间隔约 0.35 秒
+        if (floatingText != null) {
+            floatingText.onCast(caster);
         }
 
         World world = caster.getWorld();
@@ -149,7 +160,7 @@ public class MatinaSeaCrystalLampSkill extends Skill {
             if (candidate == null || candidate.equals(caster) || !isAlive(candidate)) {
                 continue;
             }
-            if (svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 afflict(world, candidate);
             } else {
                 if (heal(world, candidate)) {

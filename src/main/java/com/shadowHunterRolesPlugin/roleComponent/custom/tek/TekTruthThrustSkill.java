@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.tek;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
@@ -101,7 +102,7 @@ public class TekTruthThrustSkill extends Skill {
                     Material.NETHER_STAR);
             requires(VitalsComponent.class).requires(BuffComponent.class)
                     .requires(EnergyComponent.class).requires(TekDestinyPassive.class)
-                    .requires(HotbarRenderComponent.class);
+                    .requires(HotbarRenderComponent.class).requires(FactionComponent.class);
         }
 
         @Override
@@ -226,7 +227,7 @@ public class TekTruthThrustSkill extends Skill {
             if (!candidate.getWorld().equals(owner.getWorld())) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(id)) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(id)) {
                 continue;
             }
             double dist = candidate.getLocation().distanceSquared(here);

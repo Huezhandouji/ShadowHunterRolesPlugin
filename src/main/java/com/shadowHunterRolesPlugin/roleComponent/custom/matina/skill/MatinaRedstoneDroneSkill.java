@@ -4,11 +4,13 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.MatinaRageVfx;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaKuangPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaFloatingTextComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -147,6 +149,8 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
     private BuffComponent buff;
     private SanTEComponent sante;
     private MatinaKuangPassive kuang;
+    /** 施法台词（砸地风格）；装配期声明依赖 ⇒ 这里直接取。 */
+    private MatinaFloatingTextComponent floatingText;
 
     // ───────── 运行期状态（无人机） ─────────
 
@@ -212,7 +216,8 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
                     Material.REDSTONE);
             requires(VitalsComponent.class).requires(EnergyComponent.class)
                     .requires(BuffComponent.class).requires(SanTEComponent.class)
-                    .requires(MatinaKuangPassive.class);
+                    .requires(MatinaKuangPassive.class)
+                    .requires(MatinaFloatingTextComponent.class).requires(FactionComponent.class);
         }
 
         @Override
@@ -229,6 +234,7 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
         buff = svc().components().get(BuffComponent.class);
         sante = svc().components().get(SanTEComponent.class);
         kuang = svc().components().get(MatinaKuangPassive.class);
+        floatingText = svc().components().get(MatinaFloatingTextComponent.class);
     }
 
     // ───────── 施放：第一次召唤 / 之后切换模式 ─────────
@@ -252,6 +258,11 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
         }
         if (energy != null && !energy.tryConsume(ENERGY_COST)) {
             return;
+        }
+
+        // ★ 施法台词：只在**首次召唤**时喊（切换模式那一路已提前 return，不会刷屏）
+        if (floatingText != null) {
+            floatingText.onCast(owner);
         }
 
         //③ 召唤：初始 = **紧密跟随**（贴着视角右上角，不受距离限制）
@@ -483,7 +494,7 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
             if (candidate == null || !isAlive(candidate)) {
                 continue;
             }
-            if (svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 //★ 必须直接对"目标"上药水。buff.applyPotionEffect(...) 是**只作用于自己**的口
                 //  （内部写死 self().player().addPotionEffect），用它给敌人上毒会把中毒加在自己身上。
                 candidate.addPotionEffect(
@@ -526,7 +537,7 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
             if (candidate == null || candidate.equals(owner) || !isAlive(candidate)) {
                 continue;
             }
-            if (svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 hostiles.add(candidate);
             } else {
                 friendlies.add(candidate);

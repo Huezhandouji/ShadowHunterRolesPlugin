@@ -3,11 +3,13 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.MatinaRageVfx;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaFloatingTextComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -58,7 +60,7 @@ import java.util.List;
  *       引导结束才开始 7 秒的伤害窗口 ⇒ 从按键到打完共 10 秒。</li>
  *   <li><b>70 点怎么分</b>：伤害窗口 7 秒 = 140 刻，每 <b>0.5 秒</b>（{@value #DAMAGE_INTERVAL_TICKS} 刻）
  *       结算一次 ⇒ 14 次 × {@value #DAMAGE_PER_TICK} 点 = <b>刚好 70 点</b>（不取整、不溢出）。</li>
- *   <li><b>"敌人"的判据</b> = {@code roleInfo().isHostileTo(uuid)}；每帧现算 ⇒ 走进阵里的人立刻被结算，
+ *   <li><b>"敌人"的判据</b> = {@code getComponent(FactionComponent.class).isHostileTo(uuid)}（★ 2026-10-07 上游把阵营搬进组件后，旧口 {@code roleInfo()} 已不再含阵营）；每帧现算 ⇒ 走进阵里的人立刻被结算，
  *       走出去的立刻停止（与"范围内的敌人"这条需求一致）。</li>
  *   <li><b>定身与"免疫缓慢"的关系</b>：定身用 {@code SLOWNESS 255} + 清水平速度 + 越界拽回三件套，
  *       并且<b>每刻重刷</b>。若马提娜的狂暴值达到 10 层（免疫缓慢），被动会摘掉缓慢 ——
@@ -207,6 +209,8 @@ public class MatinaJudgmentSkill extends Skill {
     private VitalsComponent vitals;
     private TaskComponent timer;
     private HotbarRenderComponent render;
+    /** 施法台词（砸地风格）；装配期声明依赖 ⇒ 这里直接取。 */
+    private MatinaFloatingTextComponent floatingText;
 
     /** 引导 + 伤害窗口是否正在进行（挡重复施放：这段时间内冷却还没起算）。 */
     private boolean casting;
@@ -259,7 +263,8 @@ public class MatinaJudgmentSkill extends Skill {
                     0,
                     Material.HEART_OF_THE_SEA);
             requires(BuffComponent.class).requires(SanTEComponent.class).requires(VitalsComponent.class)
-                    .requires(TaskComponent.class).requires(HotbarRenderComponent.class);
+                    .requires(TaskComponent.class).requires(HotbarRenderComponent.class)
+                    .requires(MatinaFloatingTextComponent.class).requires(FactionComponent.class);
         }
 
         @Override
@@ -276,6 +281,7 @@ public class MatinaJudgmentSkill extends Skill {
         vitals = svc().components().get(VitalsComponent.class);
         timer = svc().components().get(TaskComponent.class);
         render = svc().components().get(HotbarRenderComponent.class);
+        floatingText = svc().components().get(MatinaFloatingTextComponent.class);
     }
 
     @Override
@@ -287,6 +293,10 @@ public class MatinaJudgmentSkill extends Skill {
         //★ 冷却被推迟到"技能完全结束"才起算 ⇒ 这段时间靠自己的标志挡重复施放
         if (casting) {
             return;
+        }
+        // ★ 施法台词：一次吐 1~3 句（砸地风格 + 泛光白 + 颤抖），间隔约 0.35 秒
+        if (floatingText != null) {
+            floatingText.onCast(caster);
         }
         casting = true;
         channelDone = false;
@@ -398,7 +408,7 @@ public class MatinaJudgmentSkill extends Skill {
             if (!victim.isOnline() || victim.isDead() || victim.getHealth() <= 0d) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(victim.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) {
                 continue;
             }
             sante.decreaseSanTE(victim.getUniqueId(), DAMAGE_PER_TICK);

@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
@@ -177,7 +178,7 @@ public class HunterStealthSkill extends Skill {
                     COOLDOWN_TICKS,
                     ENERGY_COST,
                     Material.CRYING_OBSIDIAN);
-            requires(VitalsComponent.class);
+            requires(VitalsComponent.class).requires(FactionComponent.class);
             requires(SanTEComponent.class);
             requires(BuffComponent.class);
             requires(HotbarRenderComponent.class);
@@ -436,7 +437,7 @@ public class HunterStealthSkill extends Skill {
             if (at.getWorld() == null || center.getWorld() == null || !at.getWorld().equals(center.getWorld())) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 continue;
             }
             if (vitals != null) {

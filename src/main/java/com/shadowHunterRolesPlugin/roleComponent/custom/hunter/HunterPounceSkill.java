@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
@@ -135,7 +136,7 @@ public class HunterPounceSkill extends Skill {
                     COOLDOWN_TICKS,
                     ENERGY_COST,
                     Material.GOLD_INGOT);
-            requires(VitalsComponent.class);
+            requires(VitalsComponent.class).requires(FactionComponent.class);
             requires(BuffComponent.class);
             requires(HunterEvolutionPassive.class);
             requires(HunterStealthSkill.class);
@@ -299,7 +300,7 @@ public class HunterPounceSkill extends Skill {
     /**
      * {@value #BITE_RADIUS} 格内**最近的敌对玩家**（没有回 {@code null}）。
      *
-     * <p>判敌走全角色唯一真值点 {@code svc().roleInfo().isHostileTo(uuid)}；
+     * <p>判敌走全角色唯一真值点 {@code svc().components().get(FactionComponent.class).isHostileTo(uuid)}；
      * 仍然显式跳过自己（既省一次查表，也让"不会咬到自己"这件事在代码里看得见）。
      */
     private Player nearestHostile(Player owner) {
@@ -317,7 +318,7 @@ public class HunterPounceSkill extends Skill {
             if (at.getWorld() == null || center.getWorld() == null || !at.getWorld().equals(center.getWorld())) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 continue;
             }
             double distanceSquared = at.distanceSquared(center);

@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
@@ -244,7 +245,7 @@ public class HunterPullSkill extends Skill {
                     COOLDOWN_TICKS,
                     ENERGY_COST,
                     Material.WEEPING_VINES);
-            requires(VitalsComponent.class);
+            requires(VitalsComponent.class).requires(FactionComponent.class);
             requires(BuffComponent.class);
             requires(HunterEvolutionPassive.class);
             requires(HunterStealthSkill.class);
@@ -475,7 +476,7 @@ public class HunterPullSkill extends Skill {
             if (at.getWorld() == null || center.getWorld() == null || !at.getWorld().equals(center.getWorld())) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 continue;
             }
             double dx = at.getX() - center.getX();

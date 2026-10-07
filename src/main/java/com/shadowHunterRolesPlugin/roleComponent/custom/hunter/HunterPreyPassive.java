@@ -3,6 +3,7 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.hunter;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -125,7 +126,7 @@ public class HunterPreyPassive extends PassiveSkill {
                     Component.text("标记冷却 6 秒；刷新时场上所有标记一并刷新"),
                     Component.text("普攻被标记者额外造成 10 点灵魂伤害，并消耗掉该标记")
             ));
-            requires(BuffComponent.class);
+            requires(BuffComponent.class).requires(FactionComponent.class);
         }
 
         @Override
@@ -321,7 +322,7 @@ public class HunterPreyPassive extends PassiveSkill {
      * 已有标记由 {@link #refreshAllMarks()} 负责刷新。否则每 6 秒都会把同一个最近的人
      * 当"新目标"，铁砧音会变成周期性噪音，且集合永远涨不上去。
      *
-     * <p>判敌走全角色唯一真值点 {@code svc().roleInfo().isHostileTo(uuid)}；
+     * <p>判敌走全角色唯一真值点 {@code svc().components().get(FactionComponent.class).isHostileTo(uuid)}；
      * 仍然显式跳过自己（既省一次查表，也让"自己不会被标记"在代码里看得见）。
      */
     private Player nearestUnmarkedHostile(Player owner) {
@@ -342,7 +343,7 @@ public class HunterPreyPassive extends PassiveSkill {
             if (!sameWorld(candidateLocation, center)) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 continue;
             }
             double distanceSquared = candidateLocation.distanceSquared(center);

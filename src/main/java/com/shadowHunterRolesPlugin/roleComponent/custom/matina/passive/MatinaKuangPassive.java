@@ -45,7 +45,7 @@ import java.util.List;
  *   <tr><td>&gt;60</td><td>每秒判定：基础 10% 直接死亡，每高 1 层 +1%，上限 100%；死亡后狂暴清 0</td>
  *       <td>{@link #rollOverloadDeath(Player)}</td></tr>
  *   <tr><td>每 2 层</td><td>周身多一个环绕自身的红石粒子，从<b>脚底</b>逐个叠高
- *       （30 层时最高 2 格）</td><td>{@link #drawRageOrbit(Player)}</td></tr>
+ *       （30 层时最高 2 格；<b>30 层后封顶，不再增高</b>）</td><td>{@link #drawRageOrbit(Player)}</td></tr>
  * </table>
  *
  * <h2>口径申报（如实）</h2>
@@ -111,16 +111,17 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
     private static final double ORBIT_RADIUS = 0.9d;
     /**
      * **两颗粒子之间的层数间隔**（需求：每两个层数增加一个粒子）。
-     * <p>⇒ 实际画出的粒子数 = {@code floor(kuang / 该值)}。
+     * <p>⇒ 实际画出的粒子数 = {@code floor(min(kuang, 30) / 该值)}。
      */
     private static final int ORBIT_LAYERS_PER_PARTICLE = 2;
     /**
-     * **满速档的层数**（需求：到达 30 层时旋转粒子最高到 2 格）。
+     * **满配层数**（需求：到达 30 层时旋转粒子最高到 2 格，且**此后封顶**）。
      * <p>它与 {@link #ORBIT_LAYERS_PER_PARTICLE} 一起定义整条高度曲线：
-     * 30 层 ⇒ 15 颗 ⇒ 最高那颗恰好在脚底上方 {@value #ORBIT_MAX_HEIGHT} 格。
+     * 30 层 ⇒ 15 颗 ⇒ 最高那颗恰好在脚底上方 {@value #ORBIT_MAX_HEIGHT} 格；
+     * 层数再高也都按 30 层画（不会继续往上涨）。
      */
     private static final int ORBIT_FULL_LAYER = 30;
-    /** **满速档的最高高度**（格；从脚底起算）。 */
+    /** **满配高度**（格；从脚底起算）。 */
     private static final double ORBIT_MAX_HEIGHT = 2.0d;
     /**
      * 每层抬高（格）——"逐个叠高"。
@@ -128,6 +129,8 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
      */
     private static final double ORBIT_STEP_Y =
             ORBIT_MAX_HEIGHT / (ORBIT_FULL_LAYER / (double) ORBIT_LAYERS_PER_PARTICLE - 1d);
+    /** **满配时的粒子数**（30 层 ⇒ 15 颗；层数再高也不超过它）。 */
+    private static final int ORBIT_MAX_PARTICLES = ORBIT_FULL_LAYER / ORBIT_LAYERS_PER_PARTICLE;
 
     private VitalsComponent vitals;
     private EnergyComponent energy;
@@ -396,12 +399,17 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
      * **狂暴环绕粒子**：起点在<b>角色脚底</b>，每 {@value #ORBIT_LAYERS_PER_PARTICLE} 层加一颗，
      * 逐颗抬高；30 层时最高一颗恰好在脚底上方 {@value #ORBIT_MAX_HEIGHT} 格。
      *
-     * <p>高度曲线是**连续**的（不封顶）：层数超过 30 后粒子继续按同一 {@link #ORBIT_STEP_Y}
-     * 往上排（100 层 ⇒ 50 颗 ⇒ 约 6.86 格高），所以"到 30 层最高 2 格"描述的是**那一刻**的形态，
-     * 不是一条硬上限 —— 需求只钉死了 30 层这个采样点。
+     * <p>★ <b>30 层封顶</b>（{@value #ORBIT_FULL_LAYER} 层 = 满配）：粒子数与高度都在 30 层达到上限，
+     * 之后**不再增高、不再变多** —— 30 层往上到 {@value #KUANG_MAX} 层，视觉形态完全一致，
+     * 超出的层数只体现在阈值加成（抗性 / 真伤 / 暴走判定）与 bossbar 数字上。
+     *
+     * <p>为什么封顶：100 层若不封顶 ⇒ 50 颗粒子排到约 6.86 格高，会盖住准星、且每刻
+     * 50 颗红石粉的可见距离过远（远处玩家也渲染）⇒ 既吵又贵。30 层（15 颗 / 2 格）是
+     * 需求钉死的"满配形态"，视觉上已经足够表达"狂躁值拉满"。
      */
     private void drawRageOrbit(Player owner) {
-        int particles = kuang / ORBIT_LAYERS_PER_PARTICLE;
+        // ★ 30 层封顶：粒子数取 min(层数/2, 满配粒子数) ⇒ 30 层之后恒定
+        int particles = orbitParticleCount(kuang);
         if (particles <= 0) {
             return;
         }
@@ -417,6 +425,41 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
         Location center = owner.getLocation().clone();
         MatinaRageVfx.rageOrbit(world, center, particles,
                 orbitPhase, ORBIT_RADIUS, ORBIT_STEP_Y);
+    }
+
+    /**
+     * ★ **环绕粒子数**（纯函数 ⇒ 可离线穷举单测）：由狂暴层数算出"这一帧画几颗"。
+     *
+     * <p>口径：{@code floor(min(层数, 30) / 2)} ⇒ 30 层满配 15 颗，**30 层之后恒定 15 颗**
+     * （不封顶的话 100 层会画 50 颗、堆到 6.86 格高，盖准星又费性能）。
+     *
+     * @param kuang 狂暴层数（负值 ⇒ 0）
+     * @return 应画的粒子数（0 .. {@link #ORBIT_MAX_PARTICLES}）
+     */
+    public static int orbitParticleCount(int kuang) {
+        int capped = Math.min(Math.max(0, kuang), ORBIT_FULL_LAYER);
+        return capped / ORBIT_LAYERS_PER_PARTICLE;
+    }
+
+    /**
+     * ★ **环绕粒子的最高高度**（纯函数 ⇒ 可离线穷举单测）：最后一颗粒子相对脚底的高度（格）。
+     *
+     * <p>= {@code (粒子数 − 1) × ORBIT_STEP_Y}；0 颗 ⇒ 0。因为粒子数在 30 层封顶，
+     * 本值在 30 层达到 {@value #ORBIT_MAX_HEIGHT} 之后**不再增长**。
+     */
+    public static double orbitTopHeight(int kuang) {
+        int particles = orbitParticleCount(kuang);
+        return particles <= 0 ? 0d : (particles - 1) * ORBIT_STEP_Y;
+    }
+
+    /** **满配层数**（30 层）——供 UI / lore / 测试读。 */
+    public static int orbitFullLayer() {
+        return ORBIT_FULL_LAYER;
+    }
+
+    /** **满配粒子数**（15 颗）——供 UI / lore / 测试读。 */
+    public static int orbitMaxParticles() {
+        return ORBIT_MAX_PARTICLES;
     }
 
     /** 刷新 bossbar 文案：狂暴层数 + 当前生效的阈值标签。 */

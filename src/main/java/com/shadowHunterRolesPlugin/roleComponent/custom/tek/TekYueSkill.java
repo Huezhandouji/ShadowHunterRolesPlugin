@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
@@ -260,7 +261,7 @@ public class TekYueSkill extends Skill {
                     Material.TUFF);
             requires(VitalsComponent.class).requires(BuffComponent.class)
                     .requires(TaskComponent.class).requires(HotbarRenderComponent.class)
-                    .requires(TekDestinyPassive.class);
+                    .requires(TekDestinyPassive.class).requires(FactionComponent.class);
         }
 
         @Override
@@ -606,7 +607,7 @@ public class TekYueSkill extends Skill {
             if (victim == null || victim.equals(owner) || !isAlive(victim)) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(victim.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) {
                 continue;
             }
             vitals.physicalDamage(victim, owner, IMPACT_DAMAGE);

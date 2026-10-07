@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
@@ -305,7 +306,7 @@ public class TekTridentMainWeapon extends MainWeapon implements OperationProvide
                             Component.text("突进冷却 " + DASH_COOLDOWN_SECONDS + " 秒（冷却期间无法蓄力）")),
                     Material.TRIDENT,
                     ATTACK_COOLDOWN_TICKS);
-            requires(VitalsComponent.class).requires(BuffComponent.class).requires(TekDestinyPassive.class);
+            requires(VitalsComponent.class).requires(BuffComponent.class).requires(TekDestinyPassive.class).requires(FactionComponent.class);
         }
 
         @Override
@@ -791,7 +792,7 @@ public class TekTridentMainWeapon extends MainWeapon implements OperationProvide
             if (dashHit.contains(candidate)) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 continue;
             }
             dashHit.add(candidate);

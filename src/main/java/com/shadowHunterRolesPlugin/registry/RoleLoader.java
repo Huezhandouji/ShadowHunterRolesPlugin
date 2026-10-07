@@ -15,6 +15,7 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPreyPassive
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPullSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterStealthSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.mainWeapon.MatinaMedicalShovelMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaFloatingTextComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaKuangPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaJudgmentSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaRedstoneDroneSkill;
@@ -330,7 +331,9 @@ public class RoleLoader {
      * </ul>
      */
     private static Role.Builder matinaBuilder() {
-        return withBuiltIns(new Role.Builder("matina"))
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.HUNTER;
+        return withBuiltIns(new Role.Builder("matina"), faction)
                 .displayName(Component.text("狂躁牧师·马提娜"))
                 .description(List.of(
                         Component.text("狂暴值越高，越是接近神，也越是接近死"),
@@ -340,7 +343,7 @@ public class RoleLoader {
                         Component.text("远程医疗：放出爱心无人机跟随并持续治疗"),
                         Component.text("神罚：引导3秒后展开魔法阵，对范围内敌人倾泻特殊值伤害")
                 ))
-                .faction(Faction.HUNTER)
+                .faction(faction)
                 .addComponent(MatinaMedicalShovelMainWeapon.ID,
                         new MatinaMedicalShovelMainWeapon.Specification().setSlot(0))
                 .addComponent(MatinaSeaCrystalLampSkill.ID,
@@ -350,6 +353,7 @@ public class RoleLoader {
                 .addComponent(MatinaJudgmentSkill.ID,
                         new MatinaJudgmentSkill.Specification().setSlot(3))
                 .addComponent(MatinaKuangPassive.ID, new MatinaKuangPassive.Specification())
+                .addComponent(MatinaFloatingTextComponent.ID, new MatinaFloatingTextComponent.Specification())
                 .icon(Material.SEA_LANTERN);
     }
 
@@ -416,7 +420,9 @@ public class RoleLoader {
      * </ul>
      */
     private static Role.Builder tekBuilder() {
-        return withBuiltIns(new Role.Builder("tek"))
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.HUNTER;
+        return withBuiltIns(new Role.Builder("tek"), faction)
                 .displayName(Component.text("特克"))
                 .description(List.of(
                         Component.text("真理在枪尖上，命运在枪尖外"),
@@ -426,7 +432,7 @@ public class RoleLoader {
                         Component.text("落岳：跃起后砸落，对范围内敌人造成伤害与眩晕"),
                         Component.text("真理之刺：场上有真理≥10的角色时解锁，瞬移刺击并清空全场真理")
                 ))
-                .faction(Faction.HUNTER)
+                .faction(faction)
                 .addComponent(TekTridentMainWeapon.ID, new TekTridentMainWeapon.Specification().setSlot(0))
                 .addComponent(TekXiaoSkill.ID, new TekXiaoSkill.Specification().setSlot(1))
                 .addComponent(TekYueSkill.ID, new TekYueSkill.Specification().setSlot(2))
@@ -460,7 +466,9 @@ public class RoleLoader {
      * </ul>
      */
     private static Role.Builder hunterBuilder() {
-        return withBuiltIns(new Role.Builder("hunter"))
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.SHADOW;
+        return withBuiltIns(new Role.Builder("hunter"), faction)
                 .displayName(Component.text("猎手"))
                 .description(List.of(
                         Component.text("猎手：先标记猎物，再把它拽回眼前"),
@@ -471,7 +479,7 @@ public class RoleLoader {
                         Component.text("遁形：速度VI、隐身、抗性V并免疫缓慢，使用技能或攻击即中断"),
                         Component.text("进化指数：击杀敌人可进化五档")
                 ))
-                .faction(Faction.SHADOW)
+                .faction(faction)
                 .addComponent(HunterGrudgeMainWeapon.ID,
                         new HunterGrudgeMainWeapon.Specification().setSlot(0))
                 .addComponent(HunterPounceSkill.ID,
@@ -484,5 +492,6 @@ public class RoleLoader {
                 .addComponent(HunterEvolutionPassive.ID, new HunterEvolutionPassive.Specification())
                 .icon(Material.NETHERITE_SWORD);
     }
+
 
 }

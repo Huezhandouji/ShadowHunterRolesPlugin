@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
@@ -35,7 +36,7 @@ import java.util.List;
  * 命中集合 = 以**准星射线**为轴、前方 {@value #THRUST_RANGE} 格内命中的**敌对**玩家
  * （走仓库既有的 {@code SkillUtil#getPlayersInSightLine}，只看可见性不看方块遮挡，与
  * {@code RedSolitaryArroganceSkill} 同口径；再补一层
- * {@code svc().roleInfo().isHostileTo(uuid)} 的敌对过滤，含"没选角色算敌人"）。
+ * {@code svc().components().get(FactionComponent.class).isHostileTo(uuid)} 的敌对过滤，含"没选角色算敌人"）。
  * 在命中集合里取**离自己最远**的那一个作为瞬移目标。
  *
  * <p>★ <b>命中判定曾经是错的</b>（详见 {@link #collectHits}）：旧实现自算"垂直于轴的侧向距离"，
@@ -132,7 +133,7 @@ public class TekXiaoSkill extends Skill implements OperationProvider {
                     ENERGY_COST,
                     Material.ECHO_SHARD);
             requires(VitalsComponent.class).requires(BuffComponent.class)
-                    .requires(EnergyComponent.class).requires(TekDestinyPassive.class);
+                    .requires(EnergyComponent.class).requires(TekDestinyPassive.class).requires(FactionComponent.class);
         }
 
         @Override
@@ -265,7 +266,7 @@ public class TekXiaoSkill extends Skill implements OperationProvider {
                 continue;
             }
             scanned++;
-            if (!svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 rejectedHostile++;
                 continue;
             }

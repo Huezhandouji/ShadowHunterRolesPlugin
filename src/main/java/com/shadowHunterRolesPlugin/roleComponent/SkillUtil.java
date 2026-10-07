@@ -1,6 +1,5 @@
 package com.shadowHunterRolesPlugin.roleComponent;
 
-import com.shadowHunterRolesPlugin.core.Faction;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -13,8 +12,8 @@ import java.util.*;
 public class SkillUtil {
 
     // 本类只放无状态几何工具 `getPlayersInSightLine`（纯射线几何、不查阵营、零插件依赖）；
-    // 阵营判定（"自身半径内是否有敌人"及"没有角色算敌人 / 创造旁观不算"那套口径）归聚合根的只读服务面
-    // `RoleInfoPort#hasEnemyInRange(radius)`。
+    // 阵营判定（"自身半径内是否有敌人"及"没有阵营算敌人 / 创造旁观不算"那套口径）归阵营组件
+    // （`FactionComponent#hasEnemyInRange(radius)`，判敌真值在 `platform/FactionManager`）。
 
     public static List<Player> getPlayersInSightLine(Player player, double maxDistance, double range) {
         List<Player> result = new ArrayList<>();

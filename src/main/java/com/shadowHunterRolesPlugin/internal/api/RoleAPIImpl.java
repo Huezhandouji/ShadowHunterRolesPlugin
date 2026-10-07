@@ -4,7 +4,6 @@ import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
 import com.shadowHunterRolesPlugin.api.RoleAPI;
 import com.shadowHunterRolesPlugin.api.RoleInfo;
 import com.shadowHunterRolesPlugin.core.util.DamageUtil;
-import com.shadowHunterRolesPlugin.core.Faction;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
@@ -12,7 +11,6 @@ import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
@@ -127,26 +125,9 @@ public class RoleAPIImpl implements RoleAPI {
 
 
 
-    // ───────── 阵营（真值在聚合根 Role）─────────
-
-    /**
-     * 两个玩家是否敌对：转调 {@link RoleManager#areHostile(UUID, UUID)}（唯一实现点）。
-     *
-     * <p>它不直接操作组件 —— 判定链是 {@code RoleManager} → {@code platform.FactionLookup} 关系表，
-     * 关系表同时看"在场"（创造 / 旁观 ⇒ 不敌对）与"阵营"（双方都有角色且同阵营才不敌对）两个维度，
-     * 因此阵营真值仍只从聚合根读。
-     *
-     * <p>语义：任一方没有角色（含实例缺失）⇒ {@code true}；任一方不在场 ⇒ {@code false}。
-     */
-    @Override
-    public boolean areHostile(UUID uuid1, UUID uuid2) {
-        return roleManager.areHostile(uuid1, uuid2);
-    }
-
-    //阵营的读 / 写不走本类（口径见 {@link RoleAPI}）：
-    //   读 = 走 {@link RoleInfo#faction()}（角色只读快照，唯一读入口）
-    //   写 = 只在聚合根上（{@code Role#setFaction} / {@code Role#resetFaction}），不由外部 API 直改
-
+    //★ 阵营没有专用 API 成员：真值与判定都在阵营组件（`roleComponent/builtin/FactionComponent`），
+    //  查询与改写一律走下面的组件操作面（`executeComponentOperation` + 组件 id `faction`），
+    //  动词表见该组件的 javadoc。因此本类不含任何阵营的解析 / 转发 / 纯函数。
 
     //枚举已装配的角色 id 与只读快照
     @Override
@@ -158,7 +139,7 @@ public class RoleAPIImpl implements RoleAPI {
     public List<RoleInfo> getRoles() {
         List<RoleInfo> result = new ArrayList<>();
         for (Role role : registry.all()) {
-            result.add(new RoleInfo(role.getId(), role.getDisplayName(), role.getDescription(), role.getIcon(), role.getFaction()));
+            result.add(new RoleInfo(role.getId(), role.getDisplayName(), role.getDescription(), role.getIcon()));
         }
         return result;
     }

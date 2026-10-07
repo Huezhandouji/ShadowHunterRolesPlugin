@@ -5,6 +5,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffType;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import net.kyori.adventure.text.Component;
@@ -147,7 +148,9 @@ public class RemotenessShapingSkill extends Skill {
                     0,
                     Material.LAPIS_BLOCK);
             requires(BuffComponent.class).requires(SanTEComponent.class).requires(TaskComponent.class)
-                    .requires(RemotenessEvolutionPassive.class);
+                    .requires(RemotenessEvolutionPassive.class)
+                    //索敌读阵营组件 ⇒ 缺它则本技能不索敌，装配期就拦住
+                    .requires(FactionComponent.class);
         }
 
         @Override
@@ -356,7 +359,7 @@ public class RemotenessShapingSkill extends Skill {
         buff.addTo(victim, BuffType.STUN, STUN_TICKS);
     }
 
-    // ───────── 索敌（几何 + 判敌口径逐字沿用 roleInfo）─────────
+    // ───────── 索敌（几何 + 判敌口径逐字沿用阵营组件）─────────
 
     /** 半径 {@code radius} 内的**敌对**玩家（几何按真实直线距离过滤 —— 世界查询给的是立方体）。 */
     private List<Player> hostilesWithin(Player self, Location center, double radius) {
@@ -379,7 +382,7 @@ public class RemotenessShapingSkill extends Skill {
             if (candidate.getLocation().distanceSquared(center) > radiusSquared) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(candidate.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
                 continue;
             }
             result.add(candidate);

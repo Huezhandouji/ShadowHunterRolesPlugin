@@ -10,6 +10,15 @@ import java.util.Set;
 import java.util.UUID;
 
 
+/**
+ * 角色系统对外面（唯一被第三方插件的入口；签名冻结，只增不改）。
+ *
+ * <p><b>★ 阵营没有专用成员</b>：阵营的真值与判定都在阵营组件
+ * （{@code roleComponent/builtin/FactionComponent}），查询与改写一律走
+ * {@link #executeComponentOperation(UUID, String, String)}（组件 id {@code faction}）；
+ * 判敌法则在 {@code platform/Hostility} + {@code platform/FactionRelation}。
+ * 因此本接口不提供"读/写某玩家阵营"与"两玩家是否敌对"的专用方法。
+ */
 public interface RoleAPI {
 
     //不建议使用所有以Player类型作参数的api
@@ -43,30 +52,10 @@ public interface RoleAPI {
     Set<String> getAllRoleIds();
     List<RoleInfo> getRoles();
 
-    //阵营信息
-    //阵营真值在聚合根（core/Role），因此本接口不暴露阵营的读/写方法：
-    //   读 = {@link RoleInfo#faction()}（角色只读快照，唯一读入口；{@code getRoles()} 回的就是它）
-    //   写 = 只在聚合根上（{@code Role#setFaction} / {@code Role#resetFaction}），不由外部 API 直改
-
-    /**
-     * <b>是否视 {@code p2} 为敌人</b>（<b>非对称</b>：{@code p1} = 发起方，{@code p2} = 目标方）。
-     *
-     * <p>★ <b>语义变更（2026）</b>：本方法<b>曾经是对称的</b>——语义为"两个玩家之间是否敌对"，
-     * {@code areHostile(a,b)} 与 {@code areHostile(b,a)} 同值。<b>现语义下两者一般不同值</b>，
-     * 下游（如 {@code SHDFGamePlugin}）若依赖了对称性需同步调整。
-     *
-     * <p>判定链 = {@code RoleManager} → 平台关系表（{@code FactionLookup}）。三条规则<b>同阵营优先</b>：
-     * <ol>
-     *   <li><b>同阵营 ⇒ 任何情况下非敌对</b>：双方都有角色且阵营相同，无论双方各是什么游戏模式；</li>
-     *   <li><b>目标方（{@code p2}）是创造 / 旁观 ⇒ 非敌对</b>（目标方不在场就不打他）；</li>
-     *   <li><b>其余 ⇒ 敌对</b>：{@code p2} 在场且不同阵营（含"任一方没有角色"）。</li>
-     * </ol>
-     * ★ <b>发起方（{@code p1}）是否在场不参与判定</b>：旧口径下 p1 是创造 / 旁观会一律回
-     * {@code false}，该闸门已删除 —— 现按上述三条规则求值。
-     *
-     * @return 两个 uuid 为 {@code null} 则 {@code false}
-     */
-    boolean areHostile(UUID p1, UUID p2);
+    //★ 阵营没有专用 API 成员：阵营真值与判定都在阵营组件（`roleComponent/builtin/FactionComponent`），
+    //  查询与改写一律走下面的组件操作面（`executeComponentOperation` + 组件 id `faction`），
+    //  动词表见该组件的 javadoc（`faction` / `declared` / `hostile <uuid>` / `enemy_in_range <半径>` /
+    //  `set <阵营>` / `reset`）。判敌法则本身在 `platform/Hostility` + `platform/FactionRelation`。
 
     //组件操作面 —— 唯一的操作角色入口
     /**

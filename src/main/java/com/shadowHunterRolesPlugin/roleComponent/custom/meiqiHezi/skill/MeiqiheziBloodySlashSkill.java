@@ -6,6 +6,7 @@ import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.DamageKind;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
@@ -54,6 +55,8 @@ public class MeiqiheziBloodySlashSkill extends Skill {
                     Material.IRON_INGOT
             );
             requires(EnergyComponent.class).requires(BuffComponent.class).requires(TaskComponent.class).requires(VitalsComponent.class);
+            //每次连斩的受害者判敌 ⇒ 读阵营组件；缺它则本技能不索敌，装配期就拦住
+            requires(FactionComponent.class);
         }
 
         @Override
@@ -119,7 +122,7 @@ public class MeiqiheziBloodySlashSkill extends Skill {
                 Collection<? extends Player> victims = loc.getNearbyPlayers(4);
 
                 for (Player victim : victims) {
-                    if (!svc().roleInfo().isHostileTo(victim.getUniqueId())) continue;
+                    if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) continue;
                     victim.setNoDamageTicks(0);
                     vitals.damage(victim, 14, DamageKind.PHYSICAL);
                 }

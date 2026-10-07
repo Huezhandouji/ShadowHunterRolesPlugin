@@ -50,14 +50,17 @@ public class Role {
  // 「物品栏位置」的持有者是渲染组件（它自己读描述符的 `slot()` 做落位），聚合根不再持有派生视图。
  // 条目仍携带栏位值（`ComponentEntry.slot`）—— 那是数据（描述符快照的一部分），不是本类的视图。
 
-    private Faction faction;
-
  /**
- * 角色模板声明的阵营：构造期由描述符给出、此后只读，它就是
- * {@link #resetFaction()} 的回落目标。
- * <p>与 {@link #faction}（可变、{@code setFaction} 的写入点）分开持有是必需的：
- * 回落目标原本住在每实例的阵营组件里（构造期取 {@code role.getFaction()}），
- * 若只保留一个可变字段，"复位"会变成"把当前值写回自己"的空操作，与旧行为不等价。
+ * 角色模板声明的阵营：构造期由描述符给出（{@code Builder#faction(...)}）、此后只读。
+ * <p><b>模板上只有这一个阵营值</b> —— 它是"这个角色属于哪一方"的静态声明，
+ * 同时是每份实例的<b>初值</b>与<b>复位回落目标</b>：装配期由
+ * {@code registry/RoleLoader#withBuiltIns(builder, declared)} 经描述符交给阵营组件
+ * （{@code roleComponent/builtin/FactionComponent} 的 {@code declared}）。
+ * <p>★ <b>运行期"某玩家当前的阵营"不在这里</b>：那是<b>每实例一份</b>的状态，
+ * 住在阵营组件里（初值取本字段），由组件操作面
+ * （{@code RoleAPI#executeComponentOperation} + 组件 id {@code faction} 的 {@code set} / {@code reset}）
+ * 按玩家改写。
+ * 因此本字段恒等于装配期声明值，运行期写入改不到它。
  */
     private final Faction defaultFaction;
 
@@ -69,8 +72,8 @@ public class Role {
         this.id = builder.id;
         this.displayName = builder.displayName;
         this.description = builder.description;
-        this.faction = builder.faction;
- //回落目标与可变值同源起步（builder.faction 由 Builder#faction 保证非 null）
+ //模板上唯一的阵营值 = 声明值（builder.faction 由 Builder#faction 保证非 null）；
+ //每份实例以它为初值与复位回落目标，实例自己的当前值住在 RoleInstance 里。
         this.defaultFaction = builder.faction;
 
         this.components = Collections.unmodifiableMap(new LinkedHashMap<>(builder.components));
@@ -416,27 +419,25 @@ public class Role {
         return entry != null ? entry.getDescriptorType() : null;
     }
 
-    public Faction getFaction() { return faction; }
-
  /**
- * 设置本角色的阵营。
- * <p>① 管理级 / 模板级语义：这是角色模板上的声明值，不是每玩家状态；
- * ② 影响该角色的所有实例（已实例化的玩家实例下一次经 `RoleInfoPort#faction()` 读取时即生效）；
- * ③ 阵营的读取唯一入口仍是 `roleInfo` 服务面，因此外部不直改、组件不直读。
- * <p>本方法是旧阵营组件 `setFaction` 的唯一接替落点，读侧一律走 `roleInfo` 服务面
- * （不读本字段的裸值）。
+ * 角色模板<b>声明</b>的阵营（构造期由描述符给定、此后只读）—— 本角色"属于哪一方"的静态声明。
+ * <p><b>它是每一份实例的初值与复位回落目标</b>：装配期由 {@code registry/RoleLoader#withBuiltIns}
+ * 经描述符携带进阵营组件，但不等于"某玩家当前是哪一方" —— 后者是<b>每实例一份</b>的状态，
+ * 住在阵营组件里，可被组件操作面（{@code RoleAPI#executeComponentOperation} + 组件 id {@code faction}
+ * 的 {@code set} / {@code reset}）按玩家改写。
+ * <p>装配期保证非 null（{@code Role.Builder#faction} 把 null 归一为 {@link Faction#UNKNOWN}）。
+ * <p><b>读它的地方</b>：装配期经描述符进组件（{@code FactionComponent#declared()}），
+ * 以及装配对账（{@code FactionComponent.Specification#declaredOf} 读同一份值）——
+ * 公开面（角色目录快照 / 专用 API）已不含阵营。
  */
-    public void setFaction(Faction faction){ this.faction = faction; }
+    public Faction getDefaultFaction() { return defaultFaction; }
 
- /**
- * 复位为角色模板声明的阵营。
- * <p>语义 = 旧阵营组件 `reset()` 的逐字等价（当时写作
- * {@code this.faction = defaultFaction;}）—— 回落目标就是构造期由描述符给出的
- * {@link #defaultFaction}（只读），因此连续复位是幂等的。
- * <p>差异只有一处：回落目标从每实例组件字段搬到角色模板字段，因此同一角色的实例
- * 共享同一回落目标（阵营本就"一个角色一份、全局静态"）。
- */
-    public void resetFaction(){ this.faction = defaultFaction; }
+ // 运行期的阵营读 / 写一律归"每实例一份"的状态（阵营组件的 `current`）⇒
+ // 本类不再提供 `getFaction()` / `setFaction(...)` / `resetFaction()` 三个模板级口子：
+ //   ① 语义不符：那三条改的是"该角色的所有实例"，而阵营的语义是"某一个玩家"；
+ //   ② 无消费者：读侧一律走阵营组件（组件侧 `svc().components().get(FactionComponent.class)`、
+ //      跨实例走 `platform/FactionManager`），写侧一律走组件操作面
+ //      （`executeComponentOperation` + 组件 id `faction` 的 `set` / `reset`）。
 
  // 栏位视图与按槽位反查已删除 ——
  // 「物品栏位置」的持有者是渲染组件：它自己读描述符的 `slot()` 做落位，

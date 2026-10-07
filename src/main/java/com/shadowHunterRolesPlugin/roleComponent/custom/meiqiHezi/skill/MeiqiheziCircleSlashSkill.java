@@ -19,6 +19,7 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import java.util.List;
 
 public class MeiqiheziCircleSlashSkill extends Skill {
@@ -55,6 +56,8 @@ public class MeiqiheziCircleSlashSkill extends Skill {
                     Material.GOLD_INGOT
             );
             requires(BuffComponent.class).requires(EnergyComponent.class).requires(VitalsComponent.class).requires(TaskComponent.class);
+            //范围伤害逐个受害者判敌 ⇒ 读阵营组件；缺它则本技能不索敌，装配期就拦住
+            requires(FactionComponent.class);
         }
 
         @Override
@@ -113,7 +116,7 @@ public class MeiqiheziCircleSlashSkill extends Skill {
                 Collection<? extends Player> victims = loc.getNearbyPlayers(7);
 
                 for(Player victim : victims){
-                    if (!svc().roleInfo().isHostileTo(victim.getUniqueId())) continue;
+                    if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) continue;
                     vitals.trueDamage(victim, caster, 20);
                 }
 

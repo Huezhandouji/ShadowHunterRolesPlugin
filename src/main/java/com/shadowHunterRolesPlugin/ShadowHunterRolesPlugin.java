@@ -7,28 +7,21 @@ import com.shadowHunterRolesPlugin.listener.hook.PlayerKilledHookListener;
 import com.shadowHunterRolesPlugin.api.RoleAPI;
 import com.shadowHunterRolesPlugin.command.RoleCommand;
 import com.shadowHunterRolesPlugin.config.ConfigurationManager;
-import com.shadowHunterRolesPlugin.core.Faction;
-//阵营读取经聚合根 Role（RoleInstance 不提供读视图）。
-import com.shadowHunterRolesPlugin.core.Role;
+//阵营读取经阵营组件（组件侧自取）与平台侧唯一权威 `platform/FactionManager`（跨实例）；
+//本主类不再实现任何阵营端口、也不再持有任何阵营接线。
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.internal.api.RoleAPIImpl;
 import com.shadowHunterRolesPlugin.listener.*;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
-import com.shadowHunterRolesPlugin.platform.CombatPresence;
-import com.shadowHunterRolesPlugin.platform.FactionLookup;
-import com.shadowHunterRolesPlugin.platform.FactionRelation;
-import com.shadowHunterRolesPlugin.platform.Hostility;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.registry.RoleLoader;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
-import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.PluginCommand;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -56,60 +49,9 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         KeyFactory keys = key -> new NamespacedKey(this, key);
         KeyFactory.Registry.install(keys);
 
-        FactionLookup factions = new FactionLookup() {
-            /**
-             * 按 UUID 读阵营（主口径）：取实例走 {@code RoleManager.getRoleInstance(uuid)}（UUID 重载）。
-             *
-             * <p>取值经聚合根（角色模板上的阵营声明值）：未选角色 / 取不到角色模板则 {@code Faction.UNKNOWN}。
-             */
-            @Override
-            public Faction factionOf(UUID uuid) {
-                if(uuid == null) return Faction.UNKNOWN;
-                RoleInstance target = roleManager != null ? roleManager.getRoleInstance(uuid) : null;
-                Role role = target != null ? target.getRole() : null;
-                return role != null ? role.getFaction() : Faction.UNKNOWN;
-            }
-
-            /**
-             * 「{@code self} 是否视 {@code other} 为敌人」——<b>非对称</b>，方向由形参顺序表达
-             * （{@code self} = 发起方，{@code other} = 目标）。
-             *
-             * <p>★ 口径（2026 语义变更）：只读<b>对方</b>的在场状态，
-             * <b>己方是创造 / 旁观不再豁免</b>（旧口径"双方都不敌对"的那道己方闸门已删除）。
-             * 因此 {@code isHostile(a,b)} 与 {@code isHostile(b,a)} 一般<b>不同值</b>。
-             *
-             * <p>本方法只是把「阵营 + 对方的在场」按「发起方 = self」展开一遍，
-             * 因此与下面 {@link #isHostile(Faction, UUID)} 逐条等价（同一条真值路径）。
-             *
-             * <p>真值转发到 {@link Hostility}（合成层）与两个维度真值 {@link CombatPresence} /
-             * {@link FactionRelation}，本处只做接线、不自己持有语义。
-             * 消费者 = {@code core/RoleInfoImpl#isHostileTo(UUID)} 与 {@code manager/RoleManager#areHostile}
-             * （后者是<b>公开 API</b> {@code RoleAPI.areHostile} 的落点）。
-             */
-            @Override
-            public boolean isHostile(UUID self, UUID other) {
-                if (self == null || other == null) {
-                    return false;
-                }
-                return isHostile(factionOf(self), other);
-            }
-
-            /**
-             * 「某个阵营」与「某个玩家」是否敌对：对方<b>在场</b>且（双方都有角色时阵营不同）则为敌对。
-             * <p>对方没有角色同样敌对（口径见类注释的「无角色」）。
-             * <p><b>己方是否在场不参与</b>：{@code self} 只是阵营，本方法看不到玩家对象也不需要看 ——
-             * 旧口径那道"自己不在场 ⇒ 一律不敌对"的前置闸门已随语义变更删除（落点已从
-             * {@code core/RoleInfoImpl#isHostileTo} 移到这里统一处理）。
-             * <p>真值转发到 {@link Hostility#isHostileTo(Faction, Faction, boolean)}（合成层）。
-             */
-            @Override
-            public boolean isHostile(Faction self, UUID other) {
-                return other != null
-                        && Hostility.isHostileTo(self, factionOf(other), participatesInHostility(other));
-            }
-        };
-
-        rolesContext = new RolesContext(this, getLogger(), new BukkitSchedulerAdapter(this), keys, factions);
+        //阵营不需要任何接线：唯一权威 = `platform/FactionManager` 的注册表（纯静态），
+        //由阵营组件自己在构造期注册、在 stop() 里注销 ⇒ 主类既不实现任何阵营端口、也不持有查询通道。
+        rolesContext = new RolesContext(this, getLogger(), new BukkitSchedulerAdapter(this), keys);
 
         //注册表是纯容器，角色装配由 RoleLoader 在 onEnable 显式执行（fail-fast、按角色隔离）
         RoleRegistry roleRegistry = new RoleRegistry();

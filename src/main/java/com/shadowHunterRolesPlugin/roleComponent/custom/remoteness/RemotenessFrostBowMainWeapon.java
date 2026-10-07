@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.base.BowWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
@@ -138,7 +139,9 @@ public class RemotenessFrostBowMainWeapon extends BowWeapon {
                     COOLDOWN_TICKS,
                     Material.BOW);
             requires(SanTEComponent.class).requires(VitalsComponent.class).requires(BuffComponent.class)
-                    .requires(RemotenessReconstructSkill.class);
+                    .requires(RemotenessReconstructSkill.class)
+                    //索敌读阵营组件 ⇒ 缺它则本武器不索敌，装配期就拦住
+                    .requires(FactionComponent.class);
         }
 
         @Override
@@ -219,7 +222,7 @@ public class RemotenessFrostBowMainWeapon extends BowWeapon {
                 && !victim.equals(self)
                 && victim.isOnline()
                 && !victim.isDead()
-                && svc().roleInfo().isHostileTo(victim.getUniqueId())) {
+                && svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) {
             if (sante != null) {
                 sante.decreaseSanTE(victim.getUniqueId(), HIT_SANTE_DAMAGE);
             }
@@ -293,7 +296,7 @@ public class RemotenessFrostBowMainWeapon extends BowWeapon {
             if (victim.isDead() || !victim.isOnline()) {
                 continue;
             }
-            if (!svc().roleInfo().isHostileTo(victim.getUniqueId())) {
+            if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) {
                 continue;
             }
             //"一次"是类型上的事实：这一支箭已经对这个敌人结过账就跳过（集合随箭一起销毁）

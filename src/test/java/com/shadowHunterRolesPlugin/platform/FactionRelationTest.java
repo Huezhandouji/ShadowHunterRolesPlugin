@@ -60,22 +60,22 @@ public class FactionRelationTest {
         assertFalse(FactionRelation.isHostileTo(Faction.HUNTER, Faction.HUNTER));
     }
 
-    // ───────── hasRole：判据落点 ─────────
+    // ───────── hasFaction：判据落点 ─────────
 
-    /** {@code UNKNOWN} / {@code null} 视为没有角色；两个真实阵营视为有角色。 */
+    /** {@code UNKNOWN} / {@code null} 视为没有阵营；两个真实阵营视为有阵营。 */
     @Test
-    public void hasRoleTreatsUnknownAndNullAsRoleless() {
-        assertTrue("SHADOW 是有角色", FactionRelation.hasRole(Faction.SHADOW));
-        assertTrue("HUNTER 是有角色", FactionRelation.hasRole(Faction.HUNTER));
-        assertFalse("UNKNOWN 就是「没有角色」", FactionRelation.hasRole(Faction.UNKNOWN));
-        assertFalse("null 视为没有角色", FactionRelation.hasRole(null));
+    public void hasFactionTreatsUnknownAndNullAsFactionless() {
+        assertTrue("SHADOW 是有阵营", FactionRelation.hasFaction(Faction.SHADOW));
+        assertTrue("HUNTER 是有阵营", FactionRelation.hasFaction(Faction.HUNTER));
+        assertFalse("UNKNOWN 就是「没有阵营」（含组件缺失那一档）", FactionRelation.hasFaction(Faction.UNKNOWN));
+        assertFalse("null 视为没有阵营", FactionRelation.hasFaction(null));
     }
 
     // ───────── 边界与不变量 ─────────
 
-    /** {@code null} 一律按"没有角色"处理，与 {@code UNKNOWN} 同结果（敌对）。 */
+    /** {@code null} 一律按"没有阵营"处理，与 {@code UNKNOWN} 同结果（敌对）。 */
     @Test
-    public void nullFactionIsTreatedAsRoleless() {
+    public void nullFactionIsTreatedAsFactionless() {
         assertTrue(FactionRelation.isHostile(null, Faction.SHADOW));
         assertTrue(FactionRelation.isHostile(Faction.SHADOW, null));
         assertTrue(FactionRelation.isHostileTo(Faction.SHADOW, null));

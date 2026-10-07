@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
@@ -103,7 +104,9 @@ public class SinThornEntangleSkill extends Skill {
                     0,
                     Material.QUARTZ);
             requires(BuffComponent.class).requires(VitalsComponent.class).requires(TaskComponent.class)
-                    .requires(HotbarRenderComponent.class);
+                    .requires(HotbarRenderComponent.class)
+                    //"7 格内所有敌人"逐个判敌 ⇒ 读阵营组件；缺它则本技能不索敌，装配期就拦住
+                    .requires(FactionComponent.class);
         }
 
         @Override
@@ -173,7 +176,7 @@ public class SinThornEntangleSkill extends Skill {
             for (Player victim : center.getNearbyPlayers(ENTANGLE_RADIUS)) {
                 if (victim == null || victim.equals(owner)) continue;
                 if (victim.isDead() || !victim.isOnline() || victim.getHealth() <= 0d) continue;
-                if (!svc().roleInfo().isHostile(victim)) continue;
+                if (!svc().components().get(FactionComponent.class).isHostile(victim)) continue;
 
                 vitals.physicalDamage(victim, owner, ENTANGLE_DAMAGE);
                 //缓慢 / 失明走 buff 组件的跨玩家入口 ⇒ 进**受害者自己**的药水账本

@@ -1,7 +1,7 @@
 # ai-generated/ · 本项目的文档（写给 AI 读）
 
 > **这份文档集面向 AI**：每条规则给【做 / 不做】+ 反例 + **可复跑命令**；不写协作过程、不含易变身份量。
-> **基线**：本目录三份文档的现算读数（口径 = 顶层目录**含直属 `.java`** 才算「包」）= 顶层 **9 包** · 未过滤的**顶层目录共 10 个**（差额 = `internal/`：它**没有直属 `.java`**、只有 `internal/api/` 子包；★ **按「顶层目录」数会得 10**，两个数都对、只是口径不同）· 任意层级**末级包共 23 个**（该口径的取数命令见下方「基线取数命令」块①）· `core/` **13 件** · `roleComponent/` **38 件** · `core/ports/` **4 件**（端口接口 3 + 服务集记录 1）· `src/main` **89 件** · `src/test` **17 件** / `@Test` **117**。每条口径与取数见三件文档各自的命令块。**与代码不一致处以代码为准**。
+> **基线**：本目录文档的现算读数（口径 = 顶层目录**含直属 `.java`** 才算「包」）= 顶层 **9 包** · 未过滤的**顶层目录共 10 个**（差额 = `internal/`：它**没有直属 `.java`**、只有 `internal/api/` 子包；★ **按「顶层目录」数会得 10**，两个数都对、只是口径不同）· 任意层级**末级包共 28 个**（该口径的取数命令见下方「基线取数命令」块①）· `core/` **14 件** · `roleComponent/` **62 件**（根 9 + `base/` 4 + `builtin/` 18 + `custom/` 31）· `core/ports/` **4 件**（端口接口 3 + 服务集记录 1）· `src/main` **120 件** · `src/test` **31 件** / `@Test` **259**。每条口径与取数见三件文档各自的命令块。**与代码不一致处以代码为准**。
 
 ## 阅读顺序（也是信任顺序）
 
@@ -55,23 +55,23 @@ $S    = "$repo\src\main\java\com\shadowHunterRolesPlugin"
 #① 顶层包数（口径：顶层目录**含直属 .java** 才算「包」）
 "顶层目录 = $((Get-ChildItem $S -Directory).Count)"                                                   # 10
 "顶层包   = $((Get-ChildItem $S -Directory | Where-Object { (Get-ChildItem $_.FullName -File -Filter *.java).Count -gt 0 }).Count)"   # 9（internal/ 只有 internal/api/ 子包）
-"末级包     = $((Get-ChildItem $S -Recurse -Directory | Where-Object { (Get-ChildItem $_.FullName -File -Filter *.java).Count -gt 0 }).Count + 1)"            # 23（任意层级末级包，含仓库根包名）
+"末级包     = $((Get-ChildItem $S -Recurse -Directory | Where-Object { (Get-ChildItem $_.FullName -File -Filter *.java).Count -gt 0 }).Count + 1)"            # 28（任意层级末级包，含仓库根包名）
 #② 件数
-"core/         = $((Get-ChildItem "$S\core" -Recurse -File -Filter *.java).Count)"                    # 13
-"roleComponent = $((Get-ChildItem "$S\roleComponent" -Recurse -File -Filter *.java).Count)"           # 38
-"src/main      = $((Get-ChildItem "$repo\src\main" -Recurse -File -Filter *.java).Count)"             # 89
-#③ roleComponent/ 分项（= 38）：根 8 + base 3 + builtin 4 + custom 11 + frameworkLevel 12（直属 9 + hotbar 3）
-"根 $((Get-ChildItem "$S\roleComponent" -File -Filter *.java).Count) + base $((Get-ChildItem "$S\roleComponent\base" -Recurse -File -Filter *.java).Count) + builtin $((Get-ChildItem "$S\roleComponent\builtin" -Recurse -File -Filter *.java).Count) + custom $((Get-ChildItem "$S\roleComponent\custom" -Recurse -File -Filter *.java).Count) + frameworkLevel $((Get-ChildItem "$S\roleComponent\frameworkLevel" -Recurse -File -Filter *.java).Count)"   # 8 + 3 + 4 + 11 + 12 = 38 ✓
+"core/         = $((Get-ChildItem "$S\core" -Recurse -File -Filter *.java).Count)"                    # 14（含 ports/ 4 与 component/ 1）
+"roleComponent = $((Get-ChildItem "$S\roleComponent" -Recurse -File -Filter *.java).Count)"           # 62
+"src/main      = $((Get-ChildItem "$repo\src\main" -Recurse -File -Filter *.java).Count)"             # 120
+#③ roleComponent/ 分项（= 62）：根 9 + base 4 + builtin 18 + custom 31
+"根 $((Get-ChildItem "$S\roleComponent" -File -Filter *.java).Count) + base $((Get-ChildItem "$S\roleComponent\base" -Recurse -File -Filter *.java).Count) + builtin $((Get-ChildItem "$S\roleComponent\builtin" -Recurse -File -Filter *.java).Count) + custom $((Get-ChildItem "$S\roleComponent\custom" -Recurse -File -Filter *.java).Count)"   # 9 + 4 + 18 + 31 = 62 ✓
 #④ 测试基线（@Test 计数；件数 = 测试文件数）
 $t = 0
 Get-ChildItem "$repo\src\test" -Recurse -File -Filter *.java | ForEach-Object {
   $n = [IO.File]::ReadAllLines($_.FullName)
   for ($i = 0; $i -lt $n.Count; $i++) { if ($n[$i] -cmatch '@Test\b') { $t++ } } }
-"@Test = $t / 测试件数 = $((Get-ChildItem "$repo\src\test" -Recurse -File -Filter *.java).Count)"    # 117 / 17
+"@Test = $t / 测试件数 = $((Get-ChildItem "$repo\src\test" -Recurse -File -Filter *.java).Count)"    # 259 / 31
 #⑤ 跑闸门后，逐份测试套件加起来（与 @Test 同数）
 $dir = "$repo\build\test-results\test"; $t=0; $f=0; $e=0
 Get-ChildItem $dir -Filter *.xml | ForEach-Object { $s = ([xml](Get-Content -Raw -Encoding UTF8 $_.FullName)).testsuite; $t += [int]$s.tests; $f += [int]$s.failures; $e += [int]$s.errors }
-"suites = $((Get-ChildItem $dir -Filter *.xml).Count) / tests = $t / failures = $f / errors = $e"     # 17 / 117 / 0 / 0
+"suites = $((Get-ChildItem $dir -Filter *.xml).Count) / tests = $t / failures = $f / errors = $e"     # 31 / 259 / 0 / 0
 ```
 
 （★ 逐行读盘一律用 `[IO.File]::ReadAllLines()`，**不要**用 `Get-Content` 取行/数行 —— 无 BOM 的多字节 CJK 文件上它会静默少算。★ 行数口径 = **全文行数**（含空行）。）

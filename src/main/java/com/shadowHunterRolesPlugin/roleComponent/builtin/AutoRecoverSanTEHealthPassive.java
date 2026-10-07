@@ -34,6 +34,8 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
         public Specification(){
             super(Component.text("自动恢复SanTE"), List.of(Component.text("当周围10格没有敌人五秒后, 开始自动恢复SanTE, 每秒3")));
             requires(SanTEComponent.class).requires(VitalsComponent.class);
+            //"周围 10 格有没有敌人"读阵营组件 ⇒ 缺它则本被动不做判定，装配期就拦住
+            requires(FactionComponent.class);
         }
 
         @Override
@@ -60,12 +62,12 @@ public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
      * 容器在 tick 里对该组件广播 {@code update()} 钩子。
      * 数值/间隔逐字不变：半径 {@code 10}、累计上限 {@code 200} tick、每秒判定 {@code 20} tick、
      * {@code +3} SanTE、{@code +1} 生命；SanTE 为 0 时提前 return 的短路保持。
-     * 阵营判定走 {@code svc().roleInfo().hasEnemyInRange(10)}；SanTE 走 {@code sante.increase(3)}、
+     * 阵营判定走 {@code svc().components().get(FactionComponent.class).hasEnemyInRange(10)}；SanTE 走 {@code sante.increase(3)}、
      * 生命走生命组件的回血入口（不再经服务集端口，直接用组件本身）。
      */
     @Override
     public void update() {
-        if(svc().roleInfo().hasEnemyInRange(10)){
+        if(svc().components().get(FactionComponent.class).hasEnemyInRange(10)){
             if(noEnemySurroundTime != 0) noEnemySurroundTime = 0;
         }
         else{

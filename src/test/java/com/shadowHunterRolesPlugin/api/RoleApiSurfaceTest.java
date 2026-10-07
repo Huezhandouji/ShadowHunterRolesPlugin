@@ -24,17 +24,19 @@ public class RoleApiSurfaceTest {
      * 冻结快照。
      *
      * <p>废弃方法已被删除 —— 它们是"直接操作组件"时代的空壳
-     * （恒回中性哨兵值 / 空操作）：阵营三条（读走 {@code RoleInfo#faction()}、写只在聚合根上）、
-     * 生命 / 能量 / SanTE / 冷却读数与增减、以及所有 {@code Player} 重载。
+     * （恒回中性哨兵值 / 空操作）：生命 / 能量 / SanTE / 冷却读数与增减、以及所有 {@code Player} 重载。
+     * <p>★ <b>阵营面已整体移出公开 API</b>：{@code getRoleDefaultFaction} / {@code getPlayerFaction} /
+     * {@code setPlayerFaction} / {@code resetPlayerFaction} 与 {@code areHostile} 五个成员已删除 ——
+     * 阵营的真值与判定都在阵营组件（{@code roleComponent/builtin/FactionComponent}），
+     * <b>查询与改写一律走 {@code executeComponentOperation}</b>（组件 id {@code faction}：
+     * {@code faction} / {@code declared} / {@code hostile <uuid>} / {@code enemy_in_range <半径>} /
+     * {@code set <阵营名>} / {@code reset}）。内部实现（容器与组件的写口）保留，只是不再有专用 API。
      * <p>★ 上面"删掉所有 {@code Player} 重载"指的是**旧那批空壳**；现快照里的
      * {@code getLastDamagerUuid(Player)} / {@code getLastDamager(Player)} 是**击杀归属读口**，
      * 参数刻意收成 {@code Player}（只有玩家能进角色实例表，故调用方拿到的必是玩家），与那批不是一类。
-     * <p>保留 {@code areHostile}：它**不是**空壳，而是转调 {@code RoleManager} 的可用实现，
-     * 且判定链只从聚合根读阵营。
      * <p>排序后逐字比较，因此与声明顺序无关。
      */
     private static final String[] FROZEN_SIGNATURES = {
-            "boolean areHostile(java.util.UUID,java.util.UUID)",
             "boolean clearPlayerRole(java.util.UUID)",
             "boolean hasRole(java.util.UUID)",
             "boolean isValidRoleId(java.lang.String)",

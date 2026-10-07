@@ -136,12 +136,17 @@ public class RoleLoader {
      * <p><b>必须排在最前</b>：{@code EnergyComponent} 的描述符要按 id 取到渲染组件并挂
      * 「变更即置脏」的监听，因此渲染组件必须先注册（本方法内部也把它放在第一位）。
      *
-     * <p>顺序 = 渲染 / 能量 / SanTE / 生命 / buff / 任务（装配序与行为都不变）。
+     * <p>顺序 = 渲染 / 能量 / SanTE / 生命 / buff / 任务 / 阵营（装配序与行为都不变）。
      *
      * <p>调用点 = 每个角色的 builder 开头，内建块在模板组件之前；
      * 与「服务组件登记在模板之后」的旧序不同，但渲染 / 能量之间的相对序不变。
+     *
+     * <p><b>★ 声明阵营由装配点显式传入</b>：{@code declared} 就是同一角色
+     * {@code Role.Builder#faction(...)} 写的那个值（本方法在链式调用里先于 {@code .faction(...)} 执行
+     * ⇒ 描述符无法从 builder 反查，只能由调用方给）。阵营组件的描述符<b>每次都要 new</b>：
+     * {@code create} 经方法引用捕获描述符实例，共享一份会让两个角色拿到同一个声明阵营。
      */
-    private static Role.Builder withBuiltIns(Role.Builder builder) {
+    private static Role.Builder withBuiltIns(Role.Builder builder, Faction declared) {
         return builder
                 .addComponent(HotbarRenderComponent.ID, new HotbarRenderComponent.Specification())
                 .addComponent(EnergyComponent.ID, new EnergyComponent.Specification())
@@ -149,14 +154,17 @@ public class RoleLoader {
                 .addComponent(VitalsComponent.ID, new VitalsComponent.Specification())
                 .addComponent(BuffComponent.ID, new BuffComponent.Specification())
                 .addComponent(TaskComponent.ID, new TaskComponent.Specification())
+                .addComponent(FactionComponent.ID, new FactionComponent.Specification(declared))
                 .addComponent(AutoRecoverSanTEHealthPassive.ID, new AutoRecoverSanTEHealthPassive.Specification())
                 .addComponent(DefaultSanTEZeroPunishment.ID, new DefaultSanTEZeroPunishment.Specification())
                 .addComponent(BossbarRoleAttributesDisplayComponent.ID, new BossbarRoleAttributesDisplayComponent.Specification());
     }
 
     private static Role.Builder meiqiheziBuilder() {
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.HUNTER;
 
-        return withBuiltIns(new Role.Builder("meiqihezi")
+        return withBuiltIns(new Role.Builder("meiqihezi"), faction)
  //「已被提供的类型」由装配方注入（core/Role 本身不认识任何组件类），
  //  否则组件声明 requires(框架级组件) 会被模板侧的依赖校验误报成"缺必需依赖"。
                 .displayName(Component.text("MeiqiHezi"))
@@ -174,14 +182,16 @@ public class RoleLoader {
                 .addComponent(MeiqiheziBloodySlashSkill.ID, new MeiqiheziBloodySlashSkill.Specification().setSlot(2))
                 .addComponent(MeiqiheziCircleSlashSkill.ID, new MeiqiheziCircleSlashSkill.Specification().setSlot(3))
                 .addComponent(MeiqiheziJuejueMainWeapon.ID, new MeiqiheziJuejueMainWeapon.Specification().setSlot(0))
-                .faction(Faction.HUNTER)
+                .faction(faction)
                 .addComponent(MeiqiheziEquipmentsPassive.ID, new MeiqiheziEquipmentsPassive.Specification())
-                .icon(Material.DIAMOND_HOE));
+                .icon(Material.DIAMOND_HOE);
     }
 
     private static Role.Builder redBuilder() {
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.SHADOW;
 
-        return withBuiltIns(new Role.Builder("red"))
+        return withBuiltIns(new Role.Builder("red"), faction)
                 .displayName(Component.text("Red"))
                 //Component.text("待到血腥降临，一切化为土尘\n普攻造成15流血\n一技能捅人恢复生命\n二技能致盲敌人并结算5层流血恢复te\n三技能烧自己te开启狂暴")
                 .description(List.of(
@@ -189,7 +199,7 @@ public class RoleLoader {
                         Component.text("普攻造成15流血"),
                         Component.text("一技能捅人恢复生命")
                 ))
-                .faction(Faction.SHADOW)
+                .faction(faction)
                 .addComponent(RedBleedPassive.ID, new RedBleedPassive.Specification())
                 //进化被动（无栏位、不占热键栏）：红的五档增益与升级消息都归它
                 //  紧跟在流血被动之后 —— 流血被动与两个技能都声明它为必需依赖（档位读口）
@@ -221,13 +231,16 @@ public class RoleLoader {
      * </ul>
      */
     private static Role.Builder cangluBuilder(){
-        return withBuiltIns(new Role.Builder("canglu"))
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.HUNTER;
+
+        return withBuiltIns(new Role.Builder("canglu"), faction)
                 .displayName(Component.text("苍鹭"))
                 .description(List.of(
                         Component.text("忧郁创痕"),
                         Component.text("深度癔症")
                 ))
-                .faction(Faction.HUNTER)
+                .faction(faction)
                 .addComponent(CangluTraumaMainWeapon.ID, new CangluTraumaMainWeapon.Specification().setSlot(0))
                 .addComponent(CangluBlueIceRevolverSkill.ID, new CangluBlueIceRevolverSkill.Specification().setSlot(1))
                 .addComponent(CangluMelodySelectionSkill.ID, new CangluMelodySelectionSkill.Specification().setSlot(2))
@@ -244,14 +257,16 @@ public class RoleLoader {
      * 「请求式刷新」与「{@code dependsOnLiveState()==false} 则不每 tick 重绘」两件事。
      */
     private static Role.Builder selfUpdateExampleBuilder() {
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.SHADOW;
 
-        return withBuiltIns(new Role.Builder("selfUpdateExample"))
+        return withBuiltIns(new Role.Builder("selfUpdateExample"), faction)
                 .displayName(Component.text("Self-Update Example"))
                 .description(List.of(
                         Component.text("示例角色：演示「组件可请求重绘」"),
                         Component.text("组件只请求、不写：写入仍由框架在帧末 flush 完成")
                 ))
-                .faction(Faction.SHADOW)
+                .faction(faction)
                 .addComponent(ExampleSelfRefreshingSkill.ID, new ExampleSelfRefreshingSkill.Specification().setSlot(0))
                 .icon(Material.CLOCK);
     }
@@ -273,14 +288,17 @@ public class RoleLoader {
      * </ul>
      */
     private static Role.Builder sinThornBuilder() {
-        return withBuiltIns(new Role.Builder("sinThorn"))
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.SHADOW;
+
+        return withBuiltIns(new Role.Builder("sinThorn"), faction)
                 .displayName(Component.text("罪棘"))
                 .description(List.of(
                         Component.text("你负以荆棘，亦负以罪孽"),
                         Component.text("罪棘：7格内的敌人每1.5秒被召唤者尖牙撕咬，受6点伤害并损失4点特殊值"),
                         Component.text("律法之言：每次攻击附加15秒罪罚，每0.5秒削减目标1点特殊值")
                 ))
-                .faction(Faction.SHADOW)
+                .faction(faction)
                 .addComponent(SinThornFangMainWeapon.ID, new SinThornFangMainWeapon.Specification().setSlot(0))
                 .addComponent(SinThornEntangleSkill.ID, new SinThornEntangleSkill.Specification().setSlot(1))
                 .addComponent(SinDefenseSkill.ID, new SinDefenseSkill.Specification().setSlot(2))
@@ -357,13 +375,16 @@ public class RoleLoader {
      * </ul>
      */
     public static Role.Builder remotenessBuilder(){
-        return withBuiltIns(new Role.Builder("remoteness"))
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.SHADOW;
+
+        return withBuiltIns(new Role.Builder("remoteness"), faction)
                 .displayName(Component.text("冷识"))
                 .description(List.of(
                         Component.text("始末：永久速度一、跳跃提升一"),
                         Component.text("冷淡：箭矢命中扣除9点特殊值并造成6点物理伤害；飞行途中4格内的敌人被扣除3点特殊值与2点真实伤害")
                 ))
-                .faction(Faction.SHADOW)
+                .faction(faction)
                 //进化被动（无栏位）：八档数值与升级消息都归它；排在消费者之前（见方法注释）
                 .addComponent(RemotenessEvolutionPassive.ID, new RemotenessEvolutionPassive.Specification())
                 .addComponent(RemotenessStartEndPassive.ID, new RemotenessStartEndPassive.Specification())

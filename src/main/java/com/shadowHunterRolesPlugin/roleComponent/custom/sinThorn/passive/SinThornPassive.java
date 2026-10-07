@@ -2,6 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.SinThornVfx;
@@ -101,6 +102,8 @@ public class SinThornPassive extends PassiveSkill {
             //  （二者同属本角色，必然同时装配）
             requires(SanTEComponent.class);
             requires(LawWordPassive.class);
+            //尖牙索敌逐个候选判敌 ⇒ 读阵营组件；缺它则本被动不索敌，装配期就拦住
+            requires(FactionComponent.class);
         }
 
         @Override
@@ -227,14 +230,14 @@ public class SinThornPassive extends PassiveSkill {
 
     /**
      * **范围内还活着的敌对玩家**（不含自己；死亡 / 死亡界面 / 已下线一律排除）。
-     * 敌人语义 = {@code svc().roleInfo().isHostile(...)}（未选角色的玩家也算敌人）。
+     * 敌人语义 = {@code svc().components().get(FactionComponent.class).isHostile(...)}（未选角色的玩家也算敌人）。
      */
     private List<Player> hostilesAround(Player self) {
         List<Player> result = new ArrayList<>();
         for (Player candidate : self.getLocation().getNearbyPlayers(FANG_RADIUS)) {
             if (candidate == null || candidate.equals(self)) continue;
             if (candidate.isDead() || !candidate.isOnline() || candidate.getHealth() <= 0d) continue;
-            if (!svc().roleInfo().isHostile(candidate)) continue;
+            if (!svc().components().get(FactionComponent.class).isHostile(candidate)) continue;
             result.add(candidate);
         }
         return result;

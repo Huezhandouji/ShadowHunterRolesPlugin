@@ -11,8 +11,8 @@ import static org.junit.Assert.assertTrue;
  * 锁住「在场」维度的真值：创造 / 旁观模式不参与敌对判定（双向）。
  *
  * <p>真值抽在 {@link CombatPresence} 里（纯静态、只读 {@link GameMode} 纯枚举与玩家对象上的
- * 一个只读字段），生产实现（插件主类的 {@code FactionLookup} 匿名实现）与 {@code core/RoleInfoImpl}
- * 都转发到它，因此本测试校验的是生产真值本身。
+ * 一个只读字段），生产接线（{@link FactionManager}，它取在线玩家对象后转发到本类）
+ * 转发到它，因此本测试校验的是生产真值本身。
  * <p>本件只传枚举 / {@code null}，不构造玩家对象、不触服务端，离线可跑。
  * <p>与 {@link FactionRelationTest} 的分工：那边管"阵营"维度，本件管"在场"维度；
  * 两个维度的合成（在场 && 阵营 ⇒ 是否敌对）落在生产接线里，不在本件范围。

@@ -18,6 +18,7 @@ import org.bukkit.util.Vector;
 import java.util.List;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 
 public class RedSolitaryArroganceSkill extends Skill {
 
@@ -57,7 +58,9 @@ public class RedSolitaryArroganceSkill extends Skill {
                     List.of(Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命")),
                     200, 0, Material.FERMENTED_SPIDER_EYE);
             requires(TaskComponent.class).requires(BuffComponent.class).requires(VitalsComponent.class)
-                    .requires(RedEvolutionPassive.class);
+                    .requires(RedEvolutionPassive.class)
+                    //每次捅击前逐个受害者判敌 ⇒ 读阵营组件；缺它则本技能不索敌，装配期就拦住
+                    .requires(FactionComponent.class);
         }
 
         @Override
@@ -108,7 +111,7 @@ public class RedSolitaryArroganceSkill extends Skill {
                         boolean shouldRecoverHealth = false;
                         for(Player victim : playersInSightLine){
                             if(victim == null || victim.isDead() || !victim.isOnline()) continue;
-                            if(!svc().roleInfo().isHostileTo(victim.getUniqueId())) continue;
+                            if(!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) continue;
 
                             shouldRecoverHealth = true;
                             vitals.physicalDamage(victim, cas, 8);

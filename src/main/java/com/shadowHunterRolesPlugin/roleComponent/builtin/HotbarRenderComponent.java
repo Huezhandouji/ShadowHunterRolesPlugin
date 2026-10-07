@@ -44,9 +44,10 @@ import java.util.logging.Logger;
  * <ul>
  * <li>它在容器里可见、可查询（{@code getAllByType} / {@code getComponent}），后续"不可动物品保护"与回调
  * 有明确的挂载点；</li>
- * <li>它与其他框架级服务组件同构（同包同族：{@code VitalsComponent} / {@code EnergyComponent} /
- * {@code SanTEComponent} / {@code BuffComponent} / {@code TaskComponent}，共 5 个；阵营不是容器里的
- * 服务组件，它的真值住在聚合根 {@code core/Role}）；</li>
+ * <li>它与其他内建服务组件同构（同包同族：{@code VitalsComponent} / {@code EnergyComponent} /
+ * {@code SanTEComponent} / {@code BuffComponent} / {@code TaskComponent} / {@code FactionComponent}）；
+ * 其中阵营组件同样"每实例一个、经内建段装配"，只是它的真值由组件自己持有、跨实例读取走
+ * {@code platform/FactionManager} 的注册表；</li>
  * <li>它是 {@code RoleComponent} 的子类，受既有生命周期与故障隔离（{@code guardedCall}）管辖。</li>
  * </ul>
  * <h2>本组件不做的事（边界）</h2>

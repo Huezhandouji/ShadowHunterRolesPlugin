@@ -152,7 +152,9 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
         this.pool = TextUtil.newPool(this);
         this.lexicon = lexicon();
         this.lastCombatTick = 0;
-        this.nextIdleTick = IDLE_INTERVAL_TICKS + random.nextInt(IDLE_JITTER_TICKS);
+        int firstInterval = Math.max(1, idleIntervalTicks());
+        int firstJitter = Math.max(0, idleJitterTicks());
+        this.nextIdleTick = firstInterval + (firstJitter > 0 ? random.nextInt(firstJitter) : 0);
         registerKillListener();
         this.started = true;
 
@@ -199,11 +201,15 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
 
         boolean quiet = tickCounter - lastCombatTick >= IDLE_QUIET_TICKS;
         if (quiet && tickCounter >= nextIdleTick) {
-            if (say(self, MOMENT_IDLE, null)) {
-                nextIdleTick = tickCounter + IDLE_INTERVAL_TICKS + random.nextInt(IDLE_JITTER_TICKS);
+            int interval = Math.max(1, idleIntervalTicks());
+            int jitter = Math.max(0, idleJitterTicks());
+            // 是否轮到这一次"开口"：默认 1.0（必说），子类可调成概率（如 0.3）
+            boolean roll = random.nextDouble() < Math.max(0d, Math.min(1d, idleChance()));
+            if (roll && say(self, MOMENT_IDLE, null)) {
+                nextIdleTick = tickCounter + interval + (jitter > 0 ? random.nextInt(jitter) : 0);
             } else {
-                // 被节流拒了 ⇒ 稍后再试，不要每刻重试（否则节流一过就连吐）
-                nextIdleTick = tickCounter + 20;
+                // 没中 / 被节流拒 ⇒ 等下一个完整周期再判（不要每刻重试，否则一过节流就连吐）
+                nextIdleTick = tickCounter + interval;
             }
         }
     }
@@ -365,7 +371,10 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
         if (self == null) {
             return;
         }
-        say(self, MOMENT_HURT, null);
+        // 受伤台词：默认必然（1.0），子类可调成概率（如 0.2）
+        if (random.nextDouble() < Math.max(0d, Math.min(1d, hurtChance()))) {
+            say(self, MOMENT_HURT, null);
+        }
         if (lowHpEnabled() && isLowHp(self)) {
             say(self, MOMENT_LOW_HP, null);
         }
@@ -491,6 +500,26 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
     /** 是否启用空闲氛围字（默认启用；子类可关掉以免啰嗦）。 */
     protected boolean idleEnabled() {
         return true;
+    }
+
+    /** 空闲判定的间隔（刻）—— 默认 {@value #IDLE_INTERVAL_TICKS}；子类可覆写（如 100 = 5 秒）。 */
+    protected int idleIntervalTicks() {
+        return IDLE_INTERVAL_TICKS;
+    }
+
+    /** 空闲间隔的随机抖动上限（刻）—— 默认 {@value #IDLE_JITTER_TICKS}；子类可覆写成 0 做严格周期。 */
+    protected int idleJitterTicks() {
+        return IDLE_JITTER_TICKS;
+    }
+
+    /** 空闲"到点"后真的开口的概率（0..1）—— 默认 1.0；子类可调成 0.3 之类的稀疏度。 */
+    protected double idleChance() {
+        return 1.0d;
+    }
+
+    /** 受伤时开口的概率（0..1）—— 默认 1.0；子类可调成 0.2。 */
+    protected double hurtChance() {
+        return 1.0d;
     }
 
     /** 是否启用濒死提醒（默认启用）。 */

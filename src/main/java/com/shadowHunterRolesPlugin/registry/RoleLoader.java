@@ -22,6 +22,12 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPounceSkill
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPreyPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPullSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterStealthSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lin.mainWeapon.LinIronBloodMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lin.passive.LinKeplerPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lin.passive.LinMartyrPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lin.skill.LinBoneNailSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lin.skill.LinShadowRaidSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lin.skill.LinTripleStrikeSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.mainWeapon.MatinaMedicalShovelMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaFloatingTextComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaKuangPassive;
@@ -33,6 +39,13 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.Meiqih
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziUnconcernSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.raven.mainWeapon.RavenRevolverMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.raven.passive.RavenAirMobilityPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.raven.passive.RavenEquipmentsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.raven.passive.RavenFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.raven.skill.RavenDeathEyeSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.raven.skill.RavenSkyStrikeSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.raven.skill.RavenSomersaultSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedBleedPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedDeeplySorrowSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEquipmentsPassive;
@@ -41,6 +54,19 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.*;
+import com.shadowHunterRolesPlugin.roleComponent.custom.resist.ResistFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.resist.ResistMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.resist.ResistStrugglePassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.resist.passive.ResistEquipmentsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.resist.skill.ResistConquestSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.resist.skill.ResistRampageSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.resist.skill.ResistRoarSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaBladeMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaBladeStormSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaFlashSlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaGauntletPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaGrenadeSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.mainWeapon.SinThornFangMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.LawWordPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.SinThornPassive;
@@ -97,7 +123,11 @@ public class RoleLoader {
                 new Definition("remoteness", RoleLoader::remotenessBuilder),
                 new Definition("tek", RoleLoader::tekBuilder),
                 new Definition("hunter", RoleLoader::hunterBuilder),
-                new Definition("albert", RoleLoader::albertBuilder)
+                new Definition("albert", RoleLoader::albertBuilder),
+                new Definition("lin", RoleLoader::linBuilder),
+                new Definition("raven", RoleLoader::ravenBuilder),
+                new Definition("sayaka", RoleLoader::sayakaBuilder),
+                new Definition("resist", RoleLoader::resistBuilder)
         );
     }
 
@@ -348,8 +378,8 @@ public class RoleLoader {
                         Component.text("狂暴值越高，越是接近神，也越是接近死"),
                         Component.text("医疗设备：每次命中造成4点物理伤害，为目标回复8点生命并造成5点特殊值伤害"),
                         Component.text("诉说苦怒：每次成功治疗或成功攻击增加1点狂暴值；每秒减少1层，高于60层时每秒可能直接死亡"),
-                        Component.text("海晶灯：洒出药物治疗同阵营并削弱敌人"),
-                        Component.text("远程医疗：放出爱心无人机跟随并持续治疗"),
+                        Component.text("海晶灯：洒出药物治疗同阵营（含自己）并削弱敌人"),
+                        Component.text("远程医疗：放出爱心无人机跟随并持续治疗（含自己）"),
                         Component.text("神罚：引导3秒后展开魔法阵，对范围内敌人倾泻特殊值伤害")
                 ))
                 .faction(faction)
@@ -554,6 +584,238 @@ public class RoleLoader {
                 //悬浮文本（叶子：只依赖 VitalsComponent）
                 .addComponent(AlbertFloatingTextComponent.ID, new AlbertFloatingTextComponent.Specification())
                 .icon(Material.IRON_SWORD);
+    }
+
+    /**
+     * **林(Lin)**（阵营 HUNTER）：铁血镇压者（铁剑）+ 三重打击 / 影袭 / 透骨钉 +
+     * 开普勒装置 / 殉道。
+     *
+     * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
+     * <ul>
+     *   <li><b>主武器「铁血镇压者」占 0 号栏</b>（{@code Material.IRON_SWORD}）——
+     *       插件只把攻击事件投递给主武器组件，而"每次攻击 8 物理 + 4~10 特殊值 + 回 1 能量 +
+     *       削敌攻击力 + 紫色打击粒子 + 破碎音效"都必须落在这一把武器上；
+     *       攻速 100（原版冷却 0.2 秒）且冷却中不出伤（{@code onAttack} 开头自判）；</li>
+     *   <li>三个主动占 1 / 2 / 3 号栏：<b>三重打击</b>（CD 8 秒 / 耗能 0）· <b>影袭</b>
+     *       （CD 8 秒 / 耗能 0）· <b>透骨钉</b>（CD 25 秒 / 耗能 25）；</li>
+     *   <li>两个被动经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏）：
+     *       「开普勒装置」是能量 / 特殊值的循环引擎，「殉道」是特殊值归零时的替代惩罚；</li>
+     *   <li><b>装配序有意安排</b>：两个被动排在主武器与技能之后 ——
+     *       组件之间没有回指依赖（主武器 → 三重打击是单向的），因此顺序不影响装配校验；</li>
+     *   <li>基础属性<b>不显式声明</b> ⇒ 与其余角色一致，走框架默认（生命上限 40 / 能量 100 / SanTE 100）；</li>
+     *   <li>数值：铁血镇压者 8 物理 + 4~10 特殊值 + 1 能量 + 敌攻 −2（5 秒）；
+     *       三重打击 3 层 / 每层 3 真伤 + 3 特殊值 / 窗口 5 秒；影袭 8 格突进（穿墙 ≤2 格）+
+     *       r2 圆柱 4 真伤 + 每目标回 4 血；透骨钉 10 物理 + 8 格推动（0.3 秒），
+     *       撞墙则 2 秒无法移动 / 致盲 / 沉默，未撞则 2 秒缓慢 IV + 致盲。</li>
+     * </ul>
+     *
+     * <p>★ <b>已知的口径取舍（如实申报）</b>：需求"林不受到特殊值惩罚"与框架内建
+     * {@code DefaultSanTEZeroPunishment}（无条件装配）正面冲突，只能在角色侧用"拉回 + 逐刻压制"
+     * 缓解，无法 100% 消除归零那一瞬的眩晕 —— 详见 {@link LinMartyrPassive} 类注释。
+     */
+    private static Role.Builder linBuilder() {
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.HUNTER;
+        return withBuiltIns(new Role.Builder("lin"), faction)
+                .displayName(Component.text("林"))
+                .description(List.of(
+                        Component.text("以血为薪，以骨为钉"),
+                        Component.text("铁血镇压者：每次攻击造成8点物理与4~10点特殊值伤害，回复1点能量，并使目标攻击力下降2"),
+                        Component.text("开普勒装置：每秒回复1点能量；特殊值偏低时以4:1转换为特殊值，能量越高获得越多增益"),
+                        Component.text("殉道：特殊值归零时不受到惩罚，但永久扣除4点生命上限并流失15点血量，随后回满至50"),
+                        Component.text("三重打击：加强下三次攻击，额外造成真实伤害与特殊值伤害"),
+                        Component.text("影袭：瞬间向前跃进8格并撕裂路径上的敌人"),
+                        Component.text("透骨钉：发射一条高速白色射线，命中后推动目标，撞墙则将其钉死")
+                ))
+                .faction(faction)
+                .addComponent(LinIronBloodMainWeapon.ID, new LinIronBloodMainWeapon.Specification().setSlot(0))
+                .addComponent(LinTripleStrikeSkill.ID, new LinTripleStrikeSkill.Specification().setSlot(1))
+                .addComponent(LinShadowRaidSkill.ID, new LinShadowRaidSkill.Specification().setSlot(2))
+                .addComponent(LinBoneNailSkill.ID, new LinBoneNailSkill.Specification().setSlot(3))
+                .addComponent(LinKeplerPassive.ID, new LinKeplerPassive.Specification())
+                .addComponent(LinMartyrPassive.ID, new LinMartyrPassive.Specification())
+                .icon(Material.IRON_SWORD);
+    }
+
+    /**
+     * **绯红渡鸦 · 林晨霜(Raven)**（阵营 {@link Faction#HUNTER}）：散华『改』（弩）+
+     * 升空突袭 / 死亡之眼 / 涅斯捷罗夫筋斗 + 浮空机动 / 穿戴装备。
+     *
+     * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
+     * <ul>
+     *   <li><b>主武器「散华『改』」占 0 号栏</b>（{@code Material.CROSSBOW}）——
+     *       插件只把攻击事件投递给主武器组件，而"近战 12 物理 + 3~6 特殊值 / 击退 2 /
+     *       右键射击 / 地面丢出换弹 / 空中丢出机动 / 浮空锁定射击"都必须落在这一把武器上；
+     *       攻速 100 且 {@code onAttack} 开头自判冷却（近战 CD 0.4 秒）；</li>
+     *   <li>三个主动占 1 / 2 / 3 号栏：<b>升空突袭</b>（CD 8 秒，地面形态<b>落地才结算</b>）·
+     *       <b>死亡之眼</b>（CD 20 秒）· <b>涅斯捷罗夫筋斗</b>（CD 40 秒），
+     *       三者<b>全部 0 耗能</b>（耗能发生在武器装填那一步）；</li>
+     *   <li><b>两个被动经 {@code addComponent} 统一入口注册</b>（被动无栏位 ⇒ 不占热键栏）：
+     *       <b>浮空机动</b>（空中状态的唯一持有者：悬停 / 瞄准模式 / 机动充能 / 落地冲击 /
+     *       <b>actionbar HUD</b>）与 <b>穿戴装备</b>（三件盔甲 + 角色常驻速度 2；★ 能量低于 50 时速度消失、回到 50 立刻恢复）；</li>
+     *   <li>★ <b>注册序有语义</b>：浮空机动排在最前 —— 主武器与三个技能都在自己的
+     *       {@code start()} 里取它，且技能一的"能否起跳"与技能三的落点预测都读它的几何读数；
+     *       "读口第一次被读到之前它已经在表里"才是结构上的事实（同 {@code albert} 的口径）；</li>
+     *   <li><b>语音组件「散华语音」最后注册</b>（被动无栏位）：它按需求给了 15 组台词
+     *       （空闲 / 命中 / 三个技能 / 三种击杀 / 浮空 / 落地冲击 / 濒死 / 解控 / 换弹 /
+     *       无人可锁 / 死亡），全部**加大字号 + 加粗 + 15 种不同浮现风格**。
+     *       ★ 注册序有语义：它读「浮空机动」的"击杀是否顺手充了机动"标记，
+     *       而那个标记由浮空机动的击杀订阅写入 ⇒ 浮空机动必须排在它前面；</li>
+     *   <li>基础属性<b>不显式声明</b> ⇒ 走框架默认（生命上限 40 / 能量 100 / SanTE 100）；</li>
+     *   <li>★ <b>阵营 = {@link Faction#HUNTER}</b>（需求未指定 ⇒ 取用户当面确认值，
+     *       要改只需动这一行）。</li>
+     * </ul>
+     *
+     * <p>★ <b>已知的口径取舍（如实申报）</b>：
+     * <ol>
+     *   <li>主武器的<b>近战冷却（0.4 秒）会挡住右键 / 左键 / Q</b> —— 施放管道统一查
+     *       {@code isCoolingDown()}，彻底解耦必须改框架（禁改区）。0.4 秒已小于射击间隔
+     *       （0.7 秒）⇒ 实际不构成可感损失；</li>
+     *   <li><b>"悬停"用关重力 + 读原始输入实现</b>（水平按按键 + 朝向自算、垂直按跳键），
+     *       而不是原版飞行 —— 详见 {@link RavenAirMobilityPassive} 的口径申报二 / 三；</li>
+     *   <li><b>落地区域标记是"落点射线"的实时预览</b>（与俯冲目标出自同一个函数
+     *       {@code RavenSomersaultSkill#resolveLandingPoint}）⇒ "标记与实际不符"这一类 BUG
+     *       被结构性消除；只要技能在主手就显示，<b>不看冷却状态</b>。
+     *       ★ 落点规则 = 头部射出 25 格射线 → 可穿越方块穿过 / 不可穿越方块需（上方 2 格净空
+     *       <b>且</b> 高度 &lt; 跃起后高度 − 3）→ 全不合格则末端垂直下坠取垂足（不得高于自己 6 格）。</li>
+     * </ol>
+     */
+    private static Role.Builder ravenBuilder() {
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.HUNTER;
+        return withBuiltIns(new Role.Builder("raven"), faction)
+                .displayName(Component.text("绯红渡鸦·林晨霜"))
+                .description(List.of(
+                        Component.text("SACPD 试验部队总队长——空中机动射手"),
+                        Component.text("散华『改』：近战 12 点物理 + 3~6 点特殊值（击退 2）；右键发射全威力弹（10 点物理 + 3~6 点特殊值）"),
+                        Component.text("弹匣 6 枚；每 2 秒消耗 3 能量自动回复 1 枚；换弹每发 3 能量；耐久条显示弹药量"),
+                        Component.text("地面丢出武器：换弹（每发 0.5 秒 / 3 能量，左键可打断）"),
+                        Component.text("浮空机动：空中丢出武器快装 2 发并 0.2 秒内前冲 8 格；上限 3 层，15 秒耗 10 能量充 1 层"),
+                        Component.text("浮空机动中武器转为锁定模式：右键蓄力 0.8 秒后轮流锁定 3 名敌人；空中左键切换瞄准模式"),
+                        Component.text("0.2 秒内双击空格，或按住蹲 ⇒ 主动解除浮空开始下落（按住蹲越久落得越快）"),
+                        Component.text("升空突袭：向斜上方突进 7 格撕裂路径上的敌人（地面形态附带击退）；浮空时改为向前 4 格、向上 2 格并刷新浮空"),
+                        Component.text("死亡之眼：跃起并瞬间补满弹药，锁定 20 格内所有敌人齐射"),
+                        Component.text("涅斯捷罗夫筋斗：跃起 12 格后高速俯冲；落点由 25 格射线判定（可穿越方块穿过、不可穿越方块需"),
+                        Component.text("      上方 2 格净空且高度低于「跃起后高度 − 3」，否则末端垂直下坠取垂足）"),
+                        Component.text("      最长持续 10 秒；超时或撞墙则不再尝试突进，就地进行砸地；落地造成范围伤害、眩晕并击飞"),
+                        Component.text("落地冲击：空中位移结束且离地 ≥1.5 格时，落地对 r5 内敌人追加伤害、击退并获得速度 6")
+                ))
+                .faction(faction)
+                //被动先行：浮空机动（空中状态持有者）→ 装备（角色特质，依赖图叶子）
+                .addComponent(RavenAirMobilityPassive.ID, new RavenAirMobilityPassive.Specification())
+                .addComponent(RavenEquipmentsPassive.ID, new RavenEquipmentsPassive.Specification())
+                //主武器 + 三个主动（0 / 1 / 2 / 3 号栏）
+                .addComponent(RavenRevolverMainWeapon.ID, new RavenRevolverMainWeapon.Specification().setSlot(0))
+                .addComponent(RavenSkyStrikeSkill.ID, new RavenSkyStrikeSkill.Specification().setSlot(1))
+                .addComponent(RavenDeathEyeSkill.ID, new RavenDeathEyeSkill.Specification().setSlot(2))
+                .addComponent(RavenSomersaultSkill.ID, new RavenSomersaultSkill.Specification().setSlot(3))
+                //★ 语音组件**最后注册**：它的"击杀分三组"要靠读浮空机动的充能标记，
+                //  而那个标记由浮空机动的击杀订阅打上 —— 注册序 = 订阅序 ⇒ 必须先有浮空机动。
+                .addComponent(RavenFloatingTextComponent.ID, new RavenFloatingTextComponent.Specification())
+                .icon(Material.CROSSBOW);
+    }
+
+    /**
+     * 「芹泽沙耶香 · 瓦尔基里」（SACPD 试验部队 / 猎影人）——正面持续作战 / 失衡爆发核心 / 能量循环。
+     *
+     * <p><b>注册顺序有语义</b>：
+     * <ol>
+     *   <li>笼手被动排最前（它是"失衡爆发"的执行器与 actionbar HUD 的唯一发布者，
+     *       且是依赖图的叶子 —— 其余组件都 requires 它）；</li>
+     *   <li>主武器 = 0 号栏（影切：拔刀 / 纳刀双形态 + 充能 + 居合）；</li>
+     *   <li>技能一 = 1 号栏（影稳态榴弹发射器）；技能二 = 2 号栏（瞬影连斩）；大招 = 3 号栏（剑刃风暴）；</li>
+     *   <li>技能二 / 大招 requires 主武器（防御判定窗口 / 风暴接管），但主武器不认识它们 ⇒ 无依赖环；</li>
+     *   <li>语音组件排最后（纯叶子）：台词由其余五个组件经 {@code saySpecial / saySkill} 显式喊话。</li>
+     * </ol>
+     */
+    /**
+     * 「抗争 · Resist」（SHADOW）——被压迫者的革命领袖。
+     *
+     * <p>依赖图（无环）：
+     * <pre>
+     *   ResistStrugglePassive（叶子：战斗时间 / 八档阈值 / HUD 唯一发布者）
+     *        ↑ requires
+     *   ResistMainWeapon / 三个主动技能
+     *   语音与衣物是纯叶子（只依赖内建）。
+     * </pre>
+     */
+    private static Role.Builder resistBuilder() {
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.SHADOW;
+        return withBuiltIns(new Role.Builder("resist"), faction)
+                .displayName(Component.text("抗争 · Resist"))
+                .description(List.of(
+                        Component.text("SHADOW 的革命领袖——越战越强，以斗争时间换取八档增益"),
+                        Component.text("▓抗争▓【铁剑】：左键击退 3 + 随机白/灰/紫剑气（TNT 音效）"),
+                        Component.text("      目标周围 5 格所有敌人：10 物理 + 3~6 特殊值；每次命中战斗时间 +1 秒；CD 0.6 秒"),
+                        Component.text("不停歇的斗争：战斗时间上限 999 秒，每 5 秒一档——"),
+                        Component.text("      5s 剑气+5 / 10s 抗性 I / 15s 速度 I + 每 2 秒回 1 TE / 20s 生命回复 II"),
+                        Component.text("      25s 每 3 秒回 4 生命 / 30s 抗性 II + 每秒减 0.2 秒技能 CD / 35s 剑气再+5 / 40s 每 5 秒 8 点吸收"),
+                        Component.text("      10 秒未命中或被攻击 ⇒ 每 0.1 秒退 1 层；每 5 层一枚绕身暴击粒子 + 一档音效"),
+                        Component.text("      40 层后身后常驻白灰双层圆环，每 2 秒扩大闪动一次；actionbar 显示战斗时间"),
+                        Component.text("谷底的怒吼【哭泣的黑曜石】：末影龙怒吼，解除全部控制（STUN/定身/负面药水），拔出 4 把巨剑"),
+                        Component.text("      r6 内 5 物理 + 击退 3；每命中一人回 15 TE、战斗时间 +2 秒；冷却 10 秒"),
+                        Component.text("命运的征服【下界石英】：引导 0.5 秒（缓慢 II / 抗性 III / 禁跳 / 禁其它技能与主武器）"),
+                        Component.text("      三刀半圆（r8 / r8 / r9）：1.5 / 1.5 / 2.0 倍剑气伤害 + 击退 2 + 击落；命中触发 0.1 秒 FOV 放大"),
+                        Component.text("      每命中一人 +3 秒战斗时间；任意一刀命中 ⇒ 收尾速度 III 1 秒；冷却 15 秒"),
+                        Component.text("被欺压者的咆哮【重生锚】：引导 0.8 秒拔剑，向前突进 30 格（25 格/秒，撞墙即停）"),
+                        Component.text("      途中 r5：8 物理 + 4~6 特殊值（每人一次）；落点 r10：10 物理 + 5~10 特殊值（可叠加）"),
+                        Component.text("      每次命中 +3 秒战斗时间；冷却 40 秒"),
+                        Component.text("衣物：▓磐山▓ / ▓亡我▓ / ▓重林▓ / ▓阔地▓（各保护 I）"),
+                        Component.text("语音：三个技能点名台词 + 空闲/命中/受控/受击/濒死/击杀/死亡的反问句")
+                ))
+                .faction(faction)
+                //被动先行：战斗时间账本 / 八档阈值 / actionbar 唯一发布者（依赖图叶子）
+                .addComponent(ResistStrugglePassive.ID, new ResistStrugglePassive.Specification())
+                //主武器 + 三个主动（0 / 1 / 2 / 3 号栏）
+                .addComponent(ResistMainWeapon.ID, new ResistMainWeapon.Specification().setSlot(0))
+                .addComponent(ResistRoarSkill.ID, new ResistRoarSkill.Specification().setSlot(1))
+                .addComponent(ResistConquestSkill.ID, new ResistConquestSkill.Specification().setSlot(2))
+                .addComponent(ResistRampageSkill.ID, new ResistRampageSkill.Specification().setSlot(3))
+                //衣物（纯内建依赖）
+                .addComponent(ResistEquipmentsPassive.ID, new ResistEquipmentsPassive.Specification())
+                //★ 语音最后注册：纯叶子，台词由其余组件显式喊
+                .addComponent(ResistFloatingTextComponent.ID, new ResistFloatingTextComponent.Specification())
+                .icon(Material.IRON_SWORD);
+    }
+
+    private static Role.Builder sayakaBuilder() {
+        //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
+        Faction faction = Faction.HUNTER;
+        return withBuiltIns(new Role.Builder("sayaka"), faction)
+                .displayName(Component.text("芹泽沙耶香·瓦尔基里"))
+                .description(List.of(
+                        Component.text("SACPD 试验部队——失衡爆发核心 / 能量循环"),
+                        Component.text("影稳态失衡：攻击积累失衡（上限 30），积满触发爆发——目标周围 5 格内敌人各 8 真伤、虚弱 1、每秒 1 点 SAN 流失（20 秒）"),
+                        Component.text("          爆发期间不再积累；同时为周围 20 格内猎影人每秒回复 1 点 SAN 与 1 点能量"),
+                        Component.text("笼手：任意敌人爆发时自身立即回 60 能量 / 1 笼手充能；另有 4 枚追踪粒子飞到身边才各回 2 生命"),
+                        Component.text("          充能上限 3、每 30 秒回 1；能量上限 100；actionbar 显示 □/◇/◆ 三槽层数"),
+                        Component.text("影切【下界合金剑】：丢出切换「拔刀 / 纳刀」；右键消耗全部笼手充能为其注入充能（每次 5 能量）"),
+                        Component.text("拔刀：近战 CD 0.1 秒；8 物理 + 2 真伤 + 2 失衡；充能兑现：+5/7/9 失衡、回 4/6/8 生命、周围 4 格 2/3/4 真伤"),
+                        Component.text("纳刀：0.3 秒准备（期间缓慢 4）；纳刀后缓慢 4 并持抗性 I；0.3 秒斜杠蓄力条 + 递增音；蓄满提示「居合准备完毕」"),
+                        Component.text("      居合对路径 8 米敌人 5 失衡 + 8 物理；一次居合后 / 切走主武器都会立刻解除纳刀"),
+                        Component.text("      充能兑现（防御）：+9/18/30 失衡与 2/3/4 真伤；（主动）：+5/9/15 失衡；3 层防御成功免疫 1 秒"),
+                        Component.text("榴弹发射器：30 格/秒抛物线（带后座与落地冲击）、最远 20 格；炸开 5 物理（r5）并生成 5 秒稳态场"),
+                        Component.text("      场内敌人每秒 1 真伤 + 2 失衡并缓慢 2（重叠不积累）；自己入场获速度 4 + 再生 1"),
+                        Component.text("      存储上限 6、每 10 秒存 1、开局满；射击耗 6 能量、射速 0.8 秒"),
+                        Component.text("瞬影连斩：0.15 秒突进斩击 12 物理 + 4 失衡；命中回 6 生命、+1 笼手充能、3 秒内可再放（每段 +1 真伤 / +2 失衡）"),
+                        Component.text("      最多连续刷新 4 次（共 5 段）；每次使用后 5 秒防御判定（被击触发居合并锁定敌人方向）；冷却 20 秒"),
+                        Component.text("剑刃风暴：三段、每段间隔 1 秒；纳刀且解除移动限制、持续居合判定；瞬移至敌后（无敌人则前移 4 格）"),
+                        Component.text("      每段 r8 内 15 物理 + 10 失衡（爆发中敌人额外 5 真伤）；进入范围的敌人被红黑菱形锁定提示"),
+                        Component.text("      收尾 12 米黑暗 10 秒；抗性 2、免疫控制；冷却 60 秒"),
+                        Component.text("语音：空闲 14 句 / 命中与技能全程台词 / 击杀 9 句 / 状态台词（濒死·能量·失神·死亡）")
+                ))
+                .faction(faction)
+                //被动先行：笼手（失衡爆发执行器 / 充能持有者 / HUD 唯一发布者 —— 依赖图叶子）
+                .addComponent(SayakaGauntletPassive.ID, new SayakaGauntletPassive.Specification())
+                //主武器 + 三个主动（0 / 1 / 2 / 3 号栏）
+                .addComponent(SayakaBladeMainWeapon.ID, new SayakaBladeMainWeapon.Specification().setSlot(0))
+                .addComponent(SayakaGrenadeSkill.ID, new SayakaGrenadeSkill.Specification().setSlot(1))
+                .addComponent(SayakaFlashSlashSkill.ID, new SayakaFlashSlashSkill.Specification().setSlot(2))
+                .addComponent(SayakaBladeStormSkill.ID, new SayakaBladeStormSkill.Specification().setSlot(3))
+                //★ 语音组件最后注册：它是纯叶子（只依赖内建），台词全部由其余五个组件显式喊话
+                .addComponent(SayakaFloatingTextComponent.ID, new SayakaFloatingTextComponent.Specification())
+                .icon(Material.NETHERITE_SWORD);
     }
 
 }

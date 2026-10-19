@@ -45,16 +45,36 @@ import java.util.UUID;
  * （{@code MainWeapon} 不是技能）且**排除本被动**（被动无冷却）。
  *
  * <h2>更新节拍</h2>
- * {@code update()}（20 Hz）做四件与"命中"无关的事：
+ * {@code update()}（20 Hz）分**两段**，段落之间以"特克本人是否活着"为界（★ 这是本类最要紧的一条结构）：
  * <ol>
- *   <li><b>绘制真理特效</b>：在携带真理的敌人身上画金环，
- *       起始高度 = 敌人坐标上方 {@value #TRUTH_ORBIT_BASE_HEIGHT} 格，层数越多环越高，
- *       但**层数到达 {@value #TRUTH_ORBIT_MAX_LAYERS} 就不再叠高**；</li>
- *   <li><b>维护真理账本</b>：<b>敌人死亡 / 离线 ⇒ 其真理层数一并消失</b>
- *       （本被动是唯一周期性遍历账本的地方）；</li>
- *   <li>自己脚下一点金色底盘（表示被动已生效）；</li>
- *   <li>兜底检查护盾阈值（命中的那条路径已经查过，这里保证"站着不动能量自然涨到 90"也能触发）。</li>
+ *   <li><b>第一段（无条件，特克本人死了也照跑）：维护真理账本</b> ——
+ *       <b>敌人死亡 / 离线 ⇒ 其真理层数一并消失</b>。★ 之所以必须放在"本人存活"守卫**之前**：
+ *       一旦特克自己被打死，{@code svc().self().player()} 会返回离线/死亡态，若守卫在前，
+ *       整张账本就再也无人清扫 —— 这正是旧版"层数只是**概率**消失"的根因之一；</li>
+ *   <li><b>第二段（本人活着才有意义）：绘制特效 + 护盾兜底</b> ——
+ *       在携带真理的敌人身上画金环（起始高度 = 敌人坐标上方 {@value #TRUTH_ORBIT_BASE_HEIGHT} 格，
+ *       层数越多环越高，但**层数到达 {@value #TRUTH_ORBIT_MAX_LAYERS} 就不再叠高**）、
+ *       自己脚下一点金色底盘、兜底检查护盾阈值（命中的那条路径已经查过，
+ *       这里保证"站着不动能量自然涨到 90"也能触发）。</li>
  * </ol>
+ *
+ * <h2>「敌人死亡 ⇒ 层数消失」为什么是**双通道**（这是修"概率消失"的关键）</h2>
+ * 单靠 {@code update()} 轮询判定 {@code isDead()} / 血量 ≤ 0 是**有竞态**的：
+ * 死亡界面那一瞬 {@code isDead()} 仍可能为 {@code false}，而重生又会把血量回满 ⇒
+ * 轮询有几率**正好错过**死亡窗口（症状 = "层数有时不消"）。
+ * 因此本类同时挂一条**事件驱动**的确定性通道：
+ * <ol>
+ *   <li><b>事件通道（确定性）</b>：{@link #start()} 里经
+ *       {@link VitalsComponent#addPlayerKilledListener} 订阅"特克击杀玩家"，
+ *       回调在 {@code PlayerDeathEvent}（主线程、{@code LOWEST} 优先级，早于清角色）里**恰好触发一次**
+ *       ⇒ 特克亲手击杀的敌人，其真理**在同一刻就被清掉**，没有任何轮询窗口；</li>
+ *   <li><b>轮询通道（兜底）</b>：敌人**不是**特克亲手所杀（被别的玩家 / 怪物 / 环境击杀、
+ *       或中途离线）时，事件通道**不会**触发（本项目的击杀广播只投给"击杀者那一侧"）
+ *       ⇒ 由第一段的账本清扫兜住。
+ * </ol>
+ * 两条通道清的都是同一个账本（{@link TekTruth}），先到先清、后到的 {@code clearOne} 是幂等 no-op
+ * ⇒ 不需要去重，也不会漏。
+ *
  * <p>另有两条**事件驱动**的行为（不在这里）：命中时减技能 CD / 加能量 / 叠真理，
  * 以及"某个敌人的真理跨过 {@value TekTruth#UNLOCK_THRESHOLD} 层时提示一次"（见 {@link #onHit}）。
  */
@@ -141,8 +161,26 @@ public class TekDestinyPassive extends PassiveSkill {
     /** 粒子节流计数（每 2 刻才画一次敌人身上的真理环）。 */
     private int phaseStep;
 
+    /**
+     * **账本清扫的节流计数**（静态：账本只有一张，全局节流天然自洽）。
+     *
+     * <p>★ 刻意**不**复用 {@link #phaseStep}：那个计数在"本人不在线"时会被跳过（守卫提前返回），
+     * 而清扫必须在本人死亡/离线期间**照常推进** ⇒ 两者节拍必须各自独立，
+     * 否则特克一死，清扫的相位就跟着停摆 —— 正是旧版的病根之一。
+     */
+    private static int reapStep;
+
     /** 护盾压制标志：刚给过护盾 ⇒ 能量没被消耗完之前不重复触发（双保险）。 */
     private boolean shieldGiven;
+
+    /**
+     * **击杀订阅（事件通道）**：特克亲手击杀的敌人 ⇒ 其真理**当刻**清空。
+     *
+     * <p>由 {@link VitalsComponent#addPlayerKilledListener} 返回、必须**按引用**存下来，
+     * 否则 {@code stop()} 时无法撤销（{@code Consumer} 闭包没有身份 ⇒ 框架只能按引用移除）。
+     * 见类注释"双通道"一节。
+     */
+    private VitalsComponent.PlayerKilledListener killedEntry;
 
     public TekDestinyPassive(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
@@ -171,10 +209,36 @@ public class TekDestinyPassive extends PassiveSkill {
         energy = svc().components().get(EnergyComponent.class);
         vitals = svc().components().get(VitalsComponent.class);
         buff = svc().components().get(BuffComponent.class);
+
+        //★ 事件通道：特克亲手击杀 ⇒ 被击杀者的真理当刻清空（见类注释"双通道"）。
+        //  本名单挂在"击杀者那一侧"的组件上 ⇒ 只在特克自己击杀时被通知；
+        //  事件在 PlayerDeathEvent（LOWEST，早于清角色）里投递，每次击杀恰好一次。
+        if (vitals != null) {
+            killedEntry = vitals.addPlayerKilledListener(this, event -> {
+                if (event == null) {
+                    return;
+                }
+                Player victim = event.getVictim();
+                if (victim == null) {
+                    return;
+                }
+                //双保险：本名单只会在"我是击杀者"时被通知（另：自杀不产生事件）
+                Player self = svc().self().player();
+                if (self != null && event.getKiller() != self) {
+                    return;
+                }
+                TekTruth.clearOne(victim.getUniqueId());
+            });
+        }
     }
 
     @Override
     public void stop() {
+        //★ 撤销击杀订阅（按引用；不撤会在角色卸载后留下悬挂监听 ⇒ 泄漏 + 误清）
+        if (vitals != null && killedEntry != null) {
+            vitals.removePlayerKilledListener(killedEntry);
+        }
+        killedEntry = null;
         shieldGiven = false;
         phase = 0d;
         phaseStep = 0;
@@ -346,6 +410,11 @@ public class TekDestinyPassive extends PassiveSkill {
 
     @Override
     public void update() {
+        //★ 第一段：账本维护 —— **无条件**（哪怕特克自己死了 / 离线也要清）。
+        //  旧版把这一段写在"本人存活"守卫之后 ⇒ 特克一死，整张账本就无人清扫
+        //  （只剩 3 分钟的惰性过期兜底）⇒ 症状 = "层数只是概率消失"。见类注释"双通道"。
+        reapDeadCarriers();
+
         Player owner = svc().self().player();
         if (owner == null || !owner.isOnline()) {
             return;
@@ -353,19 +422,13 @@ public class TekDestinyPassive extends PassiveSkill {
         phase += 0.32d;
 
         //① 真理层数的观感画在**携带真理的敌人身上**（层数越多、金环越高；
-        //   但层数到 TRUTH_ORBIT_MAX_LAYERS 就不再叠高 —— 由 orbitsFor 封顶），
-        //   顺带维护账本（死亡清理）。每 TRUTH_SCAN_INTERVAL_TICKS 刻一次。
+        //   但层数到 TRUTH_ORBIT_MAX_LAYERS 就不再叠高 —— 由 orbitsFor 封顶）。
+        //   每 TRUTH_SCAN_INTERVAL_TICKS 刻一次。
         if (phaseStep % TRUTH_SCAN_INTERVAL_TICKS == 0) {
             for (TekTruth.Target entry : TekTruth.snapshot()) {
                 Player carrier = org.bukkit.Bukkit.getPlayer(entry.playerId());
-                //★ 需求："敌人死亡时，其身上'真理'层数也随之消失"。
-                //  判据用 `isDead() || 血量 ≤ 0`：死亡界面上的玩家 `isDead()` 仍可能为 false，
-                //  血量才可靠（与 RedBleedPassive#canReceiveBleed 同口径）。
-                //  离线也一并清（否则会留到惰性过期）。
-                if (carrier == null || !carrier.isOnline()
-                        || carrier.isDead() || carrier.getHealth() <= 0d) {
-                    TekTruth.clearOne(entry.playerId());
-                    continue;
+                if (carrier == null) {
+                    continue;   // 死亡清理已由 reapDeadCarriers 负责，这里只管画
                 }
                 World carrierWorld = carrier.getWorld();
                 if (carrierWorld == null) {
@@ -392,6 +455,58 @@ public class TekDestinyPassive extends PassiveSkill {
 
         //③ 阈值兜底：站着不动、能量自然涨到 90 且残血时也应当触发
         tryTriggerShield(owner);
+    }
+
+    /**
+     * **账本清扫：把"已经不在场上"的携带者的真理一并清掉**（轮询通道；无条件执行）。
+     *
+     * <p>清除判据（**四选一即清**，见 {@link #isCarrierGone}）：
+     * <ul>
+     *   <li>{@code Bukkit.getPlayer(id) == null} —— 玩家**离线**（死亡后退出 / 掉线）；</li>
+     *   <li>{@code !isOnline()} —— 离线兜底（{@code getPlayer} 仍返回对象但已断线）；</li>
+     *   <li>{@code isDead()} —— 死亡；</li>
+     *   <li>★ {@code getHealth() <= 0d} —— **血量判据不可省**：
+     *       死亡界面那一瞬 {@code isDead()} 仍可能为 {@code false}，而血量归零是可靠的
+     *       （与 {@code RedBleedPassive#canReceiveBleed} 同口径）。
+     *       四项**取或**：任一成立即清，宁可多清不可漏清。</li>
+     * </ul>
+     *
+     * <p>★ 本方法**不做**粒子、不发声音、不碰自己的状态 —— 它是幂等的（{@code clearOne} 清空条目，
+     * 重复调用返回 0），因此与事件通道并发（同刻先清后清）都安全。
+     * <p>节流到每 {@value #TRUTH_SCAN_INTERVAL_TICKS} 刻一次：死亡清理不需要 20 Hz，
+     * 但**节流计数不能被"本人不在线"跳过**（否则相位会与 {@code phaseStep} 脱节）——
+     * 故节流状态用独立的静态计数器（账本只有一张，全局节流天然自洽）。
+     */
+    private void reapDeadCarriers() {
+        if (reapStep++ % TRUTH_SCAN_INTERVAL_TICKS != 0) {
+            return;
+        }
+        for (TekTruth.Target entry : TekTruth.snapshot()) {
+            Player carrier = org.bukkit.Bukkit.getPlayer(entry.playerId());
+            if (isCarrierGone(carrier == null, carrier == null || !carrier.isOnline(),
+                    carrier == null || carrier.isDead(),
+                    carrier == null || carrier.getHealth() <= 0d)) {
+                TekTruth.clearOne(entry.playerId());
+            }
+        }
+    }
+
+    /**
+     * **携带者是否已离场**（纯函数 ⇒ 可离线单测）。
+     *
+     * <p>四个入参都是"已经算好的布尔"，把 {@code null} 检查拆在调用方
+     * （测试因此不需要构造 {@code Player}）。
+     * <p>④ 个条件**取或**：任何一条成立就清。★ 宁可多清不可漏清 ——
+     * 漏清的代价是"层数残留"（用户报的正是这个），多清的代价只是"记分被提前归零"。
+     * （"4 个条件取或" —— 离线 / 不在线 / 死亡 / 血量归零。）
+     *
+     * @param offline {@code Bukkit.getPlayer(id) == null}
+     * @param notOnline {@code !player.isOnline()}
+     * @param dead {@code player.isDead()}
+     * @param healthZero {@code player.getHealth() <= 0}
+     */
+    static boolean isCarrierGone(boolean offline, boolean notOnline, boolean dead, boolean healthZero) {
+        return offline || notOnline || dead || healthZero;
     }
 
     // ─────────── 探针读口 ───────────

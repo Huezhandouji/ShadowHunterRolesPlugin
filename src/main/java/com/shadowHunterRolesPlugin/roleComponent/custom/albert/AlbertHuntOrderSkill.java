@@ -247,7 +247,19 @@ public class AlbertHuntOrderSkill extends Skill {
         return energy != null ? energy.current() : getEnergyCost();
     }
 
-    /** 集火窗口生效期间，技能物品常亮（"还在集火"一眼可见）。 */
+    /**
+     * 技能物品的两种发光场合（都只加光效、不加真实附魔）：
+     * <ol>
+     *   <li><b>集火窗口生效期间</b> ⇒ 常亮（"还在集火"一眼可见）；</li>
+     *   <li>★ <b>冷却已转好、但能量不足</b> ⇒ 结构空位也发光
+     *       （条件三连逐字照抄行为规范 4：[{@code !isCoolingDown() && canUse() && currentEnergy() < getEnergyCost()}]）。
+     *       理由：{@link com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.IconState#COOLDOWN} 与
+     *       {@code ENERGY_LACK} <b>共用 {@code STRUCTURE_VOID} 材质</b>，
+     *       不发光就分不出"还差几秒"和"能量不够、随时能放"。</li>
+     * </ol>
+     * {@code DISABLED}（红屏障）<b>不叠</b>光效 —— 那是更高优先级的"现在使不了"，
+     * 光效会被误读成"能放"。
+     */
     @Override
     public ItemStack buildItem() {
         ItemStack stack = super.buildItem();
@@ -255,7 +267,14 @@ public class AlbertHuntOrderSkill extends Skill {
         if (meta == null) {
             return stack;
         }
+        //① 集火窗口生效：常亮
         if (drones != null && drones.focusActive()) {
+            meta.setEnchantmentGlintOverride(Boolean.TRUE);
+            stack.setItemMeta(meta);
+            return stack;
+        }
+        //② 冷却已转好却能量不足 ⇒ 结构空位也发光（与"冷却中"的暗色结构空位区分开）
+        if (!isCoolingDown() && canUse() && currentEnergy() < getEnergyCost()) {
             meta.setEnchantmentGlintOverride(Boolean.TRUE);
             stack.setItemMeta(meta);
         }

@@ -136,6 +136,44 @@ public class RoleAssemblyTest {
     }
 
     /**
+     * **绯红渡鸦(Raven) 必须真的在注册表里，且七个组件齐全**（含语音组件）。
+     *
+     * <p>与 {@link #tekIsRegisteredWithFiveComponents()} 同一理由：单独钉住以防
+     * "忘了在 {@code defaultDefinitions()} 加一行"—— 那种漏写在其它测试里没有任何表现。
+     * <p>★ 这一条对本角色尤其要紧：它的主武器与两个技能都依赖「浮空机动」被动，
+     * 而依赖声明写错（或被动漏注册）的后果是**整个角色静默消失**（只在启动日志留一条 SEVERE）。
+     */
+    @Test
+    public void ravenIsRegisteredWithSevenComponents() {
+        RoleLoader.Definition raven = null;
+        for (RoleLoader.Definition definition : loader().defaultDefinitions()) {
+            if ("raven".equals(definition.id())) {
+                raven = definition;
+                break;
+            }
+        }
+        assertTrue("defaultDefinitions() 里必须有 id = \"raven\" 的角色（漏了 ⇒ 进游戏选不到渡鸦）",
+                raven != null);
+
+        Role role = raven.builder().get().build();
+        role.verifyDependencies();
+
+        assertTrue("渡鸦缺必需依赖: " + role.missingRequiredDependencies(),
+                role.missingRequiredDependencies().isEmpty());
+        //组件表 = 内建组件 + 7 个角色组件（主武器 + 三个技能 + 三个被动，其中一个是语音）
+        java.util.Set<String> present = role.getComponents().keySet();
+        for (String id : List.of("raven_revolver_main_weapon", "raven_sky_strike_skill",
+                "raven_death_eye_skill", "raven_somersault_skill",
+                "raven_air_mobility_passive", "raven_equipments_passive",
+                "raven_floating_text")) {
+            assertTrue("渡鸦缺组件 " + id + "，实际 = " + present, present.contains(id));
+        }
+        int builtIns = builtInComponentCount();
+        assertEquals("渡鸦应有 7 个角色组件（= 内建 " + builtIns + " + 7）；实际 = " + present,
+                builtIns + 7, role.getComponents().size());
+    }
+
+    /**
      * **内建组件的条数**（从注册表推导，不写死）。
      *
      * <p>为什么用 {@code selfUpdateExample} 当基准：这个框架示例角色的组件表 =
@@ -150,6 +188,80 @@ public class RoleAssemblyTest {
             }
         }
         throw new AssertionError("注册表里必须有 selfUpdateExample（框架示例角色）");
+    }
+
+    /**
+     * **芹泽沙耶香(Sayaka) 必须真的在注册表里，且六个组件齐全**（含语音组件）。
+     *
+     * <p>与 {@link #tekIsRegisteredWithFiveComponents()} / {@link #ravenIsRegisteredWithSevenComponents()}
+     * 同一理由：单独钉住以防"忘了在 {@code defaultDefinitions()} 加一行"。
+     * <p>★ 对本角色尤其要紧：技能二与大招都依赖主武器（防御判定窗口 / 风暴接管），
+     * 主武器依赖笼手被动，全部五个作战组件又都依赖语音组件（喊话入口） ——
+     * 任一依赖声明写错（或组件漏注册）的后果是**整个角色静默消失**。
+     */
+    @Test
+    public void sayakaIsRegisteredWithSixComponents() {
+        RoleLoader.Definition sayaka = null;
+        for (RoleLoader.Definition definition : loader().defaultDefinitions()) {
+            if ("sayaka".equals(definition.id())) {
+                sayaka = definition;
+                break;
+            }
+        }
+        assertTrue("defaultDefinitions() 里必须有 id = \"sayaka\" 的角色（漏了 ⇒ 进游戏选不到芹泽沙耶香）",
+                sayaka != null);
+
+        Role role = sayaka.builder().get().build();
+        role.verifyDependencies();
+
+        assertTrue("芹泽沙耶香缺必需依赖: " + role.missingRequiredDependencies(),
+                role.missingRequiredDependencies().isEmpty());
+        //组件表 = 内建组件 + 6 个角色组件（主武器 + 三个技能 + 笼手被动 + 语音）
+        java.util.Set<String> present = role.getComponents().keySet();
+        for (String id : List.of("sayaka_gauntlet_passive", "sayaka_blade_main_weapon",
+                "sayaka_grenade_skill", "sayaka_flash_slash_skill", "sayaka_blade_storm_skill",
+                "sayaka_floating_text")) {
+            assertTrue("芹泽沙耶香缺组件 " + id + "，实际 = " + present, present.contains(id));
+        }
+        int builtIns = builtInComponentCount();
+        assertEquals("芹泽沙耶香应有 6 个角色组件（= 内建 " + builtIns + " + 6）；实际 = " + present,
+                builtIns + 6, role.getComponents().size());
+    }
+
+    /**
+     * **抗争(Resist) 必须真的在注册表里，且七个组件齐全**。
+     *
+     * <p>与 sayaka 的钉住测试同一理由：{@code defaultDefinitions()} 漏一行 ⇒ 进游戏选不到角色，
+     * 而测试若只扫"已有角色"则永远绿。抗争还多一层风险：主武器与三个技能都依赖被动，
+     * 衣物 / 语音是叶子 —— 依赖写错会**整个角色静默消失**。
+     */
+    @Test
+    public void resistIsRegisteredWithSevenComponents() {
+        RoleLoader.Definition resist = null;
+        for (RoleLoader.Definition definition : loader().defaultDefinitions()) {
+            if ("resist".equals(definition.id())) {
+                resist = definition;
+                break;
+            }
+        }
+        assertTrue("defaultDefinitions() 里必须有 id = \"resist\" 的角色（漏了 ⇒ 进游戏选不到抗争）",
+                resist != null);
+
+        Role role = resist.builder().get().build();
+        role.verifyDependencies();
+
+        assertTrue("抗争缺必需依赖: " + role.missingRequiredDependencies(),
+                role.missingRequiredDependencies().isEmpty());
+        //组件表 = 内建组件 + 7 个角色组件（被动 + 主武器 + 三技能 + 衣物 + 语音）
+        java.util.Set<String> present = role.getComponents().keySet();
+        for (String id : List.of("resist_struggle_passive", "resist_main_weapon",
+                "resist_roar_skill", "resist_conquest_skill", "resist_rampage_skill",
+                "resist_equipments_passive", "resist_floating_text")) {
+            assertTrue("抗争缺组件 " + id + "，实际 = " + present, present.contains(id));
+        }
+        int builtIns = builtInComponentCount();
+        assertEquals("抗争应有 7 个角色组件（= 内建 " + builtIns + " + 7）；实际 = " + present,
+                builtIns + 7, role.getComponents().size());
     }
 
     /**

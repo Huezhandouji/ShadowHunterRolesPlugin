@@ -231,4 +231,121 @@ public class TekTruthFeedbackTest {
         assertEquals("", net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                 .plainText().serialize(TekRainbow.animated(null, 0)));
     }
+
+    // ───────── 需求：敌人死亡 ⇒ 真理**一定**消失（不是"概率消失"）─────────
+
+    /**
+     * {@code isCarrierGone(...)} 的**穷举**：4 个布尔 = 16 种组合，逐个钉住语义。
+     *
+     * <p>这是"层数只是概率消失"的最小可测内核 —— 旧版只把死亡判据写在
+     * {@code update()} 的守卫**之后**（本人一死就整段跳过），且只依赖轮询。
+     * 本条只验"判据本身够不够宽"：任一条件成立即判离场。
+     */
+    @Test
+    public void 离场判据_任一条件成立即离场() {
+        //16 种组合：只要有一项为 true 就必须判离场（取或，不是取与）
+        for (int mask = 0; mask < 16; mask++) {
+            boolean offline = (mask & 1) != 0;
+            boolean notOnline = (mask & 2) != 0;
+            boolean dead = (mask & 4) != 0;
+            boolean healthZero = (mask & 8) != 0;
+            boolean expected = offline || notOnline || dead || healthZero;
+            assertEquals("组合 mask=" + mask
+                            + "（offline=" + offline + ", notOnline=" + notOnline
+                            + ", dead=" + dead + ", healthZero=" + healthZero + "）判据不符",
+                    expected,
+                    TekDestinyPassive.isCarrierGone(offline, notOnline, dead, healthZero));
+        }
+    }
+
+    @Test
+    public void 离场判据_全部为假才留在场上() {
+        assertFalse("四项全假 = 还在场上，不能清",
+                TekDestinyPassive.isCarrierGone(false, false, false, false));
+    }
+
+    @Test
+    public void 离场判据_离线必须清() {
+        assertTrue("离线（getPlayer 返回 null）必须清，否则留到 3 分钟惰性过期",
+                TekDestinyPassive.isCarrierGone(true, false, false, false));
+    }
+
+    @Test
+    public void 离场判据_血量归零必须清() {
+        //★ 这是修"概率消失"的关键一条：死亡界面上 isDead() 仍可能为 false，
+        //  只靠 isDead() 会漏 ⇒ 血量归零必须独立成立。
+        assertTrue("血量 ≤ 0 必须清（isDead() 不可靠）",
+                TekDestinyPassive.isCarrierGone(false, false, false, true));
+        assertTrue("哪怕 isDead() 说还活着，血量归零也要清",
+                TekDestinyPassive.isCarrierGone(false, false, false, true));
+    }
+
+    @Test
+    public void 离场判据_死亡必须清() {
+        assertTrue("isDead() 成立必须清",
+                TekDestinyPassive.isCarrierGone(false, false, true, false));
+    }
+
+    @Test
+    public void 离场判据_不在线必须清() {
+        assertTrue("isOnline() 为假必须清",
+                TekDestinyPassive.isCarrierGone(false, true, false, false));
+    }
+
+    // ───────── 账本层的"清了就是清了"（幂等）─────────
+
+    @Test
+    public void 清层幂等_重复清同一个目标不炸且第二次为0() {
+        //事件通道与轮询通道可能对同一个目标各清一次 ⇒ clearOne 必须幂等
+        java.util.UUID victim = java.util.UUID.randomUUID();
+        try {
+            TekTruth.addOne(victim);
+            TekTruth.addOne(victim);
+            TekTruth.addOne(victim);
+            assertEquals(3, TekTruth.layersOf(victim));
+
+            int first = TekTruth.clearOne(victim);
+            int second = TekTruth.clearOne(victim);
+
+            assertEquals("第一次清掉 3 层", 3, first);
+            assertEquals("第二次已经没有条目 ⇒ 0", 0, second);
+            assertEquals("清完层数归零", 0, TekTruth.layersOf(victim));
+        } finally {
+            TekTruth.resetForTest();
+        }
+    }
+
+    @Test
+    public void 清层后账本里不再有该目标() {
+        java.util.UUID victim = java.util.UUID.randomUUID();
+        try {
+            TekTruth.addOne(victim);
+            assertTrue("加过之后快照里应当能看到",
+                    TekTruth.snapshot().stream().anyMatch(t -> t.playerId().equals(victim)));
+            TekTruth.clearOne(victim);
+            assertFalse("清掉之后快照里不应再出现",
+                    TekTruth.snapshot().stream().anyMatch(t -> t.playerId().equals(victim)));
+        } finally {
+            TekTruth.resetForTest();
+        }
+    }
+
+    @Test
+    public void 两条通道先到先清_后到的是无操作() {
+        //模拟：轮询通道先清（比如血量归零的那一 tick），随后事件通道才到
+        java.util.UUID victim = java.util.UUID.randomUUID();
+        try {
+            TekTruth.addOne(victim);
+            TekTruth.addOne(victim);
+            //轮询通道
+            TekTruth.clearOne(victim);
+            //事件通道（同刻稍后）—— 必须是无操作，不能复活条目
+            TekTruth.clearOne(victim);
+            assertEquals("后到的清不能凭空造出条目", 0, TekTruth.layersOf(victim));
+            assertFalse("账本里不该留空条目",
+                    TekTruth.snapshot().stream().anyMatch(t -> t.playerId().equals(victim)));
+        } finally {
+            TekTruth.resetForTest();
+        }
+    }
 }

@@ -52,7 +52,7 @@ import java.util.List;
  *       ⇒ 平均速度**精确**等于声明值；</li>
  *   <li><b>太远（&gt; {@value #MAX_LEASH_DISTANCE} 格）或撞墙</b> ⇒ 自动折返角色身边（变召回模式）；</li>
  *   <li><b>持续 {@value #DRONE_DURATION_TICKS} 刻（15 秒）</b>；</li>
- *   <li><b>每秒</b>治愈 r = {@value #PULSE_RADIUS} 内<b>同阵营</b>角色 {@value #PULSE_HEAL} 点生命，
+ *   <li><b>每秒</b>治愈 r = {@value #PULSE_RADIUS} 内<b>同阵营</b>角色（<b>含施法者自己</b>）{@value #PULSE_HEAL} 点生命，
  *       对不同阵营角色每秒造成 <b>1 秒中毒 III</b>；</li>
  *   <li><b>CD {@value #COOLDOWN_TICKS} 刻（20 秒），技能完全结束后才开始冷却</b>；
  *       <b>能量消耗 {@value #ENERGY_COST}</b>。</li>
@@ -209,7 +209,7 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
             super(Component.text("远程医疗·红石"),
                     List.of(Component.text("释放无人机：贴着视角持续跟随"),
                             Component.text("再次按下向前飞出（红石粉=派出、白糖=召回）"),
-                            Component.text("每秒治疗 5 格内同阵营 4 点生命；对敌方每秒施加 1 秒中毒 III"),
+                            Component.text("每秒治疗 5 格内同阵营（含自己）4 点生命；对敌方每秒施加 1 秒中毒 III"),
                             Component.text("持续 15 秒")),
                     COOLDOWN_TICKS,
                     ENERGY_COST,
@@ -387,9 +387,9 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
             mode = Mode.RECALL;
         }
 
-        //⑤ 每秒脉冲：治疗同阵营 / 中毒敌方（每治疗一人记 1 点狂暴）
+        //⑤ 每秒脉冲：治疗同阵营（含自己）/ 中毒敌方（每治疗一人记 1 点狂暴）
         if (ageTicks % 20 == 0) {
-            pulse(world, current);
+            pulse(owner, world, current);
         }
 
         //⑥ 粒子（爱心本体 + 模式标记）
@@ -487,14 +487,21 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
     /**
      * **每秒脉冲**：r=5 内同阵营治疗 4 点（爱心 + 骨粉 + 升级音效），
      * 不同阵营施加 1 秒中毒 III（村民愤怒 + 紫色粒子）。
+     *
+     * <p>★ 2026-10-17：<b>施法者自己恒按友方处理</b>（{@code equals} 短路，连阵营判定都不查）——
+     * 需求「技能应该可以给自己回复生命」。无人机在紧密跟随 / 召回后贴着视角时，
+     * 自己就在 r5 内 ⇒ 每秒 4 点自我治疗。
      */
-    private void pulse(World world, Location center) {
+    private void pulse(Player owner, World world, Location center) {
         int healed = 0;
         for (Player candidate : center.getNearbyPlayers(PULSE_RADIUS)) {
             if (candidate == null || !isAlive(candidate)) {
                 continue;
             }
-            if (svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
+            boolean self = candidate.equals(owner);
+            boolean hostile = !self
+                    && svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId());
+            if (!isHealTarget(self, hostile)) {
                 //★ 必须直接对"目标"上药水。buff.applyPotionEffect(...) 是**只作用于自己**的口
                 //  （内部写死 self().player().addPotionEffect），用它给敌人上毒会把中毒加在自己身上。
                 candidate.addPotionEffect(
@@ -519,6 +526,15 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
             //纯装饰：脉冲节拍给无人机一点小反馈
             MatinaRageVfx.hearts(world, center, 1, 0.15d);
         }
+    }
+
+    /**
+     * **目标是治疗还是中毒**（纯函数 ⇒ 离线可测）：{@code true} = 治疗，{@code false} = 中毒。
+     *
+     * <p>自己恒为治疗（自伤屏障）；其余按阵营。
+     */
+    public static boolean isHealTarget(boolean self, boolean hostile) {
+        return self || !hostile;
     }
 
     /**

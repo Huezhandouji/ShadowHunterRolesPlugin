@@ -26,15 +26,20 @@ import java.util.List;
  *
  * <h2>行为（需求逐条）</h2>
  * <ul>
- *   <li><b>立刻</b>洒出药物，对 <b>r = {@value #EFFECT_RADIUS}</b> 的<b>同阵营</b>角色回复
+ *   <li><b>立刻</b>洒出药物，对 <b>r = {@value #EFFECT_RADIUS}</b> 的<b>同阵营</b>角色（<b>含施法者自己</b>）回复
  *       <b>{@value #ALLY_HEAL}</b> 生命；</li>
  *   <li>被治疗对象身上：<b>爱心粒子</b> + <b>骨粉催熟特效</b>（原版 {@code HAPPY_VILLAGER}），
  *       并播放<b>升级音效</b>（{@code ENTITY_PLAYER_LEVELUP}）；</li>
  *   <li>对<b>不同阵营</b>角色：<b>3 秒</b>缓慢 II + 凋零 II + 虚弱 II，身上冒
  *       <b>村民愤怒粒子</b>与<b>旋转上升的紫色粒子</b>，并播放<b>僵尸村民转变音效（2 倍速）</b>；</li>
- *   <li><b>每有一名角色接受治疗</b>，增加 <b>1 点狂暴值</b>；</li>
- *   <li><b>CD {@value #COOLDOWN_TICKS} 刻</b>（6 秒）、<b>能量消耗 {@value #ENERGY_COST}</b>。</li>
+ *   <li><b>每有一名角色接受治疗</b>，增加 <b>1 点狂暴值</b>（治到自己也算一名角色）；
+ *       <b>CD {@value #COOLDOWN_TICKS} 刻</b>（6 秒）、<b>能量消耗 {@value #ENERGY_COST}</b>。</li>
  * </ul>
+ *
+ * <h2>★ 2026-10-17 修复：施法者本人不在治疗名单里</h2>
+ * 旧实现的循环开头是 {@code candidate.equals(caster) ⇒ continue}，等于"洒出的药永远绕过自己"。
+ * 现在改为：<b>自己恒按同阵营处理</b>（连 {@code isHostileTo} 都不查，直接用 {@code equals} 短路），
+ * 因此不会出现"把自己当敌人上三重减益"的极端情况。
  *
  * <h2>口径申报</h2>
  * <ol>
@@ -98,9 +103,9 @@ public class MatinaSeaCrystalLampSkill extends Skill {
 
         public Specification() {
             super(Component.text("牧师本命·海晶灯"),
-                    List.of(Component.text("立刻洒出药物：8 格内同阵营角色回复 10 点生命"),
+                    List.of(Component.text("立刻洒出药物：8 格内同阵营角色（含自己）回复 10 点生命"),
                             Component.text("不同阵营角色获得 3 秒缓慢 II、凋零 II 与虚弱 II"),
-                            Component.text("每治疗一名角色增加 1 点狂暴值")),
+                            Component.text("每治疗一名角色增加 1 点狂暴值（治到自己也算）")),
                     COOLDOWN_TICKS,
                     ENERGY_COST,
                     Material.SEA_LANTERN);
@@ -155,17 +160,23 @@ public class MatinaSeaCrystalLampSkill extends Skill {
 
         int healedCount = 0;
 
-        //② 范围内逐个判定阵营：同阵营 ⇒ 治疗；不同阵营 ⇒ 三重减益
+        //② 范围内逐个判定阵营：同阵营（**含施法者自己**）⇒ 治疗；不同阵营 ⇒ 三重减益
+        //   ★ 2026-10-17 修复：旧实现第一行就 `candidate.equals(caster) → continue`，
+        //     把施法者自己排除在治疗名单外 ⇒ 「洒药」永远治不到自己。
+        //     现在自己按**同阵营**处理（且用 equals 短路，绝不走 afflict 分支）。
         for (Player candidate : center.getNearbyPlayers(EFFECT_RADIUS)) {
-            if (candidate == null || candidate.equals(caster) || !isAlive(candidate)) {
+            if (candidate == null || !isAlive(candidate)) {
                 continue;
             }
-            if (svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId())) {
-                afflict(world, candidate);
-            } else {
+            boolean self = candidate.equals(caster);
+            boolean hostile = !self
+                    && svc().components().get(FactionComponent.class).isHostileTo(candidate.getUniqueId());
+            if (isHealTarget(self, hostile)) {
                 if (heal(world, candidate)) {
                     healedCount++;
                 }
+            } else {
+                afflict(world, candidate);
             }
         }
 
@@ -176,6 +187,20 @@ public class MatinaSeaCrystalLampSkill extends Skill {
 
         //④ 冷却由本组件在施放成功处按声明值启动（组件自持冷却）
         startCooldown();
+    }
+
+    /**
+     * **目标分类**（纯函数 ⇒ 离线可测）：{@code true} = 治疗，{@code false} = 三重减益。
+     *
+     * <p>两条规则，顺序即语义：
+     * <ol>
+     *   <li><b>自己恒为治疗</b>（{@code self ⇒ true}）—— 满足「可以给自己回复生命」，
+     *       同时是一道<b>自伤屏障</b>：即使阵营判定把自家人算成敌对，也绝不会给自己上毒；</li>
+     *   <li>其余按阵营：非敌对 ⇒ 治疗；敌对 ⇒ 减益。</li>
+     * </ol>
+     */
+    public static boolean isHealTarget(boolean self, boolean hostile) {
+        return self || !hostile;
     }
 
     /**

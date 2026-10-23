@@ -1,184 +1,340 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
-import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
-import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
-import com.shadowHunterRolesPlugin.roleComponent.SkillUtil;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffType;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Particle;
-import org.bukkit.Sound;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
-import org.bukkit.util.RayTraceResult;
-import org.bukkit.util.Vector;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
+import java.util.ArrayList;
 import java.util.List;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 
+/**
+ * 三技能（大招）：**血亲呼唤**（红石块）。
+ *
+ * <h2>引导 1 秒</h2>
+ * 缓慢 IV + 抗性 V；四根红石柱从地面旋转升起、汇入自身后向外爆开。
+ *
+ * <h2>引导结束</h2>
+ * <ul>
+ *   <li>r=12 内每个敌人结算 <b>5 层流血</b> + 黑暗 1 秒；</li>
+ *   <li>红：最大生命 <b>+10</b>、回复 <b>10</b>、速度 IV、抗性 II；</li>
+ *   <li>主武器与一技能的全部伤害 <b>+3</b>（物理与特殊值都加）；</li>
+ *   <li>期间受到的控制（失明 / 黑暗 / 缓慢 ≥4 / 定身 / 沉默）统一改为**缓慢 III（同时长）**；</li>
+ *   <li>免疫中毒 / 凋零；</li>
+ *   <li>血量进入最后 20% ⇒ 获得 3 秒抗性 V，抗性结束即结束大招；</li>
+ *   <li>每秒扣 2 SanTE，每 8 秒 +2（上限 6）；12 格内没有敌人时不扣；SanTE 归零 ⇒ 结束并接受归零惩罚。</li>
+ * </ul>
+ * CD 20 秒，**大招结束后**才进入冷却。
+ */
 public class RedSolitaryArroganceSkill extends Skill {
 
-    /** 本组件的登记 id（id 由组件自己声明）。 */
-    public static final String ID = "red_solitaryArrogance_skill";
+    /** 本组件的登记 id。 */
+    public static final String ID = "red_solitary_arrogance_skill";
 
-    private TaskComponent timer;
-    private BuffComponent buff;
+    public static final int CHANNEL_TICKS = 20;
+    public static final double RADIUS = 12d;
+    public static final int SETTLE_STACKS = 5;
+    public static final int DARKNESS_TICKS = 20;
+    public static final double HEALTH_BONUS = 10d;
+    public static final double HEAL_ON_START = 10d;
+    public static final double DAMAGE_BONUS = 3d;
+    public static final int COOLDOWN_AFTER_END = 400;
+    public static final int FINISH_RESIST_TICKS = 60;
 
-    //任务句柄：stop 时取消（句柄由平台 Scheduler 提供）
-    private ScheduledHandle attackTask;
+    /** 「没有敌人就不扣 SanTE」的判定半径（2026-10-21 需求：由 12 扩到 20）。 */
+    public static final double NO_DRAIN_RADIUS = 20d;
 
-    //生命能力向**组件本身**取用，引用缓存在 start()。
-    //服务集的白名单端口是对同一组件同一方法的**纯转发**，故两者逐字等价。
+    private static final NamespacedKey ULT_HEALTH_KEY = KeyFactory.Registry.of("red_ult_health");
+
     private VitalsComponent vitals;
+    private BuffComponent buff;
+    private FactionComponent faction;
+    private SanTEComponent sante;
+    private RedBleedPassive bleed;
+    private RedDeeplySorrowSkill thrust;
+    private RedFloatingTextComponent voice;
 
-    /**
-     * 红的进化被动（档位读口的来源）；{@code start()} 里一次取好。
-     * <p>取不到时退化为基线 4 次（装配期已声明 {@code requires(RedEvolutionPassive.class)} ⇒ 生产上不会发生）。
-     */
-    private RedEvolutionPassive evolution;
-
+    private boolean channeling;
+    private boolean active;
+    private int channelTicks;
+    private int ultTicks;
+    private int secondTimer;
+    private boolean finishing;
+    private int finishTicks;
+    private int phase;
 
     public RedSolitaryArroganceSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
-    /**
-     * 本组件的描述符：名字 / 描述 / 冷却 / 耗能 / 图标由这里声明，
-     * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
-     * <p>进化被动进依赖表：档位读口在 {@code start()} 实取（见 {@link #onCast}）。
-     */
+    /** 描述符。 */
     public static final class Specification extends Skill.Specification<RedSolitaryArroganceSkill> {
 
-        public Specification(){
-            super(Component.text("孤妄自赏"),
-                    List.of(Component.text("连续捅击四次。每次造成伤害，如果命中敌人，回复生命")),
-                    200, 0, Material.FERMENTED_SPIDER_EYE);
-            requires(TaskComponent.class).requires(BuffComponent.class).requires(VitalsComponent.class)
-                    .requires(RedEvolutionPassive.class)
-                    //每次捅击前逐个受害者判敌 ⇒ 读阵营组件；缺它则本技能不索敌，装配期就拦住
-                    .requires(FactionComponent.class);
+        public Specification() {
+            super(
+                    Component.text("血亲呼唤"),
+                    List.of(
+                            Component.text("引导 1 秒（缓慢 IV + 抗性 V）"),
+                            Component.text("r=12：结算 5 层流血 + 黑暗 1 秒"),
+                            Component.text("最大生命 +10、回 10、速度 IV、抗性 II、伤害 +3"),
+                            Component.text("控制转为缓慢 III；免疫中毒 / 凋零"),
+                            Component.text("每秒扣 SanTE，归零或残血抗性结束即收招")
+                    ),
+                    COOLDOWN_AFTER_END,
+                    0,
+                    Material.REDSTONE_BLOCK
+            );
+            requires(VitalsComponent.class).requires(BuffComponent.class).requires(FactionComponent.class)
+                    .requires(SanTEComponent.class).requires(RedBleedPassive.class)
+                    .requires(RedDeeplySorrowSkill.class);
+            requiresOptional(RedFloatingTextComponent.class);
         }
 
         @Override
-        public RedSolitaryArroganceSkill create(String id, ComponentServicesPort services){
+        public RedSolitaryArroganceSkill create(String id, ComponentServicesPort services) {
             return new RedSolitaryArroganceSkill(id, services, this);
         }
     }
 
-    /**
-     * 右击施放：`canCastSkill` 不满足时直接返回（不启冷却）；
-     * 循环任务由 `timer.addScheduleRepeating(this, 1L, 6, …)` 创建（登记进本组件资源表，角色清除时框架兜底取消）；
-     * 射线几何用静态 `SkillUtil.getPlayersInSightLine`（无状态工具，不进端口白名单）；
-     * 伤害 8、回血 4；冷却由本组件在施放成功处按声明值 200 启动。
-     * <p>`isValid()` 守卫不需要：任务登记进资源表后，`clear()` 的 `cancelAllAndClear()` 必取消它，
-     * 延迟体在 `valid=false` 之后不可达。
-     * <p><b>攻击次数</b>在施放那一刻定档（基线 4；2 级 鲜血横飞 ⇒ 6），整轮插击不因中途升级而变
-     * （否则同一轮里"捅到一半改了次数"是不可解释的时序）。每轮插击的伤害与回血数值一字未改。
-     */
-    @Override
-    public void onCast(CastSignal signal){
-        Player caster = svc().self().player();
-        if(!buff.canCastSkill()) return;
-        //攻击次数：基线 4，2 级（鲜血横飞）起 6 —— 用 final 局部量，让匿名任务体读到的是定档值
-        final int totalAttacks = evolution != null
-                ? evolution.solitaryArroganceAttackCount()
-                : RedEvolutionPassive.BASE_SOLITARY_ARROGANCE_ATTACKS;
-        attackTask = timer.addScheduleRepeating(this, 1L, 6,
-                new Runnable() {
-                    private Player cas = caster;
-                    private int cnt = 0;
-
-                    @Override
-                    public void run() {
-                        if(cas == null || !cas.isOnline() || cas.isDead()) {
-                            attackTask.cancel();
-                            return;
-                        }
-
-                        //执行 totalAttacks 次（基线 4）
-                        cnt++;
-                        if(cnt > totalAttacks){
-                            attackTask.cancel();
-                            return;
-                        }
-
-                        //射线检测打中的敌人
-                        List<Player> playersInSightLine = SkillUtil.getPlayersInSightLine(cas, 5, 0.4);
-                        boolean shouldRecoverHealth = false;
-                        for(Player victim : playersInSightLine){
-                            if(victim == null || victim.isDead() || !victim.isOnline()) continue;
-                            if(!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) continue;
-
-                            shouldRecoverHealth = true;
-                            vitals.physicalDamage(victim, cas, 8);
-                        }
-
-                        if(shouldRecoverHealth){
-                            vitals.heal(4);
-                        }
-
-                        //特效
-                        Location location = cas.getEyeLocation().clone();
-                        Vector eachForwardDistance = location.getDirection().divide(new Vector(2, 2, 2));
-                        location.subtract(new Vector(0, 0.3, 0));
-                        for(int i = 0; i < 10; i++){
-                            location.add(eachForwardDistance);
-                            //ELECTRIC_SPARK 的数据类型是 Void，不能传 data 参数
-                            location.getWorld().spawnParticle(Particle.END_ROD, location, 3, 0.1, 0.1, 0.1, 0);
-                        }
-                        location.getWorld().playSound(location, Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 1, 1);
-                    }
-                }
-        );
-        startCooldown();   //组件自启冷却（框架不再代启动）
-    }
-
-    /**
-     * **开始生效**：把生命组件一次查好缓存进字段。
-     * <p>时机 = {@code start()}，不在 {@code awake()}：禁止在 {@code awake()} 里取用其他组件
-     * （awake 只做构造期自检 / 只读自身）；`start()` 时容器已冻结，容器查找合法。
-     * <p>缓存理由：本技能每 6 tick 结算一次、回血点在循环体内，重复查容器是纯浪费；
-     * 端口引用本身也是构造期就持有的引用，因此缓存与既有口径同族（该端口是纯转发 ⇒ 逐字等价）。
-     * <p>进化被动同为缓存：档位读口在施放那一刻取一次（见 {@link #onCast}）。
-     */
     @Override
     public void start() {
-        timer = svc().components().get(TaskComponent.class);
-        buff = svc().components().get(BuffComponent.class);
-        vitals = svc().components().get(VitalsComponent.class);
-        evolution = getComponent(RedEvolutionPassive.class);
+        vitals = getComponent(VitalsComponent.class);
+        buff = getComponent(BuffComponent.class);
+        faction = getComponent(FactionComponent.class);
+        sante = getComponent(SanTEComponent.class);
+        bleed = getComponent(RedBleedPassive.class);
+        thrust = getComponent(RedDeeplySorrowSkill.class);
+        voice = getComponent(RedFloatingTextComponent.class);
+        bleed.registerCooldownReducer(this::refundCooldown);
     }
 
-    /**
-     * 停止钩子：容器在 `cancelAllAndClear()` 之前广播，因此本方法能先取消循环任务；
-     * 框架另有兜底取消，重复取消幂等。
-     */
     @Override
     public void stop() {
-        if(attackTask != null){
-            attackTask.cancel();
-            attackTask = null;
+        if (active) {
+            endUltimate(false);
+        }
+        channeling = false;
+        active = false;
+        finishing = false;
+        Player player = svc().self().player();
+        if (player != null) {
+            vitals.removeHealthModifier(ULT_HEALTH_KEY);
         }
     }
 
-    /**
-     * **闸门放行？**（基类不取 buff，由本组件用自己的字段判）。
-     */
     @Override
-    protected boolean canUse(){
-        return buff.canCastSkill();
+    public void onCast(CastSignal signal) {
+        Player caster = svc().self().player();
+        if (caster == null || channeling || active || !buff.canCastSkill() || isCoolingDown()
+                || (thrust != null && thrust.isCasting())) {
+            return;
+        }
+        channeling = true;
+        channelTicks = 0;
+        phase = 0;
+        buff.applyPotionEffect(PotionEffectType.SLOWNESS, CHANNEL_TICKS + 6, 3, true, false);
+        buff.applyPotionEffect(PotionEffectType.RESISTANCE, CHANNEL_TICKS + 6, 4, true, false);
+        RedFx.ultChannel(caster);
     }
 
-    /**
-     * **当前能量**：本组件不参与能量维度（声明耗能 0），因此返回声明值；
-     * 能量组件的值被 clamp 到 `[0, max]`，故 `current() < 0` 恒假。
-     */
     @Override
-    protected int currentEnergy(){
+    public void update() {
+        Player player = svc().self().player();
+        if (player == null || !player.isOnline() || player.isDead()) {
+            return;
+        }
+        if (channeling) {
+            channelTicks++;
+            RedFx.ultColumns(player.getLocation(), channelTicks);
+            if (channelTicks >= CHANNEL_TICKS) {
+                release(player);
+            }
+            return;
+        }
+        if (active) {
+            tickActive(player);
+        }
+    }
+
+    private void release(Player caster) {
+        channeling = false;
+        active = true;
+        ultTicks = 0;
+        secondTimer = 0;
+        finishing = false;
+        finishTicks = 0;
+
+        Location center = caster.getLocation();
+        List<Player> victims = new ArrayList<>();
+        for (Player victim : center.getNearbyPlayers(RADIUS)) {
+            if (victim == null || victim.equals(caster) || !faction.isHostileTo(victim.getUniqueId())) {
+                continue;
+            }
+            bleed.requestResolve(victim.getUniqueId(), SETTLE_STACKS);
+            buff.applyPotionEffectTo(victim, PotionEffectType.DARKNESS, DARKNESS_TICKS, 0, true, false);
+            victims.add(victim);
+        }
+
+        vitals.applyHealthModifier(ULT_HEALTH_KEY, VitalsComponent.BASE_MAX_HEALTH + HEALTH_BONUS);
+        vitals.heal(caster, HEAL_ON_START);
+        buff.applyPotionEffect(PotionEffectType.SPEED, 60, 3, true, false);
+        buff.applyPotionEffect(PotionEffectType.RESISTANCE, 60, 1, true, false);
+
+        RedFx.ultConverge(center, RADIUS);
+        RedFx.ultRelease(caster);
+        if (voice != null) {
+            voice.sayMoment(caster, RedFloatingTextComponent.MOMENT_ULT_START);
+        }
+        if (!victims.isEmpty()) {
+            bleed.onPlayerHit(caster);
+        }
+    }
+
+    private void tickActive(Player player) {
+        ultTicks++;
+        phase++;
+
+        // 控制统一转缓慢 III（同时长）
+        convertControl(player, PotionEffectType.BLINDNESS);
+        convertControl(player, PotionEffectType.DARKNESS);
+        convertSlow(player);
+        convertBuff(player, BuffType.STUN);
+        convertBuff(player, BuffType.SILENCE);
+
+        // 免疫中毒 / 凋零
+        player.removePotionEffect(PotionEffectType.POISON);
+        player.removePotionEffect(PotionEffectType.WITHER);
+
+        if (phase % 20 == 0) {
+            buff.applyPotionEffect(PotionEffectType.SPEED, 40, 3, true, false);
+            buff.applyPotionEffect(PotionEffectType.RESISTANCE, 40, 1, true, false);
+        }
+        if (phase % 5 == 0) {
+            RedFx.ultAura(player, phase);
+        }
+
+        // 残血保护：进入最后 20% ⇒ 抗性 V 3 秒，结束后收招
+        double max = player.getMaxHealth();
+        if (!finishing && player.getHealth() <= max * 0.2d) {
+            finishing = true;
+            finishTicks = FINISH_RESIST_TICKS;
+            buff.applyPotionEffect(PotionEffectType.RESISTANCE, FINISH_RESIST_TICKS, 4, true, false);
+        }
+        if (finishing && --finishTicks <= 0) {
+            endUltimate(true);
+            return;
+        }
+
+        // SanTE 消耗：12 格内有敌人才扣
+        if (++secondTimer >= 20) {
+            secondTimer = 0;
+            if (hasEnemyNear(player, NO_DRAIN_RADIUS)) {
+                int step = Math.min(6, 2 + 2 * (ultTicks / 160));
+                sante.decrease(step);
+                if (sante.current() <= 0) {
+                    // 归零：结束并交给内建归零惩罚
+                    endUltimate(true);
+                }
+            }
+        }
+    }
+
+    /** 失明 / 黑暗 ⇒ 同时长的缓慢 III。 */
+    private void convertControl(Player player, PotionEffectType type) {
+        PotionEffect effect = player.getPotionEffect(type);
+        if (effect == null) {
+            return;
+        }
+        player.removePotionEffect(type);
+        buff.applyPotionEffect(PotionEffectType.SLOWNESS, effect.getDuration(), 2, true, false);
+    }
+
+    /** 缓慢 ≥ IV ⇒ 缓慢 III（同时长）。 */
+    private void convertSlow(Player player) {
+        PotionEffect effect = player.getPotionEffect(PotionEffectType.SLOWNESS);
+        if (effect == null || effect.getAmplifier() < 3) {
+            return;
+        }
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
+        buff.applyPotionEffect(PotionEffectType.SLOWNESS, effect.getDuration(), 2, true, false);
+    }
+
+    /** 插件侧 STUN / SILENCE ⇒ 同时长的缓慢 III。 */
+    private void convertBuff(Player player, BuffType type) {
+        if (!buff.has(type)) {
+            return;
+        }
+        long remaining = buff.remainingTicks(type);
+        buff.remove(type);
+        buff.applyPotionEffect(PotionEffectType.SLOWNESS, (int) Math.max(1, remaining), 2, true, false);
+    }
+
+    private boolean hasEnemyNear(Player player, double radius) {
+        for (Player candidate : player.getLocation().getNearbyPlayers(radius)) {
+            if (candidate != null && !candidate.equals(player) && faction.isHostileTo(candidate.getUniqueId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 收招：摘掉上限加成与控制增益，进入 20 秒冷却。 */
+    private void endUltimate(boolean startCooldown) {
+        if (!active && !channeling) {
+            return;
+        }
+        active = false;
+        channeling = false;
+        finishing = false;
+        Player player = svc().self().player();
+        if (player != null) {
+            vitals.removeHealthModifier(ULT_HEALTH_KEY);
+            player.removePotionEffect(PotionEffectType.SPEED);
+            player.removePotionEffect(PotionEffectType.RESISTANCE);
+        }
+        if (startCooldown) {
+            startCooldown(COOLDOWN_AFTER_END);
+        }
+        if (player != null && voice != null) {
+            voice.sayMoment(player, RedFloatingTextComponent.MOMENT_ULT_END);
+        }
+    }
+
+    /** 主武器 / 一技能的额外伤害（大招期间 +3）。 */
+    public double damageBonus() {
+        return active ? DAMAGE_BONUS : 0d;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    private void refundCooldown() {
+        int remaining = remainingCooldownTicks();
+        if (remaining > 0) {
+            startCooldown(Math.max(0, remaining - RedBleedPassive.FRUGAL_CD_REFUND));
+        }
+    }
+
+    @Override
+    protected boolean canUse() {
+        return buff != null && buff.canCastSkill() && !channeling && !active
+                && (thrust == null || !thrust.isCasting());
+    }
+
+    @Override
+    protected int currentEnergy() {
         return getEnergyCost();
     }
 }

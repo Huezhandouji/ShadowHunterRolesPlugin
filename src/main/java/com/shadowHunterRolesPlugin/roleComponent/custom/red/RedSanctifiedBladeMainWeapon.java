@@ -1,119 +1,196 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.red;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
-import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
-import net.kyori.adventure.text.Component;
-import org.bukkit.Color;
-import org.bukkit.Material;
-import org.bukkit.Particle;
-import org.bukkit.Sound;
-import org.bukkit.entity.Player;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
+import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
-import java.util.List;
+import net.kyori.adventure.text.Component;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * 「红」主武器：**纯白之刺**（铁剑）。
+ *
+ * <ul>
+ *   <li>左键 = **前方锥形穿刺**：触及范围内所有敌人，各 8 物理 + 3~6 特殊值，并挂 5 层流血；</li>
+ *   <li>CD **0.3 秒**（6 刻）；</li>
+ *   <li>声音：起手僵尸破门；命中玻璃碎裂 + 敲铁；</li>
+ *   <li>特效：面前画圆 → 四分之一处四根短柱 → 圆心竖起主穿刺柱，柱身缠绕螺旋；命中喷血。</li>
+ * </ul>
+ *
+ * <p>武器在「贯通新生」施放期间被禁用（读该技能的 {@code isCasting()}）；大招期间 +3 伤害。
+ */
 public class RedSanctifiedBladeMainWeapon extends MainWeapon {
 
-    /** 本组件的登记 id（id 由组件自己声明）。 */
-    public static final String ID = "red_mainWeapon_sanctifiedBlade";
+    /** 本组件的登记 id。 */
+    public static final String ID = "red_sanctified_blade_main_weapon";
+
+    public static final double PHYSICAL = 8d;
+    public static final int SANTE_MIN = 3;
+    public static final int SANTE_MAX = 6;
+    public static final int BLEED_STACKS = 5;
+    public static final double RANGE = 4.2d;
+    public static final double CONE_DEGREES = 40d;
+    public static final int COOLDOWN_TICKS = 6;
+    public static final double ULT_DAMAGE_BONUS = 3d;
+
+    /** 攻速修饰符键（+100 ⇒ 无攻击冷却）。 */
+    private static final NamespacedKey ATTACK_SPEED_KEY = KeyFactory.Registry.of("red_attack_speed");
 
     private VitalsComponent vitals;
- //**可用性判定下放给子类**（基类不持 buff / energy、不查容器）⇒
-    //  本组件自己持 buff 字段（在 start() 内一次查好）。
     private BuffComponent buff;
-
-    //每次普攻施加的流血层数
-    private static final int BLEED_STACKS_PER_HIT = 15;
+    private FactionComponent faction;
+    private SanTEComponent sante;
+    private RedBleedPassive bleed;
+    private RedDeeplySorrowSkill thrust;
+    private RedSolitaryArroganceSkill ult;
+    private RedFloatingTextComponent voice;
 
     public RedSanctifiedBladeMainWeapon(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
-    /**
-     * 本组件的描述符：名字 / 描述 / 图标 / 冷却由这里声明（主武器的能量消耗由类型恒为 0），
-     * 栏位由装配点 {@code setSlot} 指定。
-     */
+    /** 描述符。 */
     public static final class Specification extends MainWeapon.Specification<RedSanctifiedBladeMainWeapon> {
 
-        public Specification(){
+        public Specification() {
             super(
-                    Component.text("至洁之刃"),
+                    Component.text("纯白之刺"),
                     List.of(
-                            Component.text("攻击施加流血效果"),
-                            Component.text("=============================="),
-                            Component.text("进化:"),
-                            Component.text("1-红月落下,每个负有流血的敌人将会持续扣除特殊值, 1秒1点"),
-                            Component.text("2-鲜血横飞,[孤妄自赏]多出2次攻击"),
-                            Component.text("3-负罪凄凉-永久获得生命上限加10，并回满生命"),
-                            Component.text("4-故不可知-[黯然销魂]的TE扣除速度减慢, 1秒4点"),
-                            Component.text("5-猩红已至-流血每秒结算3层"),
-                            Component.text("=============================="),
-                            Component.text("被动:"),
-                            Component.text("流血: 攻击给敌人叠加流血层数(上限15层),每秒结算1层、每层造成2点真实伤害,并回复自身4点TE值"),
-                            Component.text("穿戴装备: 进入角色时发放一整套不可破坏的护甲(铁头盔/铁胸甲/皮革护腿/皮革靴)")
+                            Component.text("左键：前方锥形穿刺（8 物理 + 3~6 特殊值）"),
+                            Component.text("每次命中挂 5 层流血"),
+                            Component.text("CD 0.3 秒"),
+                            Component.text("贯通新生施放期间禁用")
                     ),
                     Material.IRON_SWORD,
-                    40
+                    COOLDOWN_TICKS
             );
-            requires(VitalsComponent.class).requires(BuffComponent.class);
+            requires(VitalsComponent.class).requires(BuffComponent.class).requires(FactionComponent.class)
+                    .requires(SanTEComponent.class).requires(RedBleedPassive.class);
+            requiresOptional(RedDeeplySorrowSkill.class);
+            requiresOptional(RedSolitaryArroganceSkill.class);
+            requiresOptional(RedFloatingTextComponent.class);
         }
 
         @Override
-        public RedSanctifiedBladeMainWeapon create(String id, ComponentServicesPort services){
+        public RedSanctifiedBladeMainWeapon create(String id, ComponentServicesPort services) {
             return new RedSanctifiedBladeMainWeapon(id, services, this);
         }
     }
 
-    /**
-     * 攻击路径（`MainWeaponListener.onAttackPlayer` 接到 `instance.handleAttack`）：
-     * 流血层数经 {@code RedBleedPassive.applyStacks(...)} 写入同一份私有账本；
-     * 拿不到账本时只跳过流血、继续结算普攻伤害；伤害 `8` / 击退 `1`；
-     * 冷却由本组件在施放成功处按声明值启动。
-     */
+    @Override
+    public void start() {
+        vitals = getComponent(VitalsComponent.class);
+        buff = getComponent(BuffComponent.class);
+        faction = getComponent(FactionComponent.class);
+        sante = getComponent(SanTEComponent.class);
+        bleed = getComponent(RedBleedPassive.class);
+        thrust = getComponent(RedDeeplySorrowSkill.class);
+        ult = getComponent(RedSolitaryArroganceSkill.class);
+        voice = getComponent(RedFloatingTextComponent.class);
+    }
+
+    @Override
+    public ItemStack buildItem() {
+        ItemStack stack = super.buildItem();
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.setUnbreakable(true);
+            // 需求 4：主武器常驻附魔光效
+            meta.setEnchantmentGlintOverride(true);
+            // 需求 1：攻击速度压到 100（先移除再添加，避免重绘叠加）
+            meta.removeAttributeModifier(Attribute.ATTACK_SPEED);
+            meta.addAttributeModifier(Attribute.ATTACK_SPEED, new AttributeModifier(
+                    ATTACK_SPEED_KEY, 100d, AttributeModifier.Operation.ADD_NUMBER));
+            stack.setItemMeta(meta);
+        }
+        return stack;
+    }
+
     @Override
     public void onAttack(AttackSignal signal) {
-        Player attacker = svc().self().player();
         Player victim = signal.victim();
+        if (victim == null) {
+            return;
+        }
+        if (!faction.isHostileTo(victim.getUniqueId())) {
+            return;
+        }
+        pierce();
+    }
 
-        if (victim != null) {
-            //流血记录由 RedBleedPassive 私有持有：拿不到时只跳过流血结算，普攻伤害依然生效(不能直接return)
-            //已经死亡(含死亡界面)的玩家不再施加流血，避免尸体继续吃流血结算
-            RedBleedPassive bleed = getComponent(RedBleedPassive.class);
-            if (bleed != null && RedBleedPassive.canReceiveBleed(victim)) {
-                bleed.applyStacks(victim.getUniqueId(), BLEED_STACKS_PER_HIT);
+    @Override
+    public void onCast(CastSignal signal) {
+        if (signal != null && signal.trigger() == CastTrigger.LEFT_CLICK) {
+            pierce();
+        }
+    }
+
+    /** 前方锥形穿刺。 */
+    private void pierce() {
+        Player attacker = svc().self().player();
+        if (attacker == null || isCoolingDown() || !canUse()) {
+            return;
+        }
+
+        Vector look = attacker.getEyeLocation().getDirection().setY(0d);
+        if (look.lengthSquared() < 1e-6) {
+            look = attacker.getLocation().getDirection().setY(0d);
+        }
+        look.normalize();
+
+        List<Player> victims = new ArrayList<>();
+        for (Player candidate : attacker.getLocation().getNearbyPlayers(RANGE)) {
+            if (candidate == null || candidate.equals(attacker) || !faction.isHostileTo(candidate.getUniqueId())) {
+                continue;
             }
-
-            vitals.physicalDamage(victim, attacker, 8, 1);
+            Vector delta = candidate.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0d);
+            if (delta.lengthSquared() < 1e-6) {
+                continue;
+            }
+            double angle = Math.toDegrees(Math.acos(Math.clamp(look.dot(delta.normalize()), -1d, 1d)));
+            if (angle <= CONE_DEGREES) {
+                victims.add(candidate);
+            }
         }
 
-        attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ELDER_GUARDIAN_CURSE, 1, 1.8f);
-
-        //INSTANT_EFFECT 的数据类型是 Particle.Spell，必须传数据，否则 Paper 会抛 "missing required data"
-        if (victim != null) {
-            victim.spawnParticle(Particle.INSTANT_EFFECT, victim.getLocation().clone().add(0, 1, 0), 20, 1, 1, 1, new Particle.Spell(Color.RED, 1f));
+        double bonus = ult != null && ult.isActive() ? ULT_DAMAGE_BONUS : 0d;
+        for (Player victim : victims) {
+            vitals.physicalDamage(victim, attacker, PHYSICAL + bonus);
+            int special = SANTE_MIN + ThreadLocalRandom.current().nextInt(SANTE_MAX - SANTE_MIN + 1);
+            sante.decreaseSanTE(victim.getUniqueId(), (int) Math.round(special + bonus));
+            bleed.applyStacks(victim.getUniqueId(), BLEED_STACKS);
+            RedFx.bloodSplat(victim, 12);
         }
 
-        //声明值是冷却的唯一真值来源
-        startCooldown();   //组件自启冷却（框架不再代启动）
+        RedFx.pierceCast(attacker, RANGE, false);
+        if (!victims.isEmpty()) {
+            RedFx.pierceHit(attacker);
+            bleed.onPlayerHit(attacker);
+            if (voice != null) {
+                voice.sayMoment(attacker, RedFloatingTextComponent.MOMENT_HIT);
+            }
+        }
+
+        startCooldown();
     }
 
-    /**
-     * **开始生效**：把协作组件一次查好缓存进字段（与本族模型一致）。
-     * <p>取组件只能在本钩子里做，不得放 `awake()`；注册表装配后冻结，因此与按需解析恒等。
-     */
     @Override
-    public void start(){
-        vitals = svc().components().get(VitalsComponent.class);
-        buff = svc().components().get(BuffComponent.class);
+    protected boolean canUse() {
+        return buff != null && buff.canUseMainWeapon()
+                && (thrust == null || !thrust.isCasting());
     }
-
-    /**
-     * **闸门放行？**（基类不取 buff，由本组件用自己的字段判）。
-     */
-    @Override
-    protected boolean canUse(){
-        return buff.canUseMainWeapon() || isCoolingDown();
-    }
-
 }

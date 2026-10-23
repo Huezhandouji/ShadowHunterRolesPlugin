@@ -1,168 +1,268 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill;
-import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
-import com.shadowHunterRolesPlugin.core.*;
-import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
-import com.shadowHunterRolesPlugin.roleComponent.DamageKind;
+import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziChargeComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziMadness;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziSanDrainComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziSound;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziVfx;
 import net.kyori.adventure.text.Component;
-import org.bukkit.*;
+import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
-
+/**
+ * 二技能：**血腥连斩**（模型：金锭）。
+ *
+ * <h2>需求</h2>
+ * <ul>
+ *   <li>向前突进 <b>10 格 / 0.2 秒</b>（4 刻，每刻 2.5 格）；</li>
+ *   <li>沿途 <b>r=2</b> 的敌人：<b>12 物理 + 4~6 特殊值</b>；</li>
+ *   <li>尝试消耗充能（**最多 1 层**）：沿途敌人各追加 <b>3 真实伤害</b>，自身回复 <b>3 生命</b>
+ *       （SanTE ≤ 50 时 +2）；</li>
+ *   <li>成功命中任一敌人 ⇒ **CD -6 秒**；</li>
+ *   <li>CD 8 秒、耗能 5。</li>
+ * </ul>
+ *
+ * <h2>★★ 口径申报：逐刻位移用 teleport，不用 setVelocity</h2>
+ * 需求是"0.2 秒走完 10 格"的**定量**位移；速度法受摩擦/击退/地形影响，落点不可控。
+ * 这里逐刻 {@code teleport} 到 {@code 起点 + dir × 2.5 × i}，撞墙即提前收束，
+ * 并把 {@code fallDistance} 清零（工程口径：接管位置必须每刻清坠落距离）。
+ */
 public class MeiqiheziBloodySlashSkill extends Skill {
 
-    /** 本组件的登记 id（id 由组件自己声明）。 */
+    /** 本组件的登记 id。 */
     public static final String ID = "meiqihezi_skill_bloody_slash";
 
-    //任务句柄：stop 时取消，避免角色被清除后仍结算伤害（平台 Task）
-    private ScheduledHandle attackTask;
+    /** 突进总距离（格）。 */
+    public static final double DASH_DISTANCE = 10d;
 
-    // ───────── 四个协作组件引用**缓存在 start()** ─────────
-    //`awake()` 只做构造期自检 / 只读自身，因此容器查找**不得**放 `awake()`；`start()` 时容器已冻结，
-    //查询合法，且"一次查、处处用"（避免每次施放 / 每 tick 重复查容器）。
-    //四个能力**向组件本身**取用（容器里它们每实例恰好一个 ⇒ 与端口取到的是同一批实例）。
+    /** 突进刻数（需求 0.2 秒）。 */
+    public static final int DASH_TICKS = 4;
+
+    /** 每刻位移 = 10 / 4 = 2.5 格。 */
+    public static final double STEP = DASH_DISTANCE / DASH_TICKS;
+
+    /** 沿途伤害半径（需求 r=2）。 */
+    public static final double HIT_RADIUS = 2d;
+
+    /** 物理伤害（需求 12）。 */
+    public static final double PHYSICAL = 12d;
+
+    /** 特殊值伤害区间（需求 4~6）。 */
+    public static final int SANTE_MIN = 4;
+    public static final int SANTE_MAX = 6;
+
+    /** 每层充能的追加真实伤害（需求 3）。 */
+    public static final double CHARGE_TRUE = 3d;
+
+    /** 消耗一层充能回复的生命（需求 3）。 */
+    public static final double CHARGE_HEAL = 3d;
+
+    /** 命中后缩短的冷却（需求 6 秒）。 */
+    public static final int COOLDOWN_REFUND_TICKS = 120;
+
+    /** 10 档：控制余波半径。 */
+    public static final double ECHO_RADIUS = 6d;
+
     private EnergyComponent energy;
-    private BuffComponent buffs;
-    private TaskComponent timers;
+    private BuffComponent buff;
     private VitalsComponent vitals;
+    private SanTEComponent sante;
+    private FactionComponent faction;
+    private TaskComponent timers;
+    private MeiqiheziChargeComponent charge;
+    private MeiqiheziSanDrainComponent sanDrain;
+    private MeiqiheziFloatingTextComponent voice;
 
+    private ScheduledHandle dashTask;
+    private final Set<UUID> hitOnce = new HashSet<>();
 
-    public MeiqiheziBloodySlashSkill(String id, ComponentServicesPort services, Specification specification){
+    public MeiqiheziBloodySlashSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
-    /**
-     * 本组件的描述符：名字 / 描述 / 冷却 / 耗能 / 图标由这里声明，
-     * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
-     */
+    /** 描述符：CD 160 刻 / 耗能 5。 */
     public static final class Specification extends Skill.Specification<MeiqiheziBloodySlashSkill> {
 
-        public Specification(){
+        public Specification() {
             super(
                     Component.text("血腥连斩"),
-                    List.of(Component.text("向前移动4格并斩击，重复四次")),
+                    List.of(
+                            Component.text("0.2 秒突进 10 格"),
+                            Component.text("沿途 r=2：12 物理 + 4~6 特殊值"),
+                            Component.text("消耗 1 层充能：+3 真伤，回复 3 生命"),
+                            Component.text("命中敌人则 CD 缩短 6 秒")
+                    ),
                     160,
-                    8,
-                    Material.IRON_INGOT
+                    5,
+                    Material.GOLD_INGOT
             );
-            requires(EnergyComponent.class).requires(BuffComponent.class).requires(TaskComponent.class).requires(VitalsComponent.class);
-            //每次连斩的受害者判敌 ⇒ 读阵营组件；缺它则本技能不索敌，装配期就拦住
-            requires(FactionComponent.class);
+            requires(EnergyComponent.class).requires(BuffComponent.class).requires(VitalsComponent.class)
+                    .requires(SanTEComponent.class).requires(FactionComponent.class)
+                    .requires(TaskComponent.class).requires(MeiqiheziChargeComponent.class)
+                    .requires(MeiqiheziSanDrainComponent.class);
+            requiresOptional(MeiqiheziFloatingTextComponent.class);
         }
 
         @Override
-        public MeiqiheziBloodySlashSkill create(String id, ComponentServicesPort services){
+        public MeiqiheziBloodySlashSkill create(String id, ComponentServicesPort services) {
             return new MeiqiheziBloodySlashSkill(id, services, this);
         }
     }
 
-
-    /**
-     * **开始生效**：把四个协作组件一次查好缓存进字段。
-     * <p>时机 = {@code start()}，不在 {@code awake()}：禁止在 {@code awake()} 里取用其他组件
-     * （awake 只做构造期自检 / 只读自身）；`start()` 时容器已冻结，容器查找合法。
-     * <p>缓存理由：这些引用在一次实例生命周期内不变（组件集合装配后固定），重复查容器是纯浪费；
-     * 四个框架级服务组件每实例恰好一个且已登记进实例容器，因此按类型查容器与端口取到的是同一批实例
-     * （本类不参与运行期动态增删，引用不会失效）。
-     * <p><b>边界</b>：若服务组件因**同 id 冲突**未被登记（框架对该情形记 WARNING 并跳过登记），
-     * 这里的字段会是 {@code null}，后续使用点 NPE。该形态需要角色模板里存在与服务组件同名的 id，
-     * 产品模板里没有，属病态配置，未加额外守卫。
-     */
     @Override
     public void start() {
-        energy = svc().components().get(EnergyComponent.class);
-        buffs = svc().components().get(BuffComponent.class);
-        timers = svc().components().get(TaskComponent.class);
-        vitals = svc().components().get(VitalsComponent.class);
+        energy = getComponent(EnergyComponent.class);
+        buff = getComponent(BuffComponent.class);
+        vitals = getComponent(VitalsComponent.class);
+        sante = getComponent(SanTEComponent.class);
+        faction = getComponent(FactionComponent.class);
+        timers = getComponent(TaskComponent.class);
+        charge = getComponent(MeiqiheziChargeComponent.class);
+        sanDrain = getComponent(MeiqiheziSanDrainComponent.class);
+        voice = getComponent(MeiqiheziFloatingTextComponent.class);
     }
 
-    /**
-     * 右击施放：能量不足 / 被禁用时直接返回且不启动冷却；否则扣能量 `8`、
-     * 以 `0L` 初始延迟 / `2L` 周期启动前摇任务（登记进本组件资源表，角色清除时由框架兜底取消，
-     * 因此 `isValid()` 守卫不需要）、四周 `4` 格内敌对目标各受 `14` 点物理伤害、粒子 / 音效；
-     * 冷却由本组件在施放成功处按声明值 **160** 启动。
-     * <p>四个能力向组件本身取用（引用在 {@link #start()} 缓存）；
-     * 伤害走含 {@link DamageKind} 的入口：`PHYSICAL` ⇒ {@code dealtPhysicalDamage}
-     * （与物理伤害原语同一条 {@code DamageUtil} 路径），来源仍是本实例玩家。
-     */
     @Override
     public void onCast(CastSignal signal) {
         Player caster = svc().self().player();
+        if (caster == null || !buff.canCastSkill()) {
+            return;
+        }
+        if (!energy.tryConsume(getEnergyCost())) {
+            return;
+        }
 
-        if (energy.current() < getEnergyCost()) return;
-        if(!buffs.canCastSkill()) return;
-        energy.tryConsume(getEnergyCost());
+        hitOnce.clear();
+        startCooldown();
 
-        attackTask = timers.addScheduleRepeating(this, 0L, 2L, new Runnable() {
+        final Location start = caster.getLocation().clone();
+        final Vector dir = start.getDirection().setY(0d).normalize();
+        final int[] tick = {0};
 
-            private int count = 0;
-            private final Player player = caster;
+        MeiqiheziSound.dash(caster);
+        if (voice != null) {
+            voice.sayMoment(caster, MeiqiheziFloatingTextComponent.MOMENT_SKILL_BLOODY);
+        }
 
-            @Override
-            public void run() {
-                if (count >= 4) {
-                    attackTask.cancel();
-                    return;
-                }
-                count += 1;
-
-                Location loc = player.getLocation();
-                Vector dir = loc.getDirection();
-                player.setVelocity(dir.clone().setY(0).normalize().multiply(1.5));
-
-                Collection<? extends Player> victims = loc.getNearbyPlayers(4);
-
-                for (Player victim : victims) {
-                    if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) continue;
-                    victim.setNoDamageTicks(0);
-                    vitals.damage(victim, 14, DamageKind.PHYSICAL);
-                }
-
-                loc.getWorld().spawnParticle(Particle.EXPLOSION, loc, 1);
-                Particle.DustOptions dust = new Particle.DustOptions(Color.RED, 1f);
-                Location particleLoc = loc.clone().add(0, 1, 0);
-                particleLoc.getWorld().spawnParticle(Particle.DUST, particleLoc, 30, 0.5, 0.5, 0.5, 0, dust);
-
-                loc.getWorld().playSound(loc, Sound.ITEM_TRIDENT_RIPTIDE_1, 1f, 1f);
+        dashTask = timers.addScheduleRepeating(this, 1L, 1L, () -> {
+            Player player = svc().self().player();
+            if (player == null || !player.isOnline() || player.isDead()) {
+                finishDash(caster);
+                return;
             }
-
+            tick[0]++;
+            Location next = start.clone().add(dir.clone().multiply(STEP * tick[0]));
+            if (isBlocked(next)) {
+                finishDash(caster);
+                return;
+            }
+            player.teleport(next);
+            player.setFallDistance(0f);
+            MeiqiheziVfx.dashTrail(next);
+            damageAround(player, next);
+            if (tick[0] >= DASH_TICKS) {
+                finishDash(caster);
+            }
         });
+    }
 
-        startCooldown();   //组件自启冷却（框架不再代启动）
+    private boolean isBlocked(Location location) {
+        return location.getBlock().getType().isSolid()
+                || location.clone().add(0d, 1d, 0d).getBlock().getType().isSolid();
+    }
+
+    private void damageAround(Player caster, Location center) {
+        int san = sante.current();
+        for (Player victim : center.getNearbyPlayers(HIT_RADIUS)) {
+            if (victim == null || victim.equals(caster) || !faction.isHostileTo(victim.getUniqueId())) {
+                continue;
+            }
+            if (!hitOnce.add(victim.getUniqueId())) {
+                continue;
+            }
+            vitals.physicalDamage(victim, caster, PHYSICAL);
+            int special = SANTE_MIN + ThreadLocalRandom.current().nextInt(SANTE_MAX - SANTE_MIN + 1);
+            sante.decreaseSanTE(victim.getUniqueId(), special);
+            MeiqiheziVfx.hitMarker(victim, victim.getTicksLived());
+        }
+        MeiqiheziSound.hit(caster);
+    }
+
+    private void finishDash(Player caster) {
+        if (dashTask != null) {
+            dashTask.cancel();
+            dashTask = null;
+        }
+        if (!hitOnce.isEmpty()) {
+            int san = sante.current();
+            if (sanDrain != null) {
+                sanDrain.onHit();
+            }
+            int used = charge.consume(1);
+            if (used > 0) {
+                for (UUID id : hitOnce) {
+                    Player victim = org.bukkit.Bukkit.getPlayer(id);
+                    if (victim != null && victim.isOnline() && !victim.isDead()) {
+                        vitals.trueDamage(victim, caster, CHARGE_TRUE * used);
+                    }
+                }
+                vitals.heal(caster, CHARGE_HEAL + MeiqiheziMadness.healBonus(san));
+                MeiqiheziVfx.chargeBurst(caster);
+            }
+            if (MeiqiheziMadness.controlEcho(san)) {
+                applyControlEcho(caster);
+            }
+            startCooldown(Math.max(0, getCooldownTicks() - COOLDOWN_REFUND_TICKS));
+            MeiqiheziSound.chargedHit(caster);
+        }
+    }
+
+    private void applyControlEcho(Player caster) {
+        for (Player target : caster.getLocation().getNearbyPlayers(ECHO_RADIUS)) {
+            if (target == null || target.equals(caster) || !faction.isHostileTo(target.getUniqueId())) {
+                continue;
+            }
+            buff.applyPotionEffectTo(target, PotionEffectType.SLOWNESS, 20, 0, true, false);
+        }
+        buff.applyPotionEffect(PotionEffectType.ABSORPTION, 100, 0, true, false);
+        MeiqiheziVfx.controlEcho(caster.getLocation());
     }
 
     @Override
     public void stop() {
-        if(attackTask != null){
-            attackTask.cancel();
-            attackTask = null;
+        if (dashTask != null) {
+            dashTask.cancel();
+            dashTask = null;
         }
+        hitOnce.clear();
     }
 
-    /**
-     * **闸门放行？**（基类不取 buff，由本组件用自己的字段判）。
-     */
     @Override
-    protected boolean canUse(){
-        return buffs.canCastSkill();
+    protected boolean canUse() {
+        return buff != null && buff.canCastSkill();
     }
 
-    /**
-     * **当前能量**：本组件声明耗能 8，因此必须给出真实能量（否则"能量不足"态不出现）；
-     * 取的是同一个能量组件实例（注册表装配期后冻结、同类型实例唯一，因此字段引用与按需查找恒等）。
-     */
     @Override
-    protected int currentEnergy(){
-        return energy.current();
+    protected int currentEnergy() {
+        return energy == null ? 0 : energy.current();
     }
-
 }

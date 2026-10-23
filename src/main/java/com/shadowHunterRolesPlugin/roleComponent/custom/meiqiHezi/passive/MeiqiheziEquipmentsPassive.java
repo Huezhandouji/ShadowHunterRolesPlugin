@@ -1,108 +1,154 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive;
 
-import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
+import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Color;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.persistence.PersistentDataType;
+
 import java.util.List;
 
+/**
+ * 被动装备：**☯独苍梅☯ / ☯鹤羽披☯ / ☯血凝恨☯ / ☯踏百川☯**。
+ *
+ * <table>
+ *   <tr><th>槽位</th><th>物品</th><th>附魔</th></tr>
+ *   <tr><td>头盔</td><td>☯独苍梅☯（铁头盔）</td><td>保护 I</td></tr>
+ *   <tr><td>胸甲</td><td>☯鹤羽披☯（灰白皮革胸甲）</td><td>保护 II</td></tr>
+ *   <tr><td>护腿</td><td>☯血凝恨☯（深红皮革裤子）</td><td>保护 I + 火焰保护 I</td></tr>
+ *   <tr><td>靴子</td><td>☯踏百川☯（下界合金靴）</td><td>保护 I + 摔落保护 III + 灵魂疾行 III</td></tr>
+ * </table>
+ *
+ * <h2>★★ 与旧版的差别（这是本次修的一个真 BUG）</h2>
+ * 旧版 {@code stop()} **无条件清空四个护甲槽** ⇒ 换角色时会把玩家自己的装备一起吞掉。
+ * 现在每件装备写入 PDC 标记 {@code meiqihezi_gear}，{@code stop()} **只回收带标记的那几件**。
+ * 另外补了"不可破坏"（需求没写，但角色装备没有补发途径，破了就永久没了 —— 如实申报）。
+ */
 public class MeiqiheziEquipmentsPassive extends PassiveSkill {
 
-    /** 本组件的登记 id（id 由组件自己声明）。 */
+    /** 本组件的登记 id。 */
     public static final String ID = "meiqihezi_equippments_passive";
+
+    /** 装备归属标记（★ 静态键：离线测试需装 KeyFactory 桩）。 */
+    private static final NamespacedKey GEAR_KEY = KeyFactory.Registry.of("meiqihezi_gear");
 
     public MeiqiheziEquipmentsPassive(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
-    /**
-     * 本组件的被动描述符：被动经统一 {@code addComponent} 入口装配且无栏位，因此天然不占热键栏。
-     * 显示名与描述只在本描述符里声明一处；本组件不声明依赖 —— 实取 0 个组件，
-     * 只用 {@code svc().self().player()}。
-     */
+    /** 描述符。 */
     public static final class Specification extends PassiveSkill.Specification<MeiqiheziEquipmentsPassive> {
 
-        public Specification(){
-            super(Component.text("穿戴装备"), List.of(Component.text("ccb")));
+        public Specification() {
+            super(Component.text("四梅装"),
+                    List.of(
+                            Component.text("☯独苍梅☯ 铁头盔（保护 I）"),
+                            Component.text("☯鹤羽披☯ 灰白皮革胸甲（保护 II）"),
+                            Component.text("☯血凝恨☯ 深红皮革护腿（保护 I / 火保 I）"),
+                            Component.text("☯踏百川☯ 下界合金靴（保护 I / 摔落 III / 灵魂疾行 III）")
+                    ));
         }
 
         @Override
-        public MeiqiheziEquipmentsPassive create(String id, ComponentServicesPort services){
+        public MeiqiheziEquipmentsPassive create(String id, ComponentServicesPort services) {
             return new MeiqiheziEquipmentsPassive(id, services, this);
         }
     }
 
-    /**
-     * 装备发放：四槽 = IRON_HELMET / LEATHER_CHESTPLATE / IRON_LEGGINGS / LEATHER_BOOTS，
-     * 设置顺序 helmet→chestplate→leggings→boots。
-     */
     @Override
     public void start() {
         Player player = svc().self().player();
-        ItemStack helmet = new ItemStack(Material.IRON_HELMET);
-        {
-            ItemMeta meta = helmet.getItemMeta();
-            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
-            meta.addEnchant(Enchantment.PROTECTION, 1, false);
-            meta.addEnchant(Enchantment.PROJECTILE_PROTECTION, 1, false);
-            meta.setUnbreakable(true);
-            helmet.setItemMeta(meta);
+        if (player == null) {
+            return;
         }
 
-        ItemStack chestplate = new ItemStack(Material.LEATHER_CHESTPLATE);
-        {
-            ItemMeta meta = chestplate.getItemMeta();
-            LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) meta;
-            leatherArmorMeta.setColor(Color.fromRGB(139, 0, 0));
-            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
-            meta.addEnchant(Enchantment.PROTECTION, 2, false);
-            meta.setUnbreakable(true);
-            chestplate.setItemMeta(meta);
-        }
+        ItemStack helmet = base(Material.IRON_HELMET, "☯独苍梅☯", NamedTextColor.WHITE, null);
+        helmet = with(helmet, Enchantment.PROTECTION, 1);
 
-        ItemStack leggings = new ItemStack(Material.IRON_LEGGINGS);
-        {
-            ItemMeta meta = leggings.getItemMeta();
-            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
-            meta.addEnchant(Enchantment.PROTECTION, 1, false);
-            meta.addEnchant(Enchantment.FIRE_PROTECTION, 1, false);
-            meta.setUnbreakable(true);
-            leggings.setItemMeta(meta);
-        }
+        ItemStack chest = base(Material.LEATHER_CHESTPLATE, "☯鹤羽披☯", NamedTextColor.WHITE,
+                Color.fromRGB(0xE8, 0xE8, 0xE8));
+        chest = with(chest, Enchantment.PROTECTION, 2);
 
-        ItemStack boots = new ItemStack(Material.LEATHER_BOOTS);
-        {
-            ItemMeta meta = boots.getItemMeta();
-            LeatherArmorMeta leatherArmorMeta = (LeatherArmorMeta) meta;
-            leatherArmorMeta.setColor(Color.GRAY);
-            meta.addEnchant(Enchantment.BINDING_CURSE, 1, false);
-            meta.addEnchant(Enchantment.PROTECTION, 1, false);
-            meta.addEnchant(Enchantment.FEATHER_FALLING, 3, false);
-            meta.setUnbreakable(true);
-            boots.setItemMeta(meta);
-        }
+        ItemStack legs = base(Material.LEATHER_LEGGINGS, "☯血凝恨☯", NamedTextColor.DARK_RED,
+                Color.fromRGB(0x8B, 0x00, 0x00));
+        legs = with(legs, Enchantment.PROTECTION, 1);
+        legs = with(legs, Enchantment.FIRE_PROTECTION, 1);
+
+        ItemStack boots = base(Material.NETHERITE_BOOTS, "☯踏百川☯", NamedTextColor.AQUA, null);
+        boots = with(boots, Enchantment.PROTECTION, 1);
+        boots = with(boots, Enchantment.FEATHER_FALLING, 3);
+        boots = with(boots, Enchantment.SOUL_SPEED, 3);
 
         player.getInventory().setHelmet(helmet);
-        player.getInventory().setChestplate(chestplate);
-        player.getInventory().setLeggings(leggings);
+        player.getInventory().setChestplate(chest);
+        player.getInventory().setLeggings(legs);
         player.getInventory().setBoots(boots);
     }
 
     @Override
     public void stop() {
         Player player = svc().self().player();
-        // 与 start 严格对称：回收 4 件装备。
-        // 无条件清空 helmet/chestplate/leggings/boots，不判断归属、不加 PDC 标记
-        // （已知代价：玩家原本穿在这 4 个槽位的其它装备会被一并删除）。
-        player.getInventory().setHelmet(null);
-        player.getInventory().setChestplate(null);
-        player.getInventory().setLeggings(null);
-        player.getInventory().setBoots(null);
+        if (player == null) {
+            return;
+        }
+        // 只回收带本系统标记的装备（旧版无条件清空 ⇒ 会吞玩家自己的护甲）
+        if (ours(player.getInventory().getHelmet())) {
+            player.getInventory().setHelmet(null);
+        }
+        if (ours(player.getInventory().getChestplate())) {
+            player.getInventory().setChestplate(null);
+        }
+        if (ours(player.getInventory().getLeggings())) {
+            player.getInventory().setLeggings(null);
+        }
+        if (ours(player.getInventory().getBoots())) {
+            player.getInventory().setBoots(null);
+        }
+    }
+
+    private boolean ours(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(GEAR_KEY, PersistentDataType.BYTE);
+    }
+
+    /** 底胚：名字 + 皮革染色 + 不可破坏 + 归属标记。 */
+    private static ItemStack base(Material material, String name, NamedTextColor color, Color leatherColor) {
+        ItemStack stack = new ItemStack(material);
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) {
+            return stack;
+        }
+        meta.displayName(Component.text(name, color).decoration(TextDecoration.ITALIC, false));
+        if (leatherColor != null && meta instanceof LeatherArmorMeta leather) {
+            leather.setColor(leatherColor);
+        }
+        meta.setUnbreakable(true);
+        meta.getPersistentDataContainer().set(GEAR_KEY, PersistentDataType.BYTE, (byte) 1);
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    /** 追加一条附魔（保留既有 meta，包括 PDC 标记）。 */
+    private static ItemStack with(ItemStack stack, Enchantment enchantment, int level) {
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) {
+            return stack;
+        }
+        meta.addEnchant(enchantment, level, true);
+        stack.setItemMeta(meta);
+        return stack;
     }
 }

@@ -34,6 +34,11 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaKua
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaJudgmentSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaRedstoneDroneSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaSeaCrystalLampSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziChargeComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziMadnessPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziSanDrainComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziThrowComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
@@ -51,6 +56,7 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedDeeplySorrowSkill
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvolutionPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedFloatingTextComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.*;
@@ -207,23 +213,28 @@ public class RoleLoader {
         return withBuiltIns(new Role.Builder("meiqihezi"), faction)
  //「已被提供的类型」由装配方注入（core/Role 本身不认识任何组件类），
  //  否则组件声明 requires(框架级组件) 会被模板侧的依赖校验误报成"缺必需依赖"。
-                .displayName(Component.text("MeiqiHezi"))
+                .displayName(Component.text("梅妻鹤子"))
                 //Component.text("战斗疯子\n普攻20能量以上左键造成范围伤害并消耗能量，20以下只能打一个人\n一技能加速\n二技能三段突进并造成伤害\n三技能圆弧斩，范围真伤")
                 .description(List.of(
-                        Component.text("战斗疯子"),
-                        Component.text("普攻20能量以上左键造成范围伤害并消耗能量，20以下只能打一个人"),
-                        Component.text("一技能加速"),
-                        Component.text("二技能三段突进并造成伤害"),
-                        Component.text("三技能圆弧斩，范围真伤")
+                        Component.text("休言半纸无多重，万斛离愁尽耐担"),
+                        Component.text("普攻：8 物理 + 3~6 特殊值；每秒耗 5 能量充能（上限 3 层）"),
+                        Component.text("充能攻击：回 4 生命 + 触及范围 3 真伤；满层触及 +2"),
+                        Component.text("右键蓄力 0.8 秒丢出决爵，命中者插着跑；靠近拾回"),
+                        Component.text("须狂命：SanTE 越低增益越多，归零时爆发 15 秒")
                 ))
                 //表现值（名字/描述/冷却/耗能/图标）随组件自己的 Specification 走，
  //装配点只写 setSlot；注册顺序与既有实现逐字一致（= 派发序 = 渲染序）。
+                .addComponent(MeiqiheziChargeComponent.ID, new MeiqiheziChargeComponent.Specification())
+                .addComponent(MeiqiheziThrowComponent.ID, new MeiqiheziThrowComponent.Specification())
+                .addComponent(MeiqiheziSanDrainComponent.ID, new MeiqiheziSanDrainComponent.Specification())
                 .addComponent(MeiqiheziUnconcernSkill.ID, new MeiqiheziUnconcernSkill.Specification().setSlot(1))
                 .addComponent(MeiqiheziBloodySlashSkill.ID, new MeiqiheziBloodySlashSkill.Specification().setSlot(2))
                 .addComponent(MeiqiheziCircleSlashSkill.ID, new MeiqiheziCircleSlashSkill.Specification().setSlot(3))
                 .addComponent(MeiqiheziJuejueMainWeapon.ID, new MeiqiheziJuejueMainWeapon.Specification().setSlot(0))
                 .faction(faction)
                 .addComponent(MeiqiheziEquipmentsPassive.ID, new MeiqiheziEquipmentsPassive.Specification())
+                .addComponent(MeiqiheziMadnessPassive.ID, new MeiqiheziMadnessPassive.Specification())
+                .addComponent(MeiqiheziFloatingTextComponent.ID, new MeiqiheziFloatingTextComponent.Specification())
                 .icon(Material.DIAMOND_HOE);
     }
 
@@ -232,12 +243,13 @@ public class RoleLoader {
         Faction faction = Faction.SHADOW;
 
         return withBuiltIns(new Role.Builder("red"), faction)
-                .displayName(Component.text("Red"))
+                .displayName(Component.text("红"))
                 //Component.text("待到血腥降临，一切化为土尘\n普攻造成15流血\n一技能捅人恢复生命\n二技能致盲敌人并结算5层流血恢复te\n三技能烧自己te开启狂暴")
                 .description(List.of(
                         Component.text("待到血腥降临，一切化为土尘"),
-                        Component.text("普攻造成15流血"),
-                        Component.text("一技能捅人恢复生命")
+                        Component.text("纯白之刺：前方锥形穿刺，8 物理 + 3~6 特殊值 + 5 层流血"),
+                        Component.text("饮血 / 何足挂齿：流血敌人回血回 SanTE，每 3 次命中减 CD"),
+                        Component.text("贯通新生 / 烟血震慑 / 血亲呼唤：四段穿刺、范围结算、燃烧 SanTE 的狂暴")
                 ))
                 .faction(faction)
                 .addComponent(RedBleedPassive.ID, new RedBleedPassive.Specification())
@@ -245,10 +257,12 @@ public class RoleLoader {
                 //  紧跟在流血被动之后 —— 流血被动与两个技能都声明它为必需依赖（档位读口）
                 .addComponent(RedEvolutionPassive.ID, new RedEvolutionPassive.Specification())
                 .addComponent(RedSanctifiedBladeMainWeapon.ID, new RedSanctifiedBladeMainWeapon.Specification().setSlot(0))
-                .addComponent(RedSolitaryArroganceSkill.ID, new RedSolitaryArroganceSkill.Specification().setSlot(1))
+                //技能栏位按需求描述顺序：1=贯通新生 / 2=烟血震慑 / 3=血亲呼唤
+                .addComponent(RedDeeplySorrowSkill.ID, new RedDeeplySorrowSkill.Specification().setSlot(1))
                 .addComponent(RedEvilShockSkill.ID, new RedEvilShockSkill.Specification().setSlot(2))
-                .addComponent(RedDeeplySorrowSkill.ID, new RedDeeplySorrowSkill.Specification().setSlot(3))
+                .addComponent(RedSolitaryArroganceSkill.ID, new RedSolitaryArroganceSkill.Specification().setSlot(3))
                 .addComponent(RedEquipmentsPassive.ID, new RedEquipmentsPassive.Specification())
+                .addComponent(RedFloatingTextComponent.ID, new RedFloatingTextComponent.Specification())
                 .icon(Material.POPPY);
     }
 

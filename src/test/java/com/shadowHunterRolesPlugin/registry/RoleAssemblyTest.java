@@ -265,6 +265,77 @@ public class RoleAssemblyTest {
     }
 
     /**
+     * **梅妻鹤子(meiqihezi) 必须真的在注册表里，且九个组件齐全**（2026-10-21 重做）。
+     *
+     * <p>本次重做把"充能账本"和"离手武器"各自拆成独立组件：账本被主武器 + 三技能 + 被动共五处读，
+     * 离手状态被主武器闸门读。任何一处漏注册，失败形态都是**整个角色静默消失**（只在启动日志留 SEVERE），
+     * 因此用本条把九个 id 逐个钉住。
+     */
+    @Test
+    public void meiqiheziIsRegisteredWithTenComponents() {        RoleLoader.Definition meiqihezi = null;
+        for (RoleLoader.Definition definition : loader().defaultDefinitions()) {
+            if ("meiqihezi".equals(definition.id())) {
+                meiqihezi = definition;
+                break;
+            }
+        }
+        assertTrue("defaultDefinitions() 里必须有 id = \"meiqihezi\" 的角色（漏了 ⇒ 进游戏选不到梅妻鹤子）",
+                meiqihezi != null);
+
+        Role role = meiqihezi.builder().get().build();
+        role.verifyDependencies();
+
+        assertTrue("梅妻鹤子缺必需依赖: " + role.missingRequiredDependencies(),
+                role.missingRequiredDependencies().isEmpty());
+        java.util.Set<String> present = role.getComponents().keySet();
+        for (String id : List.of("meiqihezi_charge", "meiqihezi_throw", "meiqihezi_san_drain",
+                "meiqihezi_mainWeapon_juejue", "meiqihezi_skill_unconcern",
+                "meiqihezi_skill_bloody_slash", "meiqihezi_skill_circle_slash",
+                "meiqihezi_equippments_passive", "meiqihezi_madness_passive",
+                "meiqihezi_floating_text")) {
+            assertTrue("梅妻鹤子缺组件 " + id + "，实际 = " + present, present.contains(id));
+        }
+        int builtIns = builtInComponentCount();
+        assertEquals("梅妻鹤子应有 10 个角色组件（= 内建 " + builtIns + " + 10）；实际 = " + present,
+                builtIns + 10, role.getComponents().size());
+    }
+
+    /**
+     * **红(red) 必须真的在注册表里，且八个组件齐全**（2026-10-21 重做）。
+     *
+     * <p>本次重做把"流血 / 饮血 / 何足挂齿"合成一个账本组件，并新增语音组件；
+     * 漏注册任何一个，失败形态都是**整个角色静默消失**（只在启动日志留 SEVERE）。
+     */
+    @Test
+    public void redIsRegisteredWithEightComponents() {
+        RoleLoader.Definition red = null;
+        for (RoleLoader.Definition definition : loader().defaultDefinitions()) {
+            if ("red".equals(definition.id())) {
+                red = definition;
+                break;
+            }
+        }
+        assertTrue("defaultDefinitions() 里必须有 id = \"red\" 的角色（漏了 ⇒ 进游戏选不到红）",
+                red != null);
+
+        Role role = red.builder().get().build();
+        role.verifyDependencies();
+
+        assertTrue("红缺必需依赖: " + role.missingRequiredDependencies(),
+                role.missingRequiredDependencies().isEmpty());
+        java.util.Set<String> present = role.getComponents().keySet();
+        for (String id : List.of("red_bleed_passive", "red_evolution_passive",
+                "red_sanctified_blade_main_weapon", "red_deeply_sorrow_skill",
+                "red_evil_shock_skill", "red_solitary_arrogance_skill",
+                "red_equipments_passive", "red_floating_text")) {
+            assertTrue("红缺组件 " + id + "，实际 = " + present, present.contains(id));
+        }
+        int builtIns = builtInComponentCount();
+        assertEquals("红应有 8 个角色组件（= 内建 " + builtIns + " + 8）；实际 = " + present,
+                builtIns + 8, role.getComponents().size());
+    }
+
+    /**
      * **角色 id 不重复**（重复会让 {@code /role set} 只认到其中一个）。
      */
     @Test

@@ -34,7 +34,8 @@ public class DamageUtil {
      * <p><b>为什么不看原版 {@code LivingEntity#getKiller()}</b>：本系统的伤害有相当一部分绕过原版
      * 事件（真伤是直接 {@code setHealth}、物伤会重设无伤刻），原版途径在那些路径上给不出击杀者；
      * 而 {@link #LAST_DAMAGER_KEY} 由两条路各写一次 —— {@link #dealtPhysicalDamage}（本系统施加的伤害）
-     * 与 {@code listener/DamageTrackerListener}（原版玩家对玩家的伤害）—— 因此它是唯一覆盖两侧的口径。
+     * 与 {@code listener/DamageTrackerListener}（原版玩家伤害：直接命中与玩家射出的弹射物都算）——
+     * 因此它是唯一覆盖两侧的口径。
      * 平台侧同名读口 = {@code RoleAPI#getLastDamagerUuid(Player)} 与 {@code RoleAPI#getLastDamager(Player)}
      * （本方法只多做一步"解析成玩家"）。
      *
@@ -45,10 +46,11 @@ public class DamageUtil {
      * 因此 {@code killer == victim} 是可能的返回值 —— "自伤致死不算法击杀"这条口径归调用方
      * （与外部消费方 {@code SHDFGamePlugin} 的处置同源）。
      *
-     * <p><b>已知边界（如实申报）</b>：那条键在玩家死亡时**不会被清**，且只有"玩家直接打玩家"
-     * 才会更新它 ⇒ ① 死在怪物 / 环境手里的那一次，读到的可能是本命里上一次的玩家伤害者；
-     * ② 弹射物（箭矢）命中时 {@code DamageTrackerListener} 看到的是弹射物而非射手，故弓弩击杀不入账。
-     * 两件事都在"写账侧"，本读口不擅自补救（改了就等于动既有记账口径）。
+     * <p><b>已知边界（如实申报）</b>：那条键在玩家死亡时**不会被清** ⇒ 死在怪物 / 环境手里的那一次，
+     * 读到的可能是本命里上一次的玩家伤害者（本读口不判记录是否过期，那归产品口径）。
+     * 弹射物（箭矢等）这条曾是边界，写账侧已按 {@code Projectile#getShooter} 归属到射手补齐；
+     * 发射器等非玩家射手仍不入账（口径同"怪物伤害不入账"）。
+     * 本读口不做写账侧之外的补救（改了就等于动既有记账口径）。
      *
      * @param victim 被伤害 / 被击杀的**玩家**；{@code null} 回 {@code null}
      * @return 最后伤害者（在线玩家）；无记录 / 已离线回 {@code null}

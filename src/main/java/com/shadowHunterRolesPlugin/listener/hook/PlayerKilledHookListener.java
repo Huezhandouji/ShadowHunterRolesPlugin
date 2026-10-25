@@ -46,10 +46,11 @@ import org.bukkit.event.entity.PlayerDeathEvent;
  *   <li><b>被杀者可以无角色</b>：此时 {@code getVictimRoleId()} 为 {@code null}，事件照常产生。</li>
  *   <li><b>不做敌对 / 阵营过滤</b>：误伤、同阵营互杀同样产生事件 —— 要不要计由订阅者自己判
  *       （与外部消费方 {@code SHDFGamePlugin} 把过滤放在自己的 DeathHandler 里同源）。</li>
- *   <li><b>击杀归属继承 {@link DamageUtil#getLastDamager} 的已知边界</b>：那条 PDC 在死亡时不清、
- *       且只由"玩家直接打玩家"更新 ⇒ ① 死在怪物 / 环境手里时可能读到本命里上一次的玩家伤害者；
- *       ② 弹射物（箭矢）击杀不入账（写账侧只认"直接是玩家"的 damager）。两件事都不在本类里补 ——
- *       补了就是动既有记账口径，且会让 {@code RoleAPI#getLastDamagerUuid} 的语义跟着变。</li>
+ *   <li><b>击杀归属继承 {@link DamageUtil#getLastDamager} 的已知边界</b>：那条 PDC 在死亡时不清
+ *       ⇒ 死在怪物 / 环境手里时可能读到本命里上一次的玩家伤害者。本类不补这件事 ——
+ *       补了就是动既有记账口径，且会让 {@code RoleAPI#getLastDamagerUuid} 的语义跟着变。
+ *       （弹射物击杀曾同属这条边界，写账侧已按 {@code Projectile#getShooter} 归属到射手入账，
+ *       见 {@code DamageTrackerListener}。）</li>
  * </ul>
  */
 public class PlayerKilledHookListener implements Listener {

@@ -41,7 +41,9 @@ import java.util.function.Consumer;
  *
  * <h2>边界</h2>
  * `damage` / `heal` 只做结算：不投递回调 —— 受伤 / 受治疗由
- * {@code listener/hook/DamageHookListener} 在平台事件面派发（见 {@link Participant}）。
+ * {@code listener/hook/DamageHookListener} 在平台事件面派发给本组件的承受方订阅名单
+ * （见 {@link #addDamagedListener(RoleComponent, Consumer)} /
+ * {@link #addHealedListener(RoleComponent, Consumer)}）。
  *
  * <h2>击杀订阅面</h2>
  * 「玩家被玩家击杀」也由本组件广播（见 {@link #addPlayerKilledListener(RoleComponent, Consumer)}）：
@@ -148,32 +150,186 @@ public class VitalsComponent extends RoleComponent {
         return svc().self().player();
     }
 
-    // ───────────── 承受方回调 ─────────────
+    // ───────────── 承受方订阅面（受伤 / 受治疗；SanTE 形状的监听器列表）─────────────
 
     /**
-     * 可参与"承受方"回调的组件：实现本接口的组件在自己被伤害 / 被治疗时收到通知。
-     * <p>两个方法都是 {@code void}，因此改量与否决在类型上不可表达（只通知、不可否决）。
-     * <p><b>调用者</b>：{@code listener/hook/DamageHookListener}（平台事件面）—— 它按
-     * {@code targetInstance.getAllByType(Participant.class)} 扇出（容器的组件查取入口），
-     * 且整段扇出经 {@code RoleInstance.deliverHook}，内部走唯一受保护入口 {@code guardedCall}。
-     * <p><b>顺序</b>：先结算、后通知（量已定、账已结，回调改不了）。
+     * 一次受伤的载荷（record，不是接口）。
+     *
+     * <h2>为什么需要它</h2>
+     * 一次受伤带两个值（来源玩家 / 已结算伤害量）；本组件的监听器列表用 JDK {@code Consumer}，
+     * 需要一个载体把这两个值一起交出去（与 {@link PlayerKilledEvent} 同一理由）。
+     *
+     * <h2>语义</h2>
+     * 本记录只承载值、不带任何行为：{@code source} 可为 {@code null}（非玩家源 —— 实现方必须自己判空）；
+     * {@code amount} 已结算（只读：改它不影响结果）。
      */
-    public interface Participant {
+    public record Damaged(Player source, double amount) {
+    }
 
-        /**
-         * 受伤通知（在承受方一侧触发，结算之后调用）。
-         *
-         * @param source 伤害来源玩家；可为 {@code null}（非玩家源）—— 实现方必须自己判空
-         * @param amount 已结算的伤害量（只读：改它不影响结果）
-         */
-        void onDamaged(Player source, double amount);
+    /**
+     * 一次受治疗的载荷（record，不是接口）。
+     * <p>单值也用 record 而不是裸 {@code Double}：与 {@link Damaged} 同形（订阅面只有一种载荷形态），
+     * 且字段有名（{@code amount}）—— lambda 参数带着语义，而不是一个裸数字。
+     */
+    public record Healed(double amount) {
+    }
 
-        /**
-         * 受治疗通知（在承受方一侧触发，结算之后调用）。
-         *
-         * @param amount 已结算的治疗量（只读：改它不影响结果）
-         */
-        void onHealed(double amount);
+    /**
+     * 一条受伤监听登记：{@code owner}（谁订阅）+ {@code listener}（怎么通知）成对持有
+     * （与 {@link PlayerKilledListener} / {@code SanTEComponent.Listener} 同形）。
+     *
+     * <h2>为什么把 owner 一起登记</h2>
+     * 投递纪律是「逐个经 {@code RoleInstance#deliverHook} 调用」：某个监听器抛异常时只隔离抛异常的
+     * 那一个、其余照常收到。这条纪律需要每一条登记都知道自己属于哪个组件，而 {@code Consumer} 闭包
+     * 没有身份 ⇒ 由注册方在 {@link #addDamagedListener(RoleComponent, Consumer)} 里显式给出。
+     * <p>record 不是接口（不违反"不新增自定义接口"）。
+     */
+    public record DamagedListener(RoleComponent owner, Consumer<Damaged> listener) {
+    }
+
+    /**
+     * 一条受治疗监听登记（与 {@link DamagedListener} 同形；受伤与受治疗是两条独立名单 ——
+     * 订阅者只订阅自己关心的那一条，不再有"为实现接口而写的空 {@code onHealed}"）。
+     */
+    public record HealedListener(RoleComponent owner, Consumer<Healed> listener) {
+    }
+
+    /** 受伤监听名单 —— 顺序 = 添加先后（迭代序稳定，因此"按装配序通知"可复现）。 */
+    private final List<DamagedListener> damagedListeners = new ArrayList<>();
+
+    /** 受治疗监听名单（与 {@link #damagedListeners} 同规）。 */
+    private final List<HealedListener> healedListeners = new ArrayList<>();
+
+    /**
+     * 添加「受伤监听」—— 唯一的订阅入口。
+     *
+     * <h2>投给谁、什么时候投</h2>
+     * 名单挂在**本组件所属的那一个角色实例**上，通知的是**承受方那一侧**：该实例的玩家受伤时
+     * （平台 {@code EntityDamageEvent} 已结算、未被取消），由 {@code listener/hook/DamageHookListener}
+     * 逐条经 {@code RoleInstance#deliverHook} 投递 —— "先结算、后通知"（量已定，回调改不了）。
+     * 写法（与 {@code SanTEComponent} 同形）：在订阅组件自己的 {@code start()} 里
+     * <pre>{@code
+     * VitalsComponent vitals = getComponent(VitalsComponent.class);
+     * damagedEntry = vitals.addDamagedListener(this, event -> onDamaged(event.source(), event.amount()));
+     * }</pre>
+     * 并在 {@code stop()} 里用 {@link #removeDamagedListener(DamagedListener)} 成对移除。
+     *
+     * <h2>幂等与移除</h2>
+     * 同一 {@code owner} + 同一 {@code listener} 重复添加不重复登记；{@code owner} 或 {@code listener}
+     * 为 {@code null} 则忽略（回 {@code null}）。返回值 = 本次登记对应的 {@link DamagedListener}，
+     * 撤销时按引用移除（{@code Consumer} 闭包没有身份标识，"按身份移除"在类型上不可表达）。
+     */
+    public DamagedListener addDamagedListener(RoleComponent owner, Consumer<Damaged> listener) {
+        if (owner == null || listener == null) {
+            return null;
+        }
+        DamagedListener entry = new DamagedListener(owner, listener);
+        if (!damagedListeners.contains(entry)) {
+            damagedListeners.add(entry);
+        }
+        return entry;
+    }
+
+    /**
+     * 添加「受治疗监听」—— 唯一的订阅入口（与 {@link #addDamagedListener(RoleComponent, Consumer)} 同规；
+     * 载荷 = {@link Healed}，平台 {@code EntityRegainHealthEvent} 结算后投递）。
+     */
+    public HealedListener addHealedListener(RoleComponent owner, Consumer<Healed> listener) {
+        if (owner == null || listener == null) {
+            return null;
+        }
+        HealedListener entry = new HealedListener(owner, listener);
+        if (!healedListeners.contains(entry)) {
+            healedListeners.add(entry);
+        }
+        return entry;
+    }
+
+    /**
+     * 移除受伤监听（按引用相等；不在名单里则 no-op 且返回 {@code false}）——
+     * 调用方必须持有同一个 {@link DamagedListener} 实例（把
+     * {@link #addDamagedListener(RoleComponent, Consumer)} 的返回值存进私有字段即可）。
+     */
+    public boolean removeDamagedListener(DamagedListener entry) {
+        return entry != null && damagedListeners.remove(entry);
+    }
+
+    /** 移除受治疗监听（与 {@link #removeDamagedListener(DamagedListener)} 同规）。 */
+    public boolean removeHealedListener(HealedListener entry) {
+        return entry != null && healedListeners.remove(entry);
+    }
+
+    /** 当前受伤监听数（诊断读口；供探针与运行级取证使用）。 */
+    public int damagedListenerCount() {
+        return damagedListeners.size();
+    }
+
+    /** 当前受治疗监听数（诊断读口；与 {@link #damagedListenerCount()} 同规）。 */
+    public int healedListenerCount() {
+        return healedListeners.size();
+    }
+
+    /**
+     * 逐个把受伤登记交给调用方（"逐监听器故障隔离"的承载面）—— 投递方（
+     * {@code listener/hook/DamageHookListener}）用它把每一条套进
+     * {@code RoleInstance#deliverHook}：某个监听器抛异常时只隔离那一个、其余照常收到。
+     * <p>本方法不替调用方做派发决策，只提供遍历。遍历前对名单取快照（{@code List.copyOf}）⇒
+     * 遍历途中添加 / 移除监听器既不抛 {@code ConcurrentModificationException}，也不影响本趟。
+     */
+    public void forEachDamagedListener(Consumer<DamagedListener> action) {
+        if (action == null) {
+            return;
+        }
+        for (DamagedListener entry : List.copyOf(damagedListeners)) {
+            action.accept(entry);
+        }
+    }
+
+    /** 逐个把受治疗登记交给调用方（与 {@link #forEachDamagedListener(Consumer)} 同规）。 */
+    public void forEachHealedListener(Consumer<HealedListener> action) {
+        if (action == null) {
+            return;
+        }
+        for (HealedListener entry : List.copyOf(healedListeners)) {
+            action.accept(entry);
+        }
+    }
+
+    /**
+     * 通知全部受伤监听（一趟直调）。
+     * <p><b>生产路径不走它</b>：真实投递在 {@code listener/hook/DamageHookListener} 里，
+     * 逐条经 {@code RoleInstance#deliverHook}（"逐监听器故障隔离"的唯一实现点）。本方法的存在理由是
+     * 给"没有容器"的离线单元测试一条与生产同源的派发路径。
+     * <p>与 {@code SanTEComponent#notifyListeners} 同规：逐条 try/catch，某个监听器抛异常时只记日志并继续。
+     * <p><b>不是第二条变更通道</b>：本方法只读名单并调监听器，不改任何状态、不产生事件。
+     */
+    public void notifyDamagedListeners(Damaged event) {
+        if (event == null) {
+            return;
+        }
+        forEachDamagedListener(entry -> {
+            try {
+                entry.listener().accept(event);
+            } catch (RuntimeException listenerFailure) {
+                LOG.warning("[vitals] damaged listener failed (owner=" + entry.owner().getId() + "): "
+                        + listenerFailure);
+            }
+        });
+    }
+
+    /** 通知全部受治疗监听（与 {@link #notifyDamagedListeners(Damaged)} 同规）。 */
+    public void notifyHealedListeners(Healed event) {
+        if (event == null) {
+            return;
+        }
+        forEachHealedListener(entry -> {
+            try {
+                entry.listener().accept(event);
+            } catch (RuntimeException listenerFailure) {
+                LOG.warning("[vitals] healed listener failed (owner=" + entry.owner().getId() + "): "
+                        + listenerFailure);
+            }
+        });
     }
 
     // ───────────── 两个统一入口（结算；含伤害类型与钩子）─────────────
@@ -183,8 +339,8 @@ public class VitalsComponent extends RoleComponent {
      * <p>语义：{@code victim = target}、{@code source = 本组件所属玩家}；走既有 {@code DamageUtil}
      * 路径，与合并前逐字等价（{@code PHYSICAL} → {@code dealtPhysicalDamage}；
      * {@code TRUE} → {@code dealtTrueDamage}）。
-     * <p><b>本入口只负责结算</b>：它不自己投递回调 —— 承受方的
-     * {@link Participant#onDamaged(Player, double)} 由 {@code listener/hook/DamageHookListener}
+     * <p><b>本入口只负责结算</b>：它不自己投递回调 —— 承受方的受伤订阅
+     * （{@link #addDamagedListener(RoleComponent, Consumer)}）由 {@code listener/hook/DamageHookListener}
      * 在平台事件（{@code EntityDamageEvent}）里按目标实例派发
      * （这样"一切真实伤害"都触发，而不只是走本入口的那部分）。
      * <p>用法（两例）：{@code damage(self(), 5, DamageKind.TRUE)}（对自己，真伤）/
@@ -221,7 +377,8 @@ public class VitalsComponent extends RoleComponent {
     /**
      * 治疗（内部按目标自己的最大生命 clamp）。
      * <p>语义：{@code target} 可为自己（= {@link #heal(double)} 的行为，clamp 语义不变）或他人。
-     * <p><b>本入口只负责结算</b>：承受方的 {@link Participant#onHealed(double)} 由
+     * <p><b>本入口只负责结算</b>：承受方的受治疗订阅
+     * （{@link #addHealedListener(RoleComponent, Consumer)}）由
      * {@code listener/hook/DamageHookListener} 在平台事件（{@code EntityRegainHealthEvent}）里派发。
      * <p>用法（两例）：{@code heal(self(), 4)}（对自己）/ {@code heal(otherPlayer, 4)}（对他人）。
      *

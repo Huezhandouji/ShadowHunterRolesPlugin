@@ -29,8 +29,8 @@ import java.util.Random;
  * <h2>它怎么感知"状态改变"（三条来源，全部走既有框架挂载点，零框架改动）</h2>
  * <ol>
  *   <li><b>空闲</b>：{@link #update()} 里自己计时，连续 N 刻"没在打架"就吐一句氛围字；</li>
- *   <li><b>受击 / 濒死</b>：本组件实现 {@link VitalsComponent.Participant}，
- *       {@code onDamaged} 由框架的 {@code DamageHookListener} 在真实受伤事件里自动扇出
+ *   <li><b>受击 / 濒死</b>：{@code start()} 里经 {@link VitalsComponent#addDamagedListener}
+ *       订阅"自己受到伤害"，{@link #onDamaged} 钩子由该监听在真实受伤事件里触发
  *       （只观察、不改事件、不取消 ⇒ 与任何战斗逻辑零冲突）；</li>
  *   <li><b>击杀</b>：{@code start()} 里经 {@link VitalsComponent#addPlayerKilledListener}
  *       订阅"自己击杀了敌人"；</li>
@@ -41,7 +41,7 @@ import java.util.Random;
  * <h2>与框架的关系（铁律：不动框架）</h2>
  * 本组件是**普通角色组件**：走 {@code start()} / {@code update()} / {@code stop()} 既有生命周期，
  * 由 {@code Role.Builder.addComponent(...)} 注册。它引用的两个框架挂载点
- * （{@code Participant}、{@code addPlayerKilledListener}）都是**既有公开面**，
+ * （{@code addDamagedListener}、{@code addPlayerKilledListener}）都是**既有公开面**，
  * 不新增任何框架能力、不修改任何禁改区文件。
  *
  * <h2>性能边界（必须遵守）</h2>
@@ -51,7 +51,7 @@ import java.util.Random;
  * ③ 全局最小间隔 {@link TextUtil.Pool#MIN_GAP_TICKS} 刻。
  * 别把这些阈值调大 —— 满编服务器上几十个玩家同时吐字就是几百个实体。
  */
-public class FloatingTextComponent extends PassiveSkill implements VitalsComponent.Participant {
+public class FloatingTextComponent extends PassiveSkill {
 
     /** 本组件的登记 id（注册处与显式调用点都用它）。 */
     public static final String ID = "floatingText";
@@ -122,6 +122,9 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
     /** 随机源（自持 ⇒ 不与其它组件抢用全局 Random）。 */
     private final Random random = new Random();
 
+    /** 受伤监听登记（{@code stop()} 里按引用移除；触发 {@link #onDamaged} 钩子）。 */
+    private VitalsComponent.DamagedListener damagedEntry;
+
     /** 击杀监听登记（{@code stop()} 里按引用移除）。 */
     private VitalsComponent.PlayerKilledListener killedEntry;
 
@@ -144,7 +147,7 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
     // ───────── 生命周期 ─────────
 
     /**
-     * {@code start()}：建池、订阅击杀、初始化计时。
+     * {@code start()}：建池、订阅受伤与击杀、初始化计时。
      * <p>依赖只在 {@code start()} 取（工程铁律）。
      */
     @Override
@@ -155,6 +158,7 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
         int firstInterval = Math.max(1, idleIntervalTicks());
         int firstJitter = Math.max(0, idleJitterTicks());
         this.nextIdleTick = firstInterval + (firstJitter > 0 ? random.nextInt(firstJitter) : 0);
+        registerDamagedListener();
         registerKillListener();
         this.started = true;
 
@@ -171,6 +175,7 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
     @Override
     public void stop() {
         this.started = false;
+        unregisterDamagedListener();
         unregisterKillListener();
         if (pool != null) {
             pool.close();
@@ -359,11 +364,42 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
         return out;
     }
 
-    // ───────── 承受方回调（Participant） ─────────
+    // ───────── 受伤订阅（SanTE 形状的监听器列表；钩子子类可覆写） ─────────
 
-    /** 受伤通知（框架 {@code DamageHookListener} 扇出；只观察，不干预）。 */
-    @Override
-    public void onDamaged(Player source, double amount) {
+    /**
+     * 订阅"自己受到伤害"：经 {@link VitalsComponent#addDamagedListener} 登记，
+     * 每次真实受伤（平台事件已结算）触发一次 {@link #onDamaged} 钩子。
+     */
+    private void registerDamagedListener() {
+        if (damagedEntry != null) {
+            return;
+        }
+        VitalsComponent vitals = getComponent(VitalsComponent.class);
+        if (vitals == null) {
+            return;
+        }
+        damagedEntry = vitals.addDamagedListener(this, event -> onDamaged(event.source(), event.amount()));
+    }
+
+    private void unregisterDamagedListener() {
+        if (damagedEntry == null) {
+            return;
+        }
+        VitalsComponent vitals = getComponent(VitalsComponent.class);
+        if (vitals != null) {
+            vitals.removeDamagedListener(damagedEntry);
+        }
+        damagedEntry = null;
+    }
+
+    /**
+     * 受伤钩子（子类可覆写；经 {@link #registerDamagedListener()} 的监听在结算之后触发，
+     * 只观察、不干预 —— 方法返回 {@code void}，改量与否决在类型上不可表达）。
+     *
+     * @param source 伤害来源玩家；可为 {@code null}（非玩家源）
+     * @param amount 已结算的伤害量（只读）
+     */
+    protected void onDamaged(Player source, double amount) {
         if (!started || pool == null) {
             return;
         }
@@ -378,12 +414,6 @@ public class FloatingTextComponent extends PassiveSkill implements VitalsCompone
         if (lowHpEnabled() && isLowHp(self)) {
             say(self, MOMENT_LOW_HP, null);
         }
-    }
-
-    /** 受治疗通知（本组件不响应治疗，空实现即可）。 */
-    @Override
-    public void onHealed(double amount) {
-        // 悬浮文本不响应治疗
     }
 
     // ───────── 击杀订阅 ─────────

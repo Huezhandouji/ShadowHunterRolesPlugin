@@ -478,7 +478,7 @@ public class HotbarRenderComponent extends RoleComponent {
 
     /**
      * 渲染回调（读侧：只通知、不可否决）。
-     * <p>形态（照 {@code VitalsComponent.Participant}）：方法返回 {@code void}，因此"改量"与"否决"在类型上
+     * <p>形态（照 {@code VitalsComponent} 订阅名单一族的监听回调）：方法返回 {@code void}，因此"改量"与"否决"在类型上
      * 不可表达，实现者只能观察，不能干预渲染结果。
      * <p>触发点 = 渲染器 {@code HotbarRenderer.render()} 真正完成一次刷新之后：这是唯一能覆盖"内容变了但
      * 槽位没变"的时机（例：同一个技能格从"可用"变"冷却中"，槽位没动、物品换了，按槽位变化判会漏）。

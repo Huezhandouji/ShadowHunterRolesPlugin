@@ -197,8 +197,9 @@ public class RoleInstance {
  * 按类型取本实例内的全部组件：返回全部可赋值给 `type` 的组件，顺序 = 添加顺序；
  * 无人符合 ⇒ 空列表（不是 null）；装配完成之前调用 ⇒ 抛 `IllegalStateException`。
  * <p>类型形参无上界 ⇒ 支持接口查询；返回不可变列表。
- * <p>消费者 = `listener/hook/DamageHookListener`（承受方扇出）与生命组件（内部读口）；
- * 组件侧取组件走 `RoleComponent#getComponent(Class)`。
+ * <p>承受方扇出已改为经生命组件的订阅名单（{@code VitalsComponent#forEachDamagedListener} /
+ * {@code forEachHealedListener}）；本读口当前无生产调用点，作为容器的通用查取面保留。
+ * <p>组件侧取组件走 `RoleComponent#getComponent(Class)`。
  */
     public <T> java.util.List<T> getAllByType(Class<T> type) {
         return componentRegistry.getAll(type);

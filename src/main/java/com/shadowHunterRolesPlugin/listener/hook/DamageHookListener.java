@@ -30,9 +30,15 @@ import org.bukkit.event.entity.EntityRegainHealthEvent;
  *   事件 → 早退（非 Player 直接 return）→ 平台查找目标实例
  *        （{@code RoleManager.getRoleInstance(Player)}，复用既有 playerRoleMap）
  *        → 无实例：只不通知（伤害 / 治疗早已由 Bukkit 结算，本监听器不参与施加）
- *        → 有实例：按 {@code getAllByType(Participant.class)} 扇出
+ *        → 有实例：取实例里的生命组件（按它自己的登记 id {@link VitalsComponent#ID}）
+ *        → 按 {@code forEachDamagedListener} / {@code forEachHealedListener} 扇出到承受方订阅名单
  *        → 逐个经 {@link RoleInstance#deliverHook}（内部走唯一受保护入口 {@code guardedCall}）
  * </pre>
+ *
+ * <h2>通知顺序</h2>
+ * 名单序 = 订阅序（各组件在自己的 {@code start()} 里登记 ⇒ 等于装配序）。
+ * 与旧实现（按 {@code getAllByType(Participant.class)} 的注册表序扇出）在相对次序上等价 ——
+ * 两者都是"按装配序"。
  *
  * <h2>本类边界</h2>
  * 不起服、不跑跨实例双玩家读数与 {@code was QUARANTINED} 反例，那些需另行取证。
@@ -50,7 +56,7 @@ public class DamageHookListener implements Listener {
         this.roleManager = roleManager;
     }
 
-    /** 受伤：平台已结算，本处只负责把结果通知承受方实例。 */
+    /** 受伤：平台已结算，本处只负责把结果通知承受方实例的受伤订阅名单。 */
     @EventHandler(ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player victim)) {
@@ -65,10 +71,10 @@ public class DamageHookListener implements Listener {
                 && byEntity.getDamager() instanceof Player damager) {
             source = damager;
         }
-        deliver(instance, "onDamaged", victim, source, event.getDamage());
+        deliverDamaged(instance, new VitalsComponent.Damaged(source, event.getDamage()));
     }
 
-    /** 受治疗：平台已结算，本处只负责把结果通知受治疗方实例。 */
+    /** 受治疗：平台已结算，本处只负责把结果通知受治疗方实例的受治疗订阅名单。 */
     @EventHandler(ignoreCancelled = true)
     public void onEntityRegainHealth(EntityRegainHealthEvent event) {
         if (!(event.getEntity() instanceof Player healed)) {
@@ -78,24 +84,29 @@ public class DamageHookListener implements Listener {
         if (instance == null) {
             return;
         }
-        deliver(instance, "onHealed", healed, null, event.getAmount());
+        deliverHealed(instance, new VitalsComponent.Healed(event.getAmount()));
     }
 
     /**
-     * 按 {@code Participant} 扇出到目标实例的每个组件 —— 逐个经
-     * {@link RoleInstance#deliverHook}，某个组件抛异常时只隔离它、其余照常收到
-     * （若把整个循环塞进一次 deliverHook，首个异常就会让"本次派发"后续组件收不到）。
+     * 把一次受伤投给承受方实例的受伤订阅名单 —— 逐个经
+     * {@link RoleInstance#deliverHook}，某个监听器抛异常时只隔离它、其余照常收到
+     * （若把整个循环塞进一次 deliverHook，首个异常就会让"本次派发"后续监听器收不到）。
+     * <p>该角色没装生命组件 ⇒ 没有名单可投（防御性早退，与 {@code PlayerKilledHookListener} 同款）。
      */
-    private void deliver(RoleInstance instance, String phase, Player target, Player source, double amount) {
-        for (VitalsComponent.Participant participant : instance.getAllByType(VitalsComponent.Participant.class)) {
-            instance.deliverHook((com.shadowHunterRolesPlugin.roleComponent.RoleComponent) participant,
-                    phase, () -> {
-                        if ("onDamaged".equals(phase)) {
-                            participant.onDamaged(source, amount);
-                        } else {
-                            participant.onHealed(amount);
-                        }
-                    });
+    private void deliverDamaged(RoleInstance instance, VitalsComponent.Damaged damaged) {
+        if (!(instance.componentRegistry().getById(VitalsComponent.ID) instanceof VitalsComponent vitals)) {
+            return;
         }
+        vitals.forEachDamagedListener(entry ->
+                instance.deliverHook(entry.owner(), "onDamaged", () -> entry.listener().accept(damaged)));
+    }
+
+    /** 把一次受治疗投给承受方实例的受治疗订阅名单（与 {@link #deliverDamaged} 同一纪律）。 */
+    private void deliverHealed(RoleInstance instance, VitalsComponent.Healed healed) {
+        if (!(instance.componentRegistry().getById(VitalsComponent.ID) instanceof VitalsComponent vitals)) {
+            return;
+        }
+        vitals.forEachHealedListener(entry ->
+                instance.deliverHook(entry.owner(), "onHealed", () -> entry.listener().accept(healed)));
     }
 }

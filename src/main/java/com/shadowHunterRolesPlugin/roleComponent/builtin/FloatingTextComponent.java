@@ -1,9 +1,8 @@
-package com.shadowHunterRolesPlugin.datapack;
+package com.shadowHunterRolesPlugin.roleComponent.builtin;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.core.util.TextUtil;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;

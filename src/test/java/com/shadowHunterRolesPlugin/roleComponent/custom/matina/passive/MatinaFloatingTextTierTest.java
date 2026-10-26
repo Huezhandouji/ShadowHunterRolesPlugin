@@ -1,7 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive;
 
 import com.shadowHunterRolesPlugin.core.util.TextUtil;
-import com.shadowHunterRolesPlugin.datapack.FloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FloatingTextComponent;
 import org.junit.BeforeClass;
 import org.junit.Test;
 

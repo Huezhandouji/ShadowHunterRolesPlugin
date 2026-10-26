@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.albert;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.core.util.TextUtil;
-import com.shadowHunterRolesPlugin.datapack.FloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FloatingTextComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;

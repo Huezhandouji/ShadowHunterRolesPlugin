@@ -1,99 +1,156 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
-import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziChargeComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziMadness;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziSound;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziVfx;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
-import org.bukkit.Particle;
-import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+
 import java.util.List;
 
-
+/**
+ * 一技能：**漫不经心**（模型：烈焰粉）。
+ *
+ * <h2>需求</h2>
+ * <ul>
+ *   <li>使用后立即**尝试充能 1 层**（SanTE ≤ 20 时无条件 2 层）；</li>
+ *   <li>**速度 VIII 持续 0.5 秒**；</li>
+ *   <li>CD **1 秒**，**恢复 1 点能量**（注意是"回复"不是"消耗"）；</li>
+ *   <li>SanTE ≤ 10 档：所有技能附带"周围敌人缓慢 I 1 秒 + 自身 4 点伤害吸收"。</li>
+ * </ul>
+ *
+ * <p>本技能是整套循环的"点火器"：1 秒 CD + 回能，用来把充能层数顶到 3 层，
+ * 因此它**不消耗能量**、也不消耗充能。
+ */
 public class MeiqiheziUnconcernSkill extends Skill {
 
-    /** 本组件的登记 id（id 由组件自己声明）。 */
+    /** 本组件的登记 id。 */
     public static final String ID = "meiqihezi_skill_unconcern";
 
-    private BuffComponent buff;
+    /** 速度时长（刻）—— 需求 0.5 秒。 */
+    public static final int SPEED_TICKS = 10;
 
-    public MeiqiheziUnconcernSkill(String id, ComponentServicesPort services, Specification specification){
+    /** 速度等级 VIII ⇒ amplifier 7。 */
+    public static final int SPEED_AMPLIFIER = 7;
+
+    /** 施放回复的能量（需求：1）。 */
+    public static final int ENERGY_RESTORE = 1;
+
+    /** 10 档：控制余波半径。 */
+    public static final double ECHO_RADIUS = 6d;
+
+    /** 10 档：敌人缓慢时长。 */
+    public static final int ECHO_SLOW_TICKS = 20;
+
+    /** 10 档：自身伤害吸收（4 点 = amplifier 0）。 */
+    public static final int ABSORB_TICKS = 100;
+
+    private BuffComponent buff;    private EnergyComponent energy;
+    private SanTEComponent sante;
+    private FactionComponent faction;
+    private VitalsComponent vitals;
+    private MeiqiheziChargeComponent charge;
+    private MeiqiheziFloatingTextComponent voice;
+
+    public MeiqiheziUnconcernSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
-    /**
-     * 本组件的描述符：名字 / 描述 / 冷却 / 耗能 / 图标由这里声明，
-     * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
-     */
+    /** 描述符：CD 20 刻 / 耗能 0。 */
     public static final class Specification extends Skill.Specification<MeiqiheziUnconcernSkill> {
 
-        public Specification(){
+        public Specification() {
             super(
                     Component.text("漫不经心"),
-                    List.of(Component.text("获得2秒速度5")),
-                    100,
+                    List.of(
+                            Component.text("立即充能 1 层（低 SanTE 时 2 层）"),
+                            Component.text("速度 VIII 持续 0.5 秒"),
+                            Component.text("恢复 1 点能量"),
+                            Component.text("低 SanTE 时附带控制余波")
+                    ),
+                    20,
                     0,
                     Material.BLAZE_POWDER
             );
-            requires(BuffComponent.class);
+            requires(BuffComponent.class).requires(EnergyComponent.class).requires(SanTEComponent.class)
+                    .requires(FactionComponent.class).requires(VitalsComponent.class)
+                    .requires(MeiqiheziChargeComponent.class);
+            requiresOptional(MeiqiheziFloatingTextComponent.class);
         }
 
         @Override
-        public MeiqiheziUnconcernSkill create(String id, ComponentServicesPort services){
+        public MeiqiheziUnconcernSkill create(String id, ComponentServicesPort services) {
             return new MeiqiheziUnconcernSkill(id, services, this);
         }
     }
 
     @Override
-    public void start(){
-        buff = svc().components().get(BuffComponent.class);
+    public void start() {
+        buff = getComponent(BuffComponent.class);
+        energy = getComponent(EnergyComponent.class);
+        sante = getComponent(SanTEComponent.class);
+        faction = getComponent(FactionComponent.class);
+        vitals = getComponent(VitalsComponent.class);
+        charge = getComponent(MeiqiheziChargeComponent.class);
+        voice = getComponent(MeiqiheziFloatingTextComponent.class);
     }
 
-    /**
-     * 右击施放：药水经本组件的 buff 字段（{@code buff.applyPotionEffect(...)}）施加，
-     * 与既有写法同一条已记账路径（效果类型 SPEED / 时长 40 / 增幅 4；
-     * `type.createEffect(40,4)` 的 ambient=false、particles=true 与
-     * `new PotionEffect(type,40,4,false,true)` 一致）。
-     * `canCastSkill` 不满足时直接返回（不启冷却）；冷却由本组件在施放成功处按声明值（100）启动。
-     */
     @Override
-    public void onCast(CastSignal signal){
+    public void onCast(CastSignal signal) {
         Player caster = svc().self().player();
-        if(!buff.canCastSkill()) return;
+        if (caster == null || !buff.canCastSkill()) {
+            return;
+        }
 
-        //药水记账：经 Buff 组件施加，clear() 时只回收本系统施加的效果
-        buff.applyPotionEffect(PotionEffectType.SPEED, 40, 4);
+        int san = sante.current();
+        int stacks = MeiqiheziMadness.doubleCharge(san) ? 2 : 1;
+        charge.addStacks(stacks, caster);
+        energy.increase(ENERGY_RESTORE);
+        buff.applyPotionEffect(PotionEffectType.SPEED, SPEED_TICKS, SPEED_AMPLIFIER, true, false);
 
-        caster.getWorld().playSound(
-                caster.getLocation(),
-                Sound.ITEM_TRIDENT_RIPTIDE_1,
-                1f,
-                1f
-        );
+        MeiqiheziVfx.chargeBurst(caster);
+        MeiqiheziSound.skillCast(caster);
 
-        caster.getWorld().spawnParticle(Particle.EXPLOSION, caster.getLocation(), 1);
+        if (MeiqiheziMadness.controlEcho(san)) {
+            applyControlEcho(caster);
+        }
 
-        startCooldown();   //组件自启冷却（框架不再代启动）
+        if (voice != null) {
+            voice.sayMoment(caster, MeiqiheziFloatingTextComponent.MOMENT_SKILL_UNCONCERN);
+        }
+        startCooldown();
     }
 
-    /**
-     * **闸门放行？**（基类不取 buff，由本组件用自己的字段判）。
-     */
-    @Override
-    protected boolean canUse(){
-        return buff.canCastSkill();
+    /** 10 档：周围敌人缓慢 I 1 秒 + 自身 4 点伤害吸收。 */
+    private void applyControlEcho(Player caster) {
+        for (Player target : caster.getLocation().getNearbyPlayers(ECHO_RADIUS)) {
+            if (target == null || target.equals(caster) || !faction.isHostileTo(target.getUniqueId())) {
+                continue;
+            }
+            buff.applyPotionEffectTo(target, PotionEffectType.SLOWNESS, ECHO_SLOW_TICKS, 0, true, false);
+        }
+        buff.applyPotionEffect(PotionEffectType.ABSORPTION, ABSORB_TICKS, 0, true, false);
+        MeiqiheziVfx.controlEcho(caster.getLocation());
     }
 
-    /**
-     * **当前能量**：本组件不参与能量维度（声明耗能 0），因此返回声明值；
-     * 能量组件的值被 clamp 到 `[0, max]`，故 `current() < 0` 恒假。
-     */
     @Override
-    protected int currentEnergy(){
+    protected boolean canUse() {
+        return buff != null && buff.canCastSkill();
+    }
+
+    @Override
+    protected int currentEnergy() {
         return getEnergyCost();
     }
-
 }

@@ -1,160 +1,344 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
-import com.shadowHunterRolesPlugin.core.util.ParticleUtil;
-import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
-import com.destroystokyo.paper.ParticleBuilder;
-import com.shadowHunterRolesPlugin.core.*;
 import com.shadowHunterRolesPlugin.roleComponent.ScheduledHandle;
-import net.kyori.adventure.text.Component;
-import org.bukkit.*;
-import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.Collection;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
+import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
-import java.util.List;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.TaskComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziChargeComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziMadness;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziSanDrainComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziSound;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziVfx;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.util.Vector;
 
+import java.time.Duration;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * 三技能：**圆弧斩**（模型：烈焰膏）。
+ *
+ * <h2>需求</h2>
+ * <ul>
+ *   <li>引导 <b>0.8 秒</b>：自身<b>缓慢 IV + 抗性 III</b>；</li>
+ *   <li>引导完毕：弓箭命中声 ⇒ 对周围 <b>8 格</b>（SanTE ≤ 40 时 <b>9 格</b>）敌人
+ *       <b>14 物理 + 4~6 特殊值</b>，每命中一名敌人回复 <b>4 生命</b>；</li>
+ *   <li>尝试消耗充能（最多 1 层）：范围内敌人各追加 <b>3 真实伤害</b>，每名敌人额外回复 <b>4 生命</b>
+ *       （SanTE ≤ 50 时再 +2）；</li>
+ *   <li>CD 6 秒、耗能 10；</li>
+ *   <li>表现：起手金红边缘 → 从左手边甩出红金冲击波快速转满一圈 → 命中者身上翻滚菱形。</li>
+ * </ul>
+ *
+ * <h2>★★ 口径申报：引导期间的减速/抗性用 Buff 组件记账</h2>
+ * 走 {@code buff.applyPotionEffect} 而不是 {@code player.addPotionEffect}：角色被清 / 换角色时
+ * 由 Buff 组件统一回收，不会把"缓慢 IV"留在玩家身上。
+ */
 public class MeiqiheziCircleSlashSkill extends Skill {
 
-    /** 本组件的登记 id（id 由组件自己声明）。 */
+    /** 本组件的登记 id。 */
     public static final String ID = "meiqihezi_skill_circle_slash";
 
+    /** 引导时长（刻）—— 需求 0.8 秒。 */
+    public static final int CHANNEL_TICKS = 16;
 
-    private BuffComponent buff;
+    /** 引导期间缓慢等级 IV ⇒ amplifier 3。 */
+    public static final int CHANNEL_SLOW_AMPLIFIER = 3;
+
+    /** 引导期间抗性等级 III ⇒ amplifier 2。 */
+    public static final int CHANNEL_RESIST_AMPLIFIER = 2;
+
+    /** 基础范围（需求 8 格）。 */
+    public static final double RADIUS = 8d;
+
+    /** 40 档额外范围（需求 +1 格）。 */
+    public static final double RADIUS_BONUS = 1d;
+
+    /** 物理伤害（需求 14）。 */
+    public static final double PHYSICAL = 14d;
+
+    /** 特殊值伤害区间（需求 4~6）。 */
+    public static final int SANTE_MIN = 4;
+    public static final int SANTE_MAX = 6;
+
+    /** 每名敌人回复（需求 4）。 */
+    public static final double HEAL_PER_ENEMY = 4d;
+
+    /** 消耗一层充能：每名敌人追加真实伤害（需求 3）。 */
+    public static final double CHARGE_TRUE = 3d;
+
+    /** 消耗一层充能：每名敌人额外回复（需求 4）。 */
+    public static final double CHARGE_HEAL_PER_ENEMY = 4d;
+
+    /** 冲击波动画刻数（一圈）。 */
+    public static final int SWEEP_TICKS = 10;
+
+    /** 10 档控制余波半径。 */
+    public static final double ECHO_RADIUS = 6d;
+
     private EnergyComponent energy;
+    private BuffComponent buff;
     private VitalsComponent vitals;
-    private TaskComponent timer;
+    private SanTEComponent sante;
+    private FactionComponent faction;
+    private TaskComponent timers;
+    private MeiqiheziChargeComponent charge;
+    private MeiqiheziSanDrainComponent sanDrain;
+    private MeiqiheziFloatingTextComponent voice;
 
-    //前摇任务句柄：stop 时取消（平台 Task）
-    private ScheduledHandle castTask;
+    private ScheduledHandle channelVfxTask;
+    private ScheduledHandle detonateTask;
+    private ScheduledHandle sweepTask;
 
-
-    public MeiqiheziCircleSlashSkill(String id, ComponentServicesPort services, Specification specification){
+    public MeiqiheziCircleSlashSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
-    /**
-     * 本组件的描述符：名字 / 描述 / 冷却 / 耗能 / 图标由这里声明，
-     * 栏位由装配点 {@code setSlot} 指定，创建逻辑把描述符自己交给组件。
-     */
+    /** 描述符：CD 120 刻 / 耗能 10。 */
     public static final class Specification extends Skill.Specification<MeiqiheziCircleSlashSkill> {
 
-        public Specification(){
+        public Specification() {
             super(
                     Component.text("圆弧斩"),
-                    List.of(Component.text("前摇1秒后对7m范围内所有敌人造成20真实伤害")),
-                    200,
-                    15,
-                    Material.GOLD_INGOT
+                    List.of(
+                            Component.text("引导 0.8 秒（缓慢 IV + 抗性 III）"),
+                            Component.text("周围 8 格：14 物理 + 4~6 特殊值"),
+                            Component.text("每命中一名敌人回复 4 生命"),
+                            Component.text("消耗 1 层充能：每敌 +3 真伤、+4 回复")
+                    ),
+                    120,
+                    10,
+                    Material.MAGMA_CREAM
             );
-            requires(BuffComponent.class).requires(EnergyComponent.class).requires(VitalsComponent.class).requires(TaskComponent.class);
-            //范围伤害逐个受害者判敌 ⇒ 读阵营组件；缺它则本技能不索敌，装配期就拦住
-            requires(FactionComponent.class);
+            requires(EnergyComponent.class).requires(BuffComponent.class).requires(VitalsComponent.class)
+                    .requires(SanTEComponent.class).requires(FactionComponent.class)
+                    .requires(TaskComponent.class).requires(MeiqiheziChargeComponent.class)
+                    .requires(MeiqiheziSanDrainComponent.class);
+            requiresOptional(MeiqiheziFloatingTextComponent.class);
         }
 
         @Override
-        public MeiqiheziCircleSlashSkill create(String id, ComponentServicesPort services){
+        public MeiqiheziCircleSlashSkill create(String id, ComponentServicesPort services) {
             return new MeiqiheziCircleSlashSkill(id, services, this);
         }
     }
 
     @Override
     public void start() {
-        buff = svc().components().get(BuffComponent.class);
-        energy = svc().components().get(EnergyComponent.class);
-        vitals = svc().components().get(VitalsComponent.class);
-        timer = svc().components().get(TaskComponent.class);
+        energy = getComponent(EnergyComponent.class);
+        buff = getComponent(BuffComponent.class);
+        vitals = getComponent(VitalsComponent.class);
+        sante = getComponent(SanTEComponent.class);
+        faction = getComponent(FactionComponent.class);
+        timers = getComponent(TaskComponent.class);
+        charge = getComponent(MeiqiheziChargeComponent.class);
+        sanDrain = getComponent(MeiqiheziSanDrainComponent.class);
+        voice = getComponent(MeiqiheziFloatingTextComponent.class);
     }
 
-    /**
-     * 右击施放，判定顺序：**先判 `canCastSkill`** —— 不满足则直接返回（被禁用，不施放、不扣能量）；
-     * **再**做能量 `tryConsume` —— 不满足则直接返回（不启冷却）；
-     * 冷却由本组件在施放成功处按声明值 200 启动；缓慢用 5 参重载（`ambient=true, particles=false`）；
-     * 前摇任务由计时组件创建（请求者在首位，**登记进本组件资源表** ⇒ 角色清除时框架兜底取消）。
-     */
     @Override
-    public void onCast(CastSignal signal){
-        Player caster = svc().self().player();
-        if(!buff.canCastSkill()) return;
-        if(!energy.tryConsume(getEnergyCost())) return;
+    public void onCast(CastSignal signal) {
+        final Player caster = svc().self().player();
+        if (caster == null || !buff.canCastSkill()) {
+            return;
+        }
+        if (!energy.tryConsume(getEnergyCost())) {
+            return;
+        }
 
- //药水记账：经 Buff 组件施加，clear() 时只回收本系统施加的效果（标志位逐字一致）
-        buff.applyPotionEffect(PotionEffectType.SLOWNESS, 20, 2, true, false);
+        startCooldown();
 
-        Location loc = caster.getLocation();
+        buff.applyPotionEffect(PotionEffectType.SLOWNESS, CHANNEL_TICKS + 6, CHANNEL_SLOW_AMPLIFIER, true, false);
+        buff.applyPotionEffect(PotionEffectType.RESISTANCE, CHANNEL_TICKS + 6, CHANNEL_RESIST_AMPLIFIER, true, false);
+        MeiqiheziSound.channelStart(caster);
+        if (voice != null) {
+            voice.sayMoment(caster, MeiqiheziFloatingTextComponent.MOMENT_SKILL_CIRCLE);
+        }
 
-        loc.getWorld().playSound(loc, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1f);
+        // 引导开始：真实半径的范围红环 + 第一个字
+        final double radius = RADIUS
+                + (MeiqiheziMadness.circleReachBonus(sante.current()) ? RADIUS_BONUS : 0d);
+        MeiqiheziVfx.channelRange(caster.getLocation(), radius, 0);
+        showChannelText(caster, "圆");
 
-
-
-        castTask = timer.addScheduleLater(this, 20L, new Runnable(){
-
-            @Override
-            public void run() {
-                if(caster.isDead() || !caster.isOnline()){
-                    castTask.cancel();
-                    return;
+        final int[] phase = {0};
+        channelVfxTask = timers.addScheduleRepeating(this, 1L, 2L, () -> {
+            Player player = svc().self().player();
+            if (player == null || !player.isOnline() || player.isDead()) {
+                cancelChannel(player);
+                return;
+            }
+            phase[0]++;
+            MeiqiheziVfx.channelRange(player.getLocation(), radius, phase[0]);
+            switch (phase[0]) {
+                case 2 -> {
+                    showChannelText(player, "圆弧");
+                    MeiqiheziSound.channelTick(player, 1);
                 }
-
-                Location loc = caster.getLocation();
-                ParticleBuilder pb = Particle.DUST.builder()
-                        .count(1)
-                        .color(Color.RED)
-                        .offset(0, 0, 0);
-
-                loc.getWorld().spawnParticle(Particle.EXPLOSION, loc, 1);
-                ParticleUtil.drawCircle(loc.clone().add(0, 1, 0), 7, pb, 80);
-
-                Collection<? extends Player> victims = loc.getNearbyPlayers(7);
-
-                for(Player victim : victims){
-                    if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) continue;
-                    vitals.trueDamage(victim, caster, 20);
+                case 4 -> {
+                    showChannelText(player, "圆弧~");
+                    MeiqiheziSound.channelTick(player, 2);
                 }
-
-                loc.getWorld().playSound(loc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1f, 1f);
+                case 6 -> MeiqiheziSound.channelTick(player, 3);
+                default -> {
+                }
             }
         });
-        startCooldown();   //组件自启冷却（框架不再代启动）
+
+        detonateTask = timers.addScheduleLater(this, CHANNEL_TICKS, () -> detonate(caster, radius));
     }
 
+    private void detonate(Player caster, double radius) {
+        if (channelVfxTask != null) {
+            channelVfxTask.cancel();
+            channelVfxTask = null;
+        }
+        if (caster == null || !caster.isOnline() || caster.isDead()) {
+            return;
+        }
 
+        int san = sante.current();
+        Location center = caster.getLocation();
+        Vector forward = center.getDirection().setY(0d);
+        if (forward.lengthSquared() < 1e-6) {
+            forward = new Vector(0, 0, 1);
+        }
+        forward.normalize();
+        List<Player> victims = new ArrayList<>();
 
-    /**
-     * 停止钩子：容器在 `cancelAllAndClear()` 之前广播，因此本方法能先取消前摇任务；
-     * 框架还会兜底取消本组件资源表内的任务（重复取消幂等）。
-     */
-    @Override
-    public void stop() {
-        if(castTask != null){
-            castTask.cancel();
-            castTask = null;
+        for (Player victim : center.getNearbyPlayers(radius)) {
+            if (victim == null || victim.equals(caster) || !faction.isHostileTo(victim.getUniqueId())) {
+                continue;
+            }
+            victims.add(victim);
+            vitals.physicalDamage(victim, caster, PHYSICAL);
+            int special = SANTE_MIN + ThreadLocalRandom.current().nextInt(SANTE_MAX - SANTE_MIN + 1);
+            sante.decreaseSanTE(victim.getUniqueId(), special);
+            MeiqiheziVfx.slashHit(victim, victims.size());
+        }
+
+        if (!victims.isEmpty() && sanDrain != null) {
+            sanDrain.onHit();
+        }
+
+        double heal = HEAL_PER_ENEMY * victims.size() + MeiqiheziMadness.healBonus(san) * victims.size();
+        // 需求：充能层数**只在命中敌人时**才尝试消耗（空砍不扣层）
+        int used = victims.isEmpty() ? 0 : charge.consume(1);
+        if (used > 0) {
+            for (Player victim : victims) {
+                vitals.trueDamage(victim, caster, CHARGE_TRUE * used);
+            }
+            heal += CHARGE_HEAL_PER_ENEMY * victims.size();
+            MeiqiheziVfx.chargeBurst(caster);
+        }
+        if (heal > 0d) {
+            vitals.heal(caster, heal);
+        }
+
+        if (MeiqiheziMadness.controlEcho(san)) {
+            applyControlEcho(caster);
+        }
+
+        MeiqiheziSound.channelRelease(caster);
+        showSlashTitle(caster);
+        MeiqiheziVfx.impact(center, used > 0);
+        playSweep(center, radius, victims, used > 0, forward);
+    }
+
+    /** 引导文案：金色、逐字浮现（"圆" → "圆弧" → "圆弧~"），走 subtitle 不挡准星。 */
+    private void showChannelText(Player player, String text) {
+        player.showTitle(Title.title(
+                Component.empty(),
+                Component.text(text, NamedTextColor.GOLD).decorate(TextDecoration.BOLD),
+                Title.Times.times(Duration.ZERO, Duration.ofMillis(700), Duration.ofMillis(120))));
+    }
+
+    /** 出刀：屏幕正中一个金色的「斩！」。 */
+    private void showSlashTitle(Player player) {
+        player.showTitle(Title.title(
+                Component.text("斩！", NamedTextColor.GOLD).decorate(TextDecoration.BOLD),
+                Component.empty(),
+                Title.Times.times(Duration.ZERO, Duration.ofMillis(450), Duration.ofMillis(150))));
+    }
+
+    /** 冲击波：从**左手边**（90°）起、角度递减向右手推进，每刻 36°，十刻转满一圈。 */
+    private void playSweep(Location center, double radius, List<Player> victims, boolean charged,
+                           Vector forward) {
+        final int[] step = {0};
+        sweepTask = timers.addScheduleRepeating(this, 1L, 1L, () -> {
+            step[0]++;
+            double angle = 90d - step[0] * (360d / SWEEP_TICKS);
+            MeiqiheziVfx.shockwaveWave(center, forward, radius, angle, step[0]);
+            for (Player victim : victims) {
+                if (victim != null && victim.isOnline() && !victim.isDead()) {
+                    MeiqiheziVfx.rollingDiamond(victim, step[0]);
+                }
+            }
+            if (step[0] >= SWEEP_TICKS) {
+                if (sweepTask != null) {
+                    sweepTask.cancel();
+                    sweepTask = null;
+                }
+                if (charged) {
+                    MeiqiheziVfx.chargedRing(center, radius);
+                }
+            }
+        });
+    }
+
+    private void applyControlEcho(Player caster) {
+        for (Player target : caster.getLocation().getNearbyPlayers(ECHO_RADIUS)) {
+            if (target == null || target.equals(caster) || !faction.isHostileTo(target.getUniqueId())) {
+                continue;
+            }
+            buff.applyPotionEffectTo(target, PotionEffectType.SLOWNESS, 20, 0, true, false);
+        }
+        buff.applyPotionEffect(PotionEffectType.ABSORPTION, 100, 0, true, false);
+        MeiqiheziVfx.controlEcho(caster.getLocation());
+    }
+
+    private void cancelChannel(Player player) {
+        if (channelVfxTask != null) {
+            channelVfxTask.cancel();
+            channelVfxTask = null;
+        }
+        if (detonateTask != null) {
+            detonateTask.cancel();
+            detonateTask = null;
         }
     }
 
-    /**
-     * **闸门放行？**（基类不取 buff，由本组件用自己的字段判）。
-     */
     @Override
-    protected boolean canUse(){
-        return buff.canCastSkill();
+    public void stop() {
+        cancelChannel(null);
+        if (sweepTask != null) {
+            sweepTask.cancel();
+            sweepTask = null;
+        }
     }
 
-    /**
-     * **当前能量**：本组件声明耗能 15，因此必须给出真实能量（否则"能量不足"态不出现）；
-     * 取的是同一个能量组件实例（注册表装配期后冻结、同类型实例唯一，因此字段引用与按需查找恒等）。
-     */
     @Override
-    protected int currentEnergy(){
-        return energy.current();
+    protected boolean canUse() {
+        return buff != null && buff.canCastSkill();
     }
 
+    @Override
+    protected int currentEnergy() {
+        return energy == null ? 0 : energy.current();
+    }
 }

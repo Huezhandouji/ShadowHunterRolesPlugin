@@ -141,7 +141,7 @@ public abstract class EvolutionPassive extends PassiveSkill {
      * 理由与 {@code ActiveComponent#awake()} 那条同一口径：
      * 本族"杀人就 +1"这条能力**全部**依赖这里的那一行订阅；若子类覆写 {@code start()} 而忘了
      * {@code super.start()}，结果不是报错，而是**静默失效**（等级永远停在 0，日志里一句都没有）。
-     * 实测事故先例：{@code CangluBlueIceRevolverSkill} 曾覆写 {@code awake()} 且未调 {@code super}，
+     * 实测事故先例：{@code HeronRevolverSkill} 曾覆写 {@code awake()} 且未调 {@code super}，
      * 栏位登记没执行 ⇒ 热键栏里没有该物品、且无任何报错。{@code final} 把"漏调"从**静默失效**
      * 变成**编译错误**（本仓口径：漏写要成为编译错误，不是运行期惊喜）。
      *

@@ -89,8 +89,8 @@ public abstract class Skill extends ActiveComponent {
      * （`Specification#deriveProvidedType()`）沿 `getClass()` 链找第一个 `...Specification<X>` 的
      * 泛型实参。若本类写死 `HotbarSpecification<Skill>`，任何技能的嵌套描述符都会推导成
      * `Skill.class`（族级），别的组件写 `requires(某个具体技能.class)` 永远不满足；参数化后，
-     * 具体组件把 `<自己>` 传上来，推导结果是具体类（实测事故：`CangluTraumaMainWeapon` 声明
-     * `requires(CangluHysteriaPassive.class)`，而后者推导成 `PassiveSkill.class`
+     * 具体组件把 `<自己>` 传上来，推导结果是具体类（实测事故：`HeronMainWeapon` 声明
+     * `requires(HeronTraumaPassive.class)`，而后者推导成 `PassiveSkill.class`
      * ⇒ 装配期报「缺必需依赖」）。
      * <p>本类型不实现 {@link #create(String, ComponentServicesPort)}，具体组件必须自己声明嵌套
      * `Specification` 并覆写它（编译期强制）。

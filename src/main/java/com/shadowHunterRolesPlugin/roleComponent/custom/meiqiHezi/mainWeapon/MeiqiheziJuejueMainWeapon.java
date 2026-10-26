@@ -1,152 +1,403 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon;
-import com.shadowHunterRolesPlugin.roleComponent.builtin.Buff;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
-import com.destroystokyo.paper.ParticleBuilder;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
-import com.shadowHunterRolesPlugin.core.util.ParticleUtil;
-import net.kyori.adventure.text.Component;
-import org.bukkit.Color;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.Particle;
-import org.bukkit.Sound;
-import org.bukkit.entity.Player;
-
-import java.util.Collection;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.FactionComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
-import java.util.List;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziChargeComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziMadness;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziSanDrainComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziSound;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziThrowComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziVfx;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.util.Vector;
 
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * 「梅妻鹤子」主武器：**决爵**（模型：钻石锄）。
+ *
+ * <h2>需求逐条</h2>
+ * <ul>
+ *   <li>触及范围 <b>+1</b>（满充能再 <b>+1</b>）；攻速压到 100；</li>
+ *   <li>每次命中：<b>8 物理 + 3~6 特殊值</b>，击退 <b>1</b>；普攻 CD <b>0.1 秒</b>；</li>
+ *   <li>充能 ≥1 时：每次命中额外 <b>回复 4 生命</b> + 对触及范围内所有敌人 <b>3 真实伤害</b>；</li>
+ *   <li>右键**蓄力 0.8 秒**（subtitle 显示"蓄力中..."、缓慢 I），松手取消，满 0.8 秒丢出武器；</li>
+ *   <li>每次尝试普攻都在准星前划出红金半圆弧剑气 + 破空声；命中追加敲铁声与清脆音效；</li>
+ *   <li>武器离手期间主武器不可用（图标转红屏障）。</li>
+ * </ul>
+ *
+ * <h2>★★ 口径申报：蓄力用 {@code startUsingItem} 而不是 {@code isHandRaised()} 裸判</h2>
+ * 工程教训（§8）：{@code isHandRaised()} 在"没真正开始使用物品"时不可靠。这里主动
+ * {@code startUsingItem(HAND)} 把状态置起来，每 6 刻续一次（防原版把它清掉），松手即取消；
+ * 前 2 刻不判松手（刚置位时的抖动窗口）。
+ *
+ * <h2>★★ 口径申报：触及范围走物品属性，不动玩家属性</h2>
+ * 用 {@code ENTITY_INTERACTION_RANGE} 的**物品修饰符**：换下武器即自动失效，不需要在
+ * {@code stop()} 里回滚玩家属性（少一处"忘了还原"的静默失效）。
+ */
 public class MeiqiheziJuejueMainWeapon extends MainWeapon {
 
-    /** 本组件的登记 id（id 由组件自己声明）。 */
+    /** 本组件的登记 id。 */
     public static final String ID = "meiqihezi_mainWeapon_juejue";
+
+    /** 基础物理伤害（需求：8）。 */
+    public static final double BASE_PHYSICAL = 8d;
+
+    /** 特殊值伤害区间（需求：3~6）。 */
+    public static final int SANTE_MIN = 3;
+    public static final int SANTE_MAX = 6;
+
+    /** 击退强度（需求：1）。 */
+    public static final double KNOCKBACK = 1d;
+
+    /** 蓄力时长（刻）—— 需求：0.8 秒。 */
+    public static final int CHARGE_TICKS = 16;
+
+    /** 蓄力期间每几刻续一次"正在使用物品"。 */
+    public static final int USE_REFRESH_TICKS = 6;
+
+    /** 蓄力 subtitle 刷新间隔（刻）。 */
+    public static final int SUBTITLE_INTERVAL_TICKS = 10;
+
+    /** 充能攻击的回复量（需求：4）。 */
+    public static final double CHARGED_HEAL = 4d;
+
+    /** 充能攻击的范围真实伤害（需求：3）。 */
+    public static final double CHARGED_TRUE_DAMAGE = 3d;
+
+    /** 充能攻击的范围基准（格）—— 基础触及 3 + 1（武器）+ 满层 1。 */
+    public static final double CHARGED_RADIUS_BASE = 4d;
+
+    /** 30 档暴击概率。 */
+    public static final double CRIT_CHANCE = 0.20d;
+
+    /** 30 档暴击倍率。 */
+    public static final double CRIT_MULTIPLIER = 1.5d;
+
+    /** 40 档拉回概率。 */
+    public static final double PULL_CHANCE = 0.15d;
+
+    /** 触及范围修饰符键（★ 静态键：离线测试需装 KeyFactory 桩）。 */
+    private static final NamespacedKey REACH_KEY = KeyFactory.Registry.of("meiqihezi_reach");
+
+    /** 攻速修饰符键。 */
+    private static final NamespacedKey ATTACK_SPEED_KEY = KeyFactory.Registry.of("meiqihezi_attack_speed");
 
     private VitalsComponent vitals;
     private EnergyComponent energy;
- //**可用性判定下放给子类**（基类不持 buff / energy、不查容器）⇒
-    //  本组件自己持 buff 字段（在 start() 内一次查好）。
     private BuffComponent buff;
+    private FactionComponent faction;
+    private SanTEComponent sante;
+    private MeiqiheziChargeComponent charge;
+    private MeiqiheziThrowComponent throwSystem;
+    private MeiqiheziSanDrainComponent sanDrain;
+    private MeiqiheziFloatingTextComponent voice;
+    private HotbarRenderComponent render;
 
+    private boolean charging;
+    private int chargeTicks;
+    private int lastSubtitleTick;
+    private int phase;
 
     public MeiqiheziJuejueMainWeapon(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
     }
 
-    /**
-     * 本组件的描述符：名字 / 描述 / 图标 / 冷却由这里声明（主武器的能量消耗由类型恒为 0），
-     * 栏位由装配点 {@code setSlot} 指定。
-     */
+    /** 描述符：名称 / 图标 / 冷却（2 刻 = 0.1 秒）。 */
     public static final class Specification extends MainWeapon.Specification<MeiqiheziJuejueMainWeapon> {
 
-        public Specification(){
+        public Specification() {
             super(
-                    Component.text("Jue Jue"),
-                    List.of(Component.text("A ShadowHunter mainWeapon")),
+                    Component.text("决爵"),
+                    List.of(
+                            Component.text("每次命中：8 物理 + 3~6 特殊值，击退 1"),
+                            Component.text("每秒耗 5 能量充能（上限 3 层）"),
+                            Component.text("充能攻击：回 4 生命 + 触及范围 3 真伤"),
+                            Component.text("右键蓄力 0.8 秒丢出武器"),
+                            Component.text("触及 +1，满充能再 +1")
+                    ),
                     Material.DIAMOND_HOE,
-                    20
+                    2
             );
-            requires(VitalsComponent.class).requires(EnergyComponent.class).requires(BuffComponent.class);
-            //范围伤害逐个受害者判敌 ⇒ 读阵营组件；缺它则本武器不索敌，装配期就拦住
-            requires(FactionComponent.class);
+            requires(VitalsComponent.class).requires(EnergyComponent.class).requires(BuffComponent.class)
+                    .requires(FactionComponent.class).requires(SanTEComponent.class)
+                    .requires(MeiqiheziChargeComponent.class).requires(MeiqiheziThrowComponent.class)
+                    .requires(MeiqiheziSanDrainComponent.class);
+            requiresOptional(MeiqiheziFloatingTextComponent.class);
         }
 
         @Override
-        public MeiqiheziJuejueMainWeapon create(String id, ComponentServicesPort services){
+        public MeiqiheziJuejueMainWeapon create(String id, ComponentServicesPort services) {
             return new MeiqiheziJuejueMainWeapon(id, services, this);
         }
     }
 
-    /**
-     * 攻击路径（`MainWeaponListener.onAttackPlayer` 接到 `instance.handleAttack`）。
-     * <p>两条分支：
-     * <ul>
-     *   <li>能量 `>= 20`：走{@link #castAreaDamage(Player)} 那一套范围逻辑（与左键分支同一套）；</li>
-     *   <li>能量 `< 20`：单体 `8` 物理伤害 + `0.5` 击退。</li>
-     * </ul>
-     * 两条分支各自启动一次冷却，单次命中不会双启动。
-     */
+    @Override
+    public void start() {
+        vitals = getComponent(VitalsComponent.class);
+        energy = getComponent(EnergyComponent.class);
+        buff = getComponent(BuffComponent.class);
+        faction = getComponent(FactionComponent.class);
+        sante = getComponent(SanTEComponent.class);
+        charge = getComponent(MeiqiheziChargeComponent.class);
+        throwSystem = getComponent(MeiqiheziThrowComponent.class);
+        sanDrain = getComponent(MeiqiheziSanDrainComponent.class);
+        voice = getComponent(MeiqiheziFloatingTextComponent.class);
+        render = getComponent(HotbarRenderComponent.class);
+    }
+
+    // ───────── 物品：光效 / 触及 / 攻速 ─────────
+
+    @Override
+    public ItemStack buildItem() {
+        ItemStack stack = super.buildItem();
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) {
+            return stack;
+        }
+        boolean glint = charge != null && charge.hasCharge();
+        meta.setEnchantmentGlintOverride(glint);
+        meta.setUnbreakable(true);
+
+        double reach = 1d + (charge == null ? 0 : charge.extraReach());
+        meta.removeAttributeModifier(Attribute.ENTITY_INTERACTION_RANGE);
+        meta.addAttributeModifier(Attribute.ENTITY_INTERACTION_RANGE, new AttributeModifier(
+                REACH_KEY, reach, AttributeModifier.Operation.ADD_NUMBER));
+        meta.removeAttributeModifier(Attribute.ATTACK_SPEED);
+        meta.addAttributeModifier(Attribute.ATTACK_SPEED, new AttributeModifier(
+                ATTACK_SPEED_KEY, 100d, AttributeModifier.Operation.ADD_NUMBER));
+
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    // ───────── 攻击 ─────────
+
     @Override
     public void onAttack(AttackSignal signal) {
         Player attacker = svc().self().player();
         Player victim = signal.victim();
-
- //如果能量大于20，则进行范围伤害 —— 不能直接 return
-        if (energy.current() >= 20) {
-            castAreaDamage(attacker);
-            startCooldown();   //组件自启冷却（框架不再代启动）
+        if (attacker == null || victim == null) {
+            return;
+        }
+        if (charging || throwSystem.isOut() || isCoolingDown() || !canUse()) {
+            return;
+        }
+        if (!faction.isHostileTo(victim.getUniqueId())) {
             return;
         }
 
-        if (victim != null) {
-            vitals.physicalDamage(victim, attacker, 8, 0.5);
+        int san = sante.current();
+        boolean crit = MeiqiheziMadness.critChance(san) && ThreadLocalRandom.current().nextDouble() < CRIT_CHANCE;
+        double multiplier = crit ? CRIT_MULTIPLIER : 1d;
+
+        double physical = BASE_PHYSICAL + (MeiqiheziMadness.attackBonus(san) ? 2d : 0d);
+        int special = SANTE_MIN + ThreadLocalRandom.current().nextInt(SANTE_MAX - SANTE_MIN + 1);
+        if (MeiqiheziMadness.attackBonus(san)) {
+            special += 1;
         }
-        startCooldown();   //组件自启冷却（框架不再代启动）
+
+        vitals.physicalDamage(victim, attacker, physical * multiplier, KNOCKBACK);
+        sante.decreaseSanTE(victim.getUniqueId(), (int) Math.round(special * multiplier));
+
+        // 2026-10-21 需求 4：每次命中敌人扣自己 3 点 SanTE（多目标只记一次）
+        if (sanDrain != null) {
+            sanDrain.onHit();
+        }
+
+        if (MeiqiheziMadness.pullChance(san)
+                && ThreadLocalRandom.current().nextDouble() < PULL_CHANCE) {
+            pullToward(attacker, victim);
+        }
+
+        if (charge.hasCharge()) {
+            // 2026-10-21 需求：普攻**每命中消耗 1 层**充能（消耗成功才结算回血 + 范围真伤）；
+            // 半径按"消耗前"的层数取，满层那一下仍然享受 +1 格
+            double radius = CHARGED_RADIUS_BASE + charge.extraReach();
+            if (charge.consume(1) > 0) {
+                chargedStrike(attacker, san, radius);
+            }
+        }
+
+        MeiqiheziVfx.slashArc(attacker, ThreadLocalRandom.current().nextInt(4));
+        MeiqiheziVfx.hitMarker(victim, phase++);
+        MeiqiheziSound.slash(attacker);
+        MeiqiheziSound.hit(attacker);
+        say(MeiqiheziFloatingTextComponent.MOMENT_HIT);
+        startCooldown();
     }
 
-    /**
-     * 左键路径（`CastTrigger.LEFT_CLICK` 分支）：能量 `< 20` 时不做事且不启动冷却；
-     * 能量 `>= 20` 时打出范围伤害，冷却由本组件在施放成功处按声明值启动。
-     */
+    /** 充能攻击：回血 + 触及范围内 3 点真实伤害（{@code radius} 由调用方在消耗前算好）。 */
+    private void chargedStrike(Player attacker, int san, double radius) {
+        double heal = CHARGED_HEAL + MeiqiheziMadness.healBonus(san);
+        vitals.heal(attacker, heal);
+
+        Location center = attacker.getLocation();
+        for (Player candidate : center.getNearbyPlayers(radius)) {
+            if (candidate == null || candidate.equals(attacker)) {
+                continue;
+            }
+            if (!faction.isHostileTo(candidate.getUniqueId())) {
+                continue;
+            }
+            vitals.trueDamage(candidate, attacker, CHARGED_TRUE_DAMAGE);
+        }
+        MeiqiheziSound.chargedHit(attacker);
+        MeiqiheziVfx.fullChargePulse(attacker);
+    }
+
+    /** 40 档：把敌人向自己拉回 1 格。 */
+    private void pullToward(Player attacker, Player victim) {
+        Vector delta = attacker.getLocation().toVector().subtract(victim.getLocation().toVector());
+        if (delta.lengthSquared() < 1e-4) {
+            return;
+        }
+        victim.setVelocity(delta.normalize().multiply(0.62d).setY(0.18d));
+    }
+
+    // ───────── 施放：右键蓄力 / 左键空挥 ─────────
+
     @Override
     public void onCast(CastSignal signal) {
-        if (signal.trigger() != CastTrigger.LEFT_CLICK) {
+        if (signal == null || signal.trigger() == null) {
+            return;
+        }
+        Player player = svc().self().player();
+        if (player == null) {
             return;
         }
 
-        Player player = svc().self().player();
-        if (energy.current() < 20) return;
-
-        castAreaDamage(player);
-        startCooldown();   //组件自启冷却（框架不再代启动）
-    }
-
-    /**
-     * 范围伤害（左键与"能量 >= 20 的近战命中"共用同一套逻辑）：
-     * 扣能量 `5`；半径 `5` 的粒子圆、粒子数 `50`；半径 `5` 判定圈内敌对目标各 `14` 点物理伤害；末尾音效。
-     */
-    private void castAreaDamage(Player player) {
-        energy.tryConsume(5);
-
-        Location loc = player.getLocation();
-
-        ParticleBuilder pb = Particle.DUST.builder()
-                .count(1)
-                .color(Color.RED)
-                .offset(0, 0, 0);
-
-        ParticleUtil.drawCircle(loc.clone().add(0, 1, 0), 5, pb, 50);
-
-        Collection<? extends Player> victims = loc.getNearbyPlayers(5);
-
-        for (Player victim : victims) {
-            if (!svc().components().get(FactionComponent.class).isHostileTo(victim.getUniqueId())) continue;
-            vitals.physicalDamage(victim, player, 14);
+        if (signal.trigger() == CastTrigger.LEFT_CLICK) {
+            if (charging || throwSystem.isOut() || isCoolingDown() || !canUse()) {
+                return;
+            }
+            MeiqiheziVfx.slashArc(player, ThreadLocalRandom.current().nextInt(4));
+            MeiqiheziSound.slash(player);
+            startCooldown();
+            return;
         }
 
-        loc.getWorld().playSound(loc, Sound.ITEM_TRIDENT_THROW, 1f, 0.8f);
+        if (signal.trigger() != CastTrigger.RIGHT_CLICK) {
+            return;
+        }
+        beginCharge(player);
     }
 
-    /**
-     * **开始生效**：把协作组件一次查好缓存进字段（与本族模型一致）。
-     * <p>取组件只能在本钩子里做，不得放 `awake()`；注册表装配后冻结，因此与按需解析恒等。
-     */
+    private void beginCharge(Player player) {
+        if (charging || throwSystem.isOut() || isCoolingDown() || !canUse()) {
+            return;
+        }
+        charging = true;
+        chargeTicks = 0;
+        lastSubtitleTick = 0;
+        player.startUsingItem(EquipmentSlot.HAND);
+        buff.applyPotionEffect(PotionEffectType.SLOWNESS, CHARGE_TICKS + 8, 0, true, false);
+        MeiqiheziSound.chargeStart(player);
+        showChargeSubtitle(player);
+        say(MeiqiheziFloatingTextComponent.MOMENT_CHARGE);
+    }
+
     @Override
-    public void start(){
-        vitals = svc().components().get(VitalsComponent.class);
-        energy = svc().components().get(EnergyComponent.class);
-        buff = svc().components().get(BuffComponent.class);
+    public void update() {
+        if (!charging) {
+            return;
+        }
+        Player player = svc().self().player();
+        if (player == null || !player.isOnline() || player.isDead()) {
+            charging = false;
+            return;
+        }
+
+        chargeTicks++;
+        // 松手取消：前 2 刻是 startUsingItem 的置位抖动窗口，不判
+        if (chargeTicks > 2 && !player.isHandRaised()) {
+            cancelCharge(player);
+            return;
+        }
+        if (chargeTicks % USE_REFRESH_TICKS == 0 && chargeTicks < CHARGE_TICKS) {
+            player.startUsingItem(EquipmentSlot.HAND);
+        }
+        if (chargeTicks - lastSubtitleTick >= SUBTITLE_INTERVAL_TICKS) {
+            lastSubtitleTick = chargeTicks;
+            showChargeSubtitle(player);
+        }
+        if (chargeTicks >= CHARGE_TICKS) {
+            releaseThrow(player);
+        }
+        requestRepaint();
     }
 
-    /**
-     * **闸门放行？**（基类不取 buff，由本组件用自己的字段判）。
-     */
+    private void showChargeSubtitle(Player player) {
+        player.showTitle(Title.title(
+                Component.empty(),
+                Component.text("蓄力中...", NamedTextColor.GOLD).decorate(TextDecoration.BOLD),
+                Title.Times.times(Duration.ZERO, Duration.ofMillis(600), Duration.ofMillis(120))));
+    }
+
+    private void cancelCharge(Player player) {
+        charging = false;
+        if (player != null && player.isOnline()) {
+            player.clearActiveItem();
+        }
+        requestRepaint();
+    }
+
+    private void releaseThrow(Player player) {
+        charging = false;
+        player.clearActiveItem();
+        if (throwSystem.throwWeapon(player)) {
+            MeiqiheziSound.throwWeapon(player);
+            say(MeiqiheziFloatingTextComponent.MOMENT_THROW);
+            startCooldown();
+        }
+        requestRepaint();
+    }
+
+    // ───────── 闸门 ─────────
+
     @Override
-    protected boolean canUse(){
-        return buff.canUseMainWeapon();
+    protected boolean canUse() {
+        return buff != null && buff.canUseMainWeapon() && throwSystem != null && !throwSystem.isOut();
     }
 
+    /** 语音（可选组件；缺失则静默）。 */
+    private void say(String moment) {
+        if (voice == null) {
+            return;
+        }
+        Player player = svc().self().player();
+        if (player == null) {
+            return;
+        }
+        voice.sayMoment(player, moment);
+    }
+
+    private void requestRepaint() {
+        if (render != null) {
+            render.markDirty();
+        }
+    }
 }

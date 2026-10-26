@@ -21,7 +21,7 @@ import java.util.Map;
  * 两个监听器都落在平台事件面上，但对事件的处理姿态相反，不是同一族：
  * <ul>
  *   <li><b>{@code DamageHookListener}（读侧 / 回调侧）</b>：伤害早已由平台结算，因此监听器只读、绝不取消；
- *       它只把结果通知给组件（{@code Participant}，{@code void}）。</li>
+ *       它只把结果通知给生命组件的订阅名单（{@code addDamagedListener}，{@code void}）。</li>
  *   <li><b>本类（保护侧）</b>：目标是"不让物品被拿走"，实现手段只能是 {@code setCancelled(true)}。
  *       若照"只读不取消"写，则什么都保护不了 —— 那是假功能。</li>
  * </ul>

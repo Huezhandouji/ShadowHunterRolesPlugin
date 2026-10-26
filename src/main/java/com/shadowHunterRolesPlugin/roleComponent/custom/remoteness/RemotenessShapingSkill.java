@@ -172,7 +172,7 @@ public class RemotenessShapingSkill extends Skill {
     /**
      * 停止生效：把场收掉（取消扫描任务 + 删掉全部仍在世界里的粒子点）。
      * <p>这是**必须**的：{@link Marker} 是真实实体，不删就会在组件已死之后永远留在世界里
-     * （没人再推它、也没人会删它）——与 {@code CangluBlueIceRevolverSkill} 回收自己的子弹同源。
+     * （没人再推它、也没人会删它）——与 {@code HeronRevolverSkill} 回收自己的子弹同源。
      */
     @Override
     public void stop() {

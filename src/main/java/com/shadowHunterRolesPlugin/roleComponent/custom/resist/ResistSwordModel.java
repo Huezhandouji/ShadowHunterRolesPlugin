@@ -20,7 +20,7 @@ import java.util.List;
  *
  * <p>为什么用展示实体：无碰撞箱、不参与伤害、不受重力，且可以逐刻改位置/缩放做出
  * "从地底拔出 → 悬停 → 落回地面消散"的动画；工程先例 = 苍鹭抓钩头的
- * {@link ItemDisplay}（同目录 {@code CangluMelodySelectionSkill}）。
+ * {@link ItemDisplay}（同目录 {@code HeronHookSkill}）。
  *
  * <p>生命周期由技能每刻调 {@link #tick()} 推进；技能 {@code stop()} / 玩家死亡时必须调
  * {@link #remove()} —— 展示实体是**世界实体**，不在框架资源表里，漏删会永久残留。

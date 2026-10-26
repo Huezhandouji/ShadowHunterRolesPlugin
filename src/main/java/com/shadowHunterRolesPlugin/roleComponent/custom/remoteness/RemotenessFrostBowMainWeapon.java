@@ -165,7 +165,7 @@ public class RemotenessFrostBowMainWeapon extends BowWeapon {
      * <p>为什么**不**把还在飞的箭移除：那些箭是原版的普通箭（不是本插件生成的实体），
      * 玩家已经付出一支箭、也已看到它飞出去 —— 中途"凭空消失"是玩家可见的怪事。
      * 本组件只是**不再观察**它们：它们继续按原版规则飞完、落地。
-     * （对比：{@code CangluBlueIceRevolverSkill} 必须把自己的 Marker 子弹收回 —— 那些是它自己生成的实体，
+     * （对比：{@code HeronRevolverSkill} 必须把自己的 Marker 子弹收回 —— 那些是它自己生成的实体，
      * 不收回就是实体泄漏。两者口径不同，因为"谁生成了这个实体"不同。）
      */
     @Override

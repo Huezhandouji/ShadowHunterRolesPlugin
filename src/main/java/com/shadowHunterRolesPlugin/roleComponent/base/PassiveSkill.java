@@ -54,7 +54,7 @@ public abstract class PassiveSkill extends RoleComponent {
      * 因此被动不占热键栏是编译期事实（不是"装配点自觉传 -1"）：拿着被动描述符根本写不出指定栏位的代码。
      * <p>泛型化（`<P>` = 本组件自己的类型；理由同 `Skill.Specification`）：参数化后
      * `providedType()` 推导出具体被动类，别的组件可以 `requires(某具体被动.class)`
-     * （实测事故：`CangluTraumaMainWeapon` 声明 `requires(CangluHysteriaPassive.class)`，
+     * （实测事故：`HeronMainWeapon` 声明 `requires(HeronTraumaPassive.class)`，
      * 而后者推导成 `PassiveSkill.class` ⇒ 装配期报「缺必需依赖」）。
      * <p>本类型不实现 {@link #create(String, ComponentServicesPort)}，具体组件必须自己声明嵌套
      * `Specification` 并覆写它（编译期强制）。

@@ -400,7 +400,7 @@ public class TekTridentMainWeapon extends MainWeapon implements OperationProvide
         //② 4 点真实伤害（需求：真实伤害）
         vitals.trueDamage(victim, owner, TRUE_DAMAGE);
         //★ 连打必需（组件侧，不动框架）：扣血之后再清一次受击无敌帧。
-        //  原因见 CangluTraumaMainWeapon#clearHitInterval 的说明 ——
+        //  原因见 HeronMainWeapon#clearHitInterval 的说明 ——
         //  DamageUtil 只在扣血【前】清一次，而 damage() 结算后会把 noDamageTicks 设回 20 刻，
         //  那 20 刻内若目标先被"不经本插件伤害入口"的来源打中，我们下一击仍会被吞。
         victim.setNoDamageTicks(0);

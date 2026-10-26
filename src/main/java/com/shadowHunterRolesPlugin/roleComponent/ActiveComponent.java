@@ -69,7 +69,7 @@ public abstract class ActiveComponent extends RoleComponent {
      * <h2>为什么本方法是 {@code final}</h2>
      * 子类不能覆写它 —— 它只做"栏位登记"这一件事，而登记绝不允许被漏掉；
      * 需要自己的装配期初始化时覆写钩子 {@link #onAwake()}（本方法会替你调用）。
-     * <p>实测事故：{@code CangluBlueIceRevolverSkill} 曾覆写 {@code awake()} 且未调 super，
+     * <p>实测事故：{@code HeronRevolverSkill} 曾覆写 {@code awake()} 且未调 super，
      * 于是登记没执行、热键栏里没有左轮，且无任何报错 —— 改为 {@code final} 后从编译期堵死这条路。
      */
     @Override

@@ -282,7 +282,7 @@ public class MatinaSeaCrystalLampSkill extends Skill {
      * </ul>
      *
      * <p>★ 覆写口径照仓库既有先例（{@code MatinaRedstoneDroneSkill#buildItem} /
-     * {@code CangluBlueIceRevolverSkill#buildItem}）：先 {@code super.buildItem()} 拿基类成品、
+     * {@code HeronRevolverSkill#buildItem}）：先 {@code super.buildItem()} 拿基类成品、
      * 再在其上后处理 ⇒ 识别键 / 名称 / lore 全部保留。
      */
     @Override

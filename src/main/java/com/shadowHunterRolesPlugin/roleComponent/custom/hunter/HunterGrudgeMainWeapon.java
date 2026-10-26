@@ -70,7 +70,7 @@ import java.util.Random;
  * {@code DamageUtil.dealtPhysicalDamage} 只在扣血**前**清 {@code noDamageTicks}，而
  * {@code damage()} 结算后会把该值设回 20 刻 ⇒ 0.3 秒连打期间若目标先被"不经本插件伤害入口"
  * 的来源打中，本武器下一击仍会被吞。扣血后再清一次即可免疫这种情形
- * （工程既有先例：{@code CangluTraumaMainWeapon#clearHitInterval}，
+ * （工程既有先例：{@code HeronMainWeapon#clearHitInterval}，
  * 本处按 {@code MatinaMedicalShovelMainWeapon} 的写法**内联**一行，不另建跨类工具）。
  */
 public class HunterGrudgeMainWeapon extends MainWeapon {

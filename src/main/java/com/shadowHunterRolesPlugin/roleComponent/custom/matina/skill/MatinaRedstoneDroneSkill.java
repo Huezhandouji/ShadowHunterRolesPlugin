@@ -680,7 +680,7 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
      *   </li>
      * </ol>
      *
-     * <p>★ 覆写口径照仓库既有先例（{@code CangluBlueIceRevolverSkill#buildItem}）：
+     * <p>★ 覆写口径照仓库既有先例（{@code HeronRevolverSkill#buildItem}）：
      * 先调 {@code super.buildItem()} 拿基类成品，再在其上后处理 ⇒ 识别键 / 名称 / lore 全部保留
      * （键必须保留，否则点击无反应、角色清除时物品残留）。
      */

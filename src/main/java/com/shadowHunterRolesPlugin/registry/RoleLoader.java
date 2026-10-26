@@ -11,11 +11,13 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertLockOnPassi
 import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertOverloadSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.albert.AlbertThrustSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluBlueIceRevolverSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluDestinySkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluHysteriaPassive;
-import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluMelodySelectionSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.CangluTraumaMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronRevolverSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronEquipmentsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronFateSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronTraumaPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronHookSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterEvolutionPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterGrudgeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPounceSkill;
@@ -123,7 +125,7 @@ public class RoleLoader {
                 new Definition("meiqihezi", RoleLoader::meiqiheziBuilder),
                 new Definition("red", RoleLoader::redBuilder),
                 new Definition("selfUpdateExample", RoleLoader::selfUpdateExampleBuilder),
-                new Definition("canglu", RoleLoader::cangluBuilder),
+                new Definition("Heron", RoleLoader::cangluBuilder),
                 new Definition("sinThorn", RoleLoader::sinThornBuilder),
                 new Definition("matina", RoleLoader::matinaBuilder),
                 new Definition("remoteness", RoleLoader::remotenessBuilder),
@@ -267,39 +269,44 @@ public class RoleLoader {
     }
 
     /**
-     * 苍鹭（阵营 HUNTER）：创痕主武器 + 澜冰左轮 + 旋律选取 + 湛蓝命运，被动「深度癒症」。
+     * 苍鹭（阵营 HUNTER）：忧郁创痕（主武器）+ 音澜（双持左轮）+ 旋律选取（勾爪）+ 湛蓝命运（大招），
+     * 被动「深度癔症」。
      *
      * <p>装配口径：
      * <ul>
      *   <li><b>主武器「忧郁创痕」占 0 号栏</b> —— 插件只把攻击事件投递给主武器组件，
      *       「每次攻击叠一层创伤」因此必须有它作为落点；</li>
-     *   <li>澜冰左轮占 1 号栏（右键射击、Q 换弹），旋律选取占 2 号栏（右键发射抓钩），
-     *       湛蓝命运占 3 号栏（右键清负面 + 叠满创伤 + 8 秒强化窗口）；</li>
-     *   <li>「深度癒症」经 {@code addComponent} 统一入口注册（被动无栏位，不占热键栏），
-     *       它是「创伤」层数的唯一持有者，也是湛蓝命运 8 秒窗口的订阅源；</li>
+     *   <li>音澜占 1 号栏（左键左枪 / 右键右枪 / 双手同按齐射、Q 双手换弹），
+     *       旋律选取占 2 号栏（右键发射勾爪、再按拉拽），
+     *       湛蓝命运占 3 号栏（右键突进 + 展开领域）；</li>
+     *   <li>「深度癔症」经 {@code addComponent} 统一入口注册（被动无栏位，不占热键栏），
+     *       它是「创伤」层数的唯一持有者；</li>
      *   <li>基础属性不显式声明，与其余角色一致，走框架默认；</li>
-     *   <li>数值：创痕 6 点物伤 + 12 点 SanTE + 抽 2 能量；
-     *       左轮 每发 6 点物伤 / 8 发弹夹 / 换弹 8 能量 + 瞬移身后 4 点真伤；
-     *       旋律选取 12 点物伤 + 拉拽（抗性 IV），CD 4 刻、耗能 4、存量 2 个、储存冷却 15 秒；
-     *       湛蓝命运 速度 X 2 秒 + 叠满创伤 + 8 秒窗口，CD 16 刻、耗能 16。</li>
+     *   <li>数值（真值在各自组件里，这里是摘要）：忧郁创痕 10 物伤 + 3~7 SanTE + 抽 5 能量、0.1 秒一击；
+     *       音澜 双枪各 6 发、单发 8 物伤 + 3~5 SanTE、换弹 32 刻 / 每把 15 能量；
+     *       旋律选取 8 物伤 + 4~6 SanTE、存量 2 个、12 秒恢复一个 / 10 能量；
+     *       湛蓝命运 8 格突进 + r25 领域 20 秒，<b>每次使用消耗 10 能量</b>，
+     *       领域内 CD 4 秒、领域结束后 25 秒冷却。</li>
      * </ul>
      */
     private static Role.Builder cangluBuilder(){
         //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
         Faction faction = Faction.HUNTER;
 
-        return withBuiltIns(new Role.Builder("canglu"), faction)
-                .displayName(Component.text("苍鹭"))
+        return withBuiltIns(new Role.Builder("Heron"), faction)
+                .displayName(Component.text("Heron"))
                 .description(List.of(
                         Component.text("忧郁创痕"),
                         Component.text("深度癔症")
                 ))
                 .faction(faction)
-                .addComponent(CangluTraumaMainWeapon.ID, new CangluTraumaMainWeapon.Specification().setSlot(0))
-                .addComponent(CangluBlueIceRevolverSkill.ID, new CangluBlueIceRevolverSkill.Specification().setSlot(1))
-                .addComponent(CangluMelodySelectionSkill.ID, new CangluMelodySelectionSkill.Specification().setSlot(2))
-                .addComponent(CangluDestinySkill.ID, new CangluDestinySkill.Specification().setSlot(3))
-                .addComponent(CangluHysteriaPassive.ID, new CangluHysteriaPassive.Specification())
+                .addComponent(HeronMainWeapon.ID, new HeronMainWeapon.Specification().setSlot(0))
+                .addComponent(HeronRevolverSkill.ID, new HeronRevolverSkill.Specification().setSlot(1))
+                .addComponent(HeronHookSkill.ID, new HeronHookSkill.Specification().setSlot(2))
+                .addComponent(HeronFateSkill.ID, new HeronFateSkill.Specification().setSlot(3))
+                .addComponent(HeronEquipmentsPassive.ID, new HeronEquipmentsPassive.Specification())
+                .addComponent(HeronFloatingTextComponent.ID, new HeronFloatingTextComponent.Specification())
+                .addComponent(HeronTraumaPassive.ID, new HeronTraumaPassive.Specification())
                 .icon(Material.BLUE_ICE);
     }
 

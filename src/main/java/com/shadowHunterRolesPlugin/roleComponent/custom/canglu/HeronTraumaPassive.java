@@ -43,8 +43,7 @@ import java.util.function.Consumer;
  * <p>形态与既有 {@code EnergyComponent} 的监听名单一致（JDK {@code Consumer} + owner 成对登记），
  * 因此不为「已经是组件」的关注点新造能力接口。
  */
-public class HeronTraumaPassive extends PassiveSkill
-        implements com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent.Participant {
+public class HeronTraumaPassive extends PassiveSkill {
 
     public static final String ID = "cangluHysteriaPassive";
 
@@ -92,6 +91,14 @@ public class HeronTraumaPassive extends PassiveSkill
     private SanTEComponent sante;
     private BuffComponent buff;
     private HotbarRenderComponent render;
+    private VitalsComponent vitals;
+    /**
+     * 受伤订阅句柄（{@code start()} 注册、{@code stop()} 按引用撤销）。
+     * <p>★ 口径是上游 {@code 0c106f4} 之后的形态：**注册 consumer**，不再实现
+     * {@code VitalsComponent.Participant} 接口（那条接口已删）。受治疗那条名单本被动不关心，
+     * 因此**不再写一个空的 {@code onHealed}** —— 这正是新形态要消掉的东西。
+     */
+    private VitalsComponent.DamagedListener damagedEntry;
 
     BossBar bossbar;
 
@@ -111,6 +118,8 @@ public class HeronTraumaPassive extends PassiveSkill
 
         public Specification(){
             super(Component.text("创伤"), List.of(Component.text("苍鹭的创伤被动，给自己叠层数")));
+            //受击要订阅 VitalsComponent 的受伤名单（装配期声明，运行期才取得到）
+            requires(VitalsComponent.class);
         }
 
         @Override
@@ -131,6 +140,11 @@ public class HeronTraumaPassive extends PassiveSkill
         sante = svc().components().get(SanTEComponent.class);
         buff = svc().components().get(BuffComponent.class);
         render = svc().components().get(HotbarRenderComponent.class);
+        //订阅受伤（受击 ⇒ 清脱战计时 + 回 1 SanTE）；受治疗不订阅（本被动没有对应行为）
+        vitals = svc().components().get(VitalsComponent.class);
+        if (vitals != null) {
+            damagedEntry = vitals.addDamagedListener(this, event -> onDamaged(event.source(), event.amount()));
+        }
 
 
 
@@ -182,21 +196,24 @@ public class HeronTraumaPassive extends PassiveSkill
         outOfCombatTicks = 0;
     }
 
-    /** 受击：进入战斗，并抵消 1 点特殊值伤害。 */
-    @Override
-    public void onDamaged(Player source, double amount){
+    /**
+     * 受击回调（由 {@code start()} 里注册的 consumer 调）：进入战斗 + 抵消 1 点特殊值伤害。
+     * <p>★ 上游 {@code 0c106f4} 之后不再有 {@code onHealed} —— 受治疗那条名单本组件不订阅。
+     */
+    private void onDamaged(Player source, double amount){
         outOfCombatTicks = 0;
         sante.increase(1);
     }
 
     @Override
-    public void onHealed(double amount){
-        //无需求：治疗不影响创伤
-    }
-
-    @Override
     public void stop()  {
         super.stop();
+        //★ 按引用撤销订阅（消费方必须持有 addDamagedListener 的返回值）
+        if (vitals != null && damagedEntry != null) {
+            vitals.removeDamagedListener(damagedEntry);
+        }
+        damagedEntry = null;
+        vitals = null;
         sante = null;
         buff = null;
         render = null;

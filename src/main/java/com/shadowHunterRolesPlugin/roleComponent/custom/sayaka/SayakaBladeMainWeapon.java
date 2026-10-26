@@ -80,7 +80,7 @@ import java.util.List;
  * 不要求斩击命中）。实现 = {@code setInvulnerable(true)} {@value #IMMUNE_TICKS} 刻，
  * 到期 / 死亡 / 离线 / {@code stop()} 四路回收（自愈：每刻核对到期）。
  */
-public class SayakaBladeMainWeapon extends MainWeapon implements VitalsComponent.Participant {
+public class SayakaBladeMainWeapon extends MainWeapon {
 
     /** 本组件的登记 id。 */
     public static final String ID = "sayaka_blade_main_weapon";
@@ -212,6 +212,9 @@ public class SayakaBladeMainWeapon extends MainWeapon implements VitalsComponent
     private EnergyComponent energy;
     private BuffComponent buff;
     private FactionComponent faction;
+
+    /** 受伤订阅句柄（{@code start()} 注册、{@code stop()} 按引用撤销；触发 {@link #onDamaged}）。 */
+    private VitalsComponent.DamagedListener damagedEntry;
     private SayakaGauntletPassive passive;
     private SayakaFloatingTextComponent voice;
 
@@ -331,11 +334,19 @@ public class SayakaBladeMainWeapon extends MainWeapon implements VitalsComponent
         passive = svc().components().get(SayakaGauntletPassive.class);
         voice = svc().components().get(SayakaFloatingTextComponent.class);
         render = getComponent(HotbarRenderComponent.class);
+        //订阅受伤：纳刀中被敌对玩家攻击 ⇒ 触发防御居合（见 onDamaged）
+        if (vitals != null && damagedEntry == null) {
+            damagedEntry = vitals.addDamagedListener(this, event -> onDamaged(event.source(), event.amount()));
+        }
         resetRuntime();
     }
 
     @Override
     public void stop() {
+        if (damagedEntry != null && vitals != null) {
+            vitals.removeDamagedListener(damagedEntry);
+        }
+        damagedEntry = null;
         Player owner = svc().self().player();
         releaseOwnerEffects(owner);
         resetRuntime();
@@ -873,16 +884,16 @@ public class SayakaBladeMainWeapon extends MainWeapon implements VitalsComponent
         return hits;
     }
 
-    // ───────── 承受方回调（防御居合触发点）─────────
+    // ───────── 受伤订阅（防御居合触发点）─────────
 
     /**
-     * 受伤通知（框架在结算之后派发；改不了量，只用来触发"防御居合"）。
+     * 受伤 ⇒ 触发"防御居合"（{@code start()} 里经 {@code VitalsComponent#addDamagedListener}
+     * 登记的监听在结算之后投递；改不了量，只用来触发）。
      *
      * <p>触发条件（同时成立）：来源是敌对玩家、自身处于<b>纳刀</b>（或技能二的防御窗口 / 风暴态）、
      * 居合闸门已就绪。落点方向 = 朝攻击者。
      */
-    @Override
-    public void onDamaged(Player source, double amount) {
+    private void onDamaged(Player source, double amount) {
         if (source == null) {
             return;
         }
@@ -903,11 +914,6 @@ public class SayakaBladeMainWeapon extends MainWeapon implements VitalsComponent
             return;
         }
         resolveIai(owner, aimDirection(owner, source.getLocation()), true, source);
-    }
-
-    @Override
-    public void onHealed(double amount) {
-        //不需要
     }
 
     // ───────── 对外面（技能二 / 大招）─────────

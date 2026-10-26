@@ -56,7 +56,8 @@ import java.util.UUID;
  *
  * <p><b>消耗的两条触发路径</b>：
  * <ol>
- *   <li><b>受伤</b> —— 本类实现 {@link VitalsComponent.Participant}，在 {@link #onDamaged} 里消耗一层
+ *   <li><b>受伤</b> —— 本类在 {@code start()} 里经 {@code VitalsComponent#addDamagedListener}
+ *       订阅"自己受到伤害"，在 {@link #onDamaged} 里消耗一层
  *       （同一刻只消耗一层：见 {@link #lastShieldConsumeTick}）；</li>
  *   <li><b>远程拦截</b> —— 每刻扫描主人 {@value #INTERCEPT_RADIUS} 格内的投射物并移除它，
  *       消耗一层（这就是需求"无人机能够主动防御抵消远程攻击"的落点）。</li>
@@ -83,7 +84,7 @@ import java.util.UUID;
  * 并且**显式排除主人自己** —— {@code getNearbyPlayers(r)} 是<b>包含自己</b>的
  * （工程既有实测口径，各技能都得自己排除）。
  */
-public class AlbertDroneSystem extends PassiveSkill implements VitalsComponent.Participant {
+public class AlbertDroneSystem extends PassiveSkill {
 
     /** 本组件的登记 id。 */
     public static final String ID = "albert_passive_droneSystem";
@@ -236,6 +237,9 @@ public class AlbertDroneSystem extends PassiveSkill implements VitalsComponent.P
     /** 击杀订阅句柄（{@code start()} 注册、{@code stop()} 按引用撤销）。 */
     private VitalsComponent.PlayerKilledListener killedEntry;
 
+    /** 受伤订阅句柄（{@code start()} 注册、{@code stop()} 按引用撤销；触发 {@link #onDamaged}）。 */
+    private VitalsComponent.DamagedListener damagedEntry;
+
     /** 随机源（只影响观感抖动，不参与判定）。 */
     private final Random random = new Random();
 
@@ -327,12 +331,14 @@ public class AlbertDroneSystem extends PassiveSkill implements VitalsComponent.P
         buff = svc().components().get(BuffComponent.class);
         lockOn = svc().components().get(AlbertLockOnPassive.class);
         floatingText = svc().components().get(AlbertFloatingTextComponent.class);
+        registerDamagedListener();
         registerKillListener();
         lastHealth = -1d;
     }
 
     @Override
     public void stop() {
+        unregisterDamagedListener();
         unregisterKillListener();
         drones.clear();
         kamikazes.clear();
@@ -343,6 +349,24 @@ public class AlbertDroneSystem extends PassiveSkill implements VitalsComponent.P
         expandedUntilTick = 0;
         expandedRange = 0d;
         clearAmbientEffects();
+    }
+
+    /** 订阅受伤：每次真实受伤（平台事件已结算）消耗一层主动防御（需求原话）。 */
+    private void registerDamagedListener() {
+        if (damagedEntry != null || vitals == null) {
+            return;
+        }
+        damagedEntry = vitals.addDamagedListener(this, event -> onDamaged(event.source(), event.amount()));
+    }
+
+    private void unregisterDamagedListener() {
+        if (damagedEntry == null) {
+            return;
+        }
+        if (vitals != null) {
+            vitals.removeDamagedListener(damagedEntry);
+        }
+        damagedEntry = null;
     }
 
     /** 订阅击杀：击杀「猎杀目标」⇒ 立刻部署一架（需求原话）。 */
@@ -1111,11 +1135,13 @@ public class AlbertDroneSystem extends PassiveSkill implements VitalsComponent.P
     /**
      * **受伤 ⇒ 消耗一层主动防御**（需求："每被攻击一次，就消耗一层主动防御"）。
      *
+     * <p>触发点 = {@code start()} 里经 {@code VitalsComponent#addDamagedListener} 登记的监听
+     * （平台事件结算之后投递；改不了量）。
+     *
      * <p>同一刻去重（{@link #lastShieldConsumeTick}）：一次攻击可能同时触发
      * {@code EntityDamageEvent} 与别的路径，不去重会"一下吃两层"。
      */
-    @Override
-    public void onDamaged(Player source, double amount) {
+    private void onDamaged(Player source, double amount) {
         if (drones.isEmpty()) {
             return;
         }
@@ -1124,12 +1150,6 @@ public class AlbertDroneSystem extends PassiveSkill implements VitalsComponent.P
         }
         lastShieldConsumeTick = tick;
         consumeShieldLayer("hit");
-    }
-
-    /** 受治疗：本组件不响应。 */
-    @Override
-    public void onHealed(double amount) {
-        // 无人机系统不响应治疗
     }
 
     /** 消耗一层：移除一架无人机 + 2 秒速度 6 + 碎裂粒子 / 音效。 */

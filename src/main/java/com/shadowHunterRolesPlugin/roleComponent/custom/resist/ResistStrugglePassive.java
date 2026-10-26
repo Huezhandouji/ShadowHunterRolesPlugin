@@ -44,7 +44,7 @@ import java.util.Random;
  * 40 层（8 枚）后不再加粒子，改为**身后白灰双层圆环**常驻，每 2 秒扩大闪动一次。
  * actionbar 显示战斗时间（加粗暗红）——本组件是该角色的**唯一 actionbar 发布者**。
  */
-public class ResistStrugglePassive extends PassiveSkill implements VitalsComponent.Participant {
+public class ResistStrugglePassive extends PassiveSkill {
 
     /** 本组件的登记 id。 */
     public static final String ID = "resist_struggle_passive";
@@ -93,6 +93,9 @@ public class ResistStrugglePassive extends PassiveSkill implements VitalsCompone
     private BuffComponent buff;
     private SanTEComponent sante;
     private FactionComponent faction;
+
+    /** 受伤订阅句柄（{@code start()} 注册、{@code stop()} 按引用撤销；触发 {@link #onDamaged}）。 */
+    private VitalsComponent.DamagedListener damagedEntry;
 
     private final Random random = new Random();
 
@@ -168,6 +171,11 @@ public class ResistStrugglePassive extends PassiveSkill implements VitalsCompone
         sante = svc().components().get(SanTEComponent.class);
         faction = svc().components().get(FactionComponent.class);
 
+        //订阅受伤：被敌人攻击也算"仍在战斗"（见 onDamaged）
+        if (vitals != null && damagedEntry == null) {
+            damagedEntry = vitals.addDamagedListener(this, event -> onDamaged(event.source(), event.amount()));
+        }
+
         int now = Bukkit.getCurrentTick();
         battleSeconds = 0;
         lastCombatTick = now - COMBAT_IDLE_TICKS - 1;   //开局不在战斗中
@@ -201,6 +209,10 @@ public class ResistStrugglePassive extends PassiveSkill implements VitalsCompone
                 buff.removePotionEffect(PotionEffectType.REGENERATION);
             }
         }
+        if (damagedEntry != null && vitals != null) {
+            vitals.removeDamagedListener(damagedEntry);
+        }
+        damagedEntry = null;
         vitals = null;
         buff = null;
         sante = null;
@@ -424,24 +436,18 @@ public class ResistStrugglePassive extends PassiveSkill implements VitalsCompone
         }
     }
 
-    // ───────── 承受方回调（VitalsComponent.Participant） ─────────
+    // ───────── 受伤订阅（VitalsComponent#addDamagedListener） ─────────
 
     /**
      * 被敌人攻击也算"仍在战斗"——需求：10 秒**未攻击到敌人 或 被敌人攻击**才消退。
-     * <p>框架的 {@code DamageHookListener} 在真实受伤事件里扇出，只观察、不改事件。
+     * <p>触发点 = {@code start()} 里经 {@code VitalsComponent#addDamagedListener} 登记的监听
+     * （平台事件结算之后投递，只观察、不改事件）。
      */
-    @Override
-    public void onDamaged(Player source, double amount) {
+    private void onDamaged(Player source, double amount) {
         if (!started) {
             return;
         }
         markCombat(Bukkit.getCurrentTick());
-    }
-
-    /** 受治疗不改变战斗计时。 */
-    @Override
-    public void onHealed(double amount) {
-        //不响应治疗
     }
 
     // ───────── 纯函数（离线单测） ─────────

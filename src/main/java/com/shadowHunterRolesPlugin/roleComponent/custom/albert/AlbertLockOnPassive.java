@@ -60,7 +60,8 @@ public class AlbertLockOnPassive extends PassiveSkill {
     /**
      * 无人机对「猎杀目标」额外造成的**灵魂伤害**（需求原话"对猎杀目标额外造成1点灵魂伤害"）。
      *
-     * <p>★ 口径：插件 {@code DamageKind} 只有 {@code PHYSICAL} / {@code TRUE}，**没有"灵魂"这一类型**
+     * <p>★ 口径：插件 {@code DamageKind} **没有"灵魂"这一类型**（现有四种
+     * {@code PHYSICAL} / {@code TRUE} / {@code EXPLOSION} / {@code PROJECTILE} 都不表达灵魂）
      * ⇒ 与工程既有口径一致，灵魂伤害取 {@code TRUE}（无视护甲）。
      * 先例：{@code HunterGrudgeMainWeapon} 的"10 点灵魂伤害"、罪棘的"魔法伤害"。
      */

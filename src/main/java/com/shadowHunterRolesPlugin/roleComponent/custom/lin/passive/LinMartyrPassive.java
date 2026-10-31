@@ -31,24 +31,18 @@ import java.util.List;
  *   <li>林周身出现<b>爆炸粒子</b>，同时林身后出现<b>巨大的 4 格高白色十字架粒子</b>。</li>
  * </ol>
  *
- * <h2>★★ 口径申报一：与框架内建「归零惩罚」的正面冲突（已申报用户，选"压制"路线）</h2>
- * 框架给**每个角色无条件**装了 {@code DefaultSanTEZeroPunishment}
- * （见 {@code registry/RoleLoader#withBuiltIns}），它同样是"特殊值归零"的订阅者：
- * 归零 ⇒ 施加 STUN 100 刻 + 恐惧标题 + 每 40 刻一跳 1/3 上限真伤。
- * 而需求第 1 条要的是"林**不受到**特殊值惩罚"。
- * <p>框架是禁改区（不得改 {@code roleComponent/builtin/}），只能在角色侧绕。采用的路线：
- * <ol>
- *   <li><b>抢在归零之前把它抬回去</b>：本组件在 {@link SanTEComponent} 的变更监听里
- *       （注册序在装配表中靠后 ⇒ 通知序靠后，见下）把特殊值立刻设回
- *       {@value #RESTORE_SANTE}；</li>
- *   <li><b>逐刻压制</b>：内建惩罚期间它会在自己的 {@code update()} 里每刻 {@code sante.set(0)}，
- *       因此本组件也在 {@code update()} 里每刻把自己拉回 ≥{@value #RESTORE_SANTE}
- *       （谁后写谁生效 —— 本组件装配在后 ⇒ 本组件的 {@code update()} 后跑）。</li>
- * </ol>
- * <p><b>如实申报</b>：本手法<b>不能 100% 消掉</b>内建惩罚的"瞬时一次性表现" ——
- * 归零那一跳内建仍会打出一次 STUN 与恐惧标题（它起的是 {@code 40L} 周期任务，
- * 第 1 跳 delay 0）。能压住的是<b>持续部分</b>（每刻被钉的 0、以及后续的真伤跳数被压到最少）。
- * 若要 100% 干净，须上游给"角色可声明豁免归零惩罚"的能力 —— 那是框架改动，不在本次范围内。
+ * <h2>★★ 口径申报一：默认归零惩罚已在装配点关闭（2026-10-31 修复）</h2>
+ * 框架给**每个角色默认**装了 {@code DefaultSanTEZeroPunishment}（见
+ * {@code registry/RoleLoader#withBuiltIns}），它同样是"特殊值归零"的订阅者：
+ * 归零 ⇒ 施加 STUN + 恐惧标题 + 若干跳真伤。而需求第 1 条要的是"林**不受到**特殊值惩罚"。
+ * <p>框架后来（2026-10-30）开放了**每角色 SanTE 配置**，其中
+ * {@code SanTEComponent.Configuration#punishmentEnabled()} 可以关闭默认惩罚组件。
+ * 因此林现在的做法是：<b>装配点直接声明 {@code punishmentEnabled(false)}</b> ——
+ * 默认惩罚组件**根本不会被注册**，归零时只有本类的「殉道」生效。
+ * <p>历史包袱说明：旧实现曾在 {@code update()} 里逐刻把特殊值拉回 ≥{@value #RESTORE_SANTE}
+ * 来"压制"内建惩罚的钉值；该 workaround 已随配置能力上线而删除（否则它会把林的特殊值锁在 50 以上）。
+ * <p>{@link #start()} 仍订阅 {@link SanTEComponent} 的变更：归零那一刻由本类执行殉道
+ * （扣上限 / 扣血 / 回 50 / 表现）。
  *
  * <h2>★ 口径申报二：生命上限惩罚为什么"累积但换角色清零"</h2>
  * 需求"永久扣除林 4 点生命上限"里的"永久"，按用户当面确认的口径 =
@@ -156,28 +150,10 @@ public class LinMartyrPassive extends PassiveSkill {
     }
 
     /**
-     * 每刻：**压制内建归零惩罚**（口径申报一）。
-     *
-     * <p>内建 {@code DefaultSanTEZeroPunishment} 在惩罚期间每刻把特殊值钉 0；
-     * 本组件装配序靠后 ⇒ 本方法后跑 ⇒ 把它拉回 {@value #RESTORE_SANTE}，
-     * 于是下一次内建钉 0 与本组件拉回之间只存在极短窗口（玩家不可见）。
-     */
-    @Override
-    public void update() {
-        if (sante == null) {
-            return;
-        }
-        // 只在"确实被钉到低位"时拉回 —— 不干扰正常的高位波动
-        if (sante.current() < RESTORE_SANTE && martyrCount > 0) {
-            sante.set(RESTORE_SANTE);
-        }
-    }
-
-    /**
      * **特殊值变更回调**：值归零 ⇒ 触发一次殉道。
      *
-     * <p>★ 注意通知序：内建的归零惩罚监听在本组件之前注册（装配表靠前），
-     * 因此它先收到这次归零并起任务；本组件随后把值抬回 {@value #RESTORE_SANTE}。
+     * <p>★ 默认归零惩罚已在装配点关闭（{@code punishmentEnabled(false)}）⇒
+     * 归零时**只有本组件**的殉道会执行，不存在"内建惩罚与本类抢着处理"的时序竞争。
      */
     public void onSanTEChange(SanTEComponent.Change change) {
         if (change == null || resolving) {

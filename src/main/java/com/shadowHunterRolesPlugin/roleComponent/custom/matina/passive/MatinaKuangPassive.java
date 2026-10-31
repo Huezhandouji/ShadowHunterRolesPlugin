@@ -8,10 +8,10 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.EnergyComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.MatinaRageVfx;
-import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -48,6 +48,17 @@ import java.util.List;
  *       （30 层时最高 2 格；<b>30 层后封顶，不再增高</b>）</td><td>{@link #drawRageOrbit(Player)}</td></tr>
  * </table>
  *
+ * <h2>actionbar HUD（2026-10-31 需求）</h2>
+ * <ul>
+ *   <li>一行显示：{@code 狂暴 <当前>/100 [############]}；</li>
+ *   <li><b>60 层前</b>：进度条 12 格，<b>每 5 层</b>多一格**红色** {@code #}（空槽深灰）
+ *       ⇒ 5 层 1 格 …… 60 层满格；</li>
+ *   <li><b>60 层后</b>：进度条整体变成**快速闪动的红色乱码** —— 每
+ *       {@value #HUD_REFRESH_TICKS} 刻（0.1 秒）换一帧，12 格字符随帧变化（亮红/暗红交替）；</li>
+ *   <li><b>单一发布者</b>：本组件是马提娜唯一写 actionbar 的组件（actionbar 一行，后写覆盖先写）；
+ *       旧的"本组件自己维护的 bossbar"已随本需求移除，不再与框架的 TE/能量 bossbar 叠两条。</li>
+ * </ul>
+ *
  * <h2>口径申报（如实）</h2>
  * <ol>
  *   <li><b>"免疫缓慢"只挡缓慢药水效果</b>：每刻扫描玩家身上的 {@code SLOWNESS} 并移除。
@@ -59,8 +70,8 @@ import java.util.List;
  *       净效果 = <b>把当前生命设成「上限 − 8」</b>（40 血时恒为 32）——
  *       血量 38 时反而会<b>掉到 32</b>，与"回复 8 点"完全相反。</li>
  *   <li><b>真伤不叠加</b>：15 与 20 层同时存在时，取 20 层的 8 点（需求明写"不与 20 层叠加"）。</li>
- *   <li><b>层数显示</b>：本组件只负责<b>数值</b>；玩家可见的层数展示在主武器的 lore 行
- *       （见 {@code MatinaMedicalShovelMainWeapon}）以及本组件自己维护的一条 bossbar 上。</li>
+ *   <li><b>层数显示</b>：主武器 lore 行（{@code MatinaMedicalShovelMainWeapon}）继续显示层数；
+ *       运行时 HUD 已改为 <b>actionbar</b>（见上一节），不再使用 bossbar。</li>
  * </ol>
  */
 public class MatinaKuangPassive extends PassiveSkill implements OperationProvider {
@@ -90,6 +101,26 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
     public static final int LAYER_RESISTANCE = 30;
     /** 暴走判定起点：高于该层数每秒掷一次死亡判定。 */
     public static final int OVERLOAD_THRESHOLD = 60;
+
+    // ───────── actionbar HUD（2026-10-31 需求）─────────
+
+    /** 需求原话："60 层前每 5 层增加一个红色进度" ⇒ 每格代表 5 层。 */
+    public static final int LAYERS_PER_BAR_SEGMENT = 5;
+
+    /** 进度条格数（= {@value #OVERLOAD_THRESHOLD} / {@value #LAYERS_PER_BAR_SEGMENT} = 12；即需求原话的 {@code [############]}）。 */
+    public static final int BAR_SEGMENTS = OVERLOAD_THRESHOLD / LAYERS_PER_BAR_SEGMENT;
+
+    /** actionbar 刷新间隔（刻）：2 刻 = 0.1 秒 ⇒ 暴走期每秒闪 10 帧（"快速闪动"）。 */
+    public static final int HUD_REFRESH_TICKS = 2;
+
+    /** 暴走期乱码字符集（12 格各取一个；只放客户端字体覆盖的 ASCII 符号，且不含 {@code #} / 方括号以不破坏条框可读性）。 */
+    private static final String GARBLE_CHARS = "!@%^&*?/\\|<>{}~$";
+
+    /** 暴走期乱码的红色系（亮红 / 暗红交替 ⇒ 闪动感更强）。 */
+    private static final NamedTextColor[] GARBLE_COLORS = {NamedTextColor.RED, NamedTextColor.DARK_RED};
+
+    /** 进度条两端括号与空槽的颜色（深灰 —— 让红色填充段成为唯一视觉重点）。 */
+    private static final NamedTextColor BAR_DIM_COLOR = NamedTextColor.DARK_GRAY;
 
     /** 第 1 层的生命回复量。 */
     private static final double ATTACK_SELF_HEAL = 8d;
@@ -146,8 +177,11 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
     /** 环绕粒子的相位（每帧推进 ⇒ 整圈都在转）。 */
     private double orbitPhase;
 
-    /** 本组件的 bossbar（层数展示的一条；随组件生命周期显示与隐藏）。 */
-    private BossBar bossbar;
+    /** actionbar HUD 的刷新计时（刻；到 {@link #HUD_REFRESH_TICKS} 出一帧）。 */
+    private int hudCounter;
+
+    /** 暴走期乱码帧号（每出一帧 +1 ⇒ 相邻两帧的乱码不同，形成"快速闪动"）。 */
+    private int garbleFrame;
 
     public MatinaKuangPassive(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
@@ -182,23 +216,17 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
         sante = svc().components().get(SanTEComponent.class);
         buff = svc().components().get(BuffComponent.class);
 
-        bossbar = BossBar.bossBar(Component.empty(), 0f, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
-        Player owner = svc().self().player();
-        if (owner != null) {
-            owner.showBossBar(bossbar);
-        }
+        hudCounter = 0;
+        garbleFrame = 0;
     }
 
     @Override
     public void stop() {
-        Player owner = svc().self().player();
-        if (owner != null && bossbar != null) {
-            owner.hideBossBar(bossbar);
-        }
-        bossbar = null;
         kuang = 0;
         decayCounter = 0;
         orbitPhase = 0d;
+        hudCounter = 0;
+        garbleFrame = 0;
     }
 
     // ───────── 每刻：衰减 / 阈值光环 / 暴走判定 / 粒子 / 显示 ─────────
@@ -229,8 +257,11 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
         //③ 每层一个环绕自身的红石粒子（逐个叠高）
         drawRageOrbit(owner);
 
-        //④ bossbar 显示当前狂暴值
-        refreshBossbar();
+        //④ actionbar HUD：狂暴值 + 进度条（60 层后乱码闪动）；每 HUD_REFRESH_TICKS 刻一帧
+        if (++hudCounter >= HUD_REFRESH_TICKS) {
+            hudCounter = 0;
+            publishHud(owner);
+        }
     }
 
     // ───────── 公开读 / 写口（同角色其它组件用） ─────────
@@ -401,7 +432,7 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
      *
      * <p>★ <b>30 层封顶</b>（{@value #ORBIT_FULL_LAYER} 层 = 满配）：粒子数与高度都在 30 层达到上限，
      * 之后**不再增高、不再变多** —— 30 层往上到 {@value #KUANG_MAX} 层，视觉形态完全一致，
-     * 超出的层数只体现在阈值加成（抗性 / 真伤 / 暴走判定）与 bossbar 数字上。
+     * 超出的层数只体现在阈值加成（抗性 / 真伤 / 暴走判定）与 actionbar 数字上。
      *
      * <p>为什么封顶：100 层若不封顶 ⇒ 50 颗粒子排到约 6.86 格高，会盖住准星、且每刻
      * 50 颗红石粉的可见距离过远（远处玩家也渲染）⇒ 既吵又贵。30 层（15 颗 / 2 格）是
@@ -462,31 +493,82 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
         return ORBIT_MAX_PARTICLES;
     }
 
-    /** 刷新 bossbar 文案：狂暴层数 + 当前生效的阈值标签。 */
-    private void refreshBossbar() {
-        if (bossbar == null) {
-            return;
-        }
-        StringBuilder tags = new StringBuilder();
-        if (kuang >= LAYER_SELF_HEAL) tags.append(" 回血");
-        if (kuang >= LAYER_ENERGY_GAIN) tags.append(" 回能");
-        if (kuang >= LAYER_SANTE_GAIN) tags.append(" 回san");
-        if (kuang >= LAYER_SLOW_IMMUNE) tags.append(" 免缓");
-        if (kuang >= LAYER_RESISTANCE) tags.append(" 抗性2");
-        double extra = attackTrueDamage();
-        if (extra > 0d) {
-            tags.append(" 真伤+").append((int) extra);
-        }
+    // ───────── actionbar HUD（狂暴值 + 进度条；2026-10-31 需求）─────────
 
-        Component name = Component.text("狂暴 ").color(NamedTextColor.DARK_RED).decorate(TextDecoration.BOLD)
-                .append(Component.text(kuang + "/" + KUANG_MAX).color(NamedTextColor.RED).decorate(TextDecoration.BOLD))
-                .append(Component.text(tags.toString()).color(NamedTextColor.GOLD));
-        if (kuang > OVERLOAD_THRESHOLD) {
-            name = name.append(Component.text("  ！暴走判定中").color(NamedTextColor.DARK_RED)
-                    .decorate(TextDecoration.BOLD));
+    /**
+     * **进度条已填充格数**（纯函数 ⇒ 离线可测）：
+     * {@code floor(clamp(层数, 0, 60) / 5)} ⇒ 0 层 0 格、5 层 1 格 …… 60 层满 12 格。
+     */
+    public static int barFilled(int kuang) {
+        int layers = Math.clamp(kuang, 0, OVERLOAD_THRESHOLD);
+        return layers / LAYERS_PER_BAR_SEGMENT;
+    }
+
+    /** 是否进入"暴走乱码"显示区（需求：60 层后）。 */
+    public static boolean isOverloadDisplay(int kuang) {
+        return kuang > OVERLOAD_THRESHOLD;
+    }
+
+    /**
+     * **actionbar 进度条**（纯函数 ⇒ 离线可测）。
+     * <ul>
+     *   <li>60 层前：{@code [############]} —— 前 {@link #barFilled(int)} 格为**红色加粗** {@code #}，
+     *       其余深灰 {@code #}（槽位固定 12 格，只靠颜色区分"进度"）；</li>
+     *   <li>60 层后：12 格全部换成随帧变化的**红色乱码**（亮红 / 暗红交替）。</li>
+     * </ul>
+     */
+    public static Component barComponent(int kuang, int frame) {
+        Component bar = Component.text("[").color(BAR_DIM_COLOR);
+        if (isOverloadDisplay(kuang)) {
+            for (int index = 0; index < BAR_SEGMENTS; index++) {
+                bar = bar.append(Component.text(String.valueOf(garbleChar(frame, index)))
+                        .color(GARBLE_COLORS[index % GARBLE_COLORS.length])
+                        .decorate(TextDecoration.BOLD));
+            }
+        } else {
+            int filled = barFilled(kuang);
+            for (int index = 0; index < BAR_SEGMENTS; index++) {
+                boolean on = index < filled;
+                Component slot = Component.text("#").color(on ? NamedTextColor.RED : BAR_DIM_COLOR);
+                if (on) {
+                    slot = slot.decorate(TextDecoration.BOLD);
+                }
+                bar = bar.append(slot);
+            }
         }
-        bossbar.name(name);
-        bossbar.progress(Math.clamp(kuang / (float) KUANG_MAX, 0f, 1f));
+        return bar.append(Component.text("]").color(BAR_DIM_COLOR));
+    }
+
+    /**
+     * 暴走乱码第 {@code index} 格的字符：**同帧同串、不同帧不同**（形成"快速闪动"；也便于离线测试）。
+     * <p>用整数哈希而不是 {@code Random}：不持有随机状态 ⇒ 纯函数、可复现、无需可测性妥协。
+     */
+    private static char garbleChar(int frame, int index) {
+        int state = frame * 0x9E3779B9 + index * 1103515245 + 0x632BE5AB;
+        state ^= (state >>> 16);
+        int pick = state & Integer.MAX_VALUE;
+        return GARBLE_CHARS.charAt(pick % GARBLE_CHARS.length());
+    }
+
+    /**
+     * **actionbar 整行**（纯函数 ⇒ 离线可测）：{@code 狂暴 74/100 [############]}；
+     * 60 层后追加红色「暴走」标记。
+     */
+    public static Component hudComponent(int kuang, int frame) {
+        int clamped = Math.clamp(kuang, 0, KUANG_MAX);
+        Component text = Component.text("狂暴 ").color(NamedTextColor.DARK_RED).decorate(TextDecoration.BOLD)
+                .append(Component.text(clamped + "/" + KUANG_MAX).color(NamedTextColor.RED).decorate(TextDecoration.BOLD))
+                .append(Component.text(" ").color(NamedTextColor.GRAY))
+                .append(barComponent(clamped, frame));
+        if (isOverloadDisplay(clamped)) {
+            text = text.append(Component.text(" 暴走").color(NamedTextColor.DARK_RED).decorate(TextDecoration.BOLD));
+        }
+        return text;
+    }
+
+    /** 把这一帧 HUD 发给玩家（本组件 = 马提娜唯一 actionbar 发布者）。 */
+    private void publishHud(Player owner) {
+        owner.sendActionBar(hudComponent(kuang, garbleFrame++));
     }
 
     // ───────── 调试操作面（可选加入 OperationProvider 的那一条） ─────────
@@ -576,13 +658,9 @@ public class MatinaKuangPassive extends PassiveSkill implements OperationProvide
         return kuang > OVERLOAD_THRESHOLD;
     }
 
-    /** 供探针 / 调试读：本组件当前 bossbar 的纯文本（未显示 ⇒ 空串）。 */
-    public String bossbarText() {
-        if (bossbar == null) {
-            return "";
-        }
-        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                .serialize(bossbar.name());
+    /** 供探针 / 调试读：当前 actionbar HUD 的纯文本（未到刷新帧也能读）。 */
+    public String hudText() {
+        return PlainTextComponentSerializer.plainText().serialize(hudComponent(kuang, garbleFrame));
     }
 
     /**

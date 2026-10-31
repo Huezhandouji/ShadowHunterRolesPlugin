@@ -4,8 +4,8 @@ import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziUnconcernSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.passive.MikomakoEquipmentsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoUnconcernSkill;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -37,8 +37,8 @@ public class StateBindingByInstanceTest {
      */
     @Test
     public void sameIdTwoInstancesGetOppositeAnswers() {
-        RoleComponent bearing = new MeiqiheziUnconcernSkill("dup_id", inertServices(),
-                new MeiqiheziUnconcernSkill.Specification());
+        RoleComponent bearing = new MikomakoUnconcernSkill("dup_id", inertServices(),
+                new MikomakoUnconcernSkill.Specification());
         FakePlain plain = new FakePlain("dup_id");
 
         //id 相同（前置：同 id 可有多份实例）
@@ -54,8 +54,8 @@ public class StateBindingByInstanceTest {
     @Test
     public void predicateIsActiveComponentOnly() {
         assertTrue("主动组件家族 ⇒ 有冷却这回事",
-                new MeiqiheziUnconcernSkill("a", inertServices(),
-                        new MeiqiheziUnconcernSkill.Specification()) instanceof ActiveComponent);
+                new MikomakoUnconcernSkill("a", inertServices(),
+                        new MikomakoUnconcernSkill.Specification()) instanceof ActiveComponent);
         assertFalse((Object) new FakePlain("b") instanceof ActiveComponent);
     }
 
@@ -77,8 +77,8 @@ public class StateBindingByInstanceTest {
     public void realComponentsMatchFrozenCapabilityModel() {
         ComponentServicesPort svc = inertServices();
 
-        RoleComponent skill = new MeiqiheziUnconcernSkill("s1", svc,
-                new MeiqiheziUnconcernSkill.Specification());
+        RoleComponent skill = new MikomakoUnconcernSkill("s1", svc,
+                new MikomakoUnconcernSkill.Specification());
 
         assertTrue("技能 = 主动组件 ⇒ 有冷却这回事", skill instanceof ActiveComponent);
     }

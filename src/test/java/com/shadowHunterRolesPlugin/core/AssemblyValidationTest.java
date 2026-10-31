@@ -2,8 +2,8 @@ package com.shadowHunterRolesPlugin.core;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassive;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoBloodySlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoCircleSlashSkill;
 import org.junit.Test;
 
 import java.util.Map;
@@ -39,22 +39,22 @@ public class AssemblyValidationTest {
     public void componentIdMustNotBeEmpty() {
         Role.Builder b = builder("r");
         assertThrows(IllegalArgumentException.class,
-                () -> b.addComponent("", new MeiqiheziBloodySlashSkill.Specification().setSlot(1)));
+                () -> b.addComponent("", new MikomakoBloodySlashSkill.Specification().setSlot(1)));
     }
 
     /** fail-fast ③：id 去重是**跨类型**的（技能/被动共用同一命名空间）⇒ 文案点名类型词。 */
     @Test
     public void duplicateIdIsRejectedAcrossFamilies() {
         Role.Builder b = builder("r");
-        b.addComponent("c_a", new MeiqiheziBloodySlashSkill.Specification().setSlot(1));
+        b.addComponent("c_a", new MikomakoBloodySlashSkill.Specification().setSlot(1));
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> b.addComponent("c_a", new MeiqiheziCircleSlashSkill.Specification().setSlot(2)));
+                () -> b.addComponent("c_a", new MikomakoCircleSlashSkill.Specification().setSlot(2)));
         assertEquals("Skill already registered: c_a", e.getMessage());
 
         Role.Builder b2 = builder("r2");
         b2.addComponent("c_a", new AutoRecoverEnergyPassive.Specification());
         assertThrows(IllegalArgumentException.class,
-                () -> b2.addComponent("c_a", new MeiqiheziBloodySlashSkill.Specification().setSlot(1)));
+                () -> b2.addComponent("c_a", new MikomakoBloodySlashSkill.Specification().setSlot(1)));
     }
 
     /**
@@ -71,9 +71,9 @@ public class AssemblyValidationTest {
     @Test
     public void assemblyNoLongerRejectsDuplicateSlots() {
         Role.Builder b = builder("r");
-        MeiqiheziBloodySlashSkill.Specification specA = new MeiqiheziBloodySlashSkill.Specification();
+        MikomakoBloodySlashSkill.Specification specA = new MikomakoBloodySlashSkill.Specification();
         specA.setSlot(1);
-        MeiqiheziCircleSlashSkill.Specification specB = new MeiqiheziCircleSlashSkill.Specification();
+        MikomakoCircleSlashSkill.Specification specB = new MikomakoCircleSlashSkill.Specification();
         specB.setSlot(1);
 
         //装配期放行（不再抛）—— 冲突留给渲染组件的登记期
@@ -89,9 +89,9 @@ public class AssemblyValidationTest {
     @Test
     public void validAssemblySucceeds() {
         Role.Builder b = builder("r");
-        MeiqiheziBloodySlashSkill.Specification specA = new MeiqiheziBloodySlashSkill.Specification();
+        MikomakoBloodySlashSkill.Specification specA = new MikomakoBloodySlashSkill.Specification();
         specA.setSlot(1);
-        MeiqiheziCircleSlashSkill.Specification specB = new MeiqiheziCircleSlashSkill.Specification();
+        MikomakoCircleSlashSkill.Specification specB = new MikomakoCircleSlashSkill.Specification();
         specB.setSlot(2);
         b.addComponent("c_a", specA);
         b.addComponent("c_b", specB);
@@ -109,7 +109,7 @@ public class AssemblyValidationTest {
     /** 同一份描述符实例被两个角色共享时：后手改动影响不到先手（条目只持有不可变快照）。 */
     @Test
     public void sharedSpecificationIsFrozenAtFirstAssembly() {
-        MeiqiheziCircleSlashSkill.Specification spec = new MeiqiheziCircleSlashSkill.Specification();
+        MikomakoCircleSlashSkill.Specification spec = new MikomakoCircleSlashSkill.Specification();
         spec.setSlot(5);
         Role r1 = builder("r1").addComponent("c_x", spec).build();
         assertThrows(IllegalStateException.class, () -> spec.setSlot(6));

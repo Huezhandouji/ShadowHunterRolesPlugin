@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent;
+import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastSignal;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.CastTrigger;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
@@ -55,7 +56,8 @@ import org.bukkit.inventory.ItemStack;
  *   <tr><td>{@link PlayerInteractEvent}（左键）</td><td>取消（保护：不许挖方块）</td>
  *       <td>{@code onCast(LEFT_CLICK)} + 请求重绘</td></tr>
  *   <tr><td>{@link EntityDamageByEntityEvent}（左键打人 / 近战命中）</td>
- *       <td><b>直接拦截</b>：取消原版伤害</td><td>无（{@code BowWeapon#onAttack} 已封死）</td></tr>
+ *       <td>取消原版伤害；受害者为玩家时**派发近战入口**</td>
+ *       <td>{@code onAttack(AttackSignal)}（2026-10-31 起可覆写；默认空实现）</td></tr>
  *   <tr><td>{@link PlayerDropItemEvent}（Q）</td><td>取消（保护）</td>
  *       <td>{@code onCast(DROP)} + 请求重绘</td></tr>
  *   <tr><td>{@link InventoryClickEvent}</td><td>取消（保护）</td><td>无</td></tr>
@@ -252,20 +254,21 @@ public class BowWeaponListener implements Listener {
         }
     }
 
-    // ───────── 近战命中：直接拦截（不派发任何入口）─────────
+    // ───────── 近战命中：取消原版伤害 + 派发 onAttack（2026-10-31 起弓弩可选近战）─────────
 
     /**
-     * 近战命中（左键打人）：**直接拦截** —— 取消原版伤害，**不派发任何入口**。
-     * <p>判据 = 攻击者主手拿着本系统的弓弩物品 ⇒ 这次近战整个不成立
-     * （{@code BowWeapon#onAttack} 已被封成 {@code final} 空实现，本族没有"近战伤害"这个扩展点 ——
-     * 伤害该由射击那边给）。
-     * <p><b>为什么不做"受害者必须是玩家"的过滤</b>：这里拦的不是"不许打人"，而是"本系统的物品不造成原版
-     * 近战伤害"——那是**物品层面**的规则，与目标是谁无关。（近战主武器侧有那道过滤，是因为它的
-     * {@code onAttack} 需要一个玩家受害者；本族不派发任何入口，故不需要。）
-     * 要把口径收窄成"只拦对玩家的命中"，在下面加一行
-     * {@code if (!(event.getEntity() instanceof Player)) return;} 即可 —— 那正是
-     * {@code MainWeaponListener#onAttackPlayer} 的形态。
-     * <p>与射击路径不冲突：箭矢命中时 {@code getDamager()} 是**箭矢实体**（不是玩家）⇒ 不进本处理器。
+     * 近战命中（左键打人）：**取消原版伤害**，并在受害者为玩家时派发
+     * {@link BowWeapon#onAttack(AttackSignal)}。
+     *
+     * <p><b>为什么仍取消原版伤害</b>：弓弩物品的既有口径是"不造成原版近战伤害"；
+     * 需要近战的主武器（冷识「Lether」）由组件自己用伤害组件结算声明值，而不是靠原版伤害。
+     * <p><b>默认空实现</b> ⇒ 没有覆写 {@code onAttack} 的弓弩行为与放开前逐字一致（取消 + 无结算）。
+     * <p><b>为什么只对玩家派发</b>：{@code AttackSignal} 的载荷是 {@code Player}
+     * （与 {@code MainWeaponListener#onAttackPlayer} 同形）；对非玩家目标仍取消原版伤害
+     * （物品层面的规则），但不派发。
+     * <p><b>为什么不做冷却闸门</b>：与 {@code MainWeaponListener#onAttackPlayer} 同规 ——
+     * 管道只判"是不是本族物品、受害者是不是玩家"，"这次能不能用"（攻速 / 冷却 / 闸门）
+     * 由组件自己把住（让覆写者能按 {@code Player#getAttackCooldown()} 自行定节奏）。
      */
     @EventHandler
     public void onMeleeHit(EntityDamageByEntityEvent event) {
@@ -277,8 +280,25 @@ public class BowWeaponListener implements Listener {
         RoleInstance instance = roleManager.getRoleInstance(attacker);
         if (instance == null) return;
 
-        //取消原版事件；不派发任何入口（本族没有近战入口）
+        String weaponId = BowWeapon.Utils.getWeaponId(item);
+        if (weaponId == null) return;
+
+        //★ 2026-10-31「无法攻击」排查修复：先查组件、再取消原版伤害。
+        //旧顺序在"手里是过期/悬空的弓弩主武器"时会把原版伤害取消掉却不补伤害（静默零输出）。
+        RoleComponent component = instance.componentRegistry().getById(weaponId);
+        if (!(component instanceof ActiveComponent active)) {
+            context.logger().warning("[attack] " + attacker.getName() + " 手持弓弩主武器项 '" + weaponId
+                    + "' 但当前角色实例里没有对应组件；已保留原版伤害（不再静默取消攻击）");
+            return;
+        }
+
+        //① 取消原版伤害（弓弩物品不造成原版近战伤害 —— 与放开前一致）
         event.setCancelled(true);
+
+        //② 可选的近战入口：只在受害者为玩家时派发
+        if (!(event.getEntity() instanceof Player victim)) return;
+        instance.invokeComponentHook(component, "onAttack",
+                () -> active.onAttack(new AttackSignal(victim)));
     }
 
     // ───────── 保护：本系统的弓弩物品不可丢弃、不可从背包里搬走 ─────────

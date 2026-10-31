@@ -10,7 +10,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
  * 与"创建后一次性注入"语义等价，但没有"创建后再注入"的中间态。
  *
  * <p>泛型 {@code T} 保留具体组件类型，便于调用方拿到强类型返回值；实现通常写作方法引用，
- * 例如 {@code MeiqiheziUnconcernSkill::new}
+ * 例如 {@code MikomakoUnconcernSkill::new}
  * （其构造器为 {@code (String id, ComponentServicesPort services)}）。
  *
  * <p>本接口与装配期描述符的关系：{@link RoleComponent.Specification#create(String, ComponentServicesPort)}

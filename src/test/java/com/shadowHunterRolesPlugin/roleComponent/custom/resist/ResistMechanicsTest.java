@@ -88,7 +88,7 @@ public class ResistMechanicsTest {
     public void weaponNumbers() {
         assertEquals("0.6 秒", 12, ResistMainWeapon.ATTACK_COOLDOWN_TICKS);
         assertEquals(5.0d, ResistMainWeapon.AOE_RADIUS, 1.0E-9d);
-        assertEquals("击退 3", 3.0d, ResistMainWeapon.KNOCKBACK_STRENGTH, 1.0E-9d);
+        assertEquals("击退 1（2026-10-31 用户裁定，原 3）", 1.0d, ResistMainWeapon.KNOCKBACK_STRENGTH, 1.0E-9d);
         assertEquals("▓抗争▓", ResistMainWeapon.WEAPON_NAME);
     }
 

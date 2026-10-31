@@ -47,11 +47,18 @@ public class MainWeaponListener implements Listener {
 
         String weaponId = MainWeapon.Utils.getWeaponId(item);
 
+        //★ 2026-10-31「无法攻击」排查修复：**先查组件、再取消原版伤害**。
+        //旧顺序（先 setCancelled 再查组件）在"手里是角色已换/过期的主武器、当前角色没有对应组件"时，
+        //会把事件取消掉却没有任何伤害补上 ⇒ 玩家看到的是"左键完全打不中敌人"，且日志里没有任何异常。
+        RoleComponent component = instance.componentRegistry().getById(weaponId);
+        if(!(component instanceof ActiveComponent active)){
+            context.logger().warning("[attack] " + attacker.getName() + " 手持主武器项 '" + weaponId
+                    + "' 但当前角色实例里没有对应组件；已保留原版伤害（不再静默取消攻击）");
+            return;
+        }
         //取消原版事件
         event.setCancelled(true);
         //攻击管道归本 listener：按 id 取通用面 → 判类型 → 受保护调用 → 请求重绘
-        RoleComponent component = instance.componentRegistry().getById(weaponId);
-        if(!(component instanceof ActiveComponent active)) return;
         instance.invokeComponentHook(component, "onAttack", () -> active.onAttack(new AttackSignal(victim)));
         requestRepaint(instance);
     }

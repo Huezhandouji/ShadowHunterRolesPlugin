@@ -40,6 +40,10 @@ import java.util.UUID;
  *   <li>存量 2 个，12 秒恢复一个，每个消耗 10 能量；**命中后才扣存量**
  *       （回复节拍与其它角色的存量同形：满仓不计时不扣能、缺能这一拍不充，见 {@link #advanceChargeRegen()}）</li>
  *   <li>绳索为白色粒子，飞行/附着时微微抛物线，拉拽时绷直</li>
+ *   <li><b>拉拽最长 3 秒</b>（{@value #PULL_MAX_TICKS} 刻）：到点自动脱钩 —— 修 2026-10-30 反馈的
+ *       "被移动目标/墙壁拖成无限拉拽"；</li>
+ *   <li><b>0.15 秒内连按两次蹲下</b>（{@value #DOUBLE_SNEAK_WINDOW_TICKS} 刻）⇒ 主动取消当前勾爪
+ *       （飞行 / 附着 / 拉拽都算），取消拉拽时会把速度清零；</li>
  * </ul>
  */
 public class HeronHookSkill extends Skill {
@@ -57,6 +61,12 @@ public class HeronHookSkill extends Skill {
     public static final double HOOK_DAMAGE = 8d;
     public static final int SANTE_MIN = 4;
     public static final int SANTE_MAX = 6;
+
+    /** 拉拽的最长时间（刻）= 3 秒：超时自动脱钩，防止被移动目标/卡墙拖到无限久（2026-10-30 修复）。 */
+    public static final int PULL_MAX_TICKS = 60;
+
+    /** 双击蹲下的判定窗口（刻）= 0.15 秒：两次"蹲下按下"的间隔在此之内 ⇒ 取消当前勾爪。 */
+    public static final int DOUBLE_SNEAK_WINDOW_TICKS = 3;
 
     private enum Mode {IDLE, FLYING, ATTACHED, PULLING}
 
@@ -83,6 +93,15 @@ public class HeronHookSkill extends Skill {
     private Location pullTarget;
     private boolean chargeSpent;
     private boolean hitGlow;
+
+    /** 本次拉拽已经持续的刻数（只在 {@link Mode#PULLING} 有意义；到 {@value #PULL_MAX_TICKS} 脱钩）。 */
+    private int pullTicks;
+
+    /** 上一刻是否按着蹲下（用来取"按下沿"）。 */
+    private boolean wasSneaking;
+
+    /** 上次蹲下按下的相位（{@link #phase}）；-1 = 还没按过 / 已消费。 */
+    private int lastSneakPressPhase = -1;
 
     public HeronHookSkill(String id, ComponentServicesPort services, Specification specification) {
         super(id, services, specification);
@@ -123,6 +142,9 @@ public class HeronHookSkill extends Skill {
         buff = getComponent(BuffComponent.class);
         render = getComponent(com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent.class);
         voice = getComponent(HeronFloatingTextComponent.class);
+        pullTicks = 0;
+        wasSneaking = false;
+        lastSneakPressPhase = -1;
     }
 
     @Override
@@ -199,6 +221,15 @@ public class HeronHookSkill extends Skill {
         }
         phase++;
         advanceChargeRegen();
+        //★ 双击蹲下取消（2026-10-30）：只在"有勾爪"时判定。
+        //  空闲期蹲下只是潜行移动键，不参与任何逻辑，也不留基准相位。
+        if (mode == Mode.IDLE) {
+            wasSneaking = player.isSneaking();
+            lastSneakPressPhase = -1;
+        } else if (detectDoubleSneak(player)) {
+            cancelHookByDoubleSneak(player);
+            return;
+        }
         switch (mode) {
             case FLYING -> tickFlying(player);
             case ATTACHED -> tickAttached(player);
@@ -326,6 +357,7 @@ public class HeronHookSkill extends Skill {
 
     private void startPull(Player player) {
         mode = Mode.PULLING;
+        pullTicks = 0;
         //拉拽终点：命中实体 ⇒ 实体脚下；命中方块 ⇒ 找一个能站人的位置（不往地里拉）
         Player target = stuckEntity == null ? null : org.bukkit.Bukkit.getPlayer(stuckEntity);
         pullTarget = (target != null && target.isOnline() && !target.isDead())
@@ -337,6 +369,11 @@ public class HeronHookSkill extends Skill {
     private void tickPulling(Player player) {
         if (hookPos == null || display == null || !display.isValid()) {
             clearHook();
+            return;
+        }
+        //★ 最长拉拽 3 秒：任何原因（目标移动 / 卡墙 / 速度被清）导致拉不到，都到点脱钩
+        if (shouldAbortPull(++pullTicks)) {
+            timeOutPull(player);
             return;
         }
         Location dest = pullTarget != null ? pullTarget : hookPos;
@@ -456,6 +493,61 @@ public class HeronHookSkill extends Skill {
         }
     }
 
+    /**
+     * **双击蹲下的判定窗口**（纯函数）：两次"蹲下按下"的相位差 &lt;= {@value #DOUBLE_SNEAK_WINDOW_TICKS}
+     * 刻（0.15 秒）⇒ 算双击。
+     * <p>抽成纯函数的理由同存量闸门：0.15 秒是手感参数，写错不会报错、只会变成
+     * "几乎触发不了"或"一蹲就断"。第二刻必须严格晚于第一刻（同一刻不可能按两次）。
+     */
+    public static boolean withinDoubleSneakWindow(int firstPressPhase, int secondPressPhase) {
+        return secondPressPhase > firstPressPhase
+                && secondPressPhase - firstPressPhase <= DOUBLE_SNEAK_WINDOW_TICKS;
+    }
+
+    /** **拉拽超时判定**（纯函数）：累计拉拽刻数达到 {@value #PULL_MAX_TICKS}（3 秒）⇒ 该脱钩了。 */
+    public static boolean shouldAbortPull(int pullTicks) {
+        return pullTicks >= PULL_MAX_TICKS;
+    }
+
+    /**
+     * 检测"双击蹲下"：只在**按下沿**（false → true）计数；窗口外的一次按下只刷新基准。
+     * <p>为什么轮询而不是挂事件：本仓先例 {@code RavenAirMobilityPassive} 的输入也是每 tick 读
+     * {@link Player#isSneaking()}（组件不自挂监听器，输入统一走 update 节拍）。
+     */
+    private boolean detectDoubleSneak(Player player) {
+        boolean sneaking = player.isSneaking();
+        boolean pressed = sneaking && !wasSneaking;
+        wasSneaking = sneaking;
+        if (!pressed) {
+            return false;
+        }
+        if (lastSneakPressPhase >= 0 && withinDoubleSneakWindow(lastSneakPressPhase, phase)) {
+            lastSneakPressPhase = -1;
+            return true;
+        }
+        lastSneakPressPhase = phase;
+        return false;
+    }
+
+    /** 双击蹲下取消勾爪：主动取消拉拽时把速度清零（否则会带着拉拽速度继续飞出去）。 */
+    private void cancelHookByDoubleSneak(Player player) {
+        boolean pulling = mode == Mode.PULLING;
+        clearHook();
+        if (pulling) {
+            player.setVelocity(new Vector(0, 0, 0));
+            player.setFallDistance(0f);
+        }
+        player.getWorld().playSound(player.getLocation(), Sound.ITEM_TRIDENT_RETURN, 0.7f, 1.5f);
+    }
+
+    /** 拉拽 3 秒超时：脱钩 + 掐掉剩余速度，避免"卡墙后一直悬空被拖"。 */
+    private void timeOutPull(Player player) {
+        clearHook();
+        player.setVelocity(new Vector(0, 0, 0));
+        player.setFallDistance(0f);
+        player.getWorld().playSound(player.getLocation(), Sound.BLOCK_CHAIN_BREAK, 0.8f, 0.9f);
+    }
+
     /** 是否有勾爪正附着（音澜据此禁用左枪）。 */
     public boolean isAttached() {
         return mode == Mode.ATTACHED;
@@ -473,6 +565,7 @@ public class HeronHookSkill extends Skill {
         hookPos = null;
         pullTarget = null;
         stuckEntity = null;
+        pullTicks = 0;
         mode = Mode.IDLE;
     }
 

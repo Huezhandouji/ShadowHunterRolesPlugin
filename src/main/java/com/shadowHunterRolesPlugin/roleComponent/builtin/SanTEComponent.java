@@ -24,9 +24,9 @@ import java.util.function.Consumer;
  * <p><b>两条通道各通知一次</b>：① 每次写入（含无变化的写入）各一次；② 只在真变化时一次。
  * 因此同一次真变化对容器侧是"写入路径 1 次 + 派发边界 0 次"（派发边界不再回调平台侧）。
  * <p><b>状态唯一</b>：真值只在本组件里（容器侧不持有该字段），对外只经 {@link #current()} / {@link #set(int)}。
- * <p><b>归零惩罚的钉 0 语义不变</b>：惩罚组件（{@code DefaultSanTEZeroPunishment}）仍按既有方式
- * 调本组件自身的 {@code set(0)} 逐 tick 钉 0（协作组件引用在 {@code start()} 内一次取好、存进
- * 字段），走的还是这一条 clamp + 派发路径。
+ * <p><b>惩罚不再钉值（2026-10-30 用户裁定）</b>：惩罚组件（{@code DefaultSanTEZeroPunishment}）
+ * 不再逐 tick 调 {@code set(阈值)} 钉住 TE —— 惩罚期间被攻击，TE 依然会掉（最低到 {@link #min()}，
+ * 默认 -999），惩罚结束时由惩罚组件一次性 {@code set(max)} 拉回上限。本组件只负责 clamp 与派发。
  *
  * <h2>订阅面：JDK {@code Consumer} 监听器列表</h2>
  * 监听器列表 = 一个函数式接口的列表，其他类只需要添加 {@code Consumer} 即可。
@@ -55,8 +55,77 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
      * <p>容器装配时只读这个 id 与工厂（{@code Role.ComponentEntry}），不点名组件类。
      */
     public static final String ID = "sante";
-    /** 本组件的 SanTE 上限（组件侧配置 · 占位值）。 */
+
+    /** **默认** SanTE 上限（每个角色可在装配描述符里覆写，见 {@link Configuration}）。 */
     public static final int SANTE_MAX = 100;
+
+    /** **默认** SanTE 下限：TE 最低可以降到这里（惩罚**不会**再把值钉在阈值上）。 */
+    public static final int SANTE_MIN = -999;
+
+    /** **默认** 惩罚触发阈值：降到 0 即进入惩罚（与既有实现逐字一致）。 */
+    public static final int SANTE_PUNISHMENT_THRESHOLD = 0;
+
+    /**
+     * **每个角色的 SanTE 配置**（装配描述符的载荷 · 2026-10-30 框架改进）。
+     *
+     * <h2>字段</h2>
+     * <ul>
+     *   <li>{@code max} —— 上限，默认 {@value #SANTE_MAX}；</li>
+     *   <li>{@code min} —— 下限，默认 {@value #SANTE_MIN}；</li>
+     *   <li>{@code punishmentThreshold} —— 惩罚触发阈值，默认 {@value #SANTE_PUNISHMENT_THRESHOLD}
+     *       （降到 0 进入惩罚）；</li>
+     *   <li>{@code punishmentEnabled} —— 是否注册默认惩罚组件，默认 {@code true}。
+     *       关闭后角色可自行实现惩罚（或不惩罚）。</li>
+     * </ul>
+     *
+     * <h2>有效下界（2026-10-30 起 = min）</h2>
+     * 惩罚**不再把 TE 钉在阈值上**：惩罚期间被攻击，TE 依然会掉（可以掉到负数），
+     * 惩罚结束时由惩罚组件一次性拉回上限。因此有效下界就是 {@code min}（默认 <b>-999</b>），
+     * {@code punishmentThreshold} 只决定"什么时候开始惩罚"。
+     * <p>这条规则写成本 record 的 {@link #effectiveFloor()}（纯函数），组件从它取值。
+     *
+     * <h2>为什么是 record 而不是散装 setter</h2>
+     * 配置是"每个角色一份的不可变值"，record 的 {@code withXxx} 天然给出"改一个字段、留其余默认"的
+     * 链式写法；描述符只持有它，运行期读写仍走 {@link #max()} 等读口。
+     */
+    public record Configuration(int max, int min, int punishmentThreshold, boolean punishmentEnabled) {
+
+        /** 默认配置：100 / -999 / 0 / 惩罚开启 ⇒ 与改动前行为逐字一致。 */
+        public static final Configuration DEFAULT =
+                new Configuration(SANTE_MAX, SANTE_MIN, SANTE_PUNISHMENT_THRESHOLD, true);
+
+        public Configuration {
+            //归一：上限非负；下限不超过上限；阈值夹在 [min, max] 内
+            max = Math.max(0, max);
+            min = Math.min(min, max);
+            punishmentThreshold = Math.clamp(punishmentThreshold, min, max);
+        }
+
+        public Configuration withMax(int value) {
+            return new Configuration(value, min, punishmentThreshold, punishmentEnabled);
+        }
+
+        public Configuration withMin(int value) {
+            return new Configuration(max, value, punishmentThreshold, punishmentEnabled);
+        }
+
+        public Configuration withPunishmentThreshold(int value) {
+            return new Configuration(max, min, value, punishmentEnabled);
+        }
+
+        public Configuration withPunishmentEnabled(boolean value) {
+            return new Configuration(max, min, punishmentThreshold, value);
+        }
+
+        /**
+         * **有效下界**（纯函数）：就是 {@code min}（默认 {@value #SANTE_MIN}）。
+         * <p>2026-10-30 口径变更：惩罚不再把 TE 钉在阈值上 ⇒ 下界与 {@code punishmentThreshold} 无关。
+         * <p>再与 {@code max} 取小，保证"上限被运行期调低（如进化档位还原）"时仍然是合法区间。
+         */
+        public int effectiveFloor() {
+            return Math.min(min, max);
+        }
+    }
 
     /** 本组件的日志（逐监听器隔离时报出是谁抛了）。 */
     private static final java.util.logging.Logger LOG =
@@ -210,31 +279,126 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         });
     }
 
-    private final int max;
+    /**
+     * 上限（构造期由容器给出）。
+     * <p><b>不是 final</b>：角色进化的「特殊值上限提升」档位需要运行期改写它（见 {@link #setMax(int)}）。
+     * 这条写口是**经用户批准的一次边界跨越**（框架原本只有构造期上限），因此把改动压到最小：
+     * 只放开这一个字段 + 一个受控写口，其余校验与语义一律不变。
+     */
+    private int max;
+
+    /** 绝对下限（装配期由 {@link Configuration} 给出；惩罚关闭时 TE 可真的降到这里）。 */
+    private final int min;
+
+    /** 惩罚触发阈值（默认 0；默认惩罚组件按它触发并把 TE 钉在这个值上）。 */
+    private final int punishmentThreshold;
+
+    /** 是否启用默认惩罚（装配期由 {@link Configuration} 给出；只用于诊断与惩罚组件的自检）。 */
+    private final boolean punishmentEnabled;
 
     /** 真值：当前 SanTE（唯一持有处）。 */
     private int current;
 
+    /** 默认配置构造（上限 100 / 下限 -999 / 阈值 0 / 惩罚开启）。 */
+    public SanTEComponent(String id, ComponentServicesPort services) {
+        this(id, services, Configuration.DEFAULT);
+    }
+
+    /** 只覆写上限的兼容构造（下限 / 阈值 / 惩罚开关取默认；既有离线测试用这条）。 */
     public SanTEComponent(String id, ComponentServicesPort services, int max) {
+        this(id, services, Configuration.DEFAULT.withMax(max));
+    }
+
+    /**
+     * **完整配置构造**（每个角色的上限 / 下限 / 惩罚阈值 / 惩罚开关都在这里落地）。
+     * <p>装配期由 {@link Specification#create(String, ComponentServicesPort)} 传入；
+     * 选角色即满 SanTE（{@code current = max}），与既有构造期语义一致。
+     */
+    public SanTEComponent(String id, ComponentServicesPort services, Configuration configuration) {
         super(id, services);
-        this.max = Math.max(0, max);
-        //与既有 RoleInstance 构造期逐字一致：选角色即满 SanTE
+        Configuration config = configuration == null ? Configuration.DEFAULT : configuration;
+        this.max = config.max();
+        this.min = config.min();
+        this.punishmentThreshold = config.punishmentThreshold();
+        this.punishmentEnabled = config.punishmentEnabled();
         this.current = this.max;
+    }
+
+    // ───────── clamp（有效下界 / 上限之间）─────────
+
+    /**
+     * 当前生效的下界：就是 {@code min}（默认 -999）；再与上限取小，保证区间合法。
+     * <p><b>2026-10-30 起惩罚不再钉值</b>：下界与 {@code punishmentThreshold} 无关，
+     * 阈值只决定惩罚何时触发。
+     */
+    private int clampFloor() {
+        return Math.min(min, max);
+    }
+
+    /** 把任意写入值夹进 [floor, max]（唯一 clamp 实现点）。 */
+    private int clamp(int value) {
+        return Math.clamp(value, clampFloor(), max);
     }
 
     /**
      * 本组件的装配描述符（与技能/被动同规；不带栏位）。
-     * <p>上限取组件自己的常量，因此描述符无额外依赖。
+     * <p><b>每个角色可自定义</b>（2026-10-30 框架改进）：上限 / 下限 / 惩罚阈值 / 是否启用默认惩罚。
+     * 不写 = {@link Configuration#DEFAULT}（100 / -999 / 0 / 启用）⇒ **与改动前行为逐字一致**。
+     * <p>典型用法（角色 builder 里）：
+     * <pre>
+     * new SanTEComponent.Specification()                 // 默认：100 / -999 / 降到 0 惩罚
+     * new SanTEComponent.Specification(Configuration.DEFAULT.withMax(150))
+     * new SanTEComponent.Specification().setMin(-500).setPunishmentThreshold(-100)
+     * new SanTEComponent.Specification().setPunishmentEnabled(false)   // 不要默认惩罚
+     * </pre>
      */
     public static final class Specification extends RoleComponent.Specification<SanTEComponent> {
+
+        private Configuration configuration = Configuration.DEFAULT;
 
         public Specification() {
             super("SanTE");
         }
 
+        public Specification(Configuration configuration) {
+            this();
+            if (configuration != null) {
+                this.configuration = configuration;
+            }
+        }
+
+        /** 覆写上限（默认 {@value #SANTE_MAX}）。 */
+        public Specification setMax(int max) {
+            configuration = configuration.withMax(max);
+            return this;
+        }
+
+        /** 覆写下限（默认 {@value #SANTE_MIN}；惩罚开启时有效下界见 {@link Configuration#effectiveFloor()}）。 */
+        public Specification setMin(int min) {
+            configuration = configuration.withMin(min);
+            return this;
+        }
+
+        /** 覆写惩罚触发阈值（默认 {@value #SANTE_PUNISHMENT_THRESHOLD} = 降到 0 进入惩罚）。 */
+        public Specification setPunishmentThreshold(int punishmentThreshold) {
+            configuration = configuration.withPunishmentThreshold(punishmentThreshold);
+            return this;
+        }
+
+        /** 关闭默认惩罚组件（{@code withBuiltIns} 据此不注册 {@code DefaultSanTEZeroPunishment}）。 */
+        public Specification setPunishmentEnabled(boolean punishmentEnabled) {
+            configuration = configuration.withPunishmentEnabled(punishmentEnabled);
+            return this;
+        }
+
+        /** 当前配置（装配点 / 离线测试读口）。 */
+        public Configuration configuration() {
+            return configuration;
+        }
+
         @Override
         public SanTEComponent create(String id, ComponentServicesPort services) {
-            return new SanTEComponent(id, services, SANTE_MAX);
+            return new SanTEComponent(id, services, configuration);
         }
     }
 
@@ -243,15 +407,54 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         return current;
     }
 
-    /** SanTE 上限（构造期由容器给出）。 */
+    /** SanTE 上限（构造期由容器给出；可被 {@link #setMax(int)} 在运行期改写）。 */
     public int max() {
         return max;
     }
 
-    /** 直接写入（组件内 clamp；写后通知订阅者）。 */
+    /** SanTE 绝对下限（装配期配置，默认 {@value #SANTE_MIN}）。 */
+    public int min() {
+        return min;
+    }
+
+    /** 惩罚触发阈值（装配期配置，默认 {@value #SANTE_PUNISHMENT_THRESHOLD}）。 */
+    public int punishmentThreshold() {
+        return punishmentThreshold;
+    }
+
+    /** 默认惩罚是否启用（装配期配置；关闭后由角色自行实现惩罚）。 */
+    public boolean punishmentEnabled() {
+        return punishmentEnabled;
+    }
+
+    /**
+     * 当前**有效下界**（诊断读口）：= {@code min}（默认 -999），惩罚不再影响它。
+     * <p>写出这个读口是为了让"为什么 TE 没有降到 -999"这类问题能被直接回答，而不是靠猜配置。
+     */
+    public int floor() {
+        return clampFloor();
+    }
+
+    /**
+     * 上限写口：把本实例的 SanTE 上限改为 {@code newMax}（负数按 0 处理），
+     * 并把 {@code current} 夹回新上限区间；只有 {@code current} 真的变化时才通知订阅者
+     * （上限本身不进 {@link Change} 载荷 —— 它不随"变化"而变，读上限仍走 {@link #max()}）。
+     * <p><b>唯一允许的运行期上限入口</b>：使用者 = 角色侧「进化档位」组件
+     * （冷识的「吟唱」档把上限 100 → 150，卸载时还原）。不要在别处另造第二条上限通道。
+     */
+    public void setMax(int newMax) {
+        int previous = current;
+        this.max = Math.max(0, newMax);
+        current = clamp(current);
+        if (current != previous) {
+            notifyListeners(new Change(previous, current));
+        }
+    }
+
+    /** 直接写入（组件内按 [floor, max] clamp；写后通知订阅者）。 */
     public void set(int value) {
         int previous = current;
-        current = Math.clamp(value, 0, max);
+        current = clamp(value);
         //走 notifyListeners(Change) 通知真正的订阅者（owner == 本组件的那条属"平台侧"约定）。
         //订阅者只拿变更通知；"真变化闸门 / 重入合并"由容器在派发边界另做（同一份名单）。
         notifyListeners(new Change(previous, current));
@@ -263,7 +466,7 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         set(current + amount);
     }
 
-    /** 减少 SanTE（内部按 0 下限 clamp；归零惩罚由既有组件监听真变化后触发）。 */
+    /** 减少 SanTE（内部按**有效下界** clamp；默认配置下 = 0，归零/到阈值惩罚由惩罚组件监听真变化后触发）。 */
     public void decrease(int amount) {
         set(current - amount);
     }
@@ -377,8 +580,11 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
      * <ul>
      *   <li>{@code current} —— 读：回当前 SanTE（无参，越界参数则未识别）；</li>
      *   <li>{@code max} —— 读：回上限（无参）；</li>
-     *   <li>{@code set &lt;int≥0&gt;} —— 写：调既有的 {@link #set(int)}（内部 clamp +
-     *       平台侧通知照常），回写后值；</li>
+     *   <li>{@code min} —— 读：回**绝对下限**（装配期配置，默认 -999；无参）；</li>
+     *   <li>{@code threshold} —— 读：回**惩罚触发阈值**（默认 0；无参）；</li>
+     *   <li>{@code floor} —— 读：回**当前有效下界**（惩罚开启时 = max(min, 阈值)，默认 0；无参）；</li>
+     *   <li>{@code set &lt;int&gt;} —— 写：调既有的 {@link #set(int)}（内部 clamp +
+     *       平台侧通知照常），回写后值；<b>允许负数</b>（会被夹到有效下界）；</li>
      *   <li>{@code gain &lt;int≥0&gt;} —— 写：调既有的 {@link #increase(int)}，回写后值；</li>
      *   <li>{@code decrease &lt;int≥0&gt;} —— 写：调既有的 {@link #decrease(int)}，回写后值
      *       （不足则按既有 clamp 语义）。</li>
@@ -409,11 +615,15 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
      * <pre>
      * /role operation @s @s sante current
      * /role operation @s @s sante max
+     * /role operation @s @s sante min
+     * /role operation @s @s sante threshold
+     * /role operation @s @s sante floor
      * /role operation @s @s sante gain 20       ⇒ 写后值
+     * /role operation @s @s sante set -50       ⇒ 写后值（默认配置下夹到 0）
      * /role operation @s @s sante gain -1       ⇒ null（负数 ⇒ 参数不合法）
      * /role operation @s @s sante max 1         ⇒ null（只读动词不得带参数）
      * </pre>
-     * 反例说明：第 4 条走参数不合法分支（负数则拒绝）；第 5 条走只读动词带参分支。
+     * 反例说明：第 8 条走参数不合法分支（增减方向负数则拒绝）；第 9 条走只读动词带参分支。
      */
     @Override
     public String onOperationCommand(String payload) {
@@ -425,6 +635,9 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         if (verb.isEmpty()) return null;
         if (verb.equals("current")) return parts.length == 1 ? Integer.toString(current()) : null;
         if (verb.equals("max")) return parts.length == 1 ? Integer.toString(max()) : null;
+        if (verb.equals("min")) return parts.length == 1 ? Integer.toString(min()) : null;
+        if (verb.equals("threshold")) return parts.length == 1 ? Integer.toString(punishmentThreshold()) : null;
+        if (verb.equals("floor")) return parts.length == 1 ? Integer.toString(floor()) : null;
         if (!verb.equals("set") && !verb.equals("gain") && !verb.equals("decrease")) return null;
         if (parts.length != 2) return null;
         int amount;
@@ -433,7 +646,8 @@ public class SanTEComponent extends RoleComponent implements OperationProvider, 
         } catch (NumberFormatException ex) {
             return null;
         }
-        if (amount < 0) return null;
+        //set 允许负数（角色下限可能为负）；gain / decrease 的方向参数仍必须非负
+        if (!verb.equals("set") && amount < 0) return null;
         switch (verb) {
             case "set" -> set(amount);
             case "gain" -> increase(amount);

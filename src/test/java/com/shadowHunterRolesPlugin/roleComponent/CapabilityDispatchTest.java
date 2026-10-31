@@ -7,11 +7,11 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassiv
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziUnconcernSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.mainWeapon.MikomakoJuejueMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.passive.MikomakoEquipmentsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoBloodySlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoCircleSlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoUnconcernSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedBleedPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedDeeplySorrowSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEquipmentsPassive;
@@ -19,12 +19,16 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvolutionPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessEvolutionPassive;
-import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessFrostBowMainWeapon;
-import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessOblivionSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessReconstructSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessShapingSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.RemotenessStartEndPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheEquipmentsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheEvolutionPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheForgetSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheQuiverComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheReshapeSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheResonanceComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheShadowsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.LetheSummonSkill;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import org.bukkit.NamespacedKey;
 import org.junit.BeforeClass;
@@ -75,58 +79,66 @@ public class CapabilityDispatchTest {
     private static Map<String, Object> components() {
         ComponentServicesPort svc = inertServices();
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("MeiqiheziBloodySlashSkill", new MeiqiheziBloodySlashSkill("t_1", svc, new MeiqiheziBloodySlashSkill.Specification()));
-        out.put("MeiqiheziCircleSlashSkill", new MeiqiheziCircleSlashSkill("t_2", svc, new MeiqiheziCircleSlashSkill.Specification()));
-        out.put("MeiqiheziUnconcernSkill", new MeiqiheziUnconcernSkill("t_3", svc, new MeiqiheziUnconcernSkill.Specification()));
+        out.put("MikomakoBloodySlashSkill", new MikomakoBloodySlashSkill("t_1", svc, new MikomakoBloodySlashSkill.Specification()));
+        out.put("MikomakoCircleSlashSkill", new MikomakoCircleSlashSkill("t_2", svc, new MikomakoCircleSlashSkill.Specification()));
+        out.put("MikomakoUnconcernSkill", new MikomakoUnconcernSkill("t_3", svc, new MikomakoUnconcernSkill.Specification()));
         out.put("RedDeeplySorrowSkill", new RedDeeplySorrowSkill("t_4", svc, new RedDeeplySorrowSkill.Specification()));
         out.put("RedEvilShockSkill", new RedEvilShockSkill("t_5", svc, new RedEvilShockSkill.Specification()));
         out.put("RedSolitaryArroganceSkill", new RedSolitaryArroganceSkill("t_6", svc, new RedSolitaryArroganceSkill.Specification()));
         out.put("ExampleSelfRefreshingSkill", new ExampleSelfRefreshingSkill("t_7", svc, new ExampleSelfRefreshingSkill.Specification()));
-        out.put("MeiqiheziJuejueMainWeapon", new MeiqiheziJuejueMainWeapon("t_8", svc, new MeiqiheziJuejueMainWeapon.Specification()));
+        out.put("MikomakoJuejueMainWeapon", new MikomakoJuejueMainWeapon("t_8", svc, new MikomakoJuejueMainWeapon.Specification()));
         out.put("RedSanctifiedBladeMainWeapon", new RedSanctifiedBladeMainWeapon("t_9", svc, new RedSanctifiedBladeMainWeapon.Specification()));
         out.put("AutoRecoverEnergyPassive", new AutoRecoverEnergyPassive("t_10", svc, new AutoRecoverEnergyPassive.Specification()));
         out.put("AutoRecoverSanTEHealthPassive", new AutoRecoverSanTEHealthPassive("t_11", svc, new AutoRecoverSanTEHealthPassive.Specification()));
         out.put("DefaultSanTEZeroPunishment", new DefaultSanTEZeroPunishment("t_12", svc, new DefaultSanTEZeroPunishment.Specification()));
-        out.put("MeiqiheziEquipmentsPassive", new MeiqiheziEquipmentsPassive("t_13", svc, new MeiqiheziEquipmentsPassive.Specification()));
+        out.put("MikomakoEquipmentsPassive", new MikomakoEquipmentsPassive("t_13", svc, new MikomakoEquipmentsPassive.Specification()));
         out.put("RedBleedPassive", new RedBleedPassive("t_14", svc, new RedBleedPassive.Specification()));
         out.put("RedEquipmentsPassive", new RedEquipmentsPassive("t_15", svc, new RedEquipmentsPassive.Specification()));
         out.put("RedEvolutionPassive", new RedEvolutionPassive("t_16", svc, new RedEvolutionPassive.Specification()));
-        //冷识（remoteness）一族（2026-10-02 立）：主武器是弓弩族（extends Skill ⇒ 仍是产出物品者）
-        out.put("RemotenessEvolutionPassive", new RemotenessEvolutionPassive("t_17", svc, new RemotenessEvolutionPassive.Specification()));
-        out.put("RemotenessStartEndPassive", new RemotenessStartEndPassive("t_18", svc, new RemotenessStartEndPassive.Specification()));
-        out.put("RemotenessFrostBowMainWeapon", new RemotenessFrostBowMainWeapon("t_19", svc, new RemotenessFrostBowMainWeapon.Specification()));
-        out.put("RemotenessOblivionSkill", new RemotenessOblivionSkill("t_20", svc, new RemotenessOblivionSkill.Specification()));
-        out.put("RemotenessReconstructSkill", new RemotenessReconstructSkill("t_21", svc, new RemotenessReconstructSkill.Specification()));
-        out.put("RemotenessShapingSkill", new RemotenessShapingSkill("t_22", svc, new RemotenessShapingSkill.Specification()));
+        //冷识（lethe）一族（2026-10-30 重做）：弓弩主武器 + 3 技能产出物品；3 被动 + 3 服务组件不产物品
+        out.put("LetheMainWeapon", new LetheMainWeapon("t_17", svc, new LetheMainWeapon.Specification()));
+        out.put("LetheForgetSkill", new LetheForgetSkill("t_18", svc, new LetheForgetSkill.Specification()));
+        out.put("LetheSummonSkill", new LetheSummonSkill("t_19", svc, new LetheSummonSkill.Specification()));
+        out.put("LetheReshapeSkill", new LetheReshapeSkill("t_20", svc, new LetheReshapeSkill.Specification()));
+        out.put("LetheShadowsPassive", new LetheShadowsPassive("t_21", svc, new LetheShadowsPassive.Specification()));
+        out.put("LetheEvolutionPassive", new LetheEvolutionPassive("t_22", svc, new LetheEvolutionPassive.Specification()));
+        out.put("LetheEquipmentsPassive", new LetheEquipmentsPassive("t_23", svc, new LetheEquipmentsPassive.Specification()));
+        out.put("LetheResonanceComponent", new LetheResonanceComponent("t_24", svc, new LetheResonanceComponent.Specification()));
+        out.put("LetheQuiverComponent", new LetheQuiverComponent("t_25", svc, new LetheQuiverComponent.Specification()));
+        out.put("LetheFloatingTextComponent", new LetheFloatingTextComponent("t_26", svc, new LetheFloatingTextComponent.Specification()));
         return out;
     }
 
     /** 冻结真值表：`产出物品`（= 主动组件家族）与 `依赖活状态`（= dependsOnLiveState()）。 */
     private static final String[][] EXPECTED = {
             // 组件名, 是否产出物品, 是否依赖活状态（"N/A" = 不产出物品 ⇒ 该方法不存在）
-            {"MeiqiheziBloodySlashSkill", "true", "true"},
-            {"MeiqiheziCircleSlashSkill", "true", "true"},
-            {"MeiqiheziUnconcernSkill", "true", "true"},
+            {"MikomakoBloodySlashSkill", "true", "true"},
+            {"MikomakoCircleSlashSkill", "true", "true"},
+            {"MikomakoUnconcernSkill", "true", "true"},
             {"RedDeeplySorrowSkill", "true", "true"},
             {"RedEvilShockSkill", "true", "true"},
             {"RedSolitaryArroganceSkill", "true", "true"},
             {"ExampleSelfRefreshingSkill", "true", "false"},
-            {"MeiqiheziJuejueMainWeapon", "true", "false"},
+            {"MikomakoJuejueMainWeapon", "true", "false"},
             {"RedSanctifiedBladeMainWeapon", "true", "false"},
             {"AutoRecoverEnergyPassive", "false", "N/A"},
             {"AutoRecoverSanTEHealthPassive", "false", "N/A"},
             {"DefaultSanTEZeroPunishment", "false", "N/A"},
-            {"MeiqiheziEquipmentsPassive", "false", "N/A"},
+            {"MikomakoEquipmentsPassive", "false", "N/A"},
             {"RedBleedPassive", "false", "N/A"},
             {"RedEquipmentsPassive", "false", "N/A"},
             {"RedEvolutionPassive", "false", "N/A"},
-            //冷识一族：两个被动（不产物品）+ 弓弩主武器 + 三个技能（产出物品且外观带冷却秒数）
-            {"RemotenessEvolutionPassive", "false", "N/A"},
-            {"RemotenessStartEndPassive", "false", "N/A"},
-            {"RemotenessFrostBowMainWeapon", "true", "true"},
-            {"RemotenessOblivionSkill", "true", "true"},
-            {"RemotenessReconstructSkill", "true", "true"},
-            {"RemotenessShapingSkill", "true", "true"}
+            //冷识一族（2026-10-30 重做）：主武器 + 三技能 = 产出物品；被动与服务组件不产物品
+            {"LetheMainWeapon", "true", "true"},
+            {"LetheForgetSkill", "true", "true"},
+            {"LetheSummonSkill", "true", "true"},
+            {"LetheReshapeSkill", "true", "true"},
+            {"LetheShadowsPassive", "false", "N/A"},
+            {"LetheEvolutionPassive", "false", "N/A"},
+            {"LetheEquipmentsPassive", "false", "N/A"},
+            {"LetheResonanceComponent", "false", "N/A"},
+            {"LetheQuiverComponent", "false", "N/A"},
+            {"LetheFloatingTextComponent", "false", "N/A"}
     };
 
     /** 逐组件比对冻结真值表（22 个具体组件；枚举里没有的面 = 新增组件 ⇒ 本断言会提醒补表）。 */
@@ -198,7 +210,7 @@ public class CapabilityDispatchTest {
             if (component instanceof MainWeapon) {
                 assertFalse("主武器不得声明依赖活状态（A12 边界：冷却名不带秒数）", live);
             }
-            if (component instanceof Skill && component.getClass() == MeiqiheziBloodySlashSkill.class) {
+            if (component instanceof Skill && component.getClass() == MikomakoBloodySlashSkill.class) {
                 assertTrue("技能家族默认依赖活状态（外观含秒数）", live);
             }
         }

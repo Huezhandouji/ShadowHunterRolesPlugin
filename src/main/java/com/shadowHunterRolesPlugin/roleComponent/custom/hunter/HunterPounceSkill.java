@@ -217,6 +217,8 @@ public class HunterPounceSkill extends Skill {
         World world = owner.getWorld();
         if (world != null) {
             HunterSound.riptideHunterPounceDashSound(world, owner.getLocation());
+            //起手聚气（2026-10-31 增强）：脚下双环 + 魂柱 + 前向风压，让"要冲了"看得见
+            HunterVfx.castGatherHunterPounceCharge(world, owner.getLocation());
         }
     }
 
@@ -278,6 +280,11 @@ public class HunterPounceSkill extends Skill {
     private void bite(Player owner) {
         Player victim = nearestHostile(owner);
         if (victim == null) {
+            //空扑收势（2026-10-31 增强）：咬空也要有可见反馈，否则玩家会以为技能没生效
+            World whiffWorld = owner.getWorld();
+            if (whiffWorld != null) {
+                HunterVfx.whiffHunterPounceWhiff(whiffWorld, owner.getLocation());
+            }
             return;
         }
         if (vitals != null) {
@@ -292,6 +299,13 @@ public class HunterPounceSkill extends Skill {
         }
         if (vitals != null) {
             vitals.heal(owner, SELF_HEAL);
+        }
+        //"咬实"的观感（2026-10-31 增强）：三道爪痕 + 魂爆 + 单发爆炸 + 脚下冲击环
+        if (world != null) {
+            Vector axis = victim.getLocation().toVector().subtract(owner.getLocation().toVector());
+            axis.setY(0d);
+            HunterVfx.biteImpactHunterPounceImpact(world,
+                    victim.getLocation().clone().add(0d, 1.0d, 0d), victim.getLocation(), axis);
         }
         //"撕咬时视角朝向目标" —— 目标唯一，直接朝向它
         faceTarget(owner, victim);

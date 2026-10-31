@@ -84,6 +84,48 @@ public class SanTEComponentOperationTest {
         assertTrue("平台侧通道被走到（零新增通道 ✓）", platform.seen.size() >= 3);
     }
 
+    // ───────── 上限写口（角色进化档位用；经用户批准的框架边界改动）─────────
+
+    /** 上限上调：current 不变、上限抬高后可在新边界内写满。 */
+    @Test
+    public void setMaxRaisesCapAndKeepsCurrent() {
+        SanTEComponent sante = newComponent();
+        assertEquals("构造期满值", MAX, sante.current());
+        sante.setMax(SanTEComponent.SANTE_MAX + 50);
+        assertEquals("上限已抬高", 150, sante.max());
+        assertEquals("current 不因抬上限而变化", MAX, sante.current());
+        sante.set(150);
+        assertEquals("新上限内可写满", 150, sante.current());
+    }
+
+    /** 上限下调：current 夹回新上限，且只有当前值真的被夹动时才通知订阅者。 */
+    @Test
+    public void setMaxClampsCurrentAndNotifiesOnlyOnRealChange() {
+        RecordingListener subscriber = new RecordingListener();
+        SanTEComponent sante = newComponent();
+        sante.addListener(SUBSCRIBER, subscriber);
+        sante.set(80);
+        subscriber.seen.clear();
+
+        sante.setMax(60);
+        assertEquals("上限已下调", 60, sante.max());
+        assertEquals("current 夹回新上限", 60, sante.current());
+        assertEquals("夹动 ⇒ 通知 1 次", 1, subscriber.seen.size());
+
+        sante.setMax(120);
+        assertEquals("上限上调不夹 current", 60, sante.current());
+        assertEquals("current 未变 ⇒ 不再通知", 1, subscriber.seen.size());
+    }
+
+    /** 负上限按 0 处理（与构造期同一归一规则）。 */
+    @Test
+    public void setMaxTreatsNegativeAsZero() {
+        SanTEComponent sante = newComponent();
+        sante.setMax(-5);
+        assertEquals("上限归零", 0, sante.max());
+        assertEquals("current 夹到 0", 0, sante.current());
+    }
+
     /** 未知动词（含大小写差异）⇒ 未识别 ⇒ null（不改状态）。 */
     @Test
     public void unknownVerbIsRejected() {
@@ -124,15 +166,15 @@ public class SanTEComponentOperationTest {
         assertEquals(MAX, sante.current());
     }
 
-    /** 边界：`decrease` 不足 ⇒ **已识别**（回非空）且值单调不增（既有 clamp 语义）。 */
+    /** 边界：`decrease` 不足 ⇒ **已识别**（回非空），且夹在 min 之上（2026-10-30 起下界 = min，可为负）。 */
     @Test
-    public void decreaseBelowZeroStaysRecognisedAndMonotone() {
+    public void decreaseBelowZeroStaysRecognisedAndClampsAtMin() {
         SanTEComponent sante = newComponent(new RecordingListener());
         sante.onOperationCommand("set 20");
         String after = sante.onOperationCommand("decrease 999");
         assertNotNull("已识别（非 null ✓）", after);
-        assertTrue("值单调不增", sante.current() <= 20);
-        assertTrue("非负", sante.current() >= 0);
+        assertEquals("set 20 后 decrease 999 ⇒ 20-999 = -979（夹在 min -999 之上）", -979, sante.current());
+        assertTrue("不得低于 min", sante.current() >= SanTEComponent.SANTE_MIN);
     }
 
     /** `set 0` 是合法写入（0 是被允许的边界值）。 */
@@ -281,6 +323,147 @@ public class SanTEComponentOperationTest {
         sante.notifyListeners(new SanTEComponent.Change(100, 5));
         assertEquals("被移除者本趟后不再收到", 0, existing.seen.size());
         assertEquals("新加者从下一趟起收到", 1, late.seen.size());
+    }
+
+    // ───────── 每角色 TE/SAN 配置（2026-10-30 框架改进）─────────
+
+    /** 默认配置 = 100 / -999 / 阈值 0 / 惩罚开启；**有效下界 = min = -999**（2026-10-30 起惩罚不再钉值）。 */
+    @Test
+    public void defaultConfigurationMatchesLegacyBehaviour() {
+        SanTEComponent.Configuration config = SanTEComponent.Configuration.DEFAULT;
+        assertEquals("默认上限", 100, config.max());
+        assertEquals("默认下限", -999, config.min());
+        assertEquals("默认惩罚阈值", 0, config.punishmentThreshold());
+        assertTrue("默认启用惩罚", config.punishmentEnabled());
+        assertEquals("2026-10-30 起有效下界 = min（惩罚不再钉值）", -999, config.effectiveFloor());
+
+        SanTEComponent sante = newComponent();
+        assertEquals("默认 max", 100, sante.max());
+        assertEquals("默认 min", -999, sante.min());
+        assertEquals("默认 threshold", 0, sante.punishmentThreshold());
+        assertEquals("默认有效下界 = -999", -999, sante.floor());
+    }
+
+    /** 自定义上限 / 下限 / 阈值：clamp 用 **min**（阈值只决定惩罚触发点）。 */
+    @Test
+    public void customBoundsAndThresholdAreHonoured() {
+        SanTEComponent.Configuration config = new SanTEComponent.Configuration(150, -500, -100, true);
+        SanTEComponent sante = new SanTEComponent("sante", new ComponentServicesPort(null, null, null), config);
+
+        assertEquals("构造期满 SanTE", 150, sante.current());
+        assertEquals("有效下界 = min（-500，与阈值无关）", -500, sante.floor());
+
+        sante.set(-9999);
+        assertEquals("低于有效下界 ⇒ 夹到 -500", -500, sante.current());
+        sante.set(9999);
+        assertEquals("高于上限 ⇒ 夹到 150", 150, sante.current());
+
+        //运行期改上限：current 夹回新上限，有效下界同步收紧
+        sante.set(150);
+        sante.setMax(120);
+        assertEquals("setMax 后 current 夹到 120", 120, sante.current());
+        assertEquals("上限 120", 120, sante.max());
+    }
+
+    /** 下限生效（默认 -999）：TE 可以真的降到负数（惩罚期间被攻击也会掉，不再钉值）。 */
+    @Test
+    public void punishmentDisabledAllowsNegativeDownToMin() {
+        SanTEComponent.Configuration config = SanTEComponent.Configuration.DEFAULT
+                .withPunishmentEnabled(false);
+        SanTEComponent sante = new SanTEComponent("sante", new ComponentServicesPort(null, null, null), config);
+
+        assertEquals("关闭惩罚 ⇒ 有效下界 = min", -999, sante.floor());
+        assertFalse("punishmentEnabled 反映配置", sante.punishmentEnabled());
+
+        sante.set(-5000);
+        assertEquals("夹到下限 -999", -999, sante.current());
+        sante.set(-300);
+        assertEquals("允许写负数", -300, sante.current());
+        sante.increase(100);
+        assertEquals("从负数往上加", -200, sante.current());
+    }
+
+    /** 描述符的链式 setter：完全不写 = 默认；写哪项改哪项。 */
+    @Test
+    public void specificationFluentSettersCompose() {
+        SanTEComponent.Specification defaults = new SanTEComponent.Specification();
+        assertEquals("默认配置", SanTEComponent.Configuration.DEFAULT, defaults.configuration());
+
+        SanTEComponent.Specification custom = new SanTEComponent.Specification()
+                .setMax(180).setMin(-600).setPunishmentThreshold(-60).setPunishmentEnabled(false);
+        SanTEComponent.Configuration config = custom.configuration();
+        assertEquals(180, config.max());
+        assertEquals(-600, config.min());
+        assertEquals(-60, config.punishmentThreshold());
+        assertFalse(config.punishmentEnabled());
+
+        SanTEComponent created = custom.create("sante", new ComponentServicesPort(null, null, null));
+        assertEquals("描述符 create 走同一份配置", 180, created.max());
+        assertEquals("有效下界 = min（惩罚关闭）", -600, created.floor());
+    }
+
+    /** 操作面新增读口 min / threshold / floor；set 允许负数（按有效下界 clamp）。 */
+    @Test
+    public void operationExposesBoundsAndAllowsNegativeSet() {
+        SanTEComponent defaultComponent = newComponent(new RecordingListener());
+        assertEquals("min 读口", "-999", defaultComponent.onOperationCommand("min"));
+        assertEquals("threshold 读口", "0", defaultComponent.onOperationCommand("threshold"));
+        assertEquals("floor 读口（默认 -999）", "-999", defaultComponent.onOperationCommand("floor"));
+        assertEquals("默认配置下 set -50 直接生效", "-50", defaultComponent.onOperationCommand("set -50"));
+
+        SanTEComponent negative = new SanTEComponent("sante",
+                new ComponentServicesPort(null, null, null), SanTEComponent.Configuration.DEFAULT.withPunishmentEnabled(false));
+        assertEquals("关闭惩罚后 set -50 生效", "-50", negative.onOperationCommand("set -50"));
+        assertEquals("floor 读口 = -999", "-999", negative.onOperationCommand("floor"));
+        assertNull("gain 的方向参数仍必须非负", negative.onOperationCommand("gain -1"));
+    }
+
+    /**
+     * 惩罚触发阈值是**纯函数**（默认 0）：`current <= threshold` 即触发；角色可把阈值调到负数。
+     */
+    @Test
+    public void punishmentTriggerUsesConfiguredThreshold() {
+        assertTrue("默认：降到 0 触发", DefaultSanTEZeroPunishment.triggersPunishment(0, 0));
+        assertTrue("默认：降到负数也触发", DefaultSanTEZeroPunishment.triggersPunishment(0, -5));
+        assertFalse("默认：still above 0 不触发", DefaultSanTEZeroPunishment.triggersPunishment(0, 1));
+        assertTrue("自定义阈值 -50：到 -50 触发", DefaultSanTEZeroPunishment.triggersPunishment(-50, -50));
+        assertFalse("自定义阈值 -50：-49 还不触发", DefaultSanTEZeroPunishment.triggersPunishment(-50, -49));
+    }
+
+    /** 惩罚组件的节奏/强度可自定义；不写 = 100 刻 / 3 跳 / 10%（与改动前一致）。 */
+    @Test
+    public void punishmentSpecificationDefaultsAndTunables() {
+        DefaultSanTEZeroPunishment.Specification defaults =
+                new DefaultSanTEZeroPunishment.Specification();
+        assertEquals("默认眩晕 100 刻", 100, defaults.stunTicks());
+        assertEquals("默认 3 跳", 3, defaults.beats());
+        assertEquals("默认每跳 10% 最大生命", 10d, defaults.damagePerBeatPercentOfMaxHealth(), 0.0001d);
+
+        DefaultSanTEZeroPunishment.Specification custom =
+                new DefaultSanTEZeroPunishment.Specification()
+                        .setStunTicks(60).setBeats(5).setDamagePerBeatPercentOfMaxHealth(6.5d);
+        assertEquals(60, custom.stunTicks());
+        assertEquals(5, custom.beats());
+        assertEquals(6.5d, custom.damagePerBeatPercentOfMaxHealth(), 0.0001d);
+
+        //非法值归一：时长/跳数至少 1，伤害百分比非负
+        DefaultSanTEZeroPunishment.Specification normalized =
+                new DefaultSanTEZeroPunishment.Specification()
+                        .setStunTicks(0).setBeats(-3).setDamagePerBeatPercentOfMaxHealth(-1d);
+        assertEquals(1, normalized.stunTicks());
+        assertEquals(1, normalized.beats());
+        assertEquals(0d, normalized.damagePerBeatPercentOfMaxHealth(), 0.0001d);
+    }
+
+    /** 惩罚**不再钉值**：组件不得再覆写 {@code update()} 逐 tick 写 SanTE；阈值也不影响有效下界。 */
+    @Test
+    public void punishmentNoLongerPinsSanTe() {
+        for (Method method : DefaultSanTEZeroPunishment.class.getDeclaredMethods()) {
+            assertFalse("惩罚组件不得再逐 tick 钉 SanTE：发现了 update()",
+                    method.getName().equals("update"));
+        }
+        assertEquals("阈值只决定触发点，不影响下界",
+                -999, SanTEComponent.Configuration.DEFAULT.withPunishmentThreshold(-100).effectiveFloor());
     }
 
     /** 空值面：{@code null} owner / {@code null} 监听器 ⇒ 忽略（回 {@code null}，旧 `subscribe(null)` 同义）。 */

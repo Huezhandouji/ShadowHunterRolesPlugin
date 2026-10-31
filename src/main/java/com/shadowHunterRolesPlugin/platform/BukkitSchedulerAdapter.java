@@ -23,7 +23,7 @@ import org.bukkit.plugin.Plugin;
  * （{@code Initial delay ticks may not be <= 0}），而
  * {@code BukkitScheduler.runTaskTimer(…, 0L, …)} 接受 0。
  * 生产侧有 3 个调用点传 0（{@code BuffManager} / {@code DefaultSanTEZeroPunishment} /
- * {@code MeiqiheziBloodySlashSkill}），因此本类把 {@code initialDelayTicks} 归一为 1 tick
+ * {@code MikomakoBloodySlashSkill}），因此本类把 {@code initialDelayTicks} 归一为 1 tick
  * （{@code Math.max(1L, …)}）。
  * <p><b>该归一不产生相位差（经实测未见偏移）</b>：原生 Bukkit 的 {@code 0L} 语义本就是"下一个 tick 首次执行"，
  * 归一后首个触发 tick 与原生 {@code runTaskTimer(0L, …)} 逐字相同（已由矩阵实测：

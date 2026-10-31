@@ -70,7 +70,7 @@ public class VitalsComponent extends RoleComponent {
      * 角色的生命上限（组件侧配置 · 占位值）。
      *
      * <p>真值应来自角色配置；本值是在「角色模板不再持有 HP/SanTE/Energy」之后，为不丢失既有行为
-     * 而落的占位（可玩的 {@code meiqihezi} 与 {@code red} 的声明值都是 40）。
+     * 而落的占位（可玩的 {@code Mikomako} 与 {@code red} 的声明值都是 40）。
      * 逐角色差异（见 {@link #applyHealthModifier} 的行为申报）需由组件侧配置另行恢复。
      *
      * <p><b>为什么常量落在组件而不是容器</b>：上限的持有权已归本组件（生命的唯一持有者）；
@@ -338,26 +338,31 @@ public class VitalsComponent extends RoleComponent {
      * 造成伤害（按 {@link DamageKind} 选原语；含 {@link DamageUtil} 既有的 PDC 副作用与守卫）。
      * <p>语义：{@code victim = target}、{@code source = 本组件所属玩家}；走既有 {@code DamageUtil}
      * 路径，与合并前逐字等价（{@code PHYSICAL} → {@code dealtPhysicalDamage}；
-     * {@code TRUE} → {@code dealtTrueDamage}）。
+     * {@code TRUE} → {@code dealtTrueDamage}；{@code EXPLOSION} → {@code dealtExplosionDamage}；
+     * {@code PROJECTILE} → {@code dealtProjectileDamage}）。
      * <p><b>本入口只负责结算</b>：它不自己投递回调 —— 承受方的受伤订阅
      * （{@link #addDamagedListener(RoleComponent, Consumer)}）由 {@code listener/hook/DamageHookListener}
      * 在平台事件（{@code EntityDamageEvent}）里按目标实例派发
      * （这样"一切真实伤害"都触发，而不只是走本入口的那部分）。
-     * <p>用法（两例）：{@code damage(self(), 5, DamageKind.TRUE)}（对自己，真伤）/
-     * {@code damage(otherPlayer, 14, DamageKind.PHYSICAL)}（对他人，物伤）。
+     * <p>用法（四例）：{@code damage(self(), 5, DamageKind.TRUE)}（对自己，真伤）/
+     * {@code damage(otherPlayer, 14, DamageKind.PHYSICAL)}（对他人，物伤）/
+     * {@code damage(otherPlayer, 12, DamageKind.EXPLOSION)}（爆炸：受爆炸保护减免）/
+     * {@code damage(otherPlayer, 6, DamageKind.PROJECTILE)}（弹射物：受弹射物保护减免）。
      *
      * @param target 承受方玩家（可为自己）
      * @param amount 伤害量
-     * @param kind   伤害类型（{@link DamageKind#PHYSICAL} / {@link DamageKind#TRUE}）
+     * @param kind   伤害类型（{@link DamageKind#PHYSICAL} / {@link DamageKind#TRUE} /
+     *               {@link DamageKind#EXPLOSION} / {@link DamageKind#PROJECTILE}）
      */
     public void damage(Player target, double amount, DamageKind kind) {
-        if (target == null) {
+        if (target == null || kind == null) {
             return;
         }
-        if (kind == DamageKind.PHYSICAL) {
-            DamageUtil.dealtPhysicalDamage(target, self(), amount);
-        } else {
-            DamageUtil.dealtTrueDamage(target, self(), amount);
+        switch (kind) {
+            case PHYSICAL -> DamageUtil.dealtPhysicalDamage(target, self(), amount);
+            case TRUE -> DamageUtil.dealtTrueDamage(target, self(), amount);
+            case EXPLOSION -> DamageUtil.dealtExplosionDamage(target, self(), amount);
+            case PROJECTILE -> DamageUtil.dealtProjectileDamage(target, self(), amount);
         }
     }
 
@@ -438,7 +443,7 @@ public class VitalsComponent extends RoleComponent {
      * （既有实现里那个字面量 {@code 20} 就是它的旧写法，现在给它一个名字）。
      *
      * <p><b>一处已变更的行为（如实申报）</b>：上限值不再来自角色模板。可玩的三个角色里
-     * {@code meiqihezi}=40 / {@code red}=40 / {@code selfUpdateExample}=20；统一取
+     * {@code Mikomako}=40 / {@code red}=40 / {@code selfUpdateExample}=20；统一取
      * {@link #ROLE_HEALTH_CAP} 后，前两者行为逐字不变，而 {@code selfUpdateExample} 的 {@code mod}
      * 由 {@code 0} 变为 {@code 20}（满血 20 → 40）。该角色是演示角色（唯一目的 = 给「组件可请求
      * 重绘」一个生产使用点），故按「统一上限」处理；若日后要恢复逐角色上限，须由组件侧配置
@@ -475,7 +480,7 @@ public class VitalsComponent extends RoleComponent {
         target.getAttribute(Attribute.MAX_HEALTH).removeModifier(key);
     }
 
-    // ───────────── 四个伤害原语（与生命同属本组件）─────────────
+    // ───────────── 八个伤害原语（四种类型 × 带/不带击退；与生命同属本组件）─────────────
 
     /** 真实伤害（无视护甲；含既有 PDC 副作用）。 */
     public void trueDamage(LivingEntity victim, LivingEntity source, double amount) {
@@ -495,6 +500,34 @@ public class VitalsComponent extends RoleComponent {
     /** 物理伤害 + 击退强度。 */
     public void physicalDamage(LivingEntity victim, LivingEntity source, double amount, double knockbackStrength) {
         DamageUtil.dealtPhysicalDamage(victim, source, amount, knockbackStrength);
+    }
+
+    /**
+     * 爆炸伤害（2026-10-31 新增）：走原版 {@code minecraft:explosion} 伤害类型。
+     * <p>与 {@link #physicalDamage} 的差别：护甲 + **爆炸保护**按原版伤害类型标签减免，
+     * 死亡信息为爆炸口径；PDC 记账与清无敌帧同规。
+     */
+    public void explosionDamage(LivingEntity victim, LivingEntity source, double amount) {
+        DamageUtil.dealtExplosionDamage(victim, source, amount);
+    }
+
+    /** 爆炸伤害 + 击退强度。 */
+    public void explosionDamage(LivingEntity victim, LivingEntity source, double amount, double knockbackStrength) {
+        DamageUtil.dealtExplosionDamage(victim, source, amount, knockbackStrength);
+    }
+
+    /**
+     * 弹射物伤害（2026-10-31 新增）：走原版 {@code minecraft:arrow} 伤害类型。
+     * <p>与 {@link #physicalDamage} 的差别：护甲 + **弹射物保护**按原版伤害类型标签减免，
+     * 死亡信息为弹射物口径；PDC 记账与清无敌帧同规。
+     */
+    public void projectileDamage(LivingEntity victim, LivingEntity source, double amount) {
+        DamageUtil.dealtProjectileDamage(victim, source, amount);
+    }
+
+    /** 弹射物伤害 + 击退强度。 */
+    public void projectileDamage(LivingEntity victim, LivingEntity source, double amount, double knockbackStrength) {
+        DamageUtil.dealtProjectileDamage(victim, source, amount, knockbackStrength);
     }
 
     // ───────────── 击杀订阅面（玩家被玩家击杀）─────────────

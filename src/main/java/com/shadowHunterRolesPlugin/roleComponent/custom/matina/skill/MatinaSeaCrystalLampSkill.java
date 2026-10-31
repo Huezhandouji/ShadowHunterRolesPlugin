@@ -34,6 +34,9 @@ import java.util.List;
  *       <b>村民愤怒粒子</b>与<b>旋转上升的紫色粒子</b>，并播放<b>僵尸村民转变音效（2 倍速）</b>；</li>
  *   <li><b>每有一名角色接受治疗</b>，增加 <b>1 点狂暴值</b>（治到自己也算一名角色）；
  *       <b>CD {@value #COOLDOWN_TICKS} 刻</b>（6 秒）、<b>能量消耗 {@value #ENERGY_COST}</b>。</li>
+ *   <li><b>施放瞬间</b>，在一技能**正中心**生成<b>巨大粒子十字架</b>（{@value MatinaRageVfx#HOLY_CROSS_HEIGHT} 格高、
+ *       总宽 {@code 2 × }{@value MatinaRageVfx#HOLY_CROSS_ARM} 格；白色 + 青色双层红石粉），
+ *       <b>正面朝向施法者的视角</b> —— 2026-10-31 需求，见 {@link MatinaRageVfx#holyCross}。</li>
  * </ul>
  *
  * <h2>★ 2026-10-17 修复：施法者本人不在治疗名单里</h2>
@@ -151,6 +154,9 @@ public class MatinaSeaCrystalLampSkill extends Skill {
         if (world == null) {
             return;
         }
+
+        //★ 2026-10-31 需求：一技能正中心生成巨大的粒子十字架，正面朝向施法者的视角
+        MatinaRageVfx.holyCross(world, center, caster.getEyeLocation().getDirection());
 
         //① 施放本身的场面：药光 + 海晶灯的音效
         MatinaRageVfx.dustRing(world, center.clone().add(0d, 0.2d, 0d), EFFECT_RADIUS,

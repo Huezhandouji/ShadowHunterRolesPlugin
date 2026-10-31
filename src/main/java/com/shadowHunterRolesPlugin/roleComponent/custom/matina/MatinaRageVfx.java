@@ -8,6 +8,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 「狂躁牧师·马提娜」的**纯粒子工具**（无状态、零组件依赖、零 YAML）。
  *
@@ -33,6 +36,9 @@ public final class MatinaRageVfx {
 
     /** 「神罚」魔法阵的白色（带一点冷调，在夜晚也清楚）。 */
     public static final Color HOLY_WHITE = Color.fromRGB(240, 245, 255);
+
+    /** 一技能十字架的青色泛光（海晶主题；与 {@link #HOLY_WHITE} 叠出"美丽"层次）。 */
+    public static final Color HOLY_CYAN = Color.fromRGB(120, 235, 255);
 
     // ───────── 通用：一个点上的单颗粒子 ─────────
 
@@ -219,6 +225,104 @@ public final class MatinaRageVfx {
             }
             dust(world, at, HOLY_WHITE, 0.7f);
         }
+    }
+
+    // ───────── 一技能：巨大粒子十字架（2026-10-31 需求）─────────
+
+    /** 十字架竖杆高度（格）——"巨大"：5 格高。 */
+    public static final double HOLY_CROSS_HEIGHT = 5.0d;
+
+    /** 横杆半长（格；总宽 = 2 × 本值 = 4 格）。 */
+    public static final double HOLY_CROSS_ARM = 2.0d;
+
+    /** 横杆高度占竖杆全高的比例（0.62 ⇒ 上臂短、下臂长，是"十字"而不是"加号"）。 */
+    public static final double HOLY_CROSS_ARM_RATIO = 0.62d;
+
+    /** 采样步长（格）：步长越小粒子越密、也越贵。 */
+    private static final double HOLY_CROSS_STEP = 0.2d;
+
+    /** 十字架沿视线前移的距离（格）：避免与施法者眼位共面 ⇒ 第一人称也能看到正面。 */
+    private static final double HOLY_CROSS_FORWARD = 1.5d;
+
+    /**
+     * **十字架在自身平面内的采样偏移**（纯函数 ⇒ 离线可测）：{@code (x, y)} 分别对应
+     * "横杆方向 / 世界竖直"，平面法线由调用方另行决定。
+     * <p>竖杆：{@code y ∈ [−H/2, +H/2]}，每 {@value #HOLY_CROSS_STEP} 格一点；
+     * 横杆：{@code y = H × (ratio − 0.5)} 一行、{@code x ∈ [−arm, +arm]}；交点只算一次。
+     */
+    public static List<Vector> crossLocalPoints() {
+        List<Vector> points = new ArrayList<>();
+        double half = HOLY_CROSS_HEIGHT / 2d;
+        int verticalSteps = (int) Math.round(HOLY_CROSS_HEIGHT / HOLY_CROSS_STEP);
+        for (int i = 0; i <= verticalSteps; i++) {
+            points.add(new Vector(0d, -half + i * HOLY_CROSS_STEP, 0d));
+        }
+        int armSteps = (int) Math.round(HOLY_CROSS_ARM / HOLY_CROSS_STEP);
+        double armY = HOLY_CROSS_HEIGHT * (HOLY_CROSS_ARM_RATIO - 0.5d);
+        for (int i = -armSteps; i <= armSteps; i++) {
+            if (i == 0) {
+                continue;   // 交点已由竖杆给出，不重复画
+            }
+            points.add(new Vector(i * HOLY_CROSS_STEP, armY, 0d));
+        }
+        return points;
+    }
+
+    /**
+     * **一技能正中心的巨大粒子十字架**（需求 2026-10-31：使用一技能时在正中心生成巨大美丽十字架，
+     * 正面朝向施法者的视角）。
+     *
+     * <p><b>朝向</b>：十字架所在平面 = **竖直平面**，平面法线 = 施法者的**水平视线方向**
+     * ⇒ 从施法者视角看过去，十字架是正对镜头的"正面"，而不是斜的投影。
+     * <p><b>位置</b>：一技能中心 = 施法位置；十字架**底部中心落在该点**（竖杆向上 5 格），
+     * 并沿视线前移 {@value #HOLY_CROSS_FORWARD} 格 —— 若正好与眼位共面，第一人称会看不到正面。
+     * <p><b>形态</b>：白色 + 青色双层红石粉（{@link #HOLY_WHITE} / {@link #HOLY_CYAN}）铺满整条轮廓，
+     * 顶端与两臂端头补白色末地烛收边。
+     *
+     * @param world       世界（{@code null} ⇒ 静默返回）
+     * @param skillCenter 一技能中心（施法者位置；{@code null} ⇒ 静默返回）
+     * @param look        施法者的视线方向（{@code null} / 竖直 ⇒ 退回世界 −Z）
+     */
+    public static void holyCross(World world, Location skillCenter, Vector look) {
+        if (world == null || skillCenter == null) {
+            return;
+        }
+        Vector normal = horizontalUnit(look);
+        Vector side = new Vector(normal.getZ(), 0d, -normal.getX()).normalize();
+        Location center = skillCenter.clone()
+                .add(0d, HOLY_CROSS_HEIGHT / 2d, 0d)
+                .add(normal.clone().multiply(HOLY_CROSS_FORWARD));
+        for (Vector offset : crossLocalPoints()) {
+            Location at = center.clone()
+                    .add(side.clone().multiply(offset.getX()))
+                    .add(0d, offset.getY(), 0d);
+            world.spawnParticle(Particle.DUST, at, 2, 0.02d, 0.02d, 0.02d, 0d,
+                    new Particle.DustOptions(HOLY_WHITE, 0.9f));
+            world.spawnParticle(Particle.DUST, at, 1, 0.02d, 0.02d, 0.02d, 0d,
+                    new Particle.DustOptions(HOLY_CYAN, 1.25f));
+        }
+        // 顶端 + 两臂端头：末地烛收边，让"巨大"的轮廓在远处也看得清
+        double armY = HOLY_CROSS_HEIGHT * (HOLY_CROSS_ARM_RATIO - 0.5d);
+        spawnCrossTip(world, center.clone().add(0d, HOLY_CROSS_HEIGHT / 2d, 0d));
+        spawnCrossTip(world, center.clone().add(side.clone().multiply(HOLY_CROSS_ARM)).add(0d, armY, 0d));
+        spawnCrossTip(world, center.clone().add(side.clone().multiply(-HOLY_CROSS_ARM)).add(0d, armY, 0d));
+    }
+
+    /** 端头收边：一簇白色末地烛。 */
+    private static void spawnCrossTip(World world, Location at) {
+        world.spawnParticle(Particle.END_ROD, at, 5, 0.06d, 0.06d, 0.06d, 0.01d);
+    }
+
+    /** 水平单位视线（{@code null} / 竖直视线 ⇒ 世界 −Z，保证十字架永远"立得正"）。 */
+    private static Vector horizontalUnit(Vector look) {
+        if (look == null) {
+            return new Vector(0d, 0d, -1d);
+        }
+        Vector flat = new Vector(look.getX(), 0d, look.getZ());
+        if (flat.lengthSquared() < 1.0E-9d) {
+            return new Vector(0d, 0d, -1d);
+        }
+        return flat.normalize();
     }
 
     /** **爱心粒子**（治疗落在谁身上就在谁头上冒；也用来当无人机的"持续生成的爱心"）。 */

@@ -24,7 +24,7 @@ import java.util.List;
  *   <li>靴子 = 铁靴子 · {@code ▓阔地▓}</li>
  * </ul>
  *
- * <p>与 {@code MeiqiheziEquipmentsPassive} 同规：{@code start()} 直接写入四槽，
+ * <p>与 {@code MikomakoEquipmentsPassive} 同规：{@code start()} 直接写入四槽，
  * {@code stop()} 清空四槽（已知代价：玩家原本穿在这四槽的其它装备会被一并删除）。
  */
 public class ResistEquipmentsPassive extends PassiveSkill {

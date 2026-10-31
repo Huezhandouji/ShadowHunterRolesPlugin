@@ -18,6 +18,7 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronFloatingText
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronTraumaPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronHookSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.canglu.HeronMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterEvolutionPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterGrudgeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPounceSkill;
@@ -25,27 +26,29 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPreyPassive
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterPullSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.hunter.HunterStealthSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.lin.mainWeapon.LinIronBloodMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lin.passive.LinEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.lin.passive.LinKeplerPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.lin.passive.LinMartyrPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.lin.skill.LinBoneNailSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.lin.skill.LinShadowRaidSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.lin.skill.LinTripleStrikeSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.mainWeapon.MatinaMedicalShovelMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaEquipmentsPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaFloatingTextComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaKuangPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaJudgmentSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaRedstoneDroneSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.skill.MatinaSeaCrystalLampSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziChargeComponent;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziFloatingTextComponent;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziMadnessPassive;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziSanDrainComponent;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.MeiqiheziThrowComponent;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.mainWeapon.MeiqiheziJuejueMainWeapon;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.passive.MeiqiheziEquipmentsPassive;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziCircleSlashSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziUnconcernSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.MikomakoChargeComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.MikomakoFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.MikomakoMadnessPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.MikomakoSanDrainComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.MikomakoThrowComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.mainWeapon.MikomakoJuejueMainWeapon;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.passive.MikomakoEquipmentsPassive;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoBloodySlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoCircleSlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoUnconcernSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.raven.mainWeapon.RavenRevolverMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.raven.passive.RavenAirMobilityPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.raven.passive.RavenEquipmentsPassive;
@@ -61,7 +64,7 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedEvilShockSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedFloatingTextComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSanctifiedBladeMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.red.RedSolitaryArroganceSkill;
-import com.shadowHunterRolesPlugin.roleComponent.custom.remoteness.*;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lethe.*;
 import com.shadowHunterRolesPlugin.roleComponent.custom.resist.ResistFloatingTextComponent;
 import com.shadowHunterRolesPlugin.roleComponent.custom.resist.ResistMainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.custom.resist.ResistStrugglePassive;
@@ -73,6 +76,8 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaBladeMainWe
 import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaBladeStormSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaFlashSlashSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaFloatingTextComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.voice.ScriptedVoiceComponent;
+import com.shadowHunterRolesPlugin.roleComponent.custom.voice.VoiceScripts;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaGauntletPassive;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sayaka.SayakaGrenadeSkill;
 import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.mainWeapon.SinThornFangMainWeapon;
@@ -122,13 +127,13 @@ public class RoleLoader {
      */
     public List<Definition> defaultDefinitions() {
         return List.of(
-                new Definition("meiqihezi", RoleLoader::meiqiheziBuilder),
+                new Definition("Mikomako", RoleLoader::mikomakoBuilder),
                 new Definition("red", RoleLoader::redBuilder),
                 new Definition("selfUpdateExample", RoleLoader::selfUpdateExampleBuilder),
                 new Definition("Heron", RoleLoader::cangluBuilder),
                 new Definition("sinThorn", RoleLoader::sinThornBuilder),
                 new Definition("matina", RoleLoader::matinaBuilder),
-                new Definition("remoteness", RoleLoader::remotenessBuilder),
+                new Definition("lethe", RoleLoader::letheBuilder),
                 new Definition("tek", RoleLoader::tekBuilder),
                 new Definition("hunter", RoleLoader::hunterBuilder),
                 new Definition("albert", RoleLoader::albertBuilder),
@@ -195,24 +200,86 @@ public class RoleLoader {
      * {@code create} 经方法引用捕获描述符实例，共享一份会让两个角色拿到同一个声明阵营。
      */
     private static Role.Builder withBuiltIns(Role.Builder builder, Faction declared) {
-        return builder
+        return withBuiltIns(builder, declared, SanTEComponent.Configuration.DEFAULT, null);
+    }
+
+    /**
+     * 内建段 + **每个角色可自定义的 SanTE 配置**（2026-10-30 框架改进）。
+     *
+     * <p><b>为什么要有这个重载</b>：TE/SAN 的上限、下限、惩罚触发阈值、是否启用默认惩罚
+     * 都属于"每个角色一份"的设计值，不能写死在框架里。角色 builder 只要把
+     * {@link SanTEComponent.Configuration} 传进来（例如
+     * {@code Configuration.DEFAULT.withMax(150).withPunishmentThreshold(-100)}），
+     * 内建段就会把配置交给 {@code SanTEComponent}；关闭惩罚时**不注册**默认惩罚组件，
+     * 角色可自行加自己的惩罚被动。
+     *
+     * <p><b>不传 = 默认配置</b>（100 / -999 / 阈值 0 / 惩罚开启）⇒ 与改动前行为逐字一致；
+     * 因此现有角色的调用点（{@link #withBuiltIns(Role.Builder, Faction)}）无需改动。
+     *
+    * <p>装配顺序：渲染 / 能量 / SanTE / 生命 / buff / 任务 / 阵营 / **战斗状态** / 默认惩罚 / BOSS 条 /
+    * **名下属性显示**。
+    * 2026-10-31 起旧的「自动回 SanTE（无敌人 10 格满 200 刻）」由 {@link CombatStateComponent}
+    * 统一接管（战斗状态 + 脱战恢复 + 回血间隔期），旧的 {@code AutoRecoverSanTEHealthPassive}
+    * 不再注册（类保留供既有单测/引用）。
+    */
+    private static Role.Builder withBuiltIns(Role.Builder builder, Faction declared,
+                                             SanTEComponent.Configuration santeConfig) {
+        return withBuiltIns(builder, declared, santeConfig, null);
+    }
+
+    /**
+     * 内建段 + 自定义 SanTE 配置 + **自定义默认惩罚的参数**（2026-10-30 框架改进）。
+     *
+     * <p>第三个参数管"边界与触发"（上限 / 下限 / 阈值 / 是否启用），第四个参数管"默认惩罚的
+     * 节奏与强度"（眩晕时长 / 跳数 / 每跳真伤百分比，见
+     * {@link DefaultSanTEZeroPunishment.Specification}）。两者都可以不传：
+     * <ul>
+     *   <li>{@code santeConfig == null} ⇒ 用 {@link SanTEComponent.Configuration#DEFAULT}；</li>
+     *   <li>{@code punishmentSpec == null} ⇒ 用默认惩罚参数（100 刻 / 3 跳 / 每跳 10% 最大生命，
+     *       与改动前逐字一致）；</li>
+     *   <li>{@code config.punishmentEnabled() == false} ⇒ 即使给了 {@code punishmentSpec} 也不注册
+     *       默认惩罚组件（角色自行实现惩罚或不惩罚）。</li>
+     * </ul>
+     */
+    private static Role.Builder withBuiltIns(Role.Builder builder, Faction declared,
+                                             SanTEComponent.Configuration santeConfig,
+                                             DefaultSanTEZeroPunishment.Specification punishmentSpec) {
+        SanTEComponent.Configuration config =
+                santeConfig == null ? SanTEComponent.Configuration.DEFAULT : santeConfig;
+        Role.Builder built = builder
                 .addComponent(HotbarRenderComponent.ID, new HotbarRenderComponent.Specification())
                 .addComponent(EnergyComponent.ID, new EnergyComponent.Specification())
-                .addComponent(SanTEComponent.ID, new SanTEComponent.Specification())
+                .addComponent(SanTEComponent.ID, new SanTEComponent.Specification(config))
                 .addComponent(VitalsComponent.ID, new VitalsComponent.Specification())
                 .addComponent(BuffComponent.ID, new BuffComponent.Specification())
                 .addComponent(TaskComponent.ID, new TaskComponent.Specification())
                 .addComponent(FactionComponent.ID, new FactionComponent.Specification(declared))
-                .addComponent(AutoRecoverSanTEHealthPassive.ID, new AutoRecoverSanTEHealthPassive.Specification())
-                .addComponent(DefaultSanTEZeroPunishment.ID, new DefaultSanTEZeroPunishment.Specification())
-                .addComponent(BossbarRoleAttributesDisplayComponent.ID, new BossbarRoleAttributesDisplayComponent.Specification());
+                //★ 2026-10-31 战斗状态框架：4 格有敌人 / 给敌人上状态 / 受敌方攻击 ⇒ 战斗；
+                //  6 秒无刷新脱战；方块伤害走 3 秒回血间隔期；脱战按阵营每秒恢复（见组件 javadoc）
+                .addComponent(CombatStateComponent.ID, new CombatStateComponent.Specification());
+        //关闭默认惩罚 ⇒ 不注册它（角色自行实现惩罚，或干脆不惩罚）
+        if (config.punishmentEnabled()) {
+            DefaultSanTEZeroPunishment.Specification spec =
+                    punishmentSpec != null ? punishmentSpec : new DefaultSanTEZeroPunishment.Specification();
+            built = built.addComponent(DefaultSanTEZeroPunishment.ID, spec);
+        }
+        return built
+                .addComponent(BossbarRoleAttributesDisplayComponent.ID,
+                        new BossbarRoleAttributesDisplayComponent.Specification())
+                //★ 2026-10-31 名下显示：其他玩家视角的名字下方 = ❤ 血量 + SAN/TE
+                //  （猎影人 SAN 紫色 / 影都 TE 亮黄色；TextDisplay 跟随玩家，死亡/隐身/掉线自动隐藏）
+                .addComponent(NameplateVitalsDisplayComponent.ID,
+                        new NameplateVitalsDisplayComponent.Specification());
     }
 
-    private static Role.Builder meiqiheziBuilder() {
+    private static Role.Builder mikomakoBuilder() {
         //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
         Faction faction = Faction.HUNTER;
 
-        return withBuiltIns(new Role.Builder("meiqihezi"), faction)
+        //★ 2026-10-31 需求：鹤子有自己的「须狂命」归零逻辑（0.5 秒引导 → 15 秒狂命 → 自持 5 秒惩罚），
+        //  不再沿用默认特殊值惩罚 ⇒ 关闭默认惩罚组件（它根本不会被注册）。
+        return withBuiltIns(new Role.Builder("Mikomako"), faction,
+                SanTEComponent.Configuration.DEFAULT.withPunishmentEnabled(false))
  //「已被提供的类型」由装配方注入（core/Role 本身不认识任何组件类），
  //  否则组件声明 requires(框架级组件) 会被模板侧的依赖校验误报成"缺必需依赖"。
                 .displayName(Component.text("梅妻鹤子"))
@@ -226,17 +293,17 @@ public class RoleLoader {
                 ))
                 //表现值（名字/描述/冷却/耗能/图标）随组件自己的 Specification 走，
  //装配点只写 setSlot；注册顺序与既有实现逐字一致（= 派发序 = 渲染序）。
-                .addComponent(MeiqiheziChargeComponent.ID, new MeiqiheziChargeComponent.Specification())
-                .addComponent(MeiqiheziThrowComponent.ID, new MeiqiheziThrowComponent.Specification())
-                .addComponent(MeiqiheziSanDrainComponent.ID, new MeiqiheziSanDrainComponent.Specification())
-                .addComponent(MeiqiheziUnconcernSkill.ID, new MeiqiheziUnconcernSkill.Specification().setSlot(1))
-                .addComponent(MeiqiheziBloodySlashSkill.ID, new MeiqiheziBloodySlashSkill.Specification().setSlot(2))
-                .addComponent(MeiqiheziCircleSlashSkill.ID, new MeiqiheziCircleSlashSkill.Specification().setSlot(3))
-                .addComponent(MeiqiheziJuejueMainWeapon.ID, new MeiqiheziJuejueMainWeapon.Specification().setSlot(0))
+                .addComponent(MikomakoChargeComponent.ID, new MikomakoChargeComponent.Specification())
+                .addComponent(MikomakoThrowComponent.ID, new MikomakoThrowComponent.Specification())
+                .addComponent(MikomakoSanDrainComponent.ID, new MikomakoSanDrainComponent.Specification())
+                .addComponent(MikomakoUnconcernSkill.ID, new MikomakoUnconcernSkill.Specification().setSlot(1))
+                .addComponent(MikomakoBloodySlashSkill.ID, new MikomakoBloodySlashSkill.Specification().setSlot(2))
+                .addComponent(MikomakoCircleSlashSkill.ID, new MikomakoCircleSlashSkill.Specification().setSlot(3))
+                .addComponent(MikomakoJuejueMainWeapon.ID, new MikomakoJuejueMainWeapon.Specification().setSlot(0))
                 .faction(faction)
-                .addComponent(MeiqiheziEquipmentsPassive.ID, new MeiqiheziEquipmentsPassive.Specification())
-                .addComponent(MeiqiheziMadnessPassive.ID, new MeiqiheziMadnessPassive.Specification())
-                .addComponent(MeiqiheziFloatingTextComponent.ID, new MeiqiheziFloatingTextComponent.Specification())
+                .addComponent(MikomakoEquipmentsPassive.ID, new MikomakoEquipmentsPassive.Specification())
+                .addComponent(MikomakoMadnessPassive.ID, new MikomakoMadnessPassive.Specification())
+                .addComponent(MikomakoFloatingTextComponent.ID, new MikomakoFloatingTextComponent.Specification())
                 .icon(Material.DIAMOND_HOE);
     }
 
@@ -313,7 +380,7 @@ public class RoleLoader {
     /**
      * 示例角色：唯一目的 = 给「组件可请求重绘」这条能力一个生产使用点
      * （没有使用点的能力 = 未验证的能力）。
-     * <p>它不改动任何既有角色：{@code red} / {@code meiqihezi} 的组件集合与注册序一字未动。
+     * <p>它不改动任何既有角色：{@code red} / {@code Mikomako} 的组件集合与注册序一字未动。
      * <p>它的一个组件 = {@code ExampleSelfRefreshingSkill}（占槽 0），同时演示
      * 「请求式刷新」与「{@code dependsOnLiveState()==false} 则不每 tick 重绘」两件事。
      */
@@ -342,7 +409,7 @@ public class RoleLoader {
      *       要求有它作为落点（否则那条效果永远不触发）；</li>
      *   <li>三个主动占 1 / 2 / 3 号栏，全部 0 耗能（只靠冷却限制强度）；</li>
      *   <li>两个被动同样经 {@code addComponent} 统一入口注册（被动无栏位，不占热键栏）；</li>
-     *   <li>基础属性不显式声明，与 {@code red} / {@code meiqihezi} 一致，走框架默认；</li>
+     *   <li>基础属性不显式声明，与 {@code red} / {@code Mikomako} 一致，走框架默认；</li>
      *   <li>数值：尖牙 6 点伤害 / 4 点 SanTE / 7 格 / 1.5 秒（强化期 0.5 秒且打全体）；
      *       律法之言 15 秒、每 0.5 秒 1 点 SanTE；罪棘缠 CD 7 秒；罪恶的辩护 5 秒 + <b>结束后</b> CD 10 秒；
      *       审判孤刺 CD 40 秒。</li>
@@ -357,7 +424,8 @@ public class RoleLoader {
                 .description(List.of(
                         Component.text("你负以荆棘，亦负以罪孽"),
                         Component.text("罪棘：7格内的敌人每1.5秒被召唤者尖牙撕咬，受6点伤害并损失4点特殊值"),
-                        Component.text("律法之言：每次攻击附加15秒罪罚，每0.5秒削减目标1点特殊值")
+                        Component.text("律法之言：每次攻击附加15秒罪罚，每0.5秒削减目标1点特殊值"),
+                        Component.text("语音：荆棘律法 —— 登场的罪、空闲的数刺、受击的黑血、死亡时与罪同钉")
                 ))
                 .faction(faction)
                 .addComponent(SinThornFangMainWeapon.ID, new SinThornFangMainWeapon.Specification().setSlot(0))
@@ -366,11 +434,14 @@ public class RoleLoader {
                 .addComponent(JudgmentThornSkill.ID, new JudgmentThornSkill.Specification().setSlot(3))
                 .addComponent(SinThornPassive.ID, new SinThornPassive.Specification())
                 .addComponent(LawWordPassive.ID, new LawWordPassive.Specification())
+                //★ 2026-10-31 全员语音：影都语气（巨大怪物，少有人性，却要有人性）
+                .addComponent(ScriptedVoiceComponent.ID, VoiceScripts.sinThornVoice())
                 .icon(Material.WITHER_ROSE);
     }
 
     /**
-     * **狂躁牧师 · 马提娜(Matina)**（阵营 HUNTER）：医疗设备 + 诉说苦怒（狂暴值 {@code KUANG}）+ 三个主动。
+     * **狂躁牧师 · 马提娜(Matina)**（阵营 HUNTER）：医疗设备 + 诉说苦怒（狂暴值 {@code KUANG}）
+     * + 三个主动 + 圣装（四件专属护甲）。
      *
      * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
      * <ul>
@@ -381,9 +452,12 @@ public class RoleLoader {
      *   <li>三个主动占 1 / 2 / 3 号栏：<b>海晶灯</b>（CD 6 秒 / 耗能 15）· <b>红石无人机</b>
      *       （CD 20 秒，技能完全后起算 / 耗能 20）· <b>神罚</b>（CD 50 秒，技能完全后起算 / 耗能 0）；</li>
      *   <li>被动「诉说苦怒」经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏），
-     *       它是<b>狂暴值的唯一持有者</b>：层数 / 每秒衰减 / 阈值加成 / 暴走死亡判定 / 层数粒子与 bossbar
-     *       全在它里面；</li>
-     *   <li>基础属性<b>不显式声明</b> ⇒ 与 {@code red} / {@code meiqihezi} 一致，走框架默认
+     *       它是<b>狂暴值的唯一持有者</b>：层数 / 每秒衰减 / 阈值加成 / 暴走死亡判定 / 层数粒子 /
+     *       actionbar HUD（狂暴值 + {@code [############]} 进度条，60 层后红色乱码快速闪动）全在它里面；</li>
+     *   <li><b>圣装「狂躁牧师的圣装」</b>经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏）：
+     *       发放四件专属护甲 —— 锁链头盔 / 铁胸甲 / 红色皮革裤 / 铁靴，各带保护与绑定诅咒 I，
+     *       名字统一白色、加粗、不倾斜（2026-10-31 需求）；</li>
+     *   <li>基础属性<b>不显式声明</b> ⇒ 与 {@code red} / {@code Mikomako} 一致，走框架默认
      *       （生命上限 40、能量上限 100、SanTE 上限 100）；</li>
      *   <li>数值：普攻 4 点物理 + 目标回血 8 + 目标 5 点特殊值；海晶灯 r8 治疗 10 点 / 敌军 3 秒
      *       缓慢 II + 凋零 II + 虚弱 II；无人机 r8 跟随 / r5 每秒治疗 4 点或 1 秒中毒 III / 持续 15 秒；
@@ -399,7 +473,7 @@ public class RoleLoader {
                         Component.text("狂暴值越高，越是接近神，也越是接近死"),
                         Component.text("医疗设备：每次命中造成4点物理伤害，为目标回复8点生命并造成5点特殊值伤害"),
                         Component.text("诉说苦怒：每次成功治疗或成功攻击增加1点狂暴值；每秒减少1层，高于60层时每秒可能直接死亡"),
-                        Component.text("海晶灯：洒出药物治疗同阵营（含自己）并削弱敌人"),
+                        Component.text("海晶灯：洒出药物治疗同阵营（含自己）并削弱敌人；施放时正中心生成巨大粒子十字架"),
                         Component.text("远程医疗：放出爱心无人机跟随并持续治疗（含自己）"),
                         Component.text("神罚：引导3秒后展开魔法阵，对范围内敌人倾泻特殊值伤害")
                 ))
@@ -413,53 +487,54 @@ public class RoleLoader {
                 .addComponent(MatinaJudgmentSkill.ID,
                         new MatinaJudgmentSkill.Specification().setSlot(3))
                 .addComponent(MatinaKuangPassive.ID, new MatinaKuangPassive.Specification())
+                .addComponent(MatinaEquipmentsPassive.ID, new MatinaEquipmentsPassive.Specification())
                 .addComponent(MatinaFloatingTextComponent.ID, new MatinaFloatingTextComponent.Specification())
                 .icon(Material.SEA_LANTERN);
     }
 
     /**
-     * 冷识（阵营 SHADOW）：冷淡（弓）+ 忘怀 / 重构 / 塑造 + 「始末」与八档进化。
+     * **冷识(Lethe)**（阵营 {@link Faction#SHADOW}）：`Lether`（弓）+ 遗忘 / 召圣 / 重塑三技能
+     * + 「如影随形」与五档进化 + 「腐化的圣装」。
      *
      * <p>装配口径：
      * <ul>
-     *   <li><b>主武器「冷淡」占 0 号栏</b> —— 本族是弓弩（{@code BowWeapon}）：右键归原版
-     *       （拉弓 / 击发），命中由 {@code BowWeaponListener} 在 {@code ProjectileHitEvent} 上
-     *       交回组件；</li>
-     *   <li>忘怀 / 重构 / 塑造 / 箭矢占 1 / 2 / 3 / 4 号栏（箭矢是"槽空即补发"的自愈式弹药），
-     *       全部 0 耗能（只靠冷却限制强度）；</li>
-     *   <li><b>进化被动排在消费者之前</b>：{@code start()} 按注册序广播，而「始末」与「塑造」
-     *       都在自己的 {@code start()} 里取它、并在逐刻节拍里读它的档位读数 ⇒ 先注册它，
-     *       "读口第一次被读到之前它已经生效"才是结构上的事实；</li>
-     *   <li>「始末」是冷识的持续增益与 5 级光环的节拍持有者（被动无栏位，不占热键栏）；</li>
-     *   <li>基础属性不显式声明，与其余角色一致，走框架默认；</li>
-     *   <li>数值：冷淡 9 点特殊值 + 6 点物伤（飞行途中 4 格内再 3 特殊值 + 2 真伤），CD 2 秒；
-     *       忘怀 标记 30 秒窗口、CD 20 秒（结束后开始）；重构 10 秒窗口、CD 15 秒（结束后开始）；
-     *       塑造 半径 20、漂浮 4 秒 + 30 特殊值、40 个粒子陷阱（碰到晕 1 秒），CD 20 秒；
-     *       进化八档见 {@code RemotenessEvolutionPassive}。</li>
+     *   <li><b>主武器 Lether 占 0 号栏</b> —— 每次射击给箭打「流连」标记；带标记的箭命中额外
+     *       10 特殊值 + 4 真实伤害，停下时张开 r=3 共鸣圈（默认 0.25 秒一跳、5 跳后消散）；</li>
+     *   <li>遗忘（1 栏，灵魂火把 → 回忆）、召圣（2 栏，抬升 / 召回 / 自爆共鸣箭）、
+     *       重塑（3 栏，立方体砸落 + r=15/10 爆发 + 浮空）；</li>
+     *   <li><b>三个服务组件无栏位</b>：共鸣组件（标记箭与共鸣圈的持有者）、箭袋组件
+     *       （血泪 4 / 箭矢 12 的恢复）、进化被动（五档；2 档写共鸣圈上限，需要它在共鸣组件之后）；</li>
+     *   <li>语音组件最后注册（依赖图的叶子）；</li>
+     *   <li>基础属性不显式声明 ⇒ 走框架默认（40 血 / 100 能量 / 100 SanTE）；进化的「吟唱」把上限抬到 150。</li>
      * </ul>
      */
-    public static Role.Builder remotenessBuilder(){
+    public static Role.Builder letheBuilder(){
         //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
         Faction faction = Faction.SHADOW;
 
-        return withBuiltIns(new Role.Builder("remoteness"), faction)
+        return withBuiltIns(new Role.Builder("lethe"), faction)
                 .displayName(Component.text("冷识"))
                 .description(List.of(
-                        Component.text("始末：永久速度一、跳跃提升一"),
-                        Component.text("冷淡：箭矢命中扣除9点特殊值并造成6点物理伤害；飞行途中4格内的敌人被扣除3点特殊值与2点真实伤害")
+                        Component.text("他相信神明与救赎，却早已是黑色的、灼燃的怪物"),
+                        Component.text("Lether：每次射击标记「流连」；命中额外 10 特殊值 + 4 真实伤害"),
+                        Component.text("流连之箭停下会张开 r=3 共鸣圈：0.25 秒一跳（1 真实 + 2 特殊值），5 跳后消散"),
+                        Component.text("遗忘 / 回忆：留下时空裂缝并返回；召圣：抬升共鸣箭，召回或自爆"),
+                        Component.text("重塑：引导后立方体砸落，r=15 与每支共鸣箭处 r=10 爆发，并把受击者抛上 10 格")
                 ))
                 .faction(faction)
-                //进化被动（无栏位）：八档数值与升级消息都归它；排在消费者之前（见方法注释）
-                .addComponent(RemotenessEvolutionPassive.ID, new RemotenessEvolutionPassive.Specification())
-                .addComponent(RemotenessStartEndPassive.ID, new RemotenessStartEndPassive.Specification())
-                .addComponent(RemotenessFrostBowMainWeapon.ID, new RemotenessFrostBowMainWeapon.Specification().setSlot(0))
-                .addComponent(RemotenessOblivionSkill.ID, new RemotenessOblivionSkill.Specification().setSlot(1))
-                .addComponent(RemotenessReconstructSkill.ID, new RemotenessReconstructSkill.Specification().setSlot(2))
-                .addComponent(RemotenessShapingSkill.ID, new RemotenessShapingSkill.Specification().setSlot(3))
-                .addComponent(RemotenessArrowGivingSkill.ID, new RemotenessArrowGivingSkill.Specification().setSlot(17))
+                //共鸣组件最先：主武器与三技能都读它；进化被动在它之后（2 档要写它的圈上限）
+                .addComponent(LetheResonanceComponent.ID, new LetheResonanceComponent.Specification())
+                .addComponent(LetheEvolutionPassive.ID, new LetheEvolutionPassive.Specification())
+                .addComponent(LetheQuiverComponent.ID, new LetheQuiverComponent.Specification())
+                .addComponent(LetheMainWeapon.ID, new LetheMainWeapon.Specification().setSlot(0))
+                .addComponent(LetheForgetSkill.ID, new LetheForgetSkill.Specification().setSlot(1))
+                .addComponent(LetheSummonSkill.ID, new LetheSummonSkill.Specification().setSlot(2))
+                .addComponent(LetheReshapeSkill.ID, new LetheReshapeSkill.Specification().setSlot(3))
+                .addComponent(LetheShadowsPassive.ID, new LetheShadowsPassive.Specification())
+                .addComponent(LetheEquipmentsPassive.ID, new LetheEquipmentsPassive.Specification())
+                .addComponent(LetheFloatingTextComponent.ID, new LetheFloatingTextComponent.Specification())
                 .icon(Material.SOUL_LANTERN);
     }
-
     /**
      * **特克(Tek)**：逆命天理（三叉戟）+ 逆转天意（「真理」层数持有者）+ 三个主动。
      *
@@ -490,7 +565,8 @@ public class RoleLoader {
                         Component.text("逆转天意：命中减少1秒所有技能冷却并获得1点能量；能量≥90且残血时获得20点伤害吸收"),
                         Component.text("刺霄：向前刺出一击并瞬移到最远被击中敌人身后"),
                         Component.text("落岳：跃起后砸落，对范围内敌人造成伤害与眩晕"),
-                        Component.text("真理之刺：场上有真理≥10的角色时解锁，瞬移刺击并清空全场真理")
+                        Component.text("真理之刺：场上有真理≥10的角色时解锁，瞬移刺击并清空全场真理"),
+                        Component.text("语音：把真理逼到枪尖上的读数 —— 冷、准、像在给自己录口供")
                 ))
                 .faction(faction)
                 .addComponent(TekTridentMainWeapon.ID, new TekTridentMainWeapon.Specification().setSlot(0))
@@ -498,6 +574,8 @@ public class RoleLoader {
                 .addComponent(TekYueSkill.ID, new TekYueSkill.Specification().setSlot(2))
                 .addComponent(TekTruthThrustSkill.ID, new TekTruthThrustSkill.Specification().setSlot(3))
                 .addComponent(TekDestinyPassive.ID, new TekDestinyPassive.Specification())
+                //★ 2026-10-31 全员语音：猎影人语气（复杂背景下的反英雄）
+                .addComponent(ScriptedVoiceComponent.ID, VoiceScripts.tekVoice())
                 .icon(Material.NETHERITE_SCRAP);
     }
 
@@ -514,9 +592,11 @@ public class RoleLoader {
      *   <li>三个主动占 1 / 2 / 3 号栏：<b>扑击</b>（金锭，CD 3 秒）· <b>拉回</b>（垂泪藤，CD 6 秒）·
      *       <b>遁形</b>（哭泣的黑曜石，CD 20 秒且 <b>技能完全后</b>起算）；三者<b>全部 0 耗能</b>
      *       （需求未提耗能，只靠冷却限制强度 —— 与罪棘 / 特克同口径）；</li>
-     *   <li>两个被动经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏）：
-     *       <b>猎杀</b>（30 格内最近敌人的标记持有者 + 标记时给速度 III）与
-     *       <b>进化指数</b>（五档，击杀升级，封顶 5 级）；</li>
+     *   <li>三个被动经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏）：
+     *       <b>猎杀</b>（30 格内最近敌人的标记持有者 + 标记时给速度 III）、
+     *       <b>进化指数</b>（五档，击杀升级，封顶 5 级）与
+     *       <b>影都之壳</b>（四件下界合金护甲：黑色甲壳 / 腹部肢体 / 肌腱隔膜 / 锐利末端，
+     *       各带保护类附魔 + 绑定诅咒 I，名字亮紫、加粗、不倾斜 —— 2026-10-31 需求）；</li>
      *   <li>基础属性<b>不显式声明</b> ⇒ 走框架默认（生命上限 40、能量上限 100、SanTE 上限 100）；</li>
      *   <li>数值：遗愤 6~10 物理 + 4~10 SanTE + 回自己 4 生命（0.3 秒一击）；
      *       扑击 4 格位移 → 3 格内 12 物理 + 3 秒缓慢 III + 回自己 4 生命；
@@ -537,7 +617,8 @@ public class RoleLoader {
                         Component.text("扑击：向前扑击4格，并撕咬3格内最近的一名敌人"),
                         Component.text("拉回：引导0.3秒后穿刺12格，0.8秒后把命中者拽向视角前方"),
                         Component.text("遁形：速度VI、隐身、抗性V并免疫缓慢，使用技能或攻击即中断"),
-                        Component.text("进化指数：击杀敌人可进化五档")
+                        Component.text("进化指数：击杀敌人可进化五档"),
+                        Component.text("语音：会记得名字的怪物 —— 影都的饥饿里，偶尔漏出一盏灯、一个名字")
                 ))
                 .faction(faction)
                 .addComponent(HunterGrudgeMainWeapon.ID,
@@ -550,6 +631,9 @@ public class RoleLoader {
                         new HunterStealthSkill.Specification().setSlot(3))
                 .addComponent(HunterPreyPassive.ID, new HunterPreyPassive.Specification())
                 .addComponent(HunterEvolutionPassive.ID, new HunterEvolutionPassive.Specification())
+                .addComponent(HunterEquipmentsPassive.ID, new HunterEquipmentsPassive.Specification())
+                //★ 2026-10-31 全员语音：影都语气（短促、饥饿；人性只以残片漏出）
+                .addComponent(ScriptedVoiceComponent.ID, VoiceScripts.hunterVoice())
                 .icon(Material.NETHERITE_SWORD);
     }
 
@@ -609,7 +693,7 @@ public class RoleLoader {
 
     /**
      * **林(Lin)**（阵营 HUNTER）：铁血镇压者（铁剑）+ 三重打击 / 影袭 / 透骨钉 +
-     * 开普勒装置 / 殉道。
+     * 开普勒装置 / 殉道 / 殉道者的遗装（四件专属护甲）。
      *
      * <p>装配口径（逐条对应需求；各组件 javadoc 里有更细的行为与口径申报）：
      * <ul>
@@ -619,9 +703,11 @@ public class RoleLoader {
      *       攻速 100（原版冷却 0.2 秒）且冷却中不出伤（{@code onAttack} 开头自判）；</li>
      *   <li>三个主动占 1 / 2 / 3 号栏：<b>三重打击</b>（CD 8 秒 / 耗能 0）· <b>影袭</b>
      *       （CD 8 秒 / 耗能 0）· <b>透骨钉</b>（CD 25 秒 / 耗能 25）；</li>
-     *   <li>两个被动经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏）：
-     *       「开普勒装置」是能量 / 特殊值的循环引擎，「殉道」是特殊值归零时的替代惩罚；</li>
-     *   <li><b>装配序有意安排</b>：两个被动排在主武器与技能之后 ——
+     *   <li>三个被动经 {@code addComponent} 统一入口注册（被动无栏位 ⇒ 不占热键栏）：
+     *       「开普勒装置」是能量 / 特殊值的循环引擎，「殉道」是特殊值归零时的替代惩罚，
+     *       「殉道者的遗装」发放四件专属护甲（黑色皮革帽 / 黑色皮革胸甲 / 下界合金护腿 / 下界合金靴，
+     *       统一绑定诅咒 I，名字灰色、加粗、不倾斜 —— 2026-10-31 需求）；</li>
+     *   <li><b>装配序有意安排</b>：三个被动排在主武器与技能之后 ——
      *       组件之间没有回指依赖（主武器 → 三重打击是单向的），因此顺序不影响装配校验；</li>
      *   <li>基础属性<b>不显式声明</b> ⇒ 与其余角色一致，走框架默认（生命上限 40 / 能量 100 / SanTE 100）；</li>
      *   <li>数值：铁血镇压者 8 物理 + 4~10 特殊值 + 1 能量 + 敌攻 −2（5 秒）；
@@ -630,14 +716,18 @@ public class RoleLoader {
      *       撞墙则 2 秒无法移动 / 致盲 / 沉默，未撞则 2 秒缓慢 IV + 致盲。</li>
      * </ul>
      *
-     * <p>★ <b>已知的口径取舍（如实申报）</b>：需求"林不受到特殊值惩罚"与框架内建
-     * {@code DefaultSanTEZeroPunishment}（无条件装配）正面冲突，只能在角色侧用"拉回 + 逐刻压制"
-     * 缓解，无法 100% 消除归零那一瞬的眩晕 —— 详见 {@link LinMartyrPassive} 类注释。
+     * <p>★ <b>默认特殊值惩罚已在本角色关闭（2026-10-31 修复）</b>：林的惩罚是它自己的
+     * 「殉道」（{@link LinMartyrPassive}），因此装配点传
+     * {@code SanTEComponent.Configuration.DEFAULT.withPunishmentEnabled(false)} ——
+     * 内建 {@code DefaultSanTEZeroPunishment} **不会注册**，归零时只有殉道生效
+     * （旧实现靠"拉回 + 逐刻压制"对抗内建惩罚，已随框架配置能力上线删除）。
      */
     private static Role.Builder linBuilder() {
         //本角色声明阵营的唯一书写点：同一变量传给内建段（阵营组件）与 .faction(...)
         Faction faction = Faction.HUNTER;
-        return withBuiltIns(new Role.Builder("lin"), faction)
+        //★ 2026-10-31 需求：林有自己的「殉道」惩罚，不再沿用默认特殊值惩罚 ⇒ 关闭默认惩罚组件
+        return withBuiltIns(new Role.Builder("lin"), faction,
+                SanTEComponent.Configuration.DEFAULT.withPunishmentEnabled(false))
                 .displayName(Component.text("林"))
                 .description(List.of(
                         Component.text("以血为薪，以骨为钉"),
@@ -646,7 +736,8 @@ public class RoleLoader {
                         Component.text("殉道：特殊值归零时不受到惩罚，但永久扣除4点生命上限并流失15点血量，随后回满至50"),
                         Component.text("三重打击：加强下三次攻击，额外造成真实伤害与特殊值伤害"),
                         Component.text("影袭：瞬间向前跃进8格并撕裂路径上的敌人"),
-                        Component.text("透骨钉：发射一条高速白色射线，命中后推动目标，撞墙则将其钉死")
+                        Component.text("透骨钉：发射一条高速白色射线，命中后推动目标，撞墙则将其钉死"),
+                        Component.text("语音：账本上的名字 —— 把殉道说成流程，把镇压说成清点")
                 ))
                 .faction(faction)
                 .addComponent(LinIronBloodMainWeapon.ID, new LinIronBloodMainWeapon.Specification().setSlot(0))
@@ -655,6 +746,9 @@ public class RoleLoader {
                 .addComponent(LinBoneNailSkill.ID, new LinBoneNailSkill.Specification().setSlot(3))
                 .addComponent(LinKeplerPassive.ID, new LinKeplerPassive.Specification())
                 .addComponent(LinMartyrPassive.ID, new LinMartyrPassive.Specification())
+                .addComponent(LinEquipmentsPassive.ID, new LinEquipmentsPassive.Specification())
+                //★ 2026-10-31 全员语音：猎影人语气（以血为薪的镇压者）
+                .addComponent(ScriptedVoiceComponent.ID, VoiceScripts.linVoice())
                 .icon(Material.IRON_SWORD);
     }
 
@@ -767,7 +861,7 @@ public class RoleLoader {
                 .displayName(Component.text("抗争 · Resist"))
                 .description(List.of(
                         Component.text("SHADOW 的革命领袖——越战越强，以斗争时间换取八档增益"),
-                        Component.text("▓抗争▓【铁剑】：左键击退 3 + 随机白/灰/紫剑气（TNT 音效）"),
+                        Component.text("▓抗争▓【铁剑】：左键击退 1 + 随机白/灰/紫剑气（TNT 音效）"),
                         Component.text("      目标周围 5 格所有敌人：10 物理 + 3~6 特殊值；每次命中战斗时间 +1 秒；CD 0.6 秒"),
                         Component.text("不停歇的斗争：战斗时间上限 999 秒，每 5 秒一档——"),
                         Component.text("      5s 剑气+5 / 10s 抗性 I / 15s 速度 I + 每 2 秒回 1 TE / 20s 生命回复 II"),

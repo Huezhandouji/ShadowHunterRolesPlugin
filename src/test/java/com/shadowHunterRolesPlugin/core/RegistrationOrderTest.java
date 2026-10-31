@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.core;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.roleComponent.builtin.AutoRecoverEnergyPassive;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoBloodySlashSkill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
 import org.junit.Test;
 
@@ -35,7 +35,7 @@ public class RegistrationOrderTest {
     public void componentsKeepRegistrationOrderAndSlotViewSkipsSlotless() {
         Role.Builder b = new Role.Builder("r");
         for (int i = 0; i < IDS.length; i++) {
-            b.addComponent(IDS[i], new MeiqiheziBloodySlashSkill.Specification().setSlot(i));
+            b.addComponent(IDS[i], new MikomakoBloodySlashSkill.Specification().setSlot(i));
         }
         b.addComponent("c_9_no_slot", new AutoRecoverEnergyPassive.Specification());
         Role role = b.build();
@@ -60,7 +60,7 @@ public class RegistrationOrderTest {
         Role.Builder b = new Role.Builder("r");
         HotbarSpecification<?>[] specs = new HotbarSpecification<?>[9];
         for (int i = 0; i <= 8; i++) {
-            specs[i] = new MeiqiheziBloodySlashSkill.Specification().setSlot(i);
+            specs[i] = new MikomakoBloodySlashSkill.Specification().setSlot(i);
             b.addComponent("slot_" + i, specs[i]);
         }
         b.build();
@@ -75,11 +75,11 @@ public class RegistrationOrderTest {
     public void orderIsInsertionNotAlphabetical() {
         Role.Builder b = new Role.Builder("r");
         HotbarSpecification<?> specZ =
-                new MeiqiheziBloodySlashSkill.Specification().setSlot(3);
+                new MikomakoBloodySlashSkill.Specification().setSlot(3);
         HotbarSpecification<?> specA =
-                new MeiqiheziBloodySlashSkill.Specification().setSlot(1);
+                new MikomakoBloodySlashSkill.Specification().setSlot(1);
         HotbarSpecification<?> specM =
-                new MeiqiheziBloodySlashSkill.Specification().setSlot(2);
+                new MikomakoBloodySlashSkill.Specification().setSlot(2);
         b.addComponent("zzz", specZ);
         b.addComponent("aaa", specA);
         b.addComponent("mmm", specM);

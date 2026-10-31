@@ -1,6 +1,7 @@
 package com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.mainWeapon;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
+import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
@@ -8,9 +9,14 @@ import com.shadowHunterRolesPlugin.roleComponent.custom.sinThorn.passive.LawWord
 import net.kyori.adventure.text.Component;
 import org.bukkit.Color;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import java.util.List;
 
 /**
@@ -24,6 +30,9 @@ import java.util.List;
  * <p>攻击路径：8 点物理伤害（带击退）→ 经 {@link LawWordPassive#applyLaw} 给命中者挂「律法之言」
  * 罪罚，与 {@code SinThornPassive} 的尖牙写同一份账本（拿不到账本时只跳过罪罚，普攻伤害照常结算）。
  * 冷却由本组件在攻击成功处按声明值启动。
+ *
+ * <p><b>攻速：物品攻速统一压到 {@value #ATTACK_SPEED_VALUE}</b>（2026-10-31 补齐）——
+ * 否则下界合金斧默认攻速 1.0 会让原版攻击冷却（20 刻 = 1 秒）盖住本组件的 0.5 秒冷却。
  */
 public class SinThornFangMainWeapon extends MainWeapon {
 
@@ -42,6 +51,18 @@ public class SinThornFangMainWeapon extends MainWeapon {
      * ② {@code onAttack} 里用它挡住冷却期内的攻击（冷却中攻击不出伤）。
      */
     private static final int ATTACK_COOLDOWN_TICKS = 10;
+
+    /**
+     * **物品攻速统一压到 100**（2026-10-31 补齐：全仓最后一把漏掉的主武器）。
+     * <p>原版 1.9+ 的攻击冷却 = {@code 20 / 攻速} 刻：下界合金斧默认攻速 1.0 ⇒ 20 刻（1 秒），
+     * 会把组件自己的 0.5 秒冷却压成 1 秒。压到 100 后原版冷却 ≈ 0.2 刻（事实上不存在），
+     * "多久能打下一击"就只由 {@link #ATTACK_COOLDOWN_TICKS} 决定。
+     */
+    private static final double ATTACK_SPEED_VALUE = 100d;
+
+    /** 攻速属性的去重键（同一把键先摘后加，反复重绘不叠加）。 */
+    private static final NamespacedKey ATTACK_SPEED_KEY =
+            KeyFactory.Registry.of("sinThorn_fang_attack_speed");
 
     private VitalsComponent vitals;
     private BuffComponent buff;
@@ -138,5 +159,34 @@ public class SinThornFangMainWeapon extends MainWeapon {
     @Override
     protected boolean canUse() {
         return buff.canUseMainWeapon();
+    }
+
+    // ───────── 外观：攻速统一 100 ─────────
+
+    /**
+     * 覆写默认画法：先拿基类成品（**识别键写在基类那一步，漏了会点击无反应**），
+     * 再把攻击速度压到 {@value #ATTACK_SPEED_VALUE}。
+     */
+    @Override
+    public ItemStack buildItem() {
+        ItemStack stack = super.buildItem();
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) {
+            return stack;
+        }
+        applyAttackSpeed(meta);
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    /**
+     * **攻速属性统一压到 100**：先 {@code removeAttributeModifier} 再 add ——
+     * {@link #buildItem()} 会被反复调用，同一把键不去重就会叠加成 100 / 200 / 300…
+     * （表现是"打着打着攻击变瞬发且动作乱飘"）。
+     */
+    private static void applyAttackSpeed(ItemMeta meta) {
+        meta.removeAttributeModifier(Attribute.ATTACK_SPEED);
+        meta.addAttributeModifier(Attribute.ATTACK_SPEED, new AttributeModifier(
+                ATTACK_SPEED_KEY, ATTACK_SPEED_VALUE, AttributeModifier.Operation.ADD_NUMBER));
     }
 }

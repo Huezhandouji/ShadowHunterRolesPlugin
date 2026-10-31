@@ -2,6 +2,8 @@ package com.shadowHunterRolesPlugin.roleComponent.custom.matina;
 
 import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.custom.matina.passive.MatinaKuangPassive;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.junit.Test;
 
@@ -21,13 +23,14 @@ import static org.junit.Assert.assertTrue;
  * <h2>为什么能离线跑</h2>
  * 与 {@code CapabilityDispatchTest} 同一做法：组件的构造器**只把 id / 服务集 / 描述符存起来**、
  * 不做任何副作用 ⇒ 用一个**空的 {@code ComponentServicesPort} 桩**即可构造。
- * 本类只覆盖**不需要玩家实例**的那部分：层数读写、阈值判定、真伤取值、操作面、lore 文案。
+ * 本类只覆盖**不需要玩家实例**的那部分：层数读写、阈值判定、真伤取值、操作面、lore 文案、
+ * actionbar HUD 的**画法**（纯函数）。
  *
  * <h2>判据边界（如实申报）</h2>
  * <ul>
  *   <li><b>不</b>覆盖：第 1 层的"攻击回复自己 8 点生命"实际结算（{@code healSelf} 要真实 {@code Player}
  *       ⇒ 属运行级）、每秒衰减节拍与暴走**掷骰**结果（{@code update()} 要有玩家）、环绕粒子、
- *       bossbar 显示 —— 这些都在组件里但需要 Bukkit 运行环境。</li>
+ *       actionbar 的**发送**本身（{@code Player#sendActionBar}）—— 这些都在组件里但需要 Bukkit 运行环境。</li>
  *   <li><b>不</b>覆盖：与其它组件的装配依赖是否满足（归 {@code Role#verifyDependencies()} 那一层）。</li>
  * </ul>
  */
@@ -205,5 +208,82 @@ public class MatinaKuangTest {
         assertNotNull(line);
         assertTrue("高于 60 层要出现暴走提示，实际 = " + line, line.contains("暴走判定中"));
         assertFalse("60 层本身不提示", plain(MatinaKuangPassive.loreLineFor(60)).contains("暴走判定中"));
+    }
+
+    // ───────── ⑥ actionbar HUD（2026-10-31 需求）─────────
+
+    /** 60 层前每 5 层加一格 ⇒ 12 格 = 60 层满格。 */
+    @Test
+    public void barFilledGrowsEveryFiveLayers() {
+        assertEquals(0, MatinaKuangPassive.barFilled(0));
+        assertEquals(0, MatinaKuangPassive.barFilled(4));
+        assertEquals(1, MatinaKuangPassive.barFilled(5));
+        assertEquals(11, MatinaKuangPassive.barFilled(55));
+        assertEquals(11, MatinaKuangPassive.barFilled(59));
+        assertEquals("60 层 = 满格", 12, MatinaKuangPassive.barFilled(60));
+        assertEquals("超过 60 层仍是满格，但显示进乱码区", 12, MatinaKuangPassive.barFilled(61));
+        assertEquals(12, MatinaKuangPassive.barFilled(100));
+        assertEquals("负值按 0 层算", 0, MatinaKuangPassive.barFilled(-5));
+        assertEquals("12 格常量", 12, MatinaKuangPassive.BAR_SEGMENTS);
+    }
+
+    /** 正常区：{@code [############]}（12 格固定），红色填充数 = 已填充格数。 */
+    @Test
+    public void normalBarHasTwelveSlotsAndRedFilledSegments() {
+        assertEquals(14, plain(MatinaKuangPassive.barComponent(0, 0)).length());
+        assertEquals("[############]", plain(MatinaKuangPassive.barComponent(0, 0)));
+        assertEquals("[############]", plain(MatinaKuangPassive.barComponent(60, 0)));
+        assertEquals("[############]", plain(MatinaKuangPassive.barComponent(37, 3)));
+        assertEquals("0 层：无红色格", 0, countSlots(MatinaKuangPassive.barComponent(0, 0), NamedTextColor.RED));
+        assertEquals("5 层：1 格红", 1, countSlots(MatinaKuangPassive.barComponent(5, 0), NamedTextColor.RED));
+        assertEquals("55 层：11 格红", 11, countSlots(MatinaKuangPassive.barComponent(55, 0), NamedTextColor.RED));
+        assertEquals("60 层：12 格全红", 12, countSlots(MatinaKuangPassive.barComponent(60, 0), NamedTextColor.RED));
+    }
+
+    /** 60 层后：进度条变成红色乱码，且随帧变化（快速闪动）；60 层本身不进入乱码。 */
+    @Test
+    public void overloadAfterSixtyTurnsBarIntoFlashingRedGarble() {
+        assertFalse("60 层本身不进乱码区", MatinaKuangPassive.isOverloadDisplay(60));
+        assertTrue("61 层进乱码区", MatinaKuangPassive.isOverloadDisplay(61));
+
+        Component garble = MatinaKuangPassive.barComponent(61, 0);
+        String first = plain(garble);
+        assertEquals("条框长度不变（12 格 + 两个括号）", 14, first.length());
+        assertTrue(first.startsWith("["));
+        assertTrue(first.endsWith("]"));
+        assertFalse("乱码里不应再出现进度用的 '#'", first.contains("#"));
+        assertEquals("12 格全是红色系", 12,
+                countSlots(garble, NamedTextColor.RED) + countSlots(garble, NamedTextColor.DARK_RED));
+        assertEquals("亮红 / 暗红各半", 6, countSlots(garble, NamedTextColor.RED));
+        assertEquals(6, countSlots(garble, NamedTextColor.DARK_RED));
+
+        String second = plain(MatinaKuangPassive.barComponent(61, 1));
+        assertEquals("同一帧必须可复现", first, plain(MatinaKuangPassive.barComponent(61, 0)));
+        assertFalse("相邻帧必须不同（快速闪动）", first.equals(second));
+    }
+
+    /** actionbar 整行：前缀 + 当前/上限值 + 进度条；60 层后追加「暴走」。 */
+    @Test
+    public void hudLineCarriesValueAndOverloadMarker() {
+        String normal = plain(MatinaKuangPassive.hudComponent(37, 0));
+        assertTrue("要带狂暴值，实际 = " + normal, normal.contains("狂暴 37/100"));
+        assertTrue("要带进度条，实际 = " + normal, normal.contains("[############]"));
+        assertFalse(normal.contains("暴走"));
+
+        String overload = plain(MatinaKuangPassive.hudComponent(61, 0));
+        assertTrue("要带狂暴值，实际 = " + overload, overload.contains("狂暴 61/100"));
+        assertTrue("60 层后要带暴走标记，实际 = " + overload, overload.contains("暴走"));
+    }
+
+    /** 按叶子组件数颜色出现次数（每个槽 / 每个括号都是一个显式着色的叶子）。 */
+    private static int countSlots(Component component, net.kyori.adventure.text.format.TextColor color) {
+        if (component.children().isEmpty()) {
+            return color.equals(component.color()) ? 1 : 0;
+        }
+        int count = 0;
+        for (Component child : component.children()) {
+            count += countSlots(child, color);
+        }
+        return count;
     }
 }

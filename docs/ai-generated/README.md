@@ -3,7 +3,7 @@
 > **这份文档集面向 AI**：每条规则给【做 / 不做】+ 反例 + **可复跑命令**；不写协作过程、不含易变身份量。
 > **基线**（2026-10-08 现算，含角色「林」）：本目录文档的现算读数（口径 = 顶层目录**含直属 `.java`** 才算「包」）= 顶层 **10 包** · 未过滤的**顶层目录共 11 个**（差额 = `internal/`：它**没有直属 `.java`**、只有 `internal/api/` 子包；★ **按「顶层目录」数会得 11**，两个数都对、只是口径不同）· 任意层级**末级包共 40 个**（该口径的取数命令见下方「基线取数命令」块①）· `core/` **15 件** · `roleComponent/` **105 件**（根 9 + `base/` 4 + `builtin/` 18 + `custom/` 74）· `core/ports/` **4 件**（端口接口 3 + 服务集记录 1）· `src/main` **165 件** · `src/test` **38 件** / `@Test` **466**。每条口径与取数见三件文档各自的命令块。**与代码不一致处以代码为准**（历史「阶段7 / 阶段13」报告保留原读数，属历史记录、不追改）。
 
-> **注册角色共 11 个**（`registry/RoleLoader#defaultDefinitions` 现算）：`meiqihezi` · `red` · `selfUpdateExample` · `canglu` · `sinThorn` · `matina` · `remoteness` · `tek` · `hunter` · `albert` · `lin`。
+> **注册角色共 14 个**（`registry/RoleLoader#defaultDefinitions`）：`Mikomako` · `red` · `selfUpdateExample` · `Heron` · `sinThorn` · `matina` · `lethe` · `tek` · `hunter` · `albert` · `lin` · `raven` · `sayaka` · `resist`。
 > ★ 若本文集某处仍写「6 个角色 / 117 测试 / 106 文件」等旧数，一律以本行与上面基线行为准。
 
 ## 阅读顺序（也是信任顺序）

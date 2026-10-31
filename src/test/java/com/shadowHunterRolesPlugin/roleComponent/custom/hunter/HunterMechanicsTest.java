@@ -405,12 +405,12 @@ public class HunterMechanicsTest {
     // ───────── ⑦ 装配注册 ─────────
 
     /**
-     * **猎手必须真的在注册表里，且六个组件齐全**。
+     * **猎手必须真的在注册表里，且八个组件齐全**。
      * <p>单独钉住以防"忘了在 {@code defaultDefinitions()} 加一行"—— 那种漏写在其它测试里没有任何表现
      * （症状是"编译过、测试过、进游戏选不到这个角色"）。
      */
     @Test
-    public void hunterIsRegisteredWithSixComponents() {
+    public void hunterIsRegisteredWithEightComponents() {
         RoleLoader.Definition hunter = null;
         for (RoleLoader.Definition definition : new RoleLoader(Logger.getLogger("HunterMechanicsTest"))
                 .defaultDefinitions()) {
@@ -433,7 +433,11 @@ public class HunterMechanicsTest {
                 "hunter_skill_pullback",
                 "hunter_skill_stealth",
                 "hunter_passive_prey",
-                "hunter_evolution_passive")) {
+                "hunter_evolution_passive",
+                //2026-10-31 需求：猎手四件专属护甲（影都之壳）
+                "hunter_equipments_passive",
+                //2026-10-31 全员语音：影都语气（巨大怪物，少有人性，却要有人性）
+                "role_voice_script")) {
             assertTrue("猎手缺组件 " + id + "，实际 = " + present, present.contains(id));
         }
         //★ 内建条数**从注册表推导**，不写死：上游 2026-10-02 把内建从 7 个加到 9 个，
@@ -447,7 +451,7 @@ public class HunterMechanicsTest {
             }
         }
         assertTrue("注册表里必须有 selfUpdateExample（内建基准）", builtIns > 0);
-        assertEquals("猎手应有的组件条数（内建 " + builtIns + " + 6 角色）；实际 = " + present,
-                builtIns + 6, role.getComponents().size());
+        assertEquals("猎手应有的组件条数（内建 " + builtIns + " + 8 角色，含语音/圣装）；实际 = " + present,
+                builtIns + 8, role.getComponents().size());
     }
 }

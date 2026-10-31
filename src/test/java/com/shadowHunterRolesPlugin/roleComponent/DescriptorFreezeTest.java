@@ -2,7 +2,7 @@ package com.shadowHunterRolesPlugin.roleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.base.Skill;
 
 import com.shadowHunterRolesPlugin.roleComponent.builtin.hotbar.HotbarSpecification;
-import com.shadowHunterRolesPlugin.roleComponent.custom.meiqiHezi.skill.MeiqiheziBloodySlashSkill;
+import com.shadowHunterRolesPlugin.roleComponent.custom.Mikomako.skill.MikomakoBloodySlashSkill;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -17,13 +17,13 @@ import static org.junit.Assert.assertTrue;
  * （frozen / slot / boundId），不触 Bukkit 注册表、不构物品，因此离线可跑。
  * <p>这一族发生过真实回归（描述符封冻被绕过 / 未设栏位静默降级 / 越界不校验），所以判据必须钉死。
  * <p>本测试只用公开 API（不反射私有字段、不加测试后门）；被测描述符取真实组件的嵌套描述符
- * （{@link MeiqiheziBloodySlashSkill.Specification}，继承 {@link HotbarSpecification} ⇒ 带栏位那一支：
+ * （{@link MikomakoBloodySlashSkill.Specification}，继承 {@link HotbarSpecification} ⇒ 带栏位那一支：
  * 装配期未 setSlot 就 freeze 必抛。这正是本类要锁的口径之一）。
  */
 public class DescriptorFreezeTest {
 
     private static HotbarSpecification<?> fresh() {
-        return new MeiqiheziBloodySlashSkill.Specification();
+        return new MikomakoBloodySlashSkill.Specification();
     }
 
     /** 装配期绑定 id：绑定前 null，绑定后同值（id 属于注册处），重复绑定幂等。 */

@@ -5,6 +5,7 @@ import org.bukkit.NamespacedKey;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -54,5 +55,52 @@ public class HeronMechanicsTest {
                 HeronHookSkill.shouldRegenCharge(0, HeronHookSkill.MAX_CHARGES, cost));
         assertTrue("只剩 1 个空位 + 能量充足 ⇒ 充",
                 HeronHookSkill.shouldRegenCharge(HeronHookSkill.MAX_CHARGES - 1, HeronHookSkill.MAX_CHARGES, 100));
+    }
+
+    // ───────── 旋律选取：拉拽时限 + 双击蹲取消（2026-10-30 反馈修复）─────────
+
+    /** 拉拽硬上限：正好 3 秒（60 刻）必须脱钩，不许被移动目标/卡墙拖成无限拉拽。 */
+    @Test
+    public void 拉拽_最长不超过3秒() {
+        assertEquals("拉拽上限必须正好 3 秒", 60, HeronHookSkill.PULL_MAX_TICKS);
+        assertEquals("3 秒 = 60 刻", 3 * 20, HeronHookSkill.PULL_MAX_TICKS);
+        assertFalse("第 59 刻还没到 3 秒 ⇒ 继续拉", HeronHookSkill.shouldAbortPull(59));
+        assertTrue("第 60 刻 = 3 秒 ⇒ 必须脱钩", HeronHookSkill.shouldAbortPull(60));
+        assertTrue("超过 3 秒也一律脱钩（不累积、不续拉）", HeronHookSkill.shouldAbortPull(120));
+    }
+
+    /** 双击蹲窗口：正好 0.15 秒（3 刻）内连按两次才取消；差 4 刻（0.2 秒）不算。 */
+    @Test
+    public void 双击蹲_窗口正好0点15秒() {
+        assertEquals("窗口必须正好 3 刻 = 0.15 秒", 3, HeronHookSkill.DOUBLE_SNEAK_WINDOW_TICKS);
+        assertTrue("相邻刻按下算双击", HeronHookSkill.withinDoubleSneakWindow(10, 11));
+        assertTrue("正好 0.15 秒（3 刻）仍算双击", HeronHookSkill.withinDoubleSneakWindow(10, 13));
+        assertFalse("差 4 刻（0.2 秒）不算双击", HeronHookSkill.withinDoubleSneakWindow(10, 14));
+        assertFalse("同一刻不可能按两次", HeronHookSkill.withinDoubleSneakWindow(10, 10));
+        assertFalse("时间倒流不算双击", HeronHookSkill.withinDoubleSneakWindow(13, 10));
+    }
+
+    // ───────── 主武器备注：特殊值伤害口径必须与实际一致（2026-10-30 修）─────────
+
+    /**
+     * 主武器 lore 是玩家唯一能读到的"数值说明书"，它写错不会报错、只会让玩家按错的数字打。
+     * 这里把**特殊值伤害**与实际上限钉住：旧文案（12 特殊值 / 结算 4 灵魂伤害 / 护盾 / 12 SAN / 24 层）
+     * 全是过时口径，真值见 {@code HeronMainWeapon} 的 onAttack 与 {@code HeronTraumaPassive} 的常量。
+     */
+    @Test
+    public void 主武器备注_特殊值伤害与实际一致() {
+        StringBuilder lore = new StringBuilder();
+        for (net.kyori.adventure.text.Component line : new HeronMainWeapon.Specification().getDescription()) {
+            lore.append(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                    .plainText().serialize(line)).append('\n');
+        }
+        String text = lore.toString();
+        assertTrue("每次攻击必须写 3~7 特殊值伤害: " + text, text.contains("3~7特殊值伤害"));
+        assertFalse("旧错误文案「12特殊值伤害」不许再出现: " + text, text.contains("12特殊值伤害"));
+        assertTrue("4 层结算的额外 7 点特殊值伤害必须写明: " + text, text.contains("7点特殊值伤害"));
+        assertTrue("夺取能量应为 5（实际 ENERGY_THEFT_AMOUNT）: " + text, text.contains("夺取5能量"));
+        assertTrue("创伤上限必须是 16 层（实际 MAX_STACK_COUNT）: " + text, text.contains("16层"));
+        assertFalse("旧的「24层」是错误上限: " + text, text.contains("24层"));
+        assertFalse("旧的「12点SAN值」回复不存在: " + text, text.contains("12点SAN值"));
     }
 }

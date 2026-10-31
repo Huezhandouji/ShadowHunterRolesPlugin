@@ -84,6 +84,9 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new BowWeaponListener(roleManager, rolesContext), this);
         Bukkit.getPluginManager().registerEvents(new PlayerListener(roleManager), this);
         Bukkit.getPluginManager().registerEvents(new DamageTrackerListener(), this);
+        //战斗状态框架（2026-10-31）：被敌方攻击/被方块伤害/持续伤害 的伤害侧规则
+        //  注册在 DamageTrackerListener 之后：CUSTOM 插件伤害的归属回退要读它写好的 last_damager
+        Bukkit.getPluginManager().registerEvents(new CombatStateListener(), this);
         Bukkit.getPluginManager().registerEvents(new RoleEventListener(), this);
         //受伤 / 受治疗的平台事件面（钩子投递；ignoreCancelled、只读不取消）
         Bukkit.getPluginManager().registerEvents(new DamageHookListener(roleManager), this);

@@ -321,7 +321,12 @@ public class BuffComponent extends RoleComponent implements OperationProvider {
      */
     public boolean addTo(Player target, BuffType type, int durationTicks) {
         BuffComponent other = targetOf(target);
-        return other != null && other.add(type, durationTicks);
+        boolean applied = other != null && other.add(type, durationTicks);
+        if (applied) {
+            //战斗状态规则 2：给敌对目标成功附加状态 ⇒ 双方进入/延续战斗
+            noteHostileStatusApplied(target);
+        }
+        return applied;
     }
 
     /**
@@ -410,7 +415,36 @@ public class BuffComponent extends RoleComponent implements OperationProvider {
      */
     public boolean applyPotionEffectTo(Player target, PotionEffect effect) {
         BuffComponent other = targetOf(target);
-        return other != null && other.applyPotionEffect(effect);
+        boolean applied = other != null && other.applyPotionEffect(effect);
+        if (applied) {
+            //战斗状态规则 2：给敌对目标成功附加状态 ⇒ 双方进入/延续战斗
+            noteHostileStatusApplied(target);
+        }
+        return applied;
+    }
+
+    /**
+     * 战斗状态规则 2 / 5（2026-10-31 框架改动）：
+     * <b>通过技能给敌对目标成功附加状态</b> ⇒ 施术者进入战斗；被施加者按"被敌方施加状态"刷新<b>一次</b>
+     * （长时间伤害性药水 / 被动印记只算施加那一刻，后续持续伤害跳数由 {@code CombatStateListener} 排除）。
+     *
+     * <p>只在 {@code applied == true}（真的落地）时调用；目标自己是自己、目标非敌对、目标无角色实例
+     * 都静默跳过 —— 本方法不改变任何 buff 语义，只做战斗状态的侧记。
+     */
+    private void noteHostileStatusApplied(Player target) {
+        if (target == null) {
+            return;
+        }
+        Player self = svc().self() == null ? null : svc().self().player();
+        if (self == null || self.getUniqueId().equals(target.getUniqueId())) {
+            return;
+        }
+        FactionComponent faction = getComponent(FactionComponent.class);
+        if (faction == null || !faction.isHostileTo(target.getUniqueId())) {
+            return;
+        }
+        CombatStateComponent.refreshFor(self.getUniqueId());
+        CombatStateComponent.refreshFor(target.getUniqueId());
     }
 
     /**

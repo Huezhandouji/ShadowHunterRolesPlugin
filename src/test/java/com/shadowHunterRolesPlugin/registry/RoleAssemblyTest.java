@@ -2,6 +2,8 @@ package com.shadowHunterRolesPlugin.registry;
 
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.platform.KeyFactory;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.DefaultSanTEZeroPunishment;
+import com.shadowHunterRolesPlugin.roleComponent.custom.lin.passive.LinMartyrPassive;
 import org.bukkit.NamespacedKey;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -11,6 +13,7 @@ import java.util.List;
 import java.util.logging.Logger;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -100,6 +103,42 @@ public class RoleAssemblyTest {
     }
 
     /**
+     * **林(Lin) 的默认特殊值惩罚必须关闭，只保留自己的「殉道」**（2026-10-31 需求）。
+     *
+     * <p>为什么需要单独钉：默认惩罚是 {@code withBuiltIns} 默认注册的；如果哪天有人把
+     * {@code linBuilder} 的配置参数改回 {@code withBuiltIns(builder, faction)}，林会重新吃到
+     * "归零眩晕 + 真伤"的默认惩罚 —— 编译与装配都不会报错，只有玩法不对。
+     */
+    @Test
+    public void linDisablesDefaultPunishmentAndKeepsMartyr() {
+        RoleLoader.Definition lin = null;
+        for (RoleLoader.Definition definition : loader().defaultDefinitions()) {
+            if ("lin".equals(definition.id())) {
+                lin = definition;
+                break;
+            }
+        }
+        assertTrue("defaultDefinitions() 里必须有 id = \"lin\" 的角色", lin != null);
+        Role role = lin.builder().get().build();
+        role.verifyDependencies();
+        java.util.Set<String> present = role.getComponents().keySet();
+        assertFalse("林的默认特殊值惩罚必须关闭（punishmentEnabled=false），实际 = " + present,
+                present.contains(DefaultSanTEZeroPunishment.ID));
+        assertTrue("林自己的殉道惩罚必须仍在，实际 = " + present,
+                present.contains(LinMartyrPassive.ID));
+        //2026-10-31 并行需求「殉道者的遗装」给林补了第 7 个角色组件（lin_equipments_passive）
+        assertTrue("林的殉道者遗装必须仍在，实际 = " + present,
+                present.contains("lin_equipments_passive"));
+        //2026-10-31 全员语音：林补了 `role_voice_script`（第 8 个角色组件）
+        assertTrue("林的语音组件必须仍在，实际 = " + present,
+                present.contains("role_voice_script"));
+        int builtIns = builtInComponentCount();
+        //总组件 = 内建(10) − 默认惩罚(1) + 8 个角色组件（主武器 / 3 技能 / 2 被动 / 遗装 / 语音）
+        assertEquals("林 = 内建 " + builtIns + " − 默认惩罚 1 + 8 个角色组件；实际 = " + present,
+                builtIns - 1 + 8, role.getComponents().size());
+    }
+
+    /**
      * **特克(Tek) 必须真的在注册表里，且五个组件齐全**。
      * <p>单独钉住以防"忘了在 {@code defaultDefinitions()} 加一行"——
      * 那种漏写在其它测试里没有任何表现。
@@ -121,22 +160,23 @@ public class RoleAssemblyTest {
 
         assertTrue("特克缺必需依赖: " + role.missingRequiredDependencies(),
                 role.missingRequiredDependencies().isEmpty());
-        //组件表 = 内建组件 + 5 个角色组件（主武器 + 三个技能 + 一个被动）
-        //断言点落在"这 5 个 id 都在"，比断言总数更准（内建组件数量变化不该让本测试变红）
+        //组件表 = 内建组件 + 6 个角色组件（主武器 + 三个技能 + 一个被动 + 语音）
+        //断言点落在"这 6 个 id 都在"，比断言总数更准（内建组件数量变化不该让本测试变红）
         java.util.Set<String> present = role.getComponents().keySet();
         for (String id : List.of("tekTridentMainWeapon", "tekXiaoSkill", "tekYueSkill",
-                "tekTruthThrustSkill", "tekDestinyPassive")) {
+                "tekTruthThrustSkill", "tekDestinyPassive", "role_voice_script")) {
             assertTrue("特克缺组件 " + id + "，实际 = " + present, present.contains(id));
         }
         //★ 内建条数**从注册表推导**，不写死：上游 2026-10-02 把内建从 7 个加到 9 个，
         //  写死的总数让本测试误报过一次 —— 而"框架有几个内建"不是本测试要管的事。
         int builtIns = builtInComponentCount();
-        assertEquals("特克应有 5 个角色组件（= 内建 " + builtIns + " + 5）；实际 = " + present,
-                builtIns + 5, role.getComponents().size());
+        //2026-10-31 全员语音：特克补了 `role_voice_script`（方法名沿用历史，实际为 6 个角色组件）
+        assertEquals("特克应有 6 个角色组件（= 内建 " + builtIns + " + 6）；实际 = " + present,
+                builtIns + 6, role.getComponents().size());
     }
 
     /**
-     * **绯红渡鸦(Raven) 必须真的在注册表里，且七个组件齐全**（含语音组件）。
+     * **绯红渡鸦(Raven) 必须真的在注册表里，且十个组件齐全**（含语音组件）。
      *
      * <p>与 {@link #tekIsRegisteredWithFiveComponents()} 同一理由：单独钉住以防
      * "忘了在 {@code defaultDefinitions()} 加一行"—— 那种漏写在其它测试里没有任何表现。
@@ -229,7 +269,7 @@ public class RoleAssemblyTest {
     }
 
     /**
-     * **抗争(Resist) 必须真的在注册表里，且七个组件齐全**。
+     * **抗争(Resist) 必须真的在注册表里，且十个组件齐全**。
      *
      * <p>与 sayaka 的钉住测试同一理由：{@code defaultDefinitions()} 漏一行 ⇒ 进游戏选不到角色，
      * 而测试若只扫"已有角色"则永远绿。抗争还多一层风险：主武器与三个技能都依赖被动，
@@ -265,38 +305,77 @@ public class RoleAssemblyTest {
     }
 
     /**
-     * **梅妻鹤子(meiqihezi) 必须真的在注册表里，且九个组件齐全**（2026-10-21 重做）。
+     * **梅妻鹤子(Mikomako) 必须真的在注册表里，且十个组件齐全**（2026-10-21 重做）。
      *
      * <p>本次重做把"充能账本"和"离手武器"各自拆成独立组件：账本被主武器 + 三技能 + 被动共五处读，
      * 离手状态被主武器闸门读。任何一处漏注册，失败形态都是**整个角色静默消失**（只在启动日志留 SEVERE），
      * 因此用本条把九个 id 逐个钉住。
      */
     @Test
-    public void meiqiheziIsRegisteredWithTenComponents() {        RoleLoader.Definition meiqihezi = null;
+    public void mikomakoIsRegisteredWithTenComponents() {        RoleLoader.Definition Mikomako = null;
         for (RoleLoader.Definition definition : loader().defaultDefinitions()) {
-            if ("meiqihezi".equals(definition.id())) {
-                meiqihezi = definition;
+            if ("Mikomako".equals(definition.id())) {
+                Mikomako = definition;
                 break;
             }
         }
-        assertTrue("defaultDefinitions() 里必须有 id = \"meiqihezi\" 的角色（漏了 ⇒ 进游戏选不到梅妻鹤子）",
-                meiqihezi != null);
+        assertTrue("defaultDefinitions() 里必须有 id = \"Mikomako\" 的角色（漏了 ⇒ 进游戏选不到梅妻鹤子）",
+                Mikomako != null);
 
-        Role role = meiqihezi.builder().get().build();
+        Role role = Mikomako.builder().get().build();
         role.verifyDependencies();
 
         assertTrue("梅妻鹤子缺必需依赖: " + role.missingRequiredDependencies(),
                 role.missingRequiredDependencies().isEmpty());
         java.util.Set<String> present = role.getComponents().keySet();
-        for (String id : List.of("meiqihezi_charge", "meiqihezi_throw", "meiqihezi_san_drain",
-                "meiqihezi_mainWeapon_juejue", "meiqihezi_skill_unconcern",
-                "meiqihezi_skill_bloody_slash", "meiqihezi_skill_circle_slash",
-                "meiqihezi_equippments_passive", "meiqihezi_madness_passive",
-                "meiqihezi_floating_text")) {
+        for (String id : List.of("mikomako_charge", "mikomako_throw", "mikomako_san_drain",
+                "mikomako_mainWeapon_juejue", "mikomako_skill_unconcern",
+                "mikomako_skill_bloody_slash", "mikomako_skill_circle_slash",
+                "mikomako_equippments_passive", "mikomako_madness_passive",
+                "mikomako_floating_text")) {
             assertTrue("梅妻鹤子缺组件 " + id + "，实际 = " + present, present.contains(id));
         }
         int builtIns = builtInComponentCount();
-        assertEquals("梅妻鹤子应有 10 个角色组件（= 内建 " + builtIns + " + 10）；实际 = " + present,
+        assertFalse("鹤子的默认特殊值惩罚必须关闭（punishmentEnabled=false），实际 = " + present,
+                present.contains(DefaultSanTEZeroPunishment.ID));
+        assertEquals("梅妻鹤子应有 10 个角色组件（= 内建 " + builtIns
+                        + " − 默认惩罚 1 + 10）；实际 = " + present,
+                builtIns - 1 + 10, role.getComponents().size());
+    }
+
+    /**
+     * **冷识(lethe) 必须真的在注册表里，且十个组件齐全**（2026-10-26 改名后重钉）。
+     *
+     * <p>冷识的十个 id 由组件自己声明、由 {@code RoleLoader.letheBuilder()} 装配；
+     * 漏注册任何一件，失败形态都是**整个角色静默消失**（只在启动日志留 SEVERE），
+     * 因此用本条把十个 id 逐个钉住（与 {@link #mikomakoIsRegisteredWithTenComponents()} 同一理由）。
+     */
+    @Test
+    public void letheIsRegisteredWithTenComponents() {
+        RoleLoader.Definition lethe = null;
+        for (RoleLoader.Definition definition : loader().defaultDefinitions()) {
+            if ("lethe".equals(definition.id())) {
+                lethe = definition;
+                break;
+            }
+        }
+        assertTrue("defaultDefinitions() 里必须有 id = \"lethe\" 的角色（漏了 ⇒ 进游戏选不到冷识）",
+                lethe != null);
+
+        Role role = lethe.builder().get().build();
+        role.verifyDependencies();
+
+        assertTrue("冷识缺必需依赖: " + role.missingRequiredDependencies(),
+                role.missingRequiredDependencies().isEmpty());
+        java.util.Set<String> present = role.getComponents().keySet();
+        for (String id : List.of("lethe_resonance_component", "lethe_evolution_passive",
+                "lethe_quiver_component", "lethe_main_weapon", "lethe_forget_skill",
+                "lethe_summon_skill", "lethe_reshape_skill", "lethe_shadows_passive",
+                "lethe_equipments_passive", "lethe_floating_text")) {
+            assertTrue("冷识缺组件 " + id + "，实际 = " + present, present.contains(id));
+        }
+        int builtIns = builtInComponentCount();
+        assertEquals("冷识应有 10 个角色组件（= 内建 " + builtIns + " + 10）；实际 = " + present,
                 builtIns + 10, role.getComponents().size());
     }
 

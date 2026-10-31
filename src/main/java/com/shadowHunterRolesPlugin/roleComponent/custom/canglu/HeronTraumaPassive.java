@@ -4,6 +4,7 @@ import com.shadowHunterRolesPlugin.core.ports.ComponentServicesPort;
 import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import com.shadowHunterRolesPlugin.roleComponent.base.PassiveSkill;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.CombatStateComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
@@ -47,9 +48,18 @@ public class HeronTraumaPassive extends PassiveSkill {
 
     public static final String ID = "cangluHysteriaPassive";
 
-    private int outOfCombatTicks;
     private int hysteriaTimer;
     private int stackCount;
+
+    /**
+     * 战斗状态（2026-10-31 修复）：**唯一真值来自框架** {@link CombatStateComponent}。
+     * <p>本被动不再自己维护"脱战计时"—— 进入战斗 / 脱离战斗的判定必须与框架一致：
+     * 周围 4 格有敌人 / 给敌人上状态 / 受敌方攻击 ⇒ 战斗；最后一次刷新后 6 秒无刷新 ⇒ 脱战。
+     */
+    private CombatStateComponent combat;
+
+    /** 当前是否正在吃"深度癔症"的隐身（用于进入战斗时立刻摘掉，而不是等 45 刻自然过期）。 */
+    private boolean hysteriaActive;
 
     private static final int MAX_STACK_COUNT = 16;
     private static final int RESOLVE_COUNT = 4;
@@ -120,6 +130,8 @@ public class HeronTraumaPassive extends PassiveSkill {
             super(Component.text("创伤"), List.of(Component.text("苍鹭的创伤被动，给自己叠层数")));
             //受击要订阅 VitalsComponent 的受伤名单（装配期声明，运行期才取得到）
             requires(VitalsComponent.class);
+            //深度癔症的"脱战"判定沿用框架战斗状态（2026-10-31 修复）
+            requires(CombatStateComponent.class);
         }
 
         @Override
@@ -140,7 +152,10 @@ public class HeronTraumaPassive extends PassiveSkill {
         sante = svc().components().get(SanTEComponent.class);
         buff = svc().components().get(BuffComponent.class);
         render = svc().components().get(HotbarRenderComponent.class);
-        //订阅受伤（受击 ⇒ 清脱战计时 + 回 1 SanTE）；受治疗不订阅（本被动没有对应行为）
+        //战斗状态唯一真值（框架组件；withBuiltIns 恒装，因此装配期依赖成立）
+        combat = svc().components().get(CombatStateComponent.class);
+        hysteriaActive = false;
+        //订阅受伤（受击 ⇒ 回 1 SanTE）；受治疗不订阅（本被动没有对应行为）
         vitals = svc().components().get(VitalsComponent.class);
         if (vitals != null) {
             damagedEntry = vitals.addDamagedListener(this, event -> onDamaged(event.source(), event.amount()));
@@ -179,29 +194,34 @@ public class HeronTraumaPassive extends PassiveSkill {
                 .append(net.kyori.adventure.text.Component.text(
                         " " + stackCount + "/" + MAX_STACK_COUNT, net.kyori.adventure.text.format.NamedTextColor.WHITE)));
 
-        //深度癔症：脱离战斗 5 秒后，每秒 +10 SanTE 并隐身（直到再次进入战斗）
-        outOfCombatTicks++;
-        if(outOfCombatTicks < 100){
+        //深度癔症（2026-10-31 修复）：**脱战判定直接沿用框架** {@link CombatStateComponent#inCombat()} ——
+        //  周围 4 格有敌人 / 给敌人上状态 / 受敌方攻击都算战斗；最后一次刷新后 6 秒无刷新才算脱战。
+        //  本被动不再自己数"5 秒"：那套本地计时与框架不一致（框架 6 秒，且不含"附近有敌人"）。
+        if (combat == null || combat.inCombat()) {
+            hysteriaTimer = 0;
+            //进入战斗 ⇒ 立刻摘掉深度癔症的隐身（需求："直到再次进入战斗"）
+            if (hysteriaActive) {
+                hysteriaActive = false;
+                if (buff != null) {
+                    buff.removePotionEffect(PotionEffectType.INVISIBILITY);
+                }
+            }
             return;
         }
-        if(++hysteriaTimer >= 20){
+        if (++hysteriaTimer >= 20) {
             hysteriaTimer = 0;
             sante.increase(10);
             buff.applyPotionEffect(PotionEffectType.INVISIBILITY, 45, 0, true, false);
+            hysteriaActive = true;
         }
     }
 
-    /** 造成伤害即视为进入战斗（脱战计时清零）。 */
-    public void markCombat(){
-        outOfCombatTicks = 0;
-    }
-
     /**
-     * 受击回调（由 {@code start()} 里注册的 consumer 调）：进入战斗 + 抵消 1 点特殊值伤害。
-     * <p>★ 上游 {@code 0c106f4} 之后不再有 {@code onHealed} —— 受治疗那条名单本组件不订阅。
+     * 受击回调（由 {@code start()} 里注册的 consumer 调）：抵消 1 点特殊值伤害。
+     * <p>★ 2026-10-31：不再在这里清"脱战计时"—— 受击进入战斗由框架的
+     * {@code listener/CombatStateListener} 统一刷新 {@link CombatStateComponent}，本被动只读结果。
      */
     private void onDamaged(Player source, double amount){
-        outOfCombatTicks = 0;
         sante.increase(1);
     }
 
@@ -217,6 +237,9 @@ public class HeronTraumaPassive extends PassiveSkill {
         sante = null;
         buff = null;
         render = null;
+        combat = null;
+        hysteriaTimer = 0;
+        hysteriaActive = false;
         //订阅方组件已随本实例一起销毁，把它们留下的登记一并丢掉（避免悬挂引用）
         resolveListeners.clear();
         bossbar = null;
@@ -236,7 +259,6 @@ public class HeronTraumaPassive extends PassiveSkill {
      * <p>跨过 4 的倍数（4/8/12/16）时播对应档位音效，并请求一次热键栏重绘（主武器名字色按档位变）。
      */
     public void requestAddStackCount(@Nonnegative int amount){
-        outOfCombatTicks = 0;
         writeStacks(Math.clamp(stackCount + amount, 0, MAX_STACK_COUNT));
     }
 

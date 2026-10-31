@@ -48,6 +48,7 @@ import java.util.List;
  *       目标移动就继续飞向新的悬停位；</li>
  *   <li><b>飞行速度</b>：派出直线巡航 {@value #SPEED_DISPATCH} 格/秒；
  *       <b>附近有人</b>或<b>召回中</b> ⇒ {@value #SPEED_ASSIST} 格/秒
+ *       （2026-10-31 需求：两组速度都**加速到原本的两倍**）
  *       <p>★ 实现口径：速度按"格/刻"<b>逐刻累加</b>到一个走位储蓄里，攒够 1 格才真的走一格
  *       ⇒ 平均速度**精确**等于声明值；</li>
  *   <li><b>太远（&gt; {@value #MAX_LEASH_DISTANCE} 格）或撞墙</b> ⇒ 自动折返角色身边（变召回模式）；</li>
@@ -111,11 +112,17 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
     /** 中毒等级：III（增幅 2）。 */
     private static final int PULSE_POISON_AMPLIFIER = 2;
 
-    /** 飞行速度：**派出**（直线向前 / 追目标）格/秒。 */
-    private static final double SPEED_DISPATCH = 4.0d;
+    /**
+     * 飞行速度：**派出**（直线向前 / 追目标）格/秒。
+     * <p>2026-10-31 需求：**加速到原本速度的两倍**（原 4 格/秒 ⇒ 现 8 格/秒）。
+     */
+    static final double SPEED_DISPATCH = 8.0d;
 
-    /** 飞行速度：**附近有人 / 召回 / 紧密跟随** 格/秒。 */
-    private static final double SPEED_ASSIST = 8.0d;
+    /**
+     * 飞行速度：**附近有人 / 召回 / 紧密跟随** 格/秒。
+     * <p>2026-10-31 需求：**加速到原本速度的两倍**（原 8 格/秒 ⇒ 现 16 格/秒）。
+     */
+    static final double SPEED_ASSIST = 16.0d;
 
     /** 离角色超过该距离 ⇒ 自动折返（变召回模式）。 */
     private static final double MAX_LEASH_DISTANCE = 50.0d;
@@ -367,7 +374,7 @@ public class MatinaRedstoneDroneSkill extends Skill implements OperationProvider
         } else {
             Location here = new Location(world, x, y, z);
             Location aim = flightAim(owner, target, here);
-            //速度：召回 或 **附近有人** ⇒ 8 格/秒；纯派出直线巡航 ⇒ 4 格/秒
+            //速度：召回 或 **附近有人** ⇒ 16 格/秒；纯派出直线巡航 ⇒ 8 格/秒（2026-10-31 整体 ×2）
             double speed = (mode == Mode.RECALL || target != null) ? SPEED_ASSIST : SPEED_DISPATCH;
             stepBudget += speed / TICKS_PER_SECOND;
             if (stepBudget >= 1d) {

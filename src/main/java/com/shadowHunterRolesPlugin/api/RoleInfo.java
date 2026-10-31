@@ -15,7 +15,7 @@ import java.util.List;
  * <p><b>不含阵营</b>：阵营是内部机制（真值与判定都在阵营组件），既不在角色目录快照里、
  * 也没有专用 API 成员 —— 需要时走 {@code RoleAPI#executeComponentOperation(...)}（组件 id {@code faction}）。
  *
- * @param id          角色 id（如 {@code meiqihezi} / {@code red}）
+ * @param id          角色 id（如 {@code Mikomako} / {@code red}）
  * @param displayName 显示名（Adventure Component）
  * @param description 描述行（只读）
  * @param icon        图标材质

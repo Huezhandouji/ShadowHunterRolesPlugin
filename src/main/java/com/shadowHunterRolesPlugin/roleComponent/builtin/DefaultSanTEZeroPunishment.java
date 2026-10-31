@@ -10,11 +10,14 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
 import java.time.Duration;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
@@ -38,16 +41,23 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
  * <ol>
  *   <li>进入即标记：归零判定通过后立即 {@code inSanTEPunishment = true}，先于起任务
  *       （消除"起任务与标记之间"的重入窗口）；</li>
- *   <li>惩罚期间持续钉 SanTE = 0（逐 tick）：{@link #update()} 里以 {@code inSanTEPunishment} 守卫，
- *       每一 tick 执行 {@code sante.set(0)}（此前是"任务体每 40 刻钉一次"，整个惩罚只钉 3 次，
- *       两钉点之间可被其它组件抬高（如流血 `+4`），现改为逐 tick，惩罚期间每一 tick 都是 0）；</li>
+ *   <li><b>惩罚期间不再钉值</b>（2026-10-30 用户裁定放开）：<b>没有</b> {@code update()} 逐 tick 钉
+ *       SanTE 了 —— 惩罚期间被攻击，TE 依然会掉（可掉到负数，最低到 {@code SanTEComponent#min()}，
+ *       默认 -999）；惩罚结束后由下面的回满任务一次性拉回上限；</li>
  *   <li>忽略重入：{@code onSanTEChange} 顶部守卫 {@code if (inSanTEPunishment) return;}，
  *       因此惩罚进行中不取消、不重启、不刷新 {@code count}、不重放标题/粒子、不重复上 STUN；</li>
  *   <li>结束回满（推迟到 STUN 结束）：在施加 STUN 的那一跳（{@code count == 1}）预约
- *       {@code timer.addScheduleLater(this, 100L, …)}，STUN 100 刻到期那一刻清标记并把 SanTE
- *       恢复至 {@code max}（此前在第 3 跳 ≈4.05 s 就回满、而 STUN 到 5 s 才结束，
- *       存在约 1 秒「已回满但仍在眩晕」的窗口，现已消除；回满在同一处一次性完成）。</li>
+ *       {@code timer.addScheduleLater(this, stunTicks, …)}，STUN 到期那一刻清标记并把 SanTE
+ *       一次性恢复至 {@code max}（期间不钉值 ⇒ 玩家在惩罚里被打掉的值会一直保留到这一刻）。</li>
  * </ol>
+ *
+ * <h2>表现层（2026-10-31 增强）</h2>
+ * 原有迸发粒子（图腾 30 + 灵魂 30 / 每跳灵魂 30）**不变**；新增：
+ * <ul>
+ *   <li><b>2 次不死图腾粒子爆炸</b>：触发瞬间一次、0.4 秒后再一次（两层扩散 + END_ROD 拉丝）；</li>
+ *   <li><b>每 0.5 秒翻滚菱形</b>：大黑色菱形（半径 1.65 / 大粒子）正向翻滚，小灰色菱形（半径 0.85 /
+ *       小粒子）**反方向**翻滚 —— 见 {@link #spawnRollingDiamonds(Player, int)}。</li>
+ * </ul>
  * <p><b>一条曾被实测证伪的旧说法</b>：容器侧 `RoleInstance.dispatchSanTEChange` 的
  * `preSanTE == newSanTE` 早返回只能挡住「已经是 0 还继续扣」；「先回血再扣」（`pre = 4 → now = 0`）
  * 是真变化，照样派发。因此「SanTE 已为 0 时再扣不再重复派发，惩罚不再被重复触发/延长」与实测不符：
@@ -55,13 +65,22 @@ import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
  * 真正闭合"重复触发/延长"的是 (1) 进入即标记 + (3) 重入守卫，不是容器侧的早返回。
  * <p><b>中止路径必须复位标记（静默失效防护）</b>：{@code stop()}、玩家离线/死亡分支、
  * 任务取消/空转分支、以及回满任务本身的正常结束都必须把 {@code inSanTEPunishment} 复位 ——
- * 否则标记卡在 {@code true}，逐 tick 钉 0 会一直生效、且后续归零永不触发惩罚（绿灯不报的静默失效）。
+ * 否则标记卡在 {@code true}，后续归零永不触发惩罚（绿灯不报的静默失效）。
  * 五条路径逐条标注为源码里的 {@code (5-①…⑤)}。
  */
 public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
     /** 本组件的登记 id（知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */
     public static final String ID = "default_san_te_zero_punishment";
+
+    /** 翻滚菱形的闪烁周期（刻）= 10 刻 = 0.5 秒（需求：每 0.5 秒闪烁一次）。 */
+    public static final int FX_PERIOD_TICKS = 10;
+
+    /** 触发时的**不死图腾粒子爆炸次数**（需求：2 次；原有迸发粒子保留，不计入）。 */
+    public static final int TOTEM_BURST_COUNT = 2;
+
+    /** 第二次图腾爆炸相对触发时刻的延迟（刻）= 8 刻 ≈ 0.4 秒（两次读得出来是"两下"）。 */
+    public static final int SECOND_BURST_DELAY_TICKS = 8;
 
     private TaskComponent timer;
     private VitalsComponent vitals;
@@ -80,10 +99,24 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
 
     /**
      * 本组件的被动描述符（被动走统一的 {@code addComponent} 入口，因此无栏位、天然不占热键栏）。
-     * 表现数据逐字沿用组件构造器自己的实参（本组件原本就传 {@code null, null}，描述符同样传 null，
-     * 不新拟）；依赖 = 实取清单（`start()` 内的四个调用点）。
+     * <p><b>每个角色可自定义惩罚**节奏与强度**</b>（2026-10-30 框架改进）：
+     * 眩晕时长 / 惩罚跳数 / 每跳真伤占最大生命百分比。不写 = 100 刻 / 3 跳 / 10%
+     * ⇒ **与改动前行为逐字一致**（原实现 3 跳、每跳 ≈0.3×最大生命×0.33333 ≈ 10%）。
+     * <p><b>触发点与是否启用</b>由 {@link SanTEComponent.Configuration} 决定（阈值默认 0、启用默认 true），
+     * 本描述符不再重复一份阈值。
      */
     public static final class Specification extends PassiveSkill.Specification<DefaultSanTEZeroPunishment> {
+
+        /** 默认眩晕时长 = 100 刻 = 5 秒（与改动前一致）。 */
+        public static final int DEFAULT_STUN_TICKS = 100;
+        /** 默认惩罚跳数（与改动前一致）。 */
+        public static final int DEFAULT_BEATS = 3;
+        /** 默认每跳真伤 = 最大生命的 10%（原实现 3 跳合计 30%）。 */
+        public static final double DEFAULT_DAMAGE_PER_BEAT_PERCENT = 10d;
+
+        private int stunTicks = DEFAULT_STUN_TICKS;
+        private int beats = DEFAULT_BEATS;
+        private double damagePerBeatPercentOfMaxHealth = DEFAULT_DAMAGE_PER_BEAT_PERCENT;
 
         public Specification(){
             super(null, null);
@@ -93,6 +126,36 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
             //sante 实取但代码自带 null 兜底（`start()` 的 if (sante != null) 订阅 / `stop()` 的退订），
             //因此按「实取但可为空」声明为可选。
             requiresOptional(SanTEComponent.class);
+        }
+
+        /** 覆写眩晕时长（刻；默认 {@value #DEFAULT_STUN_TICKS}）。 */
+        public Specification setStunTicks(int stunTicks) {
+            this.stunTicks = Math.max(1, stunTicks);
+            return this;
+        }
+
+        /** 覆写惩罚跳数（默认 {@value #DEFAULT_BEATS}；每跳间隔固定 40 刻）。 */
+        public Specification setBeats(int beats) {
+            this.beats = Math.max(1, beats);
+            return this;
+        }
+
+        /** 覆写每跳真伤占最大生命的百分比（默认 {@value #DEFAULT_DAMAGE_PER_BEAT_PERCENT}%）。 */
+        public Specification setDamagePerBeatPercentOfMaxHealth(double percent) {
+            this.damagePerBeatPercentOfMaxHealth = Math.max(0d, percent);
+            return this;
+        }
+
+        public int stunTicks() {
+            return stunTicks;
+        }
+
+        public int beats() {
+            return beats;
+        }
+
+        public double damagePerBeatPercentOfMaxHealth() {
+            return damagePerBeatPercentOfMaxHealth;
         }
 
         @Override
@@ -105,6 +168,10 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
     private ScheduledHandle punishmentTask;
     //回满任务句柄（STUN 100 刻结束时一次性回满；与上面同属本组件资源表）
     private ScheduledHandle punishmentRestoreTask;
+    /** 惩罚期间"翻滚菱形"的 0.5 秒闪烁任务（惩罚结束/中止时取消）。 */
+    private ScheduledHandle punishmentFxTask;
+    /** 第二次不死图腾爆炸的一次性任务（触发后 0.4 秒）。 */
+    private ScheduledHandle punishmentSecondBurstTask;
 
     /**
      * 订阅 SanTE 变更：向 {@code SanTEComponent} 添加一条监听，而不是实现某个能力接口
@@ -132,21 +199,12 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
     private boolean inSanTEPunishment = false;
 
     /**
-     * 逐 tick 钩子（容器按注册表顺序每 tick 广播一次）—— (2) 惩罚期间逐 tick 钉 SanTE = 0。
-     * <p>与容器侧「真变化才派发」的关系（无重入循环、无任务泄漏）：
-     * <ul>
-     *   <li>已是 0 时 {@code set(0)}，容器侧 `preSanTE == newSanTE` 直接返回，不派发；</li>
-     *   <li>若本 tick 更早的组件把 SanTE 抬高（例：`RedBleedPassive` 的 `+4`），本行就是真变化，
-     *       派发一次 `(pre > 0 → 0)`；该次派发回到本组件时被 {@link #onSanTEChange} 顶部的重入守卫
-     *       挡下，因此不取消、不重启、不刷新 count；</li>
-     *   <li>钉 0 与惩罚任务彼此独立：本方法不创建/不取消任何任务，不产生任务泄漏。</li>
-     * </ul>
+     * **是否该触发惩罚**（纯函数，离线可测）：TE 已经降到阈值或以下 ⇒ 触发。
+     * <p>默认阈值 = 0（降到 0 进入惩罚，与既有实现一致）；角色把阈值调到 -50 就变成
+     * "降到 -50 才进入惩罚"。
      */
-    @Override
-    public void update() {
-        if (inSanTEPunishment) {
-            sante.set(0);
-        }
+    public static boolean triggersPunishment(int threshold, int current) {
+        return current <= threshold;
     }
 
     /**
@@ -157,12 +215,22 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
      */
     public void onSanTEChange(SanTEComponent.Change change) {
         //载荷里的两个值 = 旧入参的两个值（顺序与含义逐字不变）
-        int pre = change.previous();
         int now = change.current();
+        if (sante == null) return;
         //(3) 忽略重入：惩罚进行中直接返回 —— 不取消、不重启、不刷新 count、不重放表现层
         if(inSanTEPunishment) return;
-        if(now > 0) return;
+        //角色可关闭默认惩罚（关闭后由角色自行实现）；默认 true
+        if(!sante.punishmentEnabled()) return;
+        //触发阈值由角色配置（默认 0 ⇒ 既有行为）
+        int threshold = sante.punishmentThreshold();
+        if(!triggersPunishment(threshold, now)) return;
         Faction faction = svc().components().get(FactionComponent.class).faction();
+
+        //惩罚节奏/强度的配置在触发时抓一次快照（运行期改描述符不影响已开始的这一轮）
+        Specification config = (Specification) specification();
+        int stunTicks = config.stunTicks();
+        int beats = Math.max(1, config.beats());
+        double damagePerBeatPercent = Math.max(0d, config.damagePerBeatPercentOfMaxHealth());
 
         //单一活动任务不变量：先取消仍在跑的旧任务，因此不产生任务泄漏。
         //注意：这里不是"重入保护" —— 重入由上面的 (3) 守卫处理，本行只保证同时最多一个任务对象。
@@ -171,53 +239,58 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
         //(1) 进入即标记：必须先于起任务（消除"起任务与标记之间"的重入窗口）
         inSanTEPunishment = true;
 
+        //新增表现（2026-10-31）：2 次图腾爆炸 + 每 0.5 秒一对反向翻滚的黑/灰菱形
+        startPunishmentParticleTasks();
+
         punishmentTask = timer.addScheduleRepeating(this, 0L, 40L, new Runnable() {
 
                     int count = 0;
                     Player player = svc().self().player();
-
-                    double totalDamageAmount = player.getAttribute(Attribute.MAX_HEALTH) != null ?
-                            player.getAttribute(Attribute.MAX_HEALTH).getValue() * 0.3d : 20;
 
                     @Override
                     public void run() {
                         if (punishmentTask == null || punishmentTask.isCancelled()) {
                             //(5-③ 防御性) 任务已不在则标记不得滞留（否则后续归零永不触发惩罚）
                             inSanTEPunishment = false;
+                            cancelParticleTasks();
                             return;
                         }
                         if (!player.isOnline() || player.isDead()) {
                             //(5-② 中止路径) 离线/死亡：取消任务并复位标记
                             punishmentTask.cancel();
                             inSanTEPunishment = false;
+                            cancelParticleTasks();
                             return;
                         }
 
 
-                        if (count >= 3) {
+                        if (count >= beats) {
                             //(5-④ 防御性) 收尾跳之后的一次空转：取消并确保标记已复位
                             punishmentTask.cancel();
                             inSanTEPunishment = false;
+                            cancelParticleTasks();
                             return;
                         }
                         count += 1;
 
-                        //(2) 钉 0 不在这里：它由 update() 逐 tick 执行，
-                        //    因此惩罚期间"每一 tick 都是 0"，不再有两钉点之间被抬高的窗口。
+                        //(2) 钉阈值不在这里：它由 update() 逐 tick 执行，
+                        //    因此惩罚期间"每一 tick 都钉在阈值上"，不再有两钉点之间被抬高的窗口。
 
                         Location loc = player.getLocation();
 
                         if (count == 1) {
-                            buff.add(BuffType.STUN, 100);
+                            buff.add(BuffType.STUN, stunTicks);
 
-                            //(4) 回满推迟到 STUN 结束：STUN 在本跳施加、持续 100 刻，自本跳起 100 刻后
-                            //    （= STUN 到期那一刻）清标记并一次性回满，因此惩罚期间 SanTE 全程真正为 0
-                            //    （逐 tick 钉 + 结束后才回满），消除"已回满但仍眩晕"的窗口。
-                            punishmentRestoreTask = timer.addScheduleLater(DefaultSanTEZeroPunishment.this, 100L, () -> {
+                            //(4) 回满推迟到 STUN 结束：STUN 在本跳施加、持续 stunTicks 刻，自本跳起
+                            //    stunTicks 刻后（= STUN 到期那一刻）清标记并一次性回满。
+                            //    期间**不钉值**（2026-10-30 放开）：被打掉的值会一直保留到回满这一刻。
+                            punishmentRestoreTask = timer.addScheduleLater(DefaultSanTEZeroPunishment.this,
+                                    (long) stunTicks, () -> {
                                 //(5-⑤ 正常结束) 若标记已被中止路径复位则不再回满（防越权恢复）
                                 if (!inSanTEPunishment) return;
-                                //先清标记：否则同一 tick 的逐 tick 钉 0 会把刚回满的值立刻抹回 0
+                                //先清标记：否则同一 tick 的逐 tick 钉会把刚回满的值立刻抹回去
                                 inSanTEPunishment = false;
+                                cancelParticleTasks();
                                 sante.set(sante.max());
                             });
                             player.playSound(loc, Sound.ITEM_TOTEM_USE, 1f, 1f);
@@ -226,6 +299,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                             particleLoc.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, particleLoc, 30, 0.5d, 0.5d, 0.5d);
                             particleLoc.getWorld().spawnParticle(Particle.SCULK_SOUL, particleLoc, 30, 0.5d, 0.5d, 0.5d);
 
+                            long titleMillis = stunTicks * 50L;
                             Title title = Title.title(
                                     Component.empty(),
                                     Component.empty()
@@ -236,7 +310,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                                         Component.empty(),
                                         Title.Times.times(
                                                 Duration.ZERO,
-                                                Duration.ofMillis(5000L),
+                                                Duration.ofMillis(titleMillis),
                                                 Duration.ZERO
                                         )
                                 );
@@ -246,7 +320,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                                         Component.empty(),
                                         Title.Times.times(
                                                 Duration.ZERO,
-                                                Duration.ofMillis(5000L),
+                                                Duration.ofMillis(titleMillis),
                                                 Duration.ZERO
                                         )
                                 );
@@ -261,13 +335,151 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
                             Location particleLoc = loc.clone().add(0, 1, 0);
                             particleLoc.getWorld().spawnParticle(Particle.SCULK_SOUL, particleLoc, 30, 0.5d, 0.5d, 0.5d);
                         }
-                        vitals.trueDamage(player, null, totalDamageAmount * 0.33333d);
-                        //回满不在第 3 跳：已推迟到 STUN 结束（见 count == 1 处的回满任务）。
+                        double maxHealth = player.getAttribute(Attribute.MAX_HEALTH) != null
+                                ? player.getAttribute(Attribute.MAX_HEALTH).getValue() : 20d;
+                        vitals.trueDamage(player, null, maxHealth * damagePerBeatPercent / 100d);
+                        //回满不在末跳：已推迟到 STUN 结束（见 count == 1 处的回满任务）。
                     }
                 });
     }
 
-    //取消仍在运行的惩罚任务/回满任务并复位句柄（两把句柄都属本组件资源表）
+    // ───────── 惩罚表现（2026-10-31 需求：2 次图腾爆炸 + 每 0.5 秒翻滚菱形）─────────
+
+    /**
+     * 启动惩罚表现任务：
+     * <ol>
+     *   <li><b>两次不死图腾粒子爆炸</b>：触发瞬间一次，{@value #SECOND_BURST_DELAY_TICKS} 刻后（≈0.4 秒）
+     *       再一次 —— 原有迸发粒子（图腾 30 + 灵魂 30）保留不动，这里只是额外叠加；</li>
+     *   <li><b>翻滚菱形</b>：每 {@value #FX_PERIOD_TICKS} 刻（0.5 秒）闪烁一次 —— 一个大黑色菱形 +
+     *       一个**反向翻滚**的小灰色菱形（见 {@link #spawnRollingDiamonds}）。</li>
+     * </ol>
+     * 两个任务都挂在计时组件资源表上，由 {@link #cancelParticleTasks()} 统一取消。
+     */
+    private void startPunishmentParticleTasks() {
+        Player owner = svc().self().player();
+        if (owner == null) {
+            return;
+        }
+        //第一次爆炸：触发瞬间
+        totemBurst(owner.getWorld(), owner.getLocation());
+        //第二次爆炸：0.4 秒后（两次读得出来是"两下"）
+        punishmentSecondBurstTask = timer.addScheduleLater(this, (long) SECOND_BURST_DELAY_TICKS, () -> {
+            if (!inSanTEPunishment) return;
+            Player now = svc().self().player();
+            if (now == null || !now.isOnline() || now.isDead()) return;
+            totemBurst(now.getWorld(), now.getLocation());
+        });
+        //翻滚菱形：每 0.5 秒闪烁一次
+        int[] frame = {0};
+        punishmentFxTask = timer.addScheduleRepeating(this, 0L, FX_PERIOD_TICKS, () -> {
+            if (!inSanTEPunishment) {
+                cancelParticleTasks();
+                return;
+            }
+            Player now = svc().self().player();
+            if (now == null || !now.isOnline() || now.isDead()) {
+                cancelParticleTasks();
+                return;
+            }
+            frame[0]++;
+            spawnRollingDiamonds(now, frame[0]);
+        });
+    }
+
+    /** 取消惩罚表现任务（幂等；惩罚结束 / 中止 / 被新惩罚顶替时都走这里）。 */
+    private void cancelParticleTasks() {
+        if (punishmentFxTask != null) {
+            punishmentFxTask.cancel();
+            punishmentFxTask = null;
+        }
+        if (punishmentSecondBurstTask != null) {
+            punishmentSecondBurstTask.cancel();
+            punishmentSecondBurstTask = null;
+        }
+    }
+
+    /** 一次不死图腾粒子爆炸（两层：外圈扩散 + 内圈高密；TOTEM 为主、END_ROD 拉丝）。 */
+    private static void totemBurst(World world, Location at) {
+        if (world == null || at == null) {
+            return;
+        }
+        Location center = at.clone().add(0d, 1.0d, 0d);
+        world.spawnParticle(Particle.TOTEM_OF_UNDYING, center, 80, 0.9d, 1.0d, 0.9d, 0.08d);
+        world.spawnParticle(Particle.TOTEM_OF_UNDYING, center, 40, 0.35d, 0.5d, 0.35d, 0.02d);
+        world.spawnParticle(Particle.END_ROD, center, 16, 1.2d, 1.2d, 1.2d, 0.05d);
+    }
+
+    /**
+     * 一对**反向翻滚**的菱形（每 0.5 秒闪一次）：
+     * <ul>
+     *   <li>大黑色菱形：半径 1.65、粒子尺寸 2.2，正向翻滚；</li>
+     *   <li>小灰色菱形：半径 0.85、粒子尺寸 0.95，**反方向**翻滚（{@link #smallDiamondSpin} 取负）。</li>
+     * </ul>
+     */
+    private static void spawnRollingDiamonds(Player player, int frame) {
+        if (player == null) {
+            return;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            return;
+        }
+        Location center = player.getLocation().add(0d, 1.15d, 0d);
+        spawnDiamond(world, center, 1.65d, 2.2f, Color.fromRGB(18, 18, 18),
+                bigDiamondSpin(frame), 0.35d, 6);
+        spawnDiamond(world, center.clone().add(0d, 0.1d, 0d), 0.85d, 0.95f, Color.fromRGB(150, 150, 150),
+                smallDiamondSpin(frame), -0.35d, 4);
+    }
+
+    /**
+     * 画一个菱形：四个顶点沿边采样，先绕 Y 轴旋转 {@code spin}（翻滚），再绕 X 轴倾斜 {@code tilt}，
+     * 最后以 DUST 逐点画出。
+     */
+    private static void spawnDiamond(World world, Location center, double radius, float size, Color color,
+                                     double spin, double tilt, int edgePoints) {
+        Particle.DustOptions dust = new Particle.DustOptions(color, size);
+        double cosSpin = Math.cos(spin);
+        double sinSpin = Math.sin(spin);
+        double cosTilt = Math.cos(tilt);
+        double sinTilt = Math.sin(tilt);
+        for (int edge = 0; edge < 4; edge++) {
+            Vector from = diamondVertex(edge, radius);
+            Vector to = diamondVertex((edge + 1) % 4, radius);
+            for (int i = 0; i < edgePoints; i++) {
+                double t = i / (double) edgePoints;
+                Vector point = from.clone().multiply(1d - t).add(to.clone().multiply(t));
+                //绕 Y 翻滚
+                double x = point.getX() * cosSpin - point.getZ() * sinSpin;
+                double z = point.getX() * sinSpin + point.getZ() * cosSpin;
+                //绕 X 倾斜
+                double y = point.getY() * cosTilt - z * sinTilt;
+                double z2 = point.getY() * sinTilt + z * cosTilt;
+                world.spawnParticle(Particle.DUST, center.clone().add(x, y, z2), 1, 0d, 0d, 0d, 0d, dust);
+            }
+        }
+    }
+
+    /** 菱形的四个顶点（上 / 右 / 下 / 左）；{@code index} 越界按左处理。 */
+    static Vector diamondVertex(int index, double radius) {
+        return switch (index) {
+            case 0 -> new Vector(0d, radius, 0d);
+            case 1 -> new Vector(radius, 0d, 0d);
+            case 2 -> new Vector(0d, -radius, 0d);
+            default -> new Vector(-radius, 0d, 0d);
+        };
+    }
+
+    /** 大黑色菱形的翻滚角（帧 → 弧度）：正向。 */
+    static double bigDiamondSpin(int frame) {
+        return frame * 0.30d;
+    }
+
+    /** 小灰色菱形的翻滚角：负向 ⇒ 与大菱形**反向**（需求）。 */
+    static double smallDiamondSpin(int frame) {
+        return -frame * 0.45d;
+    }
+
+    //取消仍在运行的惩罚任务/回满任务/表现任务并复位句柄（所有句柄都属本组件资源表）
     private void cancelPunishmentTask(){
         if(punishmentTask != null){
             punishmentTask.cancel();
@@ -277,6 +489,7 @@ public class DefaultSanTEZeroPunishment extends PassiveSkill {
             punishmentRestoreTask.cancel();
             punishmentRestoreTask = null;
         }
+        cancelParticleTasks();
     }
 
     /**

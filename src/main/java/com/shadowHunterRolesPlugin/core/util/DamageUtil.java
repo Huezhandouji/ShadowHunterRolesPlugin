@@ -5,6 +5,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
@@ -86,13 +88,8 @@ public class DamageUtil {
         if(victim == null || victim.isDead()) return;
 
  //在pdc中记录最后伤害者
-        if(damager != null && victim instanceof Player) {
-            victim.getPersistentDataContainer().set(
-                    DamageUtil.LAST_DAMAGER_KEY,
-                    PersistentDataType.STRING,
-                    damager.getUniqueId().toString()
-            );
-        }
+        writeLastDamager(victim, damager);
+
  //造成伤害，绕过被玩家伤害事件
         victim.setNoDamageTicks(0);
         victim.damage(amount);
@@ -104,6 +101,96 @@ public class DamageUtil {
         if(damager == null) return;
         applyKnockback(victim, damager.getLocation(), knockbackStrength);
 
+    }
+
+ //爆炸伤害（2026-10-31 新增）
+    /**
+     * 爆炸伤害：走原版 {@code minecraft:explosion} 伤害类型。
+     * <p>与 {@link #dealtPhysicalDamage} 的差别只有伤害类型通道：护甲与**爆炸保护**按原版标签减伤，
+     * 死亡信息也是爆炸那一条；PDC「最后伤害者」与清无敌帧的口径完全一致。
+     */
+    public static void dealtExplosionDamage(LivingEntity victim, LivingEntity damager, double amount){
+        applyTypedDamage(victim, damager, amount, explosionSource(damager));
+    }
+ //带有击退的重载
+    public static void dealtExplosionDamage(LivingEntity victim, LivingEntity damager, double amount, double knockbackStrength){
+        if(victim == null || victim.isDead()) return;
+        dealtExplosionDamage(victim, damager, amount);
+        if(damager == null) return;
+        applyKnockback(victim, damager.getLocation(), knockbackStrength);
+    }
+
+ //弹射物伤害（2026-10-31 新增）
+    /**
+     * 弹射物伤害：走原版 {@code minecraft:arrow} 伤害类型。
+     * <p>与 {@link #dealtPhysicalDamage} 的差别只有伤害类型通道：护甲与**弹射物保护**按原版标签减伤，
+     * 死亡信息也是弹射物那一条；PDC「最后伤害者」与清无敌帧的口径完全一致。
+     */
+    public static void dealtProjectileDamage(LivingEntity victim, LivingEntity damager, double amount){
+        applyTypedDamage(victim, damager, amount, projectileSource(damager));
+    }
+ //带有击退的重载
+    public static void dealtProjectileDamage(LivingEntity victim, LivingEntity damager, double amount, double knockbackStrength){
+        if(victim == null || victim.isDead()) return;
+        dealtProjectileDamage(victim, damager, amount);
+        if(damager == null) return;
+        applyKnockback(victim, damager.getLocation(), knockbackStrength);
+    }
+
+    /** 在 PDC 中记录最后伤害者（物理 / 爆炸 / 弹射物三条路径共用同一口径）。 */
+    private static void writeLastDamager(LivingEntity victim, LivingEntity damager){
+        if(victim == null || damager == null || !(victim instanceof Player)) return;
+        victim.getPersistentDataContainer().set(
+                DamageUtil.LAST_DAMAGER_KEY,
+                PersistentDataType.STRING,
+                damager.getUniqueId().toString()
+        );
+    }
+
+    /**
+     * 按**指定伤害类型**结算：除伤害类型通道外，与物理伤害逐字同规
+     * （PDC 记账 → 清无敌帧 → {@code victim.damage(amount, source)}）。
+     * <p>为什么不用 {@code victim.damage(amount, damager)}：那个重载的原版伤害类型是通用攻击，
+     * 保护附魔的伤害标签对不上；这里要的是"爆炸 / 弹射物"这两条原版伤害类型。
+     */
+    private static void applyTypedDamage(LivingEntity victim, LivingEntity damager, double amount,
+                                         DamageSource source){
+        if(victim == null || victim.isDead()) return;
+        writeLastDamager(victim, damager);
+        victim.setNoDamageTicks(0);
+        victim.damage(amount, source);
+    }
+
+    /**
+     * 爆炸伤害类型：{@code minecraft:explosion} + 施加者。
+     * <p><b>★ causingEntity 与 directEntity 必须成对设置</b>：Paper 的 {@code CraftDamageSourceBuilder#build()}
+     * 在"只给 causing、没给 direct"时直接抛 {@code IllegalArgumentException
+     * ("Direct entity must be set if causing entity is set")}（已按 server jar 字节码核对，2026-10-31）。
+     * 本入口没有"是哪一次爆炸"这个入参 ⇒ 两个位置都填施加者。
+     * <p>不带 {@code damageLocation}：本入口是"结算一次声明好的爆炸伤害"，不是"复制一次真实爆炸"；
+     * 位置缺省不影响爆炸保护的标签减伤。
+     */
+    private static DamageSource explosionSource(LivingEntity damager){
+        DamageSource.Builder builder = DamageSource.builder(DamageType.EXPLOSION);
+        if(damager != null){
+            builder.withCausingEntity(damager);
+            builder.withDirectEntity(damager);
+        }
+        return builder.build();
+    }
+
+    /**
+     * 弹射物伤害类型：{@code minecraft:arrow} + 施加者。
+     * <p>同上：Paper 要求 causing / direct 成对，本入口没有"是哪一支弹射物"入参 ⇒ 两个位置都填施加者
+     * （标签减伤只看伤害类型，不受影响；真实弹射物归属由调用方另行处理）。
+     */
+    private static DamageSource projectileSource(LivingEntity damager){
+        DamageSource.Builder builder = DamageSource.builder(DamageType.ARROW);
+        if(damager != null){
+            builder.withCausingEntity(damager);
+            builder.withDirectEntity(damager);
+        }
+        return builder.build();
     }
 
     public static void applyKnockback(LivingEntity target, Location source, double strength){

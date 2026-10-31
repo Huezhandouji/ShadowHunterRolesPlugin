@@ -5,9 +5,13 @@ import com.shadowHunterRolesPlugin.platform.KeyFactory;
 import com.shadowHunterRolesPlugin.roleComponent.ActiveComponent.AttackSignal;
 import com.shadowHunterRolesPlugin.roleComponent.base.MainWeapon;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.BuffComponent;
+import com.shadowHunterRolesPlugin.roleComponent.builtin.HotbarRenderComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -36,6 +40,9 @@ import java.util.Random;
  * </ol>
  *
  * <h2>★ 口径申报：标记由"这一击"消费，顺序是先消费后结算</h2>
+ * <p>物品名字色随标记状态切换（2026-10-31 用户需求）：**场上没有**被标记的敌人 ⇒ 灰色 + 倾斜；
+ * **有** ⇒ 亮紫 + 正体（不倾斜）。名字在 {@link #buildItem()} 里按 {@link HunterPreyPassive#markedCount()}
+ * 动态着色，{@link #update()} 只在状态变化时请求一次重绘。
  * {@link HunterPreyPassive#consumeMark(UUID)} 是"取走并移除"语义（同一个标记只会被消费一次）。
  * 本类在**结算额外伤害之前**先取走标记，因此：
  * 同一 tick 内的第二次命中（例如范围伤害的其它来源）拿到的就是"没有标记"的结果 ——
@@ -51,7 +58,8 @@ import java.util.Random;
  * </ol>
  *
  * <h2>★ 口径申报：灵魂伤害取 TRUE（真伤）</h2>
- * 插件 {@code DamageKind} 只有 {@code PHYSICAL} / {@code TRUE}，**没有"灵魂"这一类型**
+ * 插件 {@code DamageKind} **没有"灵魂"这一类型**（现有四种
+ * {@code PHYSICAL} / {@code TRUE} / {@code EXPLOSION} / {@code PROJECTILE} 都不表达灵魂）
  * ⇒ "额外 10 点灵魂伤害"按"无视护甲的伤害"取 {@code TRUE}，与工程既有口径一致
  * （先例：罪棘的"魔法伤害"同样取 {@code TRUE}）。数值常量在
  * {@link HunterPreyPassive#SOUL_BONUS_DAMAGE}。
@@ -88,6 +96,9 @@ public class HunterGrudgeMainWeapon extends MainWeapon {
     private static final NamespacedKey ATTACK_SPEED_KEY =
             KeyFactory.Registry.of("hunter_grudge_attack_speed");
 
+    /** **有**标记猎物时的名字色（亮紫 #FF55FF，与猎手护甲同名色）。 */
+    private static final TextColor MARKED_NAME_COLOR = TextColor.color(0xFF55FF);
+
     /** 物理伤害下限（含）—— 需求原话"6到10点随机整数物理伤害"。 */
     public static final int PHYSICAL_DAMAGE_MIN = 6;
 
@@ -109,6 +120,12 @@ public class HunterGrudgeMainWeapon extends MainWeapon {
     private HunterPreyPassive prey;
     private HunterEvolutionPassive evolution;
     private HunterStealthSkill stealth;
+
+    /** 渲染组件：只用来在"标记状态变化"时请求重绘（名字色依赖它）。 */
+    private HotbarRenderComponent render;
+
+    /** 上一刻"场上是否有被标记的敌人"（用于检测边沿，避免每刻都请求重绘）。 */
+    private boolean lastMarkedState;
 
     /** 随机源（只影响伤害数值，不参与任何判定；每个实例一份，避免共用一个全局 Random）。 */
     private final Random random = new Random();
@@ -164,6 +181,8 @@ public class HunterGrudgeMainWeapon extends MainWeapon {
         prey = svc().components().get(HunterPreyPassive.class);
         evolution = svc().components().get(HunterEvolutionPassive.class);
         stealth = svc().components().get(HunterStealthSkill.class);
+        render = getComponent(HotbarRenderComponent.class);
+        lastMarkedState = hasMarkedPrey();
     }
 
     /** 停止生效：与 {@link #start()} 严格对称。 */
@@ -175,6 +194,30 @@ public class HunterGrudgeMainWeapon extends MainWeapon {
         prey = null;
         evolution = null;
         stealth = null;
+        render = null;
+        lastMarkedState = false;
+    }
+
+    /**
+     * 每刻只做一件事：**标记状态变化时请求重绘**。
+     * <p>主武器名字色依赖"场上是否有被标记的敌人"（见 {@link #applyMarkNameStyle}），
+     * 而框架只在冷却中逐刻重绘 ⇒ 标记出现/消失后必须自己请求一次，
+     * 否则名字会停在旧状态（这正是"名字不跟着变"的典型症状）。
+     */
+    @Override
+    public void update() {
+        boolean marked = hasMarkedPrey();
+        if (marked != lastMarkedState) {
+            lastMarkedState = marked;
+            if (render != null) {
+                render.requestRepaint();
+            }
+        }
+    }
+
+    /** 场上是否有被标记的敌人（真值住在 {@link HunterPreyPassive}，这里只读它的读口）。 */
+    private boolean hasMarkedPrey() {
+        return prey != null && prey.markedCount() > 0;
     }
 
     // ───────── 攻击 ─────────
@@ -281,8 +324,27 @@ public class HunterGrudgeMainWeapon extends MainWeapon {
             return stack;
         }
         applyAttackSpeed(meta);
+        applyMarkNameStyle(meta);
         stack.setItemMeta(meta);
         return stack;
+    }
+
+    /**
+     * **名字色随"场上是否有被标记的敌人"切换**（2026-10-31 用户需求）：
+     * 没有标记 ⇒ **灰色 + 倾斜**；有标记 ⇒ **亮紫 + 正体（不倾斜）**。
+     * <p>只改颜色与斜体，保留基类给的名字（含状态后缀）；基类识别键在 {@code super.buildItem()}
+     * 那一步已经写入，这里再改 meta 不会丢键。
+     * <p>何时重绘：见 {@link #update()}（只在状态变化时请求一次）。
+     */
+    private void applyMarkNameStyle(ItemMeta meta) {
+        Component base = meta.displayName() != null ? meta.displayName() : getDisplayName();
+        if (base == null) {
+            return;
+        }
+        boolean marked = hasMarkedPrey();
+        meta.displayName(base
+                .color(marked ? MARKED_NAME_COLOR : NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, !marked));
     }
 
     /**

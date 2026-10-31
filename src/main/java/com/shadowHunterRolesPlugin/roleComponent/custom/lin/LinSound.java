@@ -57,14 +57,41 @@ public final class LinSound {
      * **三重打击释放音：信标生成声**（需求 2026-10-08："释放时音效是信标生成时的声音"）。
      *
      * <p>取 {@code BLOCK_BEACON_ACTIVATE} —— 原版信标激活/生成时的那记上扬和声。
+     * <p>2026-10-31 需求："稍微加大一点…让它更明显、更惊艳" ⇒ 主音音量 **0.9 → 1.0**，
+     * 并叠两层同色上扬音：导管激活（次中音）+ 紫晶钟（高音）。三音同时响成和弦，
+     * 既保留"信标生成"的原需求音色，又让释放瞬间更厚、更抓耳。
      */
     public static void tripleStrikeCastSound(World world, Location at) {
-        play(world, at, Sound.BLOCK_BEACON_ACTIVATE, 0.9f, 1f);
+        play(world, at, Sound.BLOCK_BEACON_ACTIVATE, 1.0f, 1f);
+        play(world, at, Sound.BLOCK_CONDUIT_ACTIVATE, 0.6f, 1.25f);
+        play(world, at, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.5f, 1.6f);
     }
 
-    /** **TNT 爆炸音效**（需求："TNT爆炸音效"；用于"每一次强化攻击命中"）。 */
+    /**
+     * **TNT 爆炸音效**（需求："TNT爆炸音效"；用于"每一次强化攻击命中"）。
+     *
+     * <p>2026-10-31 需求："稍微加大一点…更明显、更惊艳" ⇒ TNT 主音 **0.8 → 1.0**，
+     * 另叠一记暴击的金属脆响（次中音）与紫晶碎裂（高音）：
+     * 爆炸负责"重"，脆响负责"准"，紫晶负责"贵"，三层才像一次被强化过的打击。
+     */
     public static void tripleStrikeExplosionSound(World world, Location at) {
-        play(world, at, Sound.ENTITY_GENERIC_EXPLODE, 0.8f, 1.2f);
+        play(world, at, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.2f);
+        play(world, at, Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.7f, 1.45f);
+        play(world, at, Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.55f, 1.6f);
+    }
+
+    /**
+     * **第三层（最后一击）的收尾重音**（2026-10-31 新增："更惊艳"的仪式感）。
+     *
+     * <p>与普通命中同一颗 TNT 主音，再补"雷 + 钟 + 高音晶鸣"三件：雷声给爆发，
+     * 钟声给收束，高音紫晶把余韵拉到空中。三层强化打完时响一次即可，
+     * 由组件按"消费后层数归零"判定，不额外占用调度。
+     */
+    public static void tripleStrikeFinisherSound(World world, Location at) {
+        tripleStrikeExplosionSound(world, at);
+        play(world, at, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.45f, 1.35f);
+        play(world, at, Sound.BLOCK_BELL_RESONATE, 0.55f, 1.15f);
+        play(world, at, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.5f, 2.0f);
     }
 
     // ───────── ⑤ 影袭 ─────────

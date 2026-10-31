@@ -7,6 +7,14 @@ import net.kyori.adventure.text.Component;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.SanTEComponent;
 import java.util.List;
 
+/**
+ * ★ <b>历史组件（2026-10-31 起不再注册）</b>：旧的"无敌人才回 SanTE/生命"被动。
+ *
+ * <p>它已被 {@link CombatStateComponent} 取代（战斗状态 6 秒脱战 + 按阵营每秒恢复 + 回血间隔期）：
+ * {@code RoleLoader#withBuiltIns} 不再注册本组件。类本身保留，供既有单测
+ * （{@code CapabilityDispatchTest} / {@code AssemblyValidationTest} / {@code RegistrationOrderTest}）
+ * 继续构造与引用；<b>不要</b>再把它加回内建段（会与 {@code combatState} 的脱战恢复双重回血）。
+ */
 public class AutoRecoverSanTEHealthPassive extends PassiveSkill {
 
     /** 本组件的登记 id（知识归属：组件自己 —— 谁是什么 id 由谁说了算）。 */

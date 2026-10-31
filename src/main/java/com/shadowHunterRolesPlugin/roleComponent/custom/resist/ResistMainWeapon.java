@@ -32,7 +32,7 @@ import java.util.Random;
  *
  * <h2>左键命中</h2>
  * <ol>
- *   <li>主目标**击退 3**（走 {@code DamageUtil} 的击退重载，强度 3）；</li>
+ *   <li>主目标**击退 1**（走 {@code DamageUtil} 的击退重载，强度 1）；</li>
  *   <li>随机一种剑气（月牙 / 爆裂 / 螺旋），白灰为主、紫色点缀；</li>
  *   <li>TNT 爆炸音效；</li>
  *   <li>以**目标为心 r=5** 的所有敌人：10 点物理 + 3~6 点特殊值（TE）伤害；</li>
@@ -57,8 +57,8 @@ public class ResistMainWeapon extends MainWeapon {
     /** 范围伤害半径（需求 r=5）。 */
     public static final double AOE_RADIUS = 5.0d;
 
-    /** 主目标击退强度（需求：击退 3）。 */
-    public static final double KNOCKBACK_STRENGTH = 3.0d;
+    /** 主目标击退强度（2026-10-31 用户裁定：1）。 */
+    public static final double KNOCKBACK_STRENGTH = 1.0d;
 
     /** 三种剑气的下标（需求：差异明显）。 */
     public static final int VARIANT_CRESCENT = 0;   //月牙横斩
@@ -98,7 +98,7 @@ public class ResistMainWeapon extends MainWeapon {
         public Specification() {
             super(Component.text(WEAPON_NAME, NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD),
                     List.of(
-                            Component.text("左键：击退 3，随机释放「月牙横斩 / 爆裂直刺 / 裂地砸落」三种剑气（TNT 音效）"),
+                            Component.text("左键：击退 1，随机释放「月牙横斩 / 爆裂直刺 / 裂地砸落」三种剑气（TNT 音效）"),
                             Component.text("裂地砸落额外附带巨剑竖直砸落；以目标为心 5 格内所有敌人：10 物理 + 3~6 特殊值"),
                             Component.text("每次命中使战斗时间 +1 秒；攻击 CD 0.6 秒"),
                             Component.text("-----宁作死亡的武器")
@@ -182,7 +182,7 @@ public class ResistMainWeapon extends MainWeapon {
         //★ 2026-10-18 需求 4：同步走框架冷却，热键栏才会渲染出"CD 结构空位"（STRUCTURE_VOID）
         startCooldown(ATTACK_COOLDOWN_TICKS);
 
-        //① 主目标：物理 + 击退 3 + 特殊值
+        //① 主目标：物理 + 击退 1 + 特殊值
         double physical = passive != null ? passive.swordQiPhysical() : ResistStrugglePassive.SWORD_QI_PHYSICAL;
         int variant = random.nextInt(3);
         if (vitals != null) {

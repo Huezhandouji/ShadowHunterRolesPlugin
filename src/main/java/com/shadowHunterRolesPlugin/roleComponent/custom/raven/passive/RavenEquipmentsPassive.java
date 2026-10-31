@@ -63,7 +63,7 @@ import java.util.List;
  * 而本类只在 {@code start()} 里造**全新的物品**，本来就不存在"重复叠加"的风险。
  *
  * <h2>★★ 口径申报三：常驻速度 2 的落地方式</h2>
- * 与 {@code RemotenessStartEndPassive}（"始末"）同口径：原版在**死亡 / 重生**时会清空身上全部药水，
+ * 与 {@code LetheStartEndPassive}（"始末"）同口径：原版在**死亡 / 重生**时会清空身上全部药水，
  * 因此"进场给一次"的写法会在第一次死亡后永久失效 ⇒ 用"短时长 + 每秒刷新"（时长 = 刷新间隔的 3 倍，
  * 留出卡帧余量）。走 {@link BuffComponent} 而不是直接 {@code addPotionEffect}
  * ⇒ 角色清除时由 buff 组件自己的账本一并回收，本类**不需要**在 {@code stop()} 里摘药水。

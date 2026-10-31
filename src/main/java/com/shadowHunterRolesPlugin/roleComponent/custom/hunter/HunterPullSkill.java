@@ -166,6 +166,19 @@ public class HunterPullSkill extends Skill {
     /** 认为"已经拉到锚点"的距离（格）。 */
     private static final double PULL_ARRIVE_DISTANCE = 1.0d;
 
+    /**
+     * **蓄力粒子中心沿朝向前移的距离**（格）—— 2026-10-31 第二轮需求"减少视线遮挡"：
+     * 中心从眼睛移到胸前偏下、再前移这一段，环面侧立，准星区域不被覆盖。
+     */
+    private static final double CHANNEL_CENTER_FORWARD = 0.65d;
+
+    /**
+     * **蓄力粒子中心的高度**（相对脚底，格）—— 2026-10-31 第三轮需求"下移一下"：
+     * 由胸口中部（1.0）下移到腰/手持弩附近（{@value #CHANNEL_CENTER_HEIGHT}），
+     * 让吸入环整体压在画面下半，进一步让开准星。
+     */
+    private static final double CHANNEL_CENTER_HEIGHT = 0.8d;
+
     /** 拉回的时长上限（刻）—— **2.5 秒**（需求原话"最多只能拉着敌人2.5S"；50 刻）。 */
     public static final int PULL_MAX_TICKS = 50;
 
@@ -321,6 +334,8 @@ public class HunterPullSkill extends Skill {
         World world = owner.getWorld();
         if (world != null) {
             HunterSound.crossbowLoadHunterPullChannelSound(world, owner.getLocation());
+            //蓄力汇聚（2026-10-31 增强；第二轮：白点外移成"吸入"、避开视线、配色偏紫+黑）
+            HunterVfx.channelGatherHunterPullChannel(world, pullChannelCenter(owner), horizontalAxis(owner), 0);
         }
     }
 
@@ -349,12 +364,25 @@ public class HunterPullSkill extends Skill {
 
         switch (phase) {
             case CHANNEL -> {
+                //蓄力汇聚逐刻推进（2026-10-31 增强）：外圈 1.10 → 0.65 收束成"吸入"；中心在胸前偏下、避开准星
+                World channelWorld = owner.getWorld();
+                if (channelWorld != null) {
+                    HunterVfx.channelGatherHunterPullChannel(channelWorld, pullChannelCenter(owner),
+                            horizontalAxis(owner), CHANNEL_TICKS - channelLeft);
+                }
                 channelLeft--;
                 if (channelLeft <= 0) {
                     resolveThrust(owner);
                 }
             }
             case DELAY -> {
+                //0.8 秒锁链蓄势（2026-10-31 增强）：暗紫虚线 + 目标身上收缩锁环，把倒计时画出来
+                Player delayed = pullTarget();
+                World delayWorld = owner.getWorld();
+                if (delayed != null && delayWorld != null) {
+                    HunterVfx.delayLockHunterPullDelay(delayWorld,
+                            delayed.getLocation().clone().add(0d, 1.0d, 0d), pullAnchor(owner), delayLeft);
+                }
                 delayLeft--;
                 if (delayLeft <= 0) {
                     beginPull();
@@ -415,6 +443,9 @@ public class HunterPullSkill extends Skill {
             //命中者身上：暴击粒子 + 单个爆炸粒子 + 紫色菱形边框
             HunterVfx.critBurstHunterPullHit(world, chest);
             HunterVfx.purpleDiamondHunterPullHit(world, target.getLocation());
+            //命中冲击扇（2026-10-31 增强）：沿"目标 → 施法者"方向炸开 8 道放射线
+            Vector pullDirection = owner.getLocation().toVector().subtract(target.getLocation().toVector());
+            HunterVfx.impactFanHunterPullHit(world, chest, pullDirection);
             //"命中敌人后也加个命中音效"
             HunterSound.tridentHitHunterPullImpactSound(world, chest);
         }
@@ -507,6 +538,14 @@ public class HunterPullSkill extends Skill {
         phase = Phase.PULL;
         pullLeft = PULL_MAX_TICKS;
         expected = target.getLocation().clone();
+
+        //起拉瞬间（2026-10-31 增强）：锁链从暗紫虚线变亮紫实链 + 目标胸口爆点，给"抓住了"一个重音
+        Player owner = svc().self().player();
+        World world = target.getWorld();
+        if (owner != null && world != null) {
+            HunterVfx.gripBurstHunterPullBegin(world,
+                    target.getLocation().clone().add(0d, 1.0d, 0d), pullAnchor(owner));
+        }
     }
 
     /**
@@ -529,6 +568,10 @@ public class HunterPullSkill extends Skill {
                 expected.getX(), expected.getY(), expected.getZ(),
                 actual.getX(), actual.getY(), actual.getZ(),
                 ESCAPE_DISTANCE)) {
+            //脱离观感（2026-10-31 增强）：轻量紫雾 + 散开的链环（不画重爆点，避免误读成"拉到了"）
+            if (actual.getWorld() != null) {
+                HunterVfx.escapePuffHunterPullEscape(actual.getWorld(), actual.clone().add(0d, 1.0d, 0d));
+            }
             finishPullCycle();
             return;
         }
@@ -538,8 +581,13 @@ public class HunterPullSkill extends Skill {
 
         //③ 已到锚点 ⇒ 正常收工（"只有敌人到位后才进入 CD"）
         if (actual.getWorld() == null || anchor.getWorld() == null
-                || !actual.getWorld().equals(anchor.getWorld())
-                || actual.distance(anchor) <= PULL_ARRIVE_DISTANCE) {
+                || !actual.getWorld().equals(anchor.getWorld())) {
+            finishPullCycle();
+            return;
+        }
+        if (actual.distance(anchor) <= PULL_ARRIVE_DISTANCE) {
+            //到位收尾（2026-10-31 增强）：双环 + 单发爆炸 + 上冲魂柱 + 火星
+            HunterVfx.arriveBurstHunterPullImpact(actual.getWorld(), actual);
             finishPullCycle();
             return;
         }
@@ -590,6 +638,10 @@ public class HunterPullSkill extends Skill {
         World world = owner.getWorld();
         if (world != null) {
             HunterSound.riptideHunterPullAccelerateSound(world, owner.getLocation());
+            //加速观感（2026-10-31 增强）：脚下青环 + 一道更亮的收紧链，"猛扯一下"看得见
+            Player target = pullTarget();
+            HunterVfx.accelerateBurstHunterPullSprint(world, owner.getLocation(),
+                    target == null ? null : target.getLocation().clone().add(0d, 1.0d, 0d));
         }
     }
 
@@ -647,6 +699,25 @@ public class HunterPullSkill extends Skill {
             return base.clone();
         }
         return base.clone().add(axis.clone().multiply(PULL_ANCHOR_DISTANCE));
+    }
+
+    /**
+     * **蓄力粒子的中心**：腰/手持弩高度（脚底 + {@value #CHANNEL_CENTER_HEIGHT} 格）+ 沿水平朝向前移
+     * {@value #CHANNEL_CENTER_FORWARD} 格。
+     *
+     * <p>为什么不用眼睛位置：2026-10-31 第二轮用户反馈"白色粒子挡视线"。眼睛位置放的环正好横在准星前，
+     * 任何半径都会盖住画面中心；移到腰前并前移一段后，环面侧立、整体压在画面下半，
+     * 准星区域基本不被覆盖（白色粒子再只放最外圈，遮挡进一步降低）。
+     * <p>第三轮再下移一次（1.0 → {@value #CHANNEL_CENTER_HEIGHT}）：原位置仍在胸口中部，
+     * 环的上缘会扫到准星下沿；下移到腰后吸入感更像"从腰侧把手拽回"，也更不挡视线。
+     */
+    private static Location pullChannelCenter(Player owner) {
+        Location base = owner.getLocation().add(0d, CHANNEL_CENTER_HEIGHT, 0d);
+        Vector axis = horizontalAxis(owner);
+        if (axis == null) {
+            return base;
+        }
+        return base.add(axis.clone().multiply(CHANNEL_CENTER_FORWARD));
     }
 
     /** 水平朝向单位向量；视线近垂直时退回身体朝向；都退化则回 {@code null}。 */

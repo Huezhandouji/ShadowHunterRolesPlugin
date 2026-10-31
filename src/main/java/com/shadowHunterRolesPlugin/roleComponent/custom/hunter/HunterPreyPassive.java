@@ -65,7 +65,8 @@ import java.util.UUID;
  * {@link #markNewTarget} 即可（一行）。
  *
  * <h2>★ 口径申报：灵魂伤害取 TRUE（真伤）</h2>
- * 插件 {@code DamageKind} 只有 {@code PHYSICAL} / {@code TRUE}，**没有"灵魂"这一类型**
+ * 插件 {@code DamageKind} **没有"灵魂"这一类型**（现有四种
+ * {@code PHYSICAL} / {@code TRUE} / {@code EXPLOSION} / {@code PROJECTILE} 都不表达灵魂）
  * ⇒ 需求里的"灵魂伤害"按"无视护甲的伤害"取 {@code TRUE}，与工程既有口径一致
  * （先例：罪棘的"魔法伤害"同样取 {@code TRUE}）。该类伤害由主武器侧结算，
  * 本类只声明常量 {@link #SOUL_BONUS_DAMAGE}。

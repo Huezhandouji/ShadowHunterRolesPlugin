@@ -44,9 +44,9 @@ import java.util.List;
  *   <li><b>{@link #identifyKey()} 覆写</b>：物品写**弓弩自己的键**而不是 {@code SKILL_KEY}。若不覆写，
  *       物品就带 {@code SKILL_KEY} ⇒ {@code SkillListener} 把它当技能卡 ⇒ **右键被它取消** ⇒
  *       弓永远拉不开 —— 正是本族存在的那个根因。键是"哪条输入管道认领这个物品"的判据，一族一键。</li>
- *   <li><b>{@link #onAttack(AttackSignal)} 封成 {@code final} 空实现</b>：本族的近战命中由 listener
- *       **直接拦截**（取消原版伤害，不派发任何入口）。不封的话，组件作者在弓弩里覆写 {@code onAttack}
- *       会**静默永不触发**（本族没有任何路径调它）；封死把"运行期惊喜"变成"编译错误"。</li>
+ *   <li><b>{@link #onAttack(AttackSignal)} 可覆写</b>（2026-10-31 放开）：弓弩的近战命中由 listener
+ *       **取消原版伤害**后派发本入口；默认空实现 ⇒ 未覆写的弓弩行为与放开前逐字一致。
+ *       （放开前的口径是 {@code final} 空实现 + 不派发；冷识「Lether」需要近战攻击，故放开。）</li>
  * </ol>
  *
  * <h2>入口对照（冻结口径）</h2>
@@ -58,7 +58,7 @@ import java.util.List;
  *   <tr><td>左键 · 挥空 / 挖方块</td><td>原版交互被取消 + {@code onCast(LEFT_CLICK)}</td>
  *       <td>原版交互被取消 + {@code onCast(LEFT_CLICK)}（<b>同规</b>）</td></tr>
  *   <tr><td>左键 · 打人（近战命中）</td><td>{@code onAttack(AttackSignal)}</td>
- *       <td><b>直接拦截</b>：取消原版伤害，不派发任何入口（{@link #onAttack(AttackSignal)} 已封死）</td></tr>
+ *       <td>取消原版伤害后派发 {@code onAttack(AttackSignal)}（默认空实现；受害者必须是玩家）</td></tr>
  *   <tr><td>Q 丢弃</td><td>{@code onCast(DROP)}（原版丢弃被取消）</td>
  *       <td>{@code onCast(DROP)}（<b>同规</b>，原版丢弃同样被取消）</td></tr>
  *   <tr><td><b>箭矢离弦</b></td><td>—（不存在这样的时刻）</td>
@@ -79,8 +79,8 @@ import java.util.List;
  *       {@link #onProjectileHit(ProjectileHitSignal)}（弓弩专属：箭矢命中那一刻）、
  *       {@link #identifyKey()} 覆写（弓弩物品的识别键）、
  *       {@link Utils#ARROW_OWNER_KEY}（箭矢归属键，由射击管道写入、命中管道读回）；</li>
- *   <li><b>本类封死</b>：{@link #currentEnergy()}（能量维度由类型封死 ≡ 0）与
- *       {@link #onAttack(AttackSignal)}（近战命中归 listener 直接拦截）。</li>
+ *   <li><b>本类封死</b>：{@link #currentEnergy()}（能量维度由类型封死 ≡ 0）。
+ *       （{@link #onAttack(AttackSignal)} 自 2026-10-31 起**可覆写**，不再是封死面。）</li>
  * </ul>
  *
  * <h2>能量维度（规则进类型，与主武器侧同一条做法）</h2>
@@ -229,17 +229,23 @@ public abstract class BowWeapon extends Skill {
     }
 
     /**
-     * **封印继承来的攻击入口**（本族的近战命中直接拦截）。
-     * <p>本族的近战命中（左键打人）由 {@code BowWeaponListener} **取消原版伤害后不派发任何入口** ——
-     * 弓弩物品不造成原版近战伤害，也不提供"近战伤害"这个扩展点（伤害该由射击那边给）。
-     * <p>为什么封成 {@code final} 空实现、而不是"留着不管"：留着的话，组件作者在弓弩里覆写本方法会
-     * **静默永不触发**（没有任何路径调它）。封死把"运行期惊喜"变成"编译错误"，与
-     * {@code ActiveComponent#awake()} 用 {@code final} 堵住"漏调 super"是同一条纪律。
-     * <p>为什么是空体而不是抛异常：本方法仍属 {@code ActiveComponent} 的通用面，若被误调，静默什么都不做
-     * **优于**让一次派发把组件打成故障隔离（故障隔离的语义是"组件坏了"，不是"调错了口"）。
+     * **弓弩的近战入口（默认空实现；2026-10-31 起可覆写）**
+     * <p>历史口径：近战命中由 {@code BowWeaponListener} 取消原版伤害后**不派发任何入口**
+     * （弓弩物品不造成原版近战伤害，"伤害该由射击那边给"）。2026-10-31 冷识需求要求其主武器
+     * 「Lether」具备近战攻击，因此 listener 在取消原版伤害后**派发本入口**；本类保持空实现
+     * ⇒ 没覆写的弓弩行为与放开前逐字一致。
+     *
+     * <p><b>覆写者须知</b>：
+     * <ol>
+     *   <li>原版伤害**已被 listener 取消**，因此本方法必须自己结算伤害（走 {@code VitalsComponent}）；</li>
+     *   <li>入口只在"受害者是玩家"时派发（与 {@code MainWeaponListener#onAttackPlayer} 同形）；</li>
+     *   <li>出手频率**不在管道侧限制**：要按武器攻速限制，请自己读
+     *       {@link Player#getAttackCooldown()}（1.0 = 满蓄力）；</li>
+     *   <li>受害者的受击无敌帧可能要自己清（{@code victim.setNoDamageTicks(0)}），否则连续命中会被吞。</li>
+     * </ol>
      */
     @Override
-    public final void onAttack(AttackSignal signal) {
+    public void onAttack(AttackSignal signal) {
     }
 
     /**

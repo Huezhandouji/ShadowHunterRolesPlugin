@@ -108,10 +108,13 @@ public class HeronMainWeapon extends MainWeapon {
             super(
                     Component.text("忧郁创痕-主武器"),
                     List.of(
-                            Component.text("攻击造成12特殊值伤害并夺取2能量，增加移速。如果'创伤'层数不小于4，将结算4层创伤"),
+                            //★ 备注必须与实际一致（2026-10-30 修）：
+                            //  每次攻击 = 3~7 特殊值伤害（SANTE_DAMAGE_MIN..MAX，拥影阵营再 -1）＋夺取 5 能量；
+                            //  4 层结算 = 额外 7 特殊值伤害（见 onAttack 的 passiveCasted 分支）。
+                            Component.text("攻击造成3~7特殊值伤害并夺取5能量，增加移速；对拥影阵营额外-1特殊值并回复自身5能量。如果'创伤'层数不小于4，将结算4层创伤"),
                             Component.text("=============================="),
                             Component.text("被动:"),
-                            Component.text("深度癔症: 每次攻击或使用技能叠加1层「创伤」,第4层时普通攻击造成额外4点灵魂伤害、获得4点不可叠加护盾并回复12点SAN值(最多24层)")
+                            Component.text("深度癔症: 普通攻击或左轮叠加1层「创伤」(湛蓝命运突进+2层)，第4层时普通攻击结算4层：额外5点灵魂伤害、7点特殊值伤害并回复自身4点生命；目标特殊值为0时再+5灵魂伤害(最多16层)")
                     ),
                     Material.DIAMOND_SWORD,
                     ATTACK_COOLDOWN_TICKS
@@ -243,8 +246,9 @@ public class HeronMainWeapon extends MainWeapon {
             vitals.trueDamage(signal.victim(), svc().self().player(), EXTRA_TURE_DAMAGE_AMOUNT);
             //强化普攻：额外 7 点特殊值伤害（打到目标身上）
             sante.decreaseSanTE(victimPid, 7);
-            //目标正处于特殊值惩罚（SanTE 被钉在 0）⇒ 额外 5 点真实伤害
-            if(sante.current() == 0){
+            //目标正处于特殊值惩罚（TE ≤ 惩罚阈值，默认 0）⇒ 额外 5 点真实伤害。
+            //★ 2026-10-30 起惩罚不再把 TE 钉在 0：惩罚期间 TE 可能为负，所以用 "≤ 阈值" 而不是 "== 0"
+            if(sante.current() <= sante.punishmentThreshold()){
                 vitals.trueDamage(signal.victim(), svc().self().player(), 5d);
             }
             vitals.heal(svc().self().player(), 4d);

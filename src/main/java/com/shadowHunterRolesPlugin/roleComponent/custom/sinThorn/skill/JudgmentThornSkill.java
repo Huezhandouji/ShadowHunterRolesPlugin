@@ -46,8 +46,9 @@ import java.util.List;
  * <p>缓慢 / 抗性走 {@code BuffComponent}（自己身上的效果由账本统一管，角色清除时一并回收）；
  * 敌人身上的粒子是纯装饰，不涉及账本。
  *
- * <p>伤害类型口径（如实申报）：插件只有 {@code DamageKind.PHYSICAL}（走护甲）与
- * {@code TRUE}（无视护甲，工程内叫"真伤"）两种，没有"魔法伤害"这一类型。
+ * <p>伤害类型口径（如实申报）：插件现有四种 {@code DamageKind}
+ * （{@code PHYSICAL} 走护甲 / {@code TRUE} 无视护甲，工程内叫"真伤" /
+ * {@code EXPLOSION} 爆炸 / {@code PROJECTILE} 弹射物），**没有"魔法伤害"这一类型**。
  * 这里按"魔法伤害 = 无视护甲"取 {@code TRUE} 作为最接近的既有原语；若日后工程补了魔法类型，本处应改回。
  */
 public class JudgmentThornSkill extends Skill {

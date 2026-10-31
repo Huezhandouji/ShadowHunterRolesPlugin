@@ -316,8 +316,8 @@ public class DebugSchedCommand implements SubCommand {
         RoleInstance portInstance = null;
         if(roleManager.hasRole(player)){
             portInstance = roleManager.getRoleInstance(player);
-            String[] candidates = {"autoRecoverEnergy_passive", "autoRecoverSanTEPassive", "default_san_te_zero_punishment",
-                    "meiqihezi_mainWeapon_juejue", "meiqihezi_equippments_passive", "red_equippments_passive"};
+            String[] candidates = {"autoRecoverEnergy_passive", "combatState", "autoRecoverSanTEPassive", "default_san_te_zero_punishment",
+                    "mikomako_mainWeapon_juejue", "mikomako_equippments_passive", "red_equippments_passive"};
             if(portInstance != null){
                 for(String candidate : candidates){
                     if(portInstance.servicesOf(candidate) != null){

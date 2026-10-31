@@ -232,8 +232,13 @@ public class LinTripleStrikeSkill extends Skill {
             sante.decreaseSanTE(victim.getUniqueId(), BONUS_SANTE_DAMAGE);
         }
         // ④ 观感：暴击粒子 + TNT 爆炸音效（2026-10-08：白色爆炸粒子已改为暴击粒子）
+        //    2026-10-31：音量上调并叠层；最后一层（消费后归零）改用带雷/钟/晶鸣的收尾重音
         LinVfx.tripleStrikeBurst(victim.getWorld(), victim.getLocation().clone().add(0d, 1d, 0d));
-        LinSound.tripleStrikeExplosionSound(victim.getWorld(), victim.getLocation());
+        if (stacks == 0) {
+            LinSound.tripleStrikeFinisherSound(victim.getWorld(), victim.getLocation());
+        } else {
+            LinSound.tripleStrikeExplosionSound(victim.getWorld(), victim.getLocation());
+        }
 
         if (render != null) {
             render.requestRepaint();

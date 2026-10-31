@@ -46,7 +46,7 @@ description: 在 ShadowHunterRolesPlugin 里**只做角色、不碰框架**地�
 ### 允许新增 / 修改（**只有这些** ✓）
 | 路径 | 说明 |
 |---|---|
-| `src/main/java/com/shadowHunterRolesPlugin/roleComponent/custom/<角色名>/…` | **你的全部新代码**（建议子包：`skill/` · `passive/` · `mainWeapon/` ✓ —— 照 `custom/red/` 与 `custom/meiqiHezi/` 的既有布局 ✓） |
+| `src/main/java/com/shadowHunterRolesPlugin/roleComponent/custom/<角色名>/…` | **你的全部新代码**（建议子包：`skill/` · `passive/` · `mainWeapon/` ✓ —— 照 `custom/red/` 与 `custom/Mikomako/` 的既有布局 ✓） |
 | `../../../../src/main/java/com/shadowHunterRolesPlugin/registry/RoleLoader.java` | **唯一允许碰的框架文件** ✓，且**只允许**：① 加一行 `private static final String ID_… = "…";` ② 加一行 `new Definition("<id>", RoleLoader::<id>Builder)` ③ 加一个 `private static Role.Builder <id>Builder()` ✓ |
 
 ## 2. 三层模型（30 秒版）

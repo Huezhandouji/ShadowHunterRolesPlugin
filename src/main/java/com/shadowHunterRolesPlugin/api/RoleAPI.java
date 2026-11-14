@@ -3,11 +3,13 @@ package com.shadowHunterRolesPlugin.api;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 
 /**
@@ -51,6 +53,28 @@ public interface RoleAPI {
     //下游用这两个方法自行发现"有哪些角色"，而不是 import 内部类去读注册表
     Set<String> getAllRoleIds();
     List<RoleInfo> getRoles();
+
+    //事件订阅面 —— 外部只读通知
+    /**
+     * 订阅本插件的事件流：handler 将按发布顺序、同步地收到本插件发布的每一个事件
+     * （现有事件见 {@code api/event} 包：{@code RoleSetEvent} / {@code RoleClearEvent} /
+     * {@code RoleDeathEvent}，均为只读事件；未来新增的事件同样送达，订阅方按具体子类型自行分派）。
+     *
+     * <p><b>分发语义</b>（可依赖的合约）：按订阅顺序同步分发；单个 handler 抛出任意异常只记日志、
+     * 不影响其余订阅者（一个坏订阅者不得饿死别人）；handler 在回调中退订不影响本次分发（快照迭代）。
+     *
+     * <p><b>不走 Bukkit 事件系统</b>：这些事件虽继承 Bukkit 的 {@code Event}，但发布只走本插件的
+     * 事件总线——用 {@code @EventHandler} 挂 Bukkit 监听器收不到，订阅唯一入口是本方法。
+     *
+     * <p><b>线程契约</b>：订阅与分发都约定在服务器主线程。
+     * <p><b>生命周期</b>：订阅不跨本插件的 disable→enable 存活——本插件重载后须重新取
+     * {@code RoleAPI} 并重新订阅（旧令牌随之作废，退订它无害）。
+     *
+     * @param handler 事件处理器（以 {@code Event} 视角收到，按子类型分派）
+     * @return 订阅令牌（幂等退订；订阅方应在自己的 onDisable 里退订）
+     * @throws IllegalArgumentException handler 为 null
+     */
+    RoleEventSubscription subscribeEvents(Consumer<Event> handler);
 
     //★ 阵营没有专用 API 成员：阵营真值与判定都在阵营组件（`roleComponent/builtin/FactionComponent`），
     //  查询与改写一律走下面的组件操作面（`executeComponentOperation` + 组件 id `faction`），

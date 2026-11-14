@@ -1,6 +1,9 @@
 package com.shadowHunterRolesPlugin.manager;
 
+import com.shadowHunterRolesPlugin.api.event.RoleClearEvent;
+import com.shadowHunterRolesPlugin.api.event.RoleSetEvent;
 import com.shadowHunterRolesPlugin.core.*;
+import com.shadowHunterRolesPlugin.internal.event.RoleEventBus;
 import com.shadowHunterRolesPlugin.platform.RolesContext;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import com.shadowHunterRolesPlugin.roleComponent.HotbarItems;
@@ -21,15 +24,24 @@ public class RoleManager {
     private final RoleRegistry roleRegistry;
 
     /**
+     * 事件总线（构造注入，主类 onEnable 创建的唯一实例）：角色状态的变更事实从这里对外发布
+     * （{@link RoleSetEvent} / {@link RoleClearEvent}；死亡事件在 PlayerListener 发布）。
+     * 管理器是"玩家 → 角色"真值的唯一所有者 ⇒ Set / Clear 的发布点收敛在这里，
+     * 所有路径（指令 / API / 换角色 / 死亡 / 掉线 / 隔离 / 停用）都经此汇入、一处不漏。
+     */
+    private final RoleEventBus eventBus;
+
+    /**
      * 故障隔离的提醒器（全服简报 + OP 详情 + 限流/去重）。
      * 由管理器持有（而不是 RoleInstance）：提醒是"对全服说一句话"，属管理器职责；
      * 且限流表需跨实例共享（同一角色反复失败时，N 秒内只播一次）。
      */
     private final QuarantineNotifier quarantineNotifier;
 
-    public RoleManager(RolesContext context, RoleRegistry roleRegistry){
+    public RoleManager(RolesContext context, RoleRegistry roleRegistry, RoleEventBus eventBus){
         this.context = context;
         this.roleRegistry = roleRegistry;
+        this.eventBus = eventBus;
         this.quarantineNotifier = new QuarantineNotifier(context);
     }
 
@@ -118,6 +130,10 @@ public class RoleManager {
 
         playerRoleMap.put(player.getUniqueId(), instance);
 
+        //装配已落地（新实例入表）才对外发布"角色已设置"——处理器里现查即得新角色；
+        //若此前有旧角色，上面 clearRole 已先行发布过 Clear(旧) ⇒ 订阅方见序 Clear(旧) → Set(新)
+        eventBus.publish(new RoleSetEvent(player.getUniqueId(), roleId));
+
         return true;
     }
     public boolean selectRole(UUID uuid, String roleId){
@@ -174,6 +190,9 @@ public class RoleManager {
         }
 
         playerRoleMap.put(player.getUniqueId(), instance);
+
+        //同 Player 重载：装配落地后发布"角色已设置"（见序与理由见上）
+        eventBus.publish(new RoleSetEvent(player.getUniqueId(), roleId));
 
         return true;
     }
@@ -233,10 +252,17 @@ public class RoleManager {
 
     //插件禁用/重载时：走 instance.clear() 逐个回收（属性修饰符、记账内的药水、热键栏、任务），不再只把 map 清空
     public void clearAllPlayersRole(){
-        for(RoleInstance instance : new ArrayList<>(playerRoleMap.values())){
-            instance.clear();
+        List<RoleClearEvent> clearedEvents = new ArrayList<>();
+        for(Map.Entry<UUID, RoleInstance> entry : new ArrayList<>(playerRoleMap.entrySet())){
+            entry.getValue().clear();
+            clearedEvents.add(new RoleClearEvent(entry.getKey(), roleIdOf(entry.getValue())));
         }
         playerRoleMap.clear();
+        //先收状态后通知（与两个 clearRole 重载同一纪律）：全部回收、map 清空之后才逐条发布，
+        //处理器里经 API 现查时状态已经一致（hasRole=false）；停用期订阅者可能已禁用 ⇒ 异常由总线隔离
+        for(RoleClearEvent cleared : clearedEvents){
+            eventBus.publish(cleared);
+        }
     }
 
     //清除玩家的角色
@@ -250,6 +276,8 @@ public class RoleManager {
  //两个重载都清物品（这一"清角色"的语义不因取 Player 的方式而变）——
  //  故三条走 UUID 的路径（换角色 / 隔离 / API 的 UUID 重载）与掉线路径都不再需要各自补清。
             HotbarItems.clearFrom(player);
+            //清除已落地（实例已摘表、资源已回收）才发布"角色已清除"——处理器里现查 hasRole 即得 false
+            eventBus.publish(new RoleClearEvent(player.getUniqueId(), roleIdOf(removed)));
             return true;
         }
         return false;
@@ -260,17 +288,23 @@ public class RoleManager {
             removed.clear();
  //清角色 ⇒ 一并清掉本系统写在热键栏里的物品（物品关注点归 roleComponent/HotbarItems）。
  //与 {@link #clearRole(Player)} 的唯一差别只是取 Player 的方式：本重载用
- //  {@code Bukkit.getPlayer(uuid)}（离线 ⇒ null ⇒ 无实体可清，跳过）。清物品这一点两个重载必须一致 ——
- //  否则三条走 UUID 的路径（换角色 / 隔离 / API 的 UUID 重载）会静默失去清理（掉线那处曾因此出现
- //  「随存档持久化的残留」）。
+ // {@code Bukkit.getPlayer(uuid)}（离线 ⇒ null ⇒ 无实体可清，跳过）。清物品这一点两个重载必须一致 ——
+ // 否则三条走 UUID 的路径（换角色 / 隔离 / API 的 UUID 重载）会静默失去清理（掉线那处曾因此出现
+ // 「随存档持久化的残留」）。
             Player online = Bukkit.getPlayer(uuid);
             if(online != null){
                 HotbarItems.clearFrom(online);
             }
+            //同 Player 重载：清除落地后发布"角色已清除"
+            eventBus.publish(new RoleClearEvent(uuid, roleIdOf(removed)));
             return true;
         }
         return false;
     }
 
+    /** 实例所持角色的登记 id；实例为空（或角色为空）回 {@code null}（事件载荷的防御性口径）。 */
+    private static String roleIdOf(RoleInstance instance) {
+        return instance == null || instance.getRole() == null ? null : instance.getRole().getId();
+    }
 
 }

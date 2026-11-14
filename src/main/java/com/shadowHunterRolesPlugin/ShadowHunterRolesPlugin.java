@@ -11,6 +11,7 @@ import com.shadowHunterRolesPlugin.config.ConfigurationManager;
 //本主类不再实现任何阵营端口、也不再持有任何阵营接线。
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.internal.api.RoleAPIImpl;
+import com.shadowHunterRolesPlugin.internal.event.RoleEventBus;
 import com.shadowHunterRolesPlugin.listener.*;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.platform.BukkitSchedulerAdapter;
@@ -30,6 +31,7 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
     private static ShadowHunterRolesPlugin instance;
     private RoleManager roleManager;
     private RolesContext rolesContext;
+    private RoleEventBus eventBus;
 
     private RoleAPI roleAPI;
 
@@ -62,11 +64,15 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
             getLogger().severe("No role templates were registered; /role and SHDF role selection will be unavailable.");
         }
 
-        roleManager = new RoleManager(rolesContext, roleRegistry);
+        //事件总线：一个实例贯穿本次启用代次（RoleManager 发布 Set/Clear、PlayerListener 发布 Death、
+        //RoleAPI 对外订阅都走它）；订阅不跨 disable→enable 存活（onDisable 清空，见下）
+        eventBus = new RoleEventBus();
+
+        roleManager = new RoleManager(rolesContext, roleRegistry, eventBus);
 
         //RoleAPI 的构造在指令注册之前 —— 组件操作面的指令面要直接调公开 API
         //（服务表注册仍在下面原处，两者顺序对下游无影响）
-        roleAPI = new RoleAPIImpl(roleManager, roleRegistry);
+        roleAPI = new RoleAPIImpl(roleManager, roleRegistry, eventBus);
 
         PluginCommand roleCommand = getCommand("role");
         if(roleCommand == null){
@@ -82,7 +88,7 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         //（拉弓 / 装填 / 击发），系统只在箭矢离弦那一刻派发 onShoot；左键与 Q 则照技能家族口径派发 onCast。
         //三条管道按各自的识别键判物，互不认领对方的物品。
         Bukkit.getPluginManager().registerEvents(new BowWeaponListener(roleManager, rolesContext), this);
-        Bukkit.getPluginManager().registerEvents(new PlayerListener(roleManager), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerListener(roleManager, eventBus), this);
         Bukkit.getPluginManager().registerEvents(new DamageTrackerListener(), this);
         //战斗状态框架（2026-10-31）：被敌方攻击/被方块伤害/持续伤害 的伤害侧规则
         //  注册在 DamageTrackerListener 之后：CUSTOM 插件伤害的归属回退要读它写好的 last_damager
@@ -110,7 +116,13 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
     public void onDisable() {
 
         if(roleManager != null){
+            //先清角色（逐实例回收 + 发布 Clear 事件），再清订阅——顺序不可倒：
+            //清角色路径上的事件应当送达仍在订阅的一方，之后本插件停用、订阅随之作废
             roleManager.clearAllPlayersRole();
+        }
+
+        if(eventBus != null){
+            eventBus.unsubscribeAll();
         }
 
 

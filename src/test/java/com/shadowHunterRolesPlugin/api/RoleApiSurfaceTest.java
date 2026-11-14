@@ -41,6 +41,9 @@ public class RoleApiSurfaceTest {
             "boolean hasRole(java.util.UUID)",
             "boolean isValidRoleId(java.lang.String)",
             "boolean setPlayerRole(java.util.UUID,java.lang.String)",
+            //2026-11-10 事件订阅面（只增）：外部经 Consumer<Event> 订阅本插件的只读事件流
+            //（RoleSetEvent / RoleClearEvent / RoleDeathEvent，见 api/event 包）
+            "com.shadowHunterRolesPlugin.api.RoleEventSubscription subscribeEvents(java.util.function.Consumer)",
             "java.lang.String executeComponentOperation(java.util.UUID,java.lang.String,java.lang.String)",
             "java.lang.String getPlayerRoleId(java.util.UUID)",
             "java.util.List getRoleDescription(java.lang.String)",

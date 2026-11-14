@@ -2,10 +2,12 @@ package com.shadowHunterRolesPlugin.internal.api;
 import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
 
 import com.shadowHunterRolesPlugin.api.RoleAPI;
+import com.shadowHunterRolesPlugin.api.RoleEventSubscription;
 import com.shadowHunterRolesPlugin.api.RoleInfo;
 import com.shadowHunterRolesPlugin.core.util.DamageUtil;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
+import com.shadowHunterRolesPlugin.internal.event.RoleEventBus;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.registry.RoleRegistry;
 import com.shadowHunterRolesPlugin.roleComponent.OperationProvider;
@@ -13,21 +15,25 @@ import com.shadowHunterRolesPlugin.roleComponent.RoleComponent;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public class RoleAPIImpl implements RoleAPI {
 
     private final RoleManager roleManager;
     private final RoleRegistry registry;
+    private final RoleEventBus eventBus;
 
-    public RoleAPIImpl(RoleManager roleManager, RoleRegistry registry){
+    public RoleAPIImpl(RoleManager roleManager, RoleRegistry registry, RoleEventBus eventBus){
         this.roleManager = roleManager;
         this.registry = registry;
+        this.eventBus = eventBus;
     }
 
     @Override
@@ -124,6 +130,19 @@ public class RoleAPIImpl implements RoleAPI {
 
 
 
+
+    // ───────── 事件订阅面（外部只读通知） ─────────
+
+    /**
+     * 唯一的对外订阅入口：转发到本插件的事件总线（实现件 {@link RoleEventBus}，语义见其类注）。
+     * <p><b>订阅键取 {@code Event} 根</b>：兑现 API javadoc 的承诺——"本插件发布的所有事件"都送达，
+     * 未来新增非 {@code RoleEvent} 子类的事件时也不会漏发。
+     * <p>不持状态、不缓存；handler 为 null 由总线拒绝（IllegalArgumentException，见 API javadoc）。
+     */
+    @Override
+    public RoleEventSubscription subscribeEvents(Consumer<Event> handler) {
+        return eventBus.subscribe(Event.class, handler)::unsubscribe;
+    }
 
     //★ 阵营没有专用 API 成员：真值与判定都在阵营组件（`roleComponent/builtin/FactionComponent`），
     //  查询与改写一律走下面的组件操作面（`executeComponentOperation` + 组件 id `faction`），

@@ -2,7 +2,6 @@ package com.shadowHunterRolesPlugin.api;
 
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
-import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
@@ -22,12 +21,6 @@ import java.util.function.Consumer;
  * 因此本接口不提供"读/写某玩家阵营"与"两玩家是否敌对"的专用方法。
  */
 public interface RoleAPI {
-
-    //不建议使用所有以Player类型作参数的api
-
-    //通过特殊设置的pdc查询最后攻击者
-    UUID getLastDamagerUuid(Player player);
-    Player getLastDamager(Player player);
 
     //查询一个角色id是否存在，即这个角色是否被实现
     boolean isValidRoleId(String id);

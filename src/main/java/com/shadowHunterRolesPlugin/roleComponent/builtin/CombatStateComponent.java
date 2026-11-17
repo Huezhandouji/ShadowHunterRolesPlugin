@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li><b>通过技能给敌人附加状态 ⇒ 进入战斗</b>：{@code BuffComponent} 施加 buff / 原版药水
  *       到敌对目标成功时，刷新施术者（与被施加者）—— 见 {@link #refreshFor(UUID)}；</li>
  *   <li><b>受到敌方攻击 ⇒ 进入战斗</b>：{@code listener/CombatStateListener} 在伤害事件里
- *       解析敌方玩家（直接 / 弹射物 / 插件伤害的 last_damager），刷新双方；</li>
+ *       解析敌方玩家（直接 / 弹射物 / 插件伤害的原版 killer 回退），刷新双方；</li>
  *   <li><b>被伤害性方块伤害 ⇒ 不进入战斗，改为进入回血间隔期</b>：
  *       监听器对 {@code EntityDamageByBlockEvent} 与方块类伤害原因走
  *       {@link #beginHealingIntervalFor(UUID)}（{@value #HEALING_INTERVAL_TICKS} 刻 = 3 秒）；</li>

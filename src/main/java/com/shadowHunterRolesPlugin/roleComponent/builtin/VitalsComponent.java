@@ -49,7 +49,7 @@ import java.util.function.Consumer;
  * 「玩家被玩家击杀」也由本组件广播（见 {@link #addPlayerKilledListener(RoleComponent, Consumer)}）：
  * 本组件是"死亡"这条链的终点（生命的唯一写入者），而**要发增益的是击杀者** ⇒ 投递对象 =
  * **击杀者那一侧的**本组件。检测与投递写在 {@code listener/hook/PlayerKilledHookListener}
- * （击杀者经 {@link DamageUtil#getLastDamager(Player)} 定出）；本组件只持有名单与载荷。
+ * （击杀者经原版 {@code LivingEntity#getKiller()} 定出）；本组件只持有名单与载荷。
  */
 public class VitalsComponent extends RoleComponent {
 
@@ -548,8 +548,8 @@ public class VitalsComponent extends RoleComponent {
      *
      * <h2>字段口径</h2>
      * <ul>
-     *   <li>{@code killer} —— 由 {@link DamageUtil#getLastDamager(Player)} 定出的击杀者
-     *       （**不是**原版 {@code getKiller()}：本系统一部分伤害绕过原版事件，只有那条 PDC 覆盖两侧）；</li>
+     *   <li>{@code killer} —— 原版 {@code getKiller()} 定出的击杀者（本系统无来源伤害由
+     *       {@code DamageUtil} 施加前用 {@code setKiller} 补写，原版玩家伤害原版自己会记）；</li>
      *   <li>{@code victim} —— 死者（{@code PlayerDeathEvent} 的承受方，取值时其角色实例尚未被清）；</li>
      *   <li>{@code killerRoleId} —— 击杀者当时所装角色的登记 id（如 {@code "red"}）；</li>
      *   <li>{@code victimRoleId} —— 被杀者当时所装角色的 id；被杀者当时**没有**角色则为 {@code null}。</li>
@@ -579,7 +579,7 @@ public class VitalsComponent extends RoleComponent {
             this.victimRoleId = victimRoleId;
         }
 
-        /** 击杀者（经 {@link DamageUtil#getLastDamager(Player)} 定出，非原版 {@code getKiller()}）。 */
+        /** 击杀者（原版 {@code getKiller()} 定出，本系统无来源伤害由 {@code DamageUtil} 补写）。 */
         public Player getKiller() {
             return killer;
         }

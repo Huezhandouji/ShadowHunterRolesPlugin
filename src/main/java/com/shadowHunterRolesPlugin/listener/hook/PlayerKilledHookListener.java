@@ -1,7 +1,6 @@
 package com.shadowHunterRolesPlugin.listener.hook;
 
 import com.shadowHunterRolesPlugin.core.RoleInstance;
-import com.shadowHunterRolesPlugin.core.util.DamageUtil;
 import com.shadowHunterRolesPlugin.manager.RoleManager;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.VitalsComponent;
 import org.bukkit.entity.Player;
@@ -26,7 +25,9 @@ import org.bukkit.event.entity.PlayerDeathEvent;
  * <h2>投递路径（不得绕开）</h2>
  * <pre>
  *   PlayerDeathEvent → 早退（被杀者已在监听器里限定为 Player）
- *      → 击杀者 = {@link DamageUtil#getLastDamager(Player)}（**非**原版 getKiller）
+ *      → 击杀者 = 原版 {@code LivingEntity#getKiller()}
+ *        （本系统无来源伤害由 {@code DamageUtil} 在施加前用 {@code setKiller} 补写；
+ *         原版玩家伤害 —— 直接命中与玩家射出的弹射物 —— 原版结算自己会记）
  *      → 早退：无击杀者 / 自杀（killer == victim）/ 击杀者无角色实例
  *      → 取击杀者实例里的生命组件（按它自己的登记 id {@link VitalsComponent#ID}）
  *      → 构造 {@link VitalsComponent.PlayerKilledEvent}（两个玩家 + 两个角色 id）
@@ -46,11 +47,10 @@ import org.bukkit.event.entity.PlayerDeathEvent;
  *   <li><b>被杀者可以无角色</b>：此时 {@code getVictimRoleId()} 为 {@code null}，事件照常产生。</li>
  *   <li><b>不做敌对 / 阵营过滤</b>：误伤、同阵营互杀同样产生事件 —— 要不要计由订阅者自己判
  *       （与外部消费方 {@code SHDFGamePlugin} 把过滤放在自己的 DeathHandler 里同源）。</li>
- *   <li><b>击杀归属继承 {@link DamageUtil#getLastDamager} 的已知边界</b>：那条 PDC 在死亡时不清
- *       ⇒ 死在怪物 / 环境手里时可能读到本命里上一次的玩家伤害者。本类不补这件事 ——
- *       补了就是动既有记账口径，且会让 {@code RoleAPI#getLastDamagerUuid} 的语义跟着变。
- *       （弹射物击杀曾同属这条边界，写账侧已按 {@code Projectile#getShooter} 归属到射手入账，
- *       见 {@code DamageTrackerListener}。）</li>
+ *   <li><b>击杀归属是原版 {@code getKiller()} 语义</b>：原版只在最后一次被玩家伤害后的
+ *       100 tick 内记住击杀者 ⇒ 死在怪物 / 环境手里、且距上一次玩家伤害超过 5 秒时读到
+ *       {@code null}（旧 PDC 口径"永不过期、可能读到本命里上一次的玩家伤害者"的边界随之消失）。
+ *       弹射物按原版伤害源归属到射手。</li>
  * </ul>
  */
 public class PlayerKilledHookListener implements Listener {
@@ -66,7 +66,7 @@ public class PlayerKilledHookListener implements Listener {
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player victim = event.getEntity();
 
-        Player killer = DamageUtil.getLastDamager(victim);
+        Player killer = victim.getKiller();
         if (killer == null || killer.equals(victim)) {
             return;     // 无击杀者（怪物 / 环境 / 离线）：不该产生击杀事件；自杀同理（不给自己发"击杀"）
         }

@@ -4,7 +4,6 @@ import com.shadowHunterRolesPlugin.core.component.ComponentRegistry;
 import com.shadowHunterRolesPlugin.api.RoleAPI;
 import com.shadowHunterRolesPlugin.api.RoleEventSubscription;
 import com.shadowHunterRolesPlugin.api.RoleInfo;
-import com.shadowHunterRolesPlugin.core.util.DamageUtil;
 import com.shadowHunterRolesPlugin.core.Role;
 import com.shadowHunterRolesPlugin.core.RoleInstance;
 import com.shadowHunterRolesPlugin.internal.event.RoleEventBus;
@@ -35,16 +34,6 @@ public class RoleAPIImpl implements RoleAPI {
         this.registry = registry;
         this.eventBus = eventBus;
     }
-
-    @Override
-    public UUID getLastDamagerUuid(Player player) {
-        return DamageUtil.getLastDamagerUUID(player);
-    }
-    @Override
-    public Player getLastDamager(Player player) {
-        return DamageUtil.getLastDamager(player);
-    }
-
 
     @Override
     public boolean isValidRoleId(String id) {

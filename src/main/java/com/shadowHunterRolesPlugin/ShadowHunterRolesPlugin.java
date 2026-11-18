@@ -89,9 +89,8 @@ public final class ShadowHunterRolesPlugin extends JavaPlugin {
         //三条管道按各自的识别键判物，互不认领对方的物品。
         Bukkit.getPluginManager().registerEvents(new BowWeaponListener(roleManager, rolesContext), this);
         Bukkit.getPluginManager().registerEvents(new PlayerListener(roleManager, eventBus), this);
-        Bukkit.getPluginManager().registerEvents(new DamageTrackerListener(), this);
         //战斗状态框架（2026-10-31）：被敌方攻击/被方块伤害/持续伤害 的伤害侧规则
-        //  注册在 DamageTrackerListener 之后：CUSTOM 插件伤害的归属回退要读它写好的 last_damager
+        //  CUSTOM 插件伤害的归属回退读原版 getKiller（DamageUtil 在施加无来源伤害前已用 setKiller 补写）
         Bukkit.getPluginManager().registerEvents(new CombatStateListener(), this);
         Bukkit.getPluginManager().registerEvents(new RoleEventListener(), this);
         //受伤 / 受治疗的平台事件面（钩子投递；ignoreCancelled、只读不取消）

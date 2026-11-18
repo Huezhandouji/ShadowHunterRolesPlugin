@@ -22,7 +22,7 @@ import org.bukkit.event.entity.EntityRegainHealthEvent;
  *   <li><b>{@code ignoreCancelled = true}</b> —— 被取消的事件没有真的发生，不算"受伤 / 受治疗"
  *       （否则会在"伤害被挡下"时误报回调）。</li>
  *   <li><b>只读不取消</b> —— 本监听器绝不 {@code setCancelled}、绝不改 {@code getDamage()}，
- *       与既有 {@code DamageTrackerListener} 同形态（只做记账）。</li>
+ *       只做通知，不改任何结算状态。</li>
  * </ul>
  *
  * <h2>投递路径（不得绕开）</h2>

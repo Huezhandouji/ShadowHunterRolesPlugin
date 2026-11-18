@@ -1,9 +1,7 @@
 package com.shadowHunterRolesPlugin.listener;
 
-import com.shadowHunterRolesPlugin.core.util.DamageUtil;
 import com.shadowHunterRolesPlugin.platform.FactionManager;
 import com.shadowHunterRolesPlugin.roleComponent.builtin.CombatStateComponent;
-import org.bukkit.Bukkit;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
@@ -41,15 +39,16 @@ import java.util.UUID;
  *   <li>优先读 Paper {@link DamageSource} 的 causing / direct entity（弹射物按射手归属）；</li>
  *   <li>其次读 {@link EntityDamageByEntityEvent} 的 damager（弹射物再按射手归属）；</li>
  *   <li>最后：<b>插件主动伤害</b>走 {@code victim.damage(...)}，事件里没有伤害实体，但
- *       {@code DamageUtil} 会先把 last_damager 写进 PDC ⇒ 仅在 {@code DamageCause.CUSTOM} 时回退读它
- *       （其余自然伤害原因不读，避免旧 PDC 造成误刷新）。</li>
+ *       {@code DamageUtil} 在施加前已用 {@code setKiller} 补写击杀归属 ⇒ 仅在
+ *       {@code DamageCause.CUSTOM} 时回退读原版 {@code getKiller()}
+ *       （其余自然伤害原因不读，避免陈旧归属造成误刷新）。</li>
  * </ul>
  *
  * <h2>边界（如实申报）</h2>
  * <ul>
  *   <li>非玩家承伤者直接早退（与 {@code DamageHookListener} 同口径）；</li>
  *   <li>被取消的伤害不刷新（{@code ignoreCancelled = true}：取消 = 没有真的发生）；</li>
- *   <li>插件周期性物伤若走 {@code DamageUtil.dealtPhysicalDamage}，会以 CUSTOM 事件按 last_damager 刷新 ——
+ *   <li>插件周期性物伤若走 {@code DamageUtil.dealtPhysicalDamage}，会以 CUSTOM 事件按原版 killer 回退刷新 ——
  *       长时段跳伤请改用真伤（{@code dealtTrueDamage}，走 setHealth、不产生伤害事件）；</li>
  *   <li>THORNS / 环境爆炸等间接来源：能解析到敌方玩家就刷新，解析不到就静默跳过。</li>
  * </ul>
@@ -183,12 +182,9 @@ public class CombatStateListener implements Listener {
         return null;
     }
 
-    /** 插件主动伤害的归属回退：{@code DamageUtil} 已把"最后伤害者"写进 PDC（仅 CUSTOM 原因使用）。 */
+    /** 插件主动伤害的归属回退：读原版 {@code getKiller()} —— {@code DamageUtil} 施加无来源伤害前
+     *  已用 {@code setKiller} 补写好击杀归属（仅 CUSTOM 原因使用）。 */
     private static Player resolvePluginAttacker(Player victim) {
-        UUID lastDamager = DamageUtil.getLastDamagerUUID(victim);
-        if (lastDamager == null) {
-            return null;
-        }
-        return Bukkit.getPlayer(lastDamager);
+        return victim.getKiller();
     }
 }

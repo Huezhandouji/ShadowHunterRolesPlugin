@@ -29,9 +29,9 @@ import java.util.logging.Logger;
  * </ul>
  *
  * <h2>为什么挂 {@link VitalsComponent}，而不是自己听 {@code PlayerDeathEvent}</h2>
- * 「谁杀的」这条链的**终点与唯一口径**都在生命组件：击杀者由
- * {@code DamageUtil.getLastDamager} 定出（不是原版 {@code getKiller()} —— 本系统一部分伤害绕过
- * 原版事件），且投递**只发到击杀者那一侧**的实例（见 {@code listener/hook/PlayerKilledHookListener}）。
+ * 「谁杀的」这条链的**终点与唯一口径**都在生命组件：击杀者由原版
+ * {@code getKiller()} 定出（本系统无来源伤害由 {@code DamageUtil} 施加前用 {@code setKiller} 补写），
+ * 且投递**只发到击杀者那一侧**的实例（见 {@code listener/hook/PlayerKilledHookListener}）。
  * 因此在 {@code start()} 里订阅本实例自己的击杀名单，"杀人就进化"就已经完整成立：
  * 自杀 / 无击杀者 / 击杀者无角色 / 非玩家击杀这些边界全由那条链处理，本类一条都不必重写。
  *
